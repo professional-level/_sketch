@@ -18,11 +18,10 @@ import kotlin.test.Test
 @SpringBootTest
 class SketchControllerTest(
     @Autowired val webClient: WebClient,
-    @Autowired val env: EnvironmentProperty,
 ) {
-    val APP_KEY = env.APP_KEY
-    val APP_SECRET = env.APP_SECRET
-    val BASE_URL = env.BASE_URL
+    val APP_KEY = Property.APP_KEY
+    val APP_SECRET = Property.APP_SECRET
+    val BASE_URL = Property.BASE_URL
 
     @Test
     @DisplayName("WebClient의 get 요청이 정상적으로 수행되어야 한다.")
@@ -97,19 +96,25 @@ class WebClientConfig {
     fun webclient(): WebClient {
         return WebClient
             .builder()
-            .baseUrl("") // TODO: url binding
+            .baseUrl(Property.BASE_URL)
             .build()
     }
 }
 
 @Configuration
 @PropertySource("classpath:application-secret.properties")
-class EnvironmentProperty(
+class Property(
     env: Environment
 ) {
-    val BASE_URL = requireNotNull(env.getProperty("base_url"))
+    init {
+        BASE_URL = requireNotNull(env.getProperty("base_url"))
+        APP_KEY = requireNotNull(env.getProperty("app_key"))
+        APP_SECRET = requireNotNull(env.getProperty("app_secret"))
+    }
 
-    val APP_KEY = requireNotNull(env.getProperty("app_key"))
-
-    val APP_SECRET = requireNotNull(env.getProperty("app_secret"))
+    companion object {
+        lateinit var BASE_URL: String
+        lateinit var APP_KEY: String
+        lateinit var APP_SECRET: String
+    }
 }
