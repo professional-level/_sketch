@@ -1,6 +1,6 @@
 package com.example.stock.adapter.out.persistence
 
-import com.example.stock.domain.StockDerivative
+import com.example.stock.application.port.out.dto.StockDTO
 import jakarta.persistence.*
 
 @Entity
@@ -10,6 +10,8 @@ class StockJpaEntity(
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long,
     val name: String,
-    val price: Double,
+    val price: Int,
     val derivative: Double,
-)
+) {
+    fun toDTO(): StockDTO = StockDTO(id, name, price, derivative)
+}
