@@ -1,14 +1,12 @@
 package com.example.sketch
 
 
+import com.example.sketch.configure.Property
+import com.example.sketch.configure.RequestInfo
+import com.example.sketch.configure.requestInfo
 import org.junit.jupiter.api.DisplayName
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.context.annotation.Bean
-import org.springframework.context.annotation.Configuration
-import org.springframework.context.annotation.PropertySource
-import org.springframework.core.env.Environment
-import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.WebClient.RequestBodySpec
@@ -61,60 +59,5 @@ class SketchControllerTest(
         println(toEntity.statusCode)
         println("body:")
         println(toEntity.body)
-    }
-}
-
-enum class RequestInfo(val requestURI: String, val type: RequestType) {
-    GET_TOKEN(requestURI = "/oauth2/tokenP", type = RequestType.POST),
-    ;
-
-    fun getRequestUri() = requestURI
-    fun getRequestType() = type
-}
-
-enum class RequestType {
-    GET,
-    POST,
-    PUT,
-    DELETE,
-    OPTION,
-}
-
-fun WebClient.requestInfo(requestInfo: RequestInfo): WebClient.RequestHeadersSpec<*> {
-    return when (requestInfo.getRequestType()) {
-        RequestType.GET -> this.get().uri(requestInfo.getRequestUri())
-        RequestType.POST -> this.post().uri(requestInfo.getRequestUri()).contentType(MediaType.APPLICATION_JSON)
-        RequestType.PUT -> this.put().uri(requestInfo.getRequestUri())
-        RequestType.DELETE -> this.delete().uri(requestInfo.getRequestUri())
-        RequestType.OPTION -> this.options().uri(requestInfo.getRequestUri())
-    }
-}
-
-@Configuration
-class WebClientConfig {
-    @Bean
-    fun webclient(): WebClient {
-        return WebClient
-            .builder()
-            .baseUrl(Property.BASE_URL)
-            .build()
-    }
-}
-
-@Configuration
-@PropertySource("classpath:application-secret.properties")
-class Property(
-    env: Environment
-) {
-    init {
-        BASE_URL = requireNotNull(env.getProperty("base_url"))
-        APP_KEY = requireNotNull(env.getProperty("app_key"))
-        APP_SECRET = requireNotNull(env.getProperty("app_secret"))
-    }
-
-    companion object {
-        lateinit var BASE_URL: String
-        lateinit var APP_KEY: String
-        lateinit var APP_SECRET: String
     }
 }
