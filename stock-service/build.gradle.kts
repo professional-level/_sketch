@@ -70,6 +70,8 @@ dependencies {
     implementation("jakarta.inject:jakarta.inject-api:2.0.1")
     // jakarta
     implementation("jakarta.enterprise:jakarta.enterprise.cdi-api:3.0.0")
+    // arch unit
+    testImplementation("com.tngtech.archunit:archunit-junit5:0.23.1")
 }
 
 kotlin {
