@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 
 @WebAdapter // 명시적 annotation
-class SketchController(
+class AssembleStockInfoController(
     @Autowired private val useCase: AssembleStockInfoUseCase,
 ) {
 
