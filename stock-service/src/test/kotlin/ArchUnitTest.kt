@@ -36,7 +36,7 @@ class ArchUnitTest {
 
         rule.check(importedClasses)
     }
-    
+
     @Test
     fun `controllers should be annotated with WebAdapter`() {
         val rule = classes()

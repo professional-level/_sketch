@@ -1,4 +1,4 @@
-package com.example.stock.adapter.out.persistence
+package com.example.stock.adapter.out.persistence.entity
 
 import com.example.stock.application.port.out.dto.StockDTO
 import jakarta.persistence.*
