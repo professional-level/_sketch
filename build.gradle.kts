@@ -70,6 +70,10 @@ dependencies {
     implementation("jakarta.inject:jakarta.inject-api:2.0.1")
     // jakarta
     implementation("jakarta.enterprise:jakarta.enterprise.cdi-api:3.0.0")
+    // Caffeine Cache
+ //3.1.8
+    implementation("com.github.ben-manes.caffeine:caffeine:3.1.8")
+    implementation("org.springframework.boot:spring-boot-starter-cache")
 }
 
 kotlin {
