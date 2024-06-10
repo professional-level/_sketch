@@ -1,0 +1,2 @@
+### CACHE TEST
+GET http://localhost:8080/test/cache
