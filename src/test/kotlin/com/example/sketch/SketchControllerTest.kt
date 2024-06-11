@@ -4,19 +4,36 @@ package com.example.sketch
 import com.example.sketch.configure.Property
 import com.example.sketch.configure.RequestInfo
 import com.example.sketch.configure.requestInfo
+import com.example.sketch.sketch.CacheTestService
+import com.example.sketch.sketch.SketchController
 import org.junit.jupiter.api.DisplayName
+import org.mockito.Mockito.times
+import org.mockito.Mockito.verify
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.mock.mockito.SpyBean
+import org.springframework.boot.test.web.server.LocalServerPort
+import org.springframework.cache.CacheManager
+import org.springframework.cache.caffeine.CaffeineCache
 import org.springframework.http.ResponseEntity
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.WebClient.RequestBodySpec
 import org.springframework.web.reactive.function.client.toEntity
 import kotlin.test.Test
+import kotlin.test.assertTrue
 
-@SpringBootTest
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class SketchControllerTest(
     @Autowired val webClient: WebClient,
+//    @Autowired val sketchController: SketchController,
+    @Autowired val cacheManager: CacheManager,
 ) {
+    @SpyBean
+    lateinit var cacheTestService: CacheTestService
+
+    @LocalServerPort
+    private var port: Int = 0
+
     val APP_KEY = Property.APP_KEY
     val APP_SECRET = Property.APP_SECRET
     val BASE_URL = Property.BASE_URL
@@ -40,7 +57,6 @@ class SketchControllerTest(
     @DisplayName("접근 토큰 발급 api")
     fun postToken() {
         val info = RequestInfo.GET_TOKEN
-
         val requestBody = mapOf(
             "grant_type" to "client_credentials",
             "appkey" to APP_KEY,
@@ -59,5 +75,34 @@ class SketchControllerTest(
         println(toEntity.statusCode)
         println("body:")
         println(toEntity.body)
+    }
+
+    @Test
+    @DisplayName("내부 캐시 테스트")
+    fun internalCacheTest() {
+        // 첫 번째 호출
+        val firstResponse = webClient
+            .get()
+            .uri("http://localhost:$port/test/cache")
+            .retrieve()
+            .bodyToMono(String::class.java)
+            .block()
+        // 첫 번째 호출 시 서비스 메서드가 호출되었는지 확인
+        verify(cacheTestService, times(1)).testCache()
+
+        // Cache 상태 확인
+        val cache = cacheManager.getCache("authentication") as CaffeineCache
+        val cacheValue = cache.nativeCache.getIfPresent("api_tokens")
+        assertTrue(cacheValue != null && cacheValue == "Cache Test")
+
+        // 두 번째 호출
+        val secondResponse = webClient.get()
+            .uri("http://localhost:$port/test/cache")
+            .retrieve()
+            .bodyToMono(String::class.java)
+            .block()
+
+        // 두 번째 호출 시 서비스 메서드가 호출되지 않아야 함
+        verify(cacheTestService, times(1)).testCache()
     }
 }
