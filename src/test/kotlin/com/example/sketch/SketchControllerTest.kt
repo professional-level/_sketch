@@ -7,6 +7,7 @@ import com.example.sketch.configure.requestInfo
 import com.example.sketch.sketch.CacheTestService
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.DisplayName
 import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
@@ -55,6 +56,7 @@ class SketchControllerTest(
     }
 
     @Test
+    @Disabled("토큰 요청 api 제한 때문에 disabled 처리")
     @DisplayName("접근 토큰 발급 api")
     fun postToken() {
         val info = RequestInfo.GET_TOKEN
@@ -133,5 +135,4 @@ class SketchControllerTest(
     fun getSpecificField(jsonNode: JsonNode, fieldName: String): String? {
         return jsonNode.path(fieldName).asText()
     }
-
 }
