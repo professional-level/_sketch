@@ -5,7 +5,8 @@ import com.example.sketch.configure.Property
 import com.example.sketch.configure.RequestInfo
 import com.example.sketch.configure.requestInfo
 import com.example.sketch.sketch.CacheTestService
-import com.example.sketch.sketch.SketchController
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.DisplayName
 import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
@@ -105,4 +106,32 @@ class SketchControllerTest(
         // 두 번째 호출 시 서비스 메서드가 호출되지 않아야 함
         verify(cacheTestService, times(1)).testCache()
     }
+
+    @Test
+    @DisplayName("json response parsing Test")
+    fun jsonParingTest() {
+        val result =
+            "{\"access_token\":\"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJ0b2tlbiIsImF1ZCI6IjVmM2RmMjc1LTUxMjgtNDYwZi05ZmQyLTc1MTQ2ZjUzOTAyMSIsInByZHRfY2QiOiIiLCJpc3MiOiJ1bm9ndyIsImV4cCI6MTcxODI4ODYzMCwiaWF0IjoxNzE4MjAyMjMwLCJqdGkiOiJQUzl0WHdqRVh1Y0VQVXRkZlhhaHNyazdmZnl2eXFWZFMwOW8ifQ.0ICIdzoxKbHKWcEHBVwd16vkGMWrvphcvWw711lWiGevtbliBaLDpev6KWeUYL05xXXH6MdzabVFKeIwyiuEKw\",\"access_token_token_expired\":\"2024-06-13 23:23:50\",\"token_type\":\"Bearer\",\"expires_in\":86400}"
+        val jsonResponse = ResponseEntity.ok().body(result)
+        val jsonNode = parseJsonResponse(jsonResponse)
+
+        assertTrue(jsonNode.get("access_token") != null)
+        assertTrue(jsonNode.get("access_token").textValue().startsWith("eyJ0e"))
+
+        assertTrue(getSpecificField(jsonNode, "access_token")!!.startsWith("eyJ0e"))
+    }
+
+    fun parseJsonResponse(response: ResponseEntity<String>): JsonNode {
+        return parseJsonString(response.body)
+    }
+
+    private fun parseJsonString(value: String?): JsonNode {
+        val objectMapper = ObjectMapper()
+        return objectMapper.readTree(value)
+    }
+
+    fun getSpecificField(jsonNode: JsonNode, fieldName: String): String? {
+        return jsonNode.path(fieldName).asText()
+    }
+
 }
