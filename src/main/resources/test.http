@@ -83,5 +83,7 @@ GET {{base}}?name=ChangedName
 
 
 ### TOKEN
-
 POST https://openapi.koreainvestment.com:9443/oauth2/revokeP
+
+### CACHE TEST
+GET {{base}}

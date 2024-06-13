@@ -1,6 +1,5 @@
 package com.example.sketch
 
-
 import com.example.sketch.configure.Property
 import com.example.sketch.configure.RequestInfo
 import com.example.sketch.configure.requestInfo
@@ -30,6 +29,8 @@ class SketchControllerTest(
 //    @Autowired val sketchController: SketchController,
     @Autowired val cacheManager: CacheManager,
 ) {
+    val objectMapper = ObjectMapper()
+
     @SpyBean
     lateinit var cacheTestService: CacheTestService
 
@@ -43,12 +44,13 @@ class SketchControllerTest(
     @Test
     @DisplayName("WebClient의 get 요청이 정상적으로 수행되어야 한다.")
     fun getGoogleApi() {
-        val toEntity: ResponseEntity<String> = webClient
-            .get()
-            .uri("https://google.com")
-            .retrieve()
-            .toEntity<String>()
-            .block()!!
+        val toEntity: ResponseEntity<String> =
+            webClient
+                .get()
+                .uri("https://google.com")
+                .retrieve()
+                .toEntity<String>()
+                .block()!!
         println("status:")
         println(toEntity.statusCode)
         println("body:")
@@ -60,19 +62,25 @@ class SketchControllerTest(
     @DisplayName("접근 토큰 발급 api")
     fun postToken() {
         val info = RequestInfo.GET_TOKEN
-        val requestBody = mapOf(
-            "grant_type" to "client_credentials",
-            "appkey" to APP_KEY,
-            "appsecret" to APP_SECRET,
-        ) // TODO: body 값 building을 좀 더 객체로써 만들어야 함
+        val requestBody =
+            mapOf(
+                "grant_type" to "client_credentials",
+                "appkey" to APP_KEY,
+                "appsecret" to APP_SECRET,
+            ) // TODO: body 값 building을 좀 더 객체로써 만들어야 함
 
-        val toEntity: ResponseEntity<String> = (WebClient
-            .builder().baseUrl(BASE_URL).build() // TODO: baseUrl을 매핑하는 구조 고민 해봐야 함
-            .requestInfo(info) as RequestBodySpec) // TODO: as RequestBodySpec 이 부분을 고민해야함
-            .bodyValue(requestBody)
-            .retrieve()
-            .toEntity<String>()
-            .block()!!
+        val toEntity: ResponseEntity<String> =
+            (
+                WebClient
+                    .builder()
+                    .baseUrl(BASE_URL)
+                    .build() // TODO: baseUrl을 매핑하는 구조 고민 해봐야 함
+                    .requestInfo(info) as RequestBodySpec
+            ) // TODO: as RequestBodySpec 이 부분을 고민해야함
+                .bodyValue(requestBody)
+                .retrieve()
+                .toEntity<String>()
+                .block()!!
 
         println("status:")
         println(toEntity.statusCode)
@@ -84,12 +92,13 @@ class SketchControllerTest(
     @DisplayName("내부 캐시 테스트")
     fun internalCacheTest() {
         // 첫 번째 호출
-        val firstResponse = webClient
-            .get()
-            .uri("http://localhost:$port/test/cache")
-            .retrieve()
-            .bodyToMono(String::class.java)
-            .block()
+        val firstResponse =
+            webClient
+                .get()
+                .uri("http://localhost:$port/test/cache")
+                .retrieve()
+                .bodyToMono(String::class.java)
+                .block()
         // 첫 번째 호출 시 서비스 메서드가 호출되었는지 확인
         verify(cacheTestService, times(1)).testCache()
 
@@ -99,11 +108,13 @@ class SketchControllerTest(
         assertTrue(cacheValue != null && cacheValue == "Cache Test")
 
         // 두 번째 호출
-        val secondResponse = webClient.get()
-            .uri("http://localhost:$port/test/cache")
-            .retrieve()
-            .bodyToMono(String::class.java)
-            .block()
+        val secondResponse =
+            webClient
+                .get()
+                .uri("http://localhost:$port/test/cache")
+                .retrieve()
+                .bodyToMono(String::class.java)
+                .block()
 
         // 두 번째 호출 시 서비스 메서드가 호출되지 않아야 함
         verify(cacheTestService, times(1)).testCache()
@@ -122,17 +133,18 @@ class SketchControllerTest(
 
         assertTrue(getSpecificField(jsonNode, "access_token")!!.startsWith("eyJ0e"))
     }
-
-    fun parseJsonResponse(response: ResponseEntity<String>): JsonNode {
-        return parseJsonString(response.body)
-    }
-
-    private fun parseJsonString(value: String?): JsonNode {
-        val objectMapper = ObjectMapper()
-        return objectMapper.readTree(value)
-    }
-
-    fun getSpecificField(jsonNode: JsonNode, fieldName: String): String? {
-        return jsonNode.path(fieldName).asText()
-    }
 }
+
+fun parseJsonResponse(response: ResponseEntity<String>): JsonNode = parseJsonString(response.body)
+
+// tempolary public function
+// private
+fun parseJsonString(value: String?): JsonNode {
+    val objectMapper = ObjectMapper()
+    return objectMapper.readTree(value)
+}
+
+fun getSpecificField(
+    jsonNode: JsonNode,
+    fieldName: String,
+): String? = jsonNode.path(fieldName).asText()
