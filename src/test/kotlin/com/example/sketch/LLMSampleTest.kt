@@ -7,6 +7,7 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.MediaType
 import org.springframework.web.reactive.function.client.WebClient
 import kotlin.test.Test
+import kotlin.test.assertTrue
 
 @SpringBootTest
 class LLMSampleTest(
@@ -33,6 +34,16 @@ class LLMSampleTest(
         assert(result.get("model").textValue().contains("RTX") && result.get("model").textValue().contains("4070"))
     }
 
+    @Test
+    @DisplayName("게시글에 포함된 가격 270000원을 반환해야하며, 모델의 이름 일부를 반환해야한다")
+    fun ollamaTest2() {
+        val requestBody = requestBody(item2)
+        val response = requestExecute(requestBody)
+        val result = objectMapper.readTree(parseJsonString(response.body).get("response").textValue())
+        println(result)
+        assert((result.get("price").intValue() == 270000) || (result.get("price").textValue() == "270000"))
+        assert(result.get("model").textValue().contains("RTX") && result.get("model").textValue().contains("3060"))
+    }
     private fun requestBody(value: String) =
         mapOf(
             "model" to "llama3",
