@@ -44,6 +44,17 @@ class LLMSampleTest(
         assert((result.get("price").intValue() == 270000) || (result.get("price").textValue() == "270000"))
         assert(result.get("model").textValue().contains("RTX") && result.get("model").textValue().contains("3060"))
     }
+
+    @Test
+    @DisplayName("게시글에 GPU모델 뿐만 아니라 복합적인 물품이 포함된 가격만 존재할 경우 price는 null이어야 한다")
+    fun ollamaTest3() {
+        val requestBody = requestBody(item3)
+        val response = requestExecute(requestBody)
+        val result = objectMapper.readTree(parseJsonString(response.body).get("response").textValue())
+        println(result)
+        assertTrue(result.get("price").isNull)
+    }
+
     private fun requestBody(value: String) =
         mapOf(
             "model" to "llama3",
