@@ -4,7 +4,8 @@ import com.example.sketch.configure.Property
 import com.example.sketch.configure.RequestInfo
 import com.example.sketch.configure.requestInfo
 import com.example.sketch.sketch.CacheTestService
-import com.fasterxml.jackson.databind.JsonNode
+import com.example.sketch.utils.ParseJsonResponse.getSpecificField
+import com.example.sketch.utils.ParseJsonResponse.parseJsonResponse
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.DisplayName
@@ -80,7 +81,7 @@ class SketchControllerTest(
                 .bodyValue(requestBody)
                 .retrieve()
                 .toEntity<String>()
-                .block()!!
+                .block()!! // TODO: block 구조 개선 필요
 
         println("status:")
         println(toEntity.statusCode)
@@ -130,21 +131,7 @@ class SketchControllerTest(
 
         assertTrue(jsonNode.get("access_token") != null)
         assertTrue(jsonNode.get("access_token").textValue().startsWith("eyJ0e"))
-
         assertTrue(getSpecificField(jsonNode, "access_token")!!.startsWith("eyJ0e"))
     }
 }
 
-fun parseJsonResponse(response: ResponseEntity<String>): JsonNode = parseJsonString(response.body)
-
-// tempolary public function
-// private
-fun parseJsonString(value: String?): JsonNode {
-    val objectMapper = ObjectMapper()
-    return objectMapper.readTree(value)
-}
-
-fun getSpecificField(
-    jsonNode: JsonNode,
-    fieldName: String,
-): String? = jsonNode.path(fieldName).asText()
