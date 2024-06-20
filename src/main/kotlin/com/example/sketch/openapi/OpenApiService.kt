@@ -1,4 +1,4 @@
-package com.example.sketch.sketch
+package com.example.sketch.openapi
 
 import com.example.sketch.configure.Property.Companion.APP_KEY
 import com.example.sketch.configure.Property.Companion.APP_SECRET
@@ -9,27 +9,23 @@ import com.example.sketch.utils.ParseJsonResponse.parseJsonResponse
 import kotlinx.coroutines.reactor.awaitSingleOrNull
 import org.springframework.cache.annotation.Cacheable
 import org.springframework.http.ResponseEntity
-import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RestController
+import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.WebClient.RequestBodySpec
 import org.springframework.web.reactive.function.client.toEntity
 
-@RequestMapping("/open-api")
-@RestController
-class OpenApiController {
+@Service
+class OpenApiService {
     @Cacheable(cacheNames = ["authentication"], key = "'api_token'")
-    @PostMapping("/token")
-    suspend fun login(): TokenResponse { // TODO: java와의 호환성을 위해 Mono타입으로 변경 필요, suspend 제거
-        val info = RequestInfo.GET_TOKEN
-        val requestBody =
+    suspend fun getToken(
+        info: RequestInfo = RequestInfo.GET_TOKEN,
+        requestBody: Map<String, String> =
             mapOf(
                 "grant_type" to "client_credentials",
                 "appkey" to APP_KEY,
                 "appsecret" to APP_SECRET,
-            ) // TODO: body 값 building을 좀 더 객체로써 만들어야 함
-
+            ),
+    ): TokenResponse {
         val toEntity: ResponseEntity<String> =
             (
                 WebClient
@@ -53,7 +49,3 @@ class OpenApiController {
         return TokenResponse(token = accessToken)
     }
 }
-
-data class TokenResponse(
-    val token: String,
-)
