@@ -15,6 +15,3 @@ class OpenApiController(
     }
 }
 
-data class TokenResponse(
-    val token: String,
-)
