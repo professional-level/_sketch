@@ -1,7 +1,7 @@
 package com.example.sketch
 
 import com.example.sketch.configure.Property
-import com.example.sketch.configure.RequestInfo
+import com.example.sketch.configure.RequestType
 import com.example.sketch.configure.requestInfo
 import com.example.sketch.sketch.CacheTestService
 import com.example.sketch.utils.ParseJsonResponse.getSpecificField
@@ -62,7 +62,7 @@ class SketchControllerTest(
     @Disabled("토큰 요청 api 제한 때문에 disabled 처리")
     @DisplayName("접근 토큰 발급 api")
     fun postToken() {
-        val info = RequestInfo.GET_TOKEN
+        val info = RequestType.GET_TOKEN
         val requestBody =
             mapOf(
                 "grant_type" to "client_credentials",
@@ -134,4 +134,3 @@ class SketchControllerTest(
         assertTrue(getSpecificField(jsonNode, "access_token")!!.startsWith("eyJ0e"))
     }
 }
-
