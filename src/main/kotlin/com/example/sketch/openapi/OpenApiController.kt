@@ -1,5 +1,6 @@
 package com.example.sketch.openapi
 
+import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
@@ -13,5 +14,9 @@ class OpenApiController(
     suspend fun login(): TokenResponse { // TODO: java와의 호환성을 위해 Mono타입으로 변경 필요, suspend 제거
         return service.getToken()
     }
-}
 
+    @GetMapping("/current-price")
+    suspend fun getCurrentPrice(): Any { // TODO: Any -> 적확한 타입 반환
+        return service.getCurrentPrice()
+    }
+}
