@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.http.ResponseEntity
 
 object ParseJsonResponse {
-    fun parseJsonResponse(response: ResponseEntity<String>): JsonNode = parseJsonString(response.body)
+    fun parseJsonResponse(response: ResponseEntity<String>): OpenApiResponse = parseJsonString(response.body)
 
     // tempolary public function
 // private
@@ -19,3 +19,5 @@ object ParseJsonResponse {
         fieldName: String,
     ): String? = jsonNode.path(fieldName).asText()
 }
+
+typealias OpenApiResponse = JsonNode

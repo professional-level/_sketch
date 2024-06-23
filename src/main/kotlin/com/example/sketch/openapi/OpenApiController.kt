@@ -1,5 +1,6 @@
 package com.example.sketch.openapi
 
+import com.example.sketch.utils.OpenApiResponse
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
@@ -16,7 +17,7 @@ class OpenApiController(
     }
 
     @GetMapping("/current-price")
-    suspend fun getCurrentPrice(): Any { // TODO: Any -> 적확한 타입 반환
+    suspend fun getCurrentPrice(): OpenApiResponse { // TODO: OpenApiResponse -> swagger response에 정확히 반영시킬 방법
         return service.getCurrentPrice()
     }
 }

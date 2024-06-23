@@ -1,5 +1,7 @@
 package com.example.sketch.configure
 
+import com.fasterxml.jackson.core.*
+import com.fasterxml.jackson.databind.JsonNode
 import org.springframework.http.MediaType
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.util.UriComponentsBuilder
@@ -53,3 +55,4 @@ fun WebClient.requestInfo(
         HttpMethod.OPTION -> this.options().uri(uri)
     }
 }
+

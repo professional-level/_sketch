@@ -6,6 +6,7 @@ import com.example.sketch.configure.Property.Companion.BASE_URL
 import com.example.sketch.configure.RequestQueryParameter
 import com.example.sketch.configure.RequestType
 import com.example.sketch.configure.requestInfo
+import com.example.sketch.utils.OpenApiResponse
 import com.example.sketch.utils.ParseJsonResponse.parseJsonResponse
 import com.fasterxml.jackson.databind.JsonNode
 import kotlinx.coroutines.reactor.awaitSingleOrNull
@@ -55,7 +56,7 @@ class OpenApiService(
         return TokenResponse(token = accessToken)
     }
 
-    suspend fun getCurrentPrice(): JsonNode { // TODO: getToken()이 suspend이므로 문제가 전파된다. 반드시 해결 필요
+    suspend fun getCurrentPrice(): OpenApiResponse { // TODO: getToken()이 suspend이므로 문제가 전파된다. 반드시 해결 필요
         val token = applicationContext.getBean(OpenApiService::class.java).getToken().token
         /** TODO: Point 프록시 객체가 아닌 실제 메서드를 직접 호출하면 AOP가 적용되지 않아 캐싱이 동작하지 않는 문제
          self-invocation을 피하기 위해, ApplicationContext 프록시 객체를 가져와서, 메서드 호출. 고도화 필요*/
