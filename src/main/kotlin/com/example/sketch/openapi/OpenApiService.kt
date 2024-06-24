@@ -2,13 +2,11 @@ package com.example.sketch.openapi
 
 import com.example.sketch.configure.Property.Companion.APP_KEY
 import com.example.sketch.configure.Property.Companion.APP_SECRET
-import com.example.sketch.configure.Property.Companion.BASE_URL
 import com.example.sketch.configure.RequestQueryParameter
 import com.example.sketch.configure.RequestType
 import com.example.sketch.configure.requestInfo
 import com.example.sketch.utils.OpenApiResponse
 import com.example.sketch.utils.ParseJsonResponse.parseJsonResponse
-import com.fasterxml.jackson.databind.JsonNode
 import kotlinx.coroutines.reactor.awaitSingleOrNull
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.cache.annotation.Cacheable
@@ -22,6 +20,7 @@ import org.springframework.web.reactive.function.client.toEntity
 @Service
 class OpenApiService(
     @Autowired val applicationContext: ApplicationContext,
+    @Autowired val webClient: WebClient,
 ) {
     @Cacheable(cacheNames = ["authentication"], key = "'api_token'")
     suspend fun getToken(
@@ -34,13 +33,7 @@ class OpenApiService(
             ),
     ): TokenResponse {
         val toEntity: ResponseEntity<String> =
-            (
-                WebClient
-                    .builder()
-                    .baseUrl(BASE_URL) // TODO: BASE_URL을 직접 바인딩하지 않고 Webclient bean으로 갖도록 변경 필요
-                    .build()
-                    .requestInfo(info) as RequestBodySpec
-            ) // TODO: as RequestBodySpec 이 부분을 고민해야함
+            (webClient.requestInfo(info) as RequestBodySpec) // TODO: as RequestBodySpec 이 부분을 고민해야함
                 .bodyValue(requestBody)
                 .retrieve()
                 .toEntity<String>()
@@ -79,10 +72,7 @@ class OpenApiService(
                 ),
             )
         val toEntity =
-            WebClient
-                .builder()
-                .baseUrl(BASE_URL)
-                .build()
+            webClient
                 .requestInfo(info, queryParameters)
                 .headers { httpHeaders ->
                     headers.forEach { (key, value) ->
