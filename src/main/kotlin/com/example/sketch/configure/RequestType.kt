@@ -1,7 +1,6 @@
 package com.example.sketch.configure
 
 import com.fasterxml.jackson.core.*
-import com.fasterxml.jackson.databind.JsonNode
 import org.springframework.http.MediaType
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.util.UriComponentsBuilder
@@ -13,6 +12,7 @@ enum class RequestType(
 ) {
     GET_TOKEN(requestURI = "/oauth2/tokenP", type = HttpMethod.POST),
     GET_CURRENT_PRICE(requestURI = "/uapi/domestic-stock/v1/quotations/inquire-price", type = HttpMethod.GET),
+    GET_CURRENT_PRICE_OF_INVESTMENT(requestURI = "/uapi/domestic-stock/v1/quotations/inquire-investor", type = HttpMethod.GET),
     ;
 
     fun getRequestUri() = requestURI
@@ -55,4 +55,3 @@ fun WebClient.requestInfo(
         HttpMethod.OPTION -> this.options().uri(uri)
     }
 }
-

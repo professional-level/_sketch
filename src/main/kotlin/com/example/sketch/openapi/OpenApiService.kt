@@ -86,4 +86,39 @@ class OpenApiService(
         val response = parseJsonResponse(toEntity)
         return response
     }
+
+    suspend fun getCurrentPriceOfInvestment(): OpenApiResponse {
+        val token = applicationContext.getBean(OpenApiService::class.java).getToken().token
+        require(token.isNotBlank())
+        val info: RequestType = RequestType.GET_CURRENT_PRICE_OF_INVESTMENT
+        val headers =
+            mapOf(
+                "authorization" to "Bearer $token",
+                "appkey" to APP_KEY,
+                "appsecret" to APP_SECRET,
+                "tr_id" to "FHKST01010900", // 주식현재가 투자자
+            ) // TODO: Post나 Get이나 header이냐 body이냐의 차이이지 appkey와 appsecret을 map 객체를 쓰므로 통합적 관리 필요
+        val queryParameters =
+            RequestQueryParameter(
+                mapOf(
+                    // TODO: RequestQueryParameter를 일일히 넣는 것이 아니라, 고정적으로 들어갈 값은 고정으로 넣고, 동적으로 바뀌는 부분만 request 값으로 넣는 시스템 구조 필요
+                    "FID_COND_MRKT_DIV_CODE" to "J", // 주식
+                    "FID_INPUT_ISCD" to "005930", // 종목번호 6자리 ex) 삼성전자: 005930
+                ),
+            )
+        val toEntity =
+            webClient
+                .requestInfo(info, queryParameters)
+                .headers { httpHeaders ->
+                    headers.forEach { (key, value) ->
+                        httpHeaders.set(key, value)
+                    }
+                }.retrieve()
+                .toEntity<String>()
+                .awaitSingleOrNull() ?: ResponseEntity
+                .notFound()
+                .build<String>()
+        val response = parseJsonResponse(toEntity)
+        return response
+    }
 }
