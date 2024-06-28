@@ -23,7 +23,7 @@ class OpenApiService(
     @Autowired val webClient: WebClient,
 ) {
     @Cacheable(cacheNames = ["authentication"], key = "'api_token'")
-    suspend fun getToken(
+    suspend fun requestToken(
         info: RequestType = RequestType.GET_TOKEN,
         requestBody: Map<String, String> =
             mapOf(
@@ -50,11 +50,12 @@ class OpenApiService(
     }
 
     suspend fun getCurrentPrice(): OpenApiResponse { // TODO: getToken()이 suspend이므로 문제가 전파된다. 반드시 해결 필요
-        val token = applicationContext.getBean(OpenApiService::class.java).getToken().token
+        // 변화 과정을 위해 일부로 inline 하지 않음
+        val token = applicationContext.getBean(OpenApiService::class.java).requestToken().token
         /** TODO: Point 프록시 객체가 아닌 실제 메서드를 직접 호출하면 AOP가 적용되지 않아 캐싱이 동작하지 않는 문제
          self-invocation을 피하기 위해, ApplicationContext 프록시 객체를 가져와서, 메서드 호출. 고도화 필요*/
-
         require(token.isNotBlank()) // TODO: token validation 필요
+
         val info: RequestType = RequestType.GET_CURRENT_PRICE
         val headers =
             mapOf(
@@ -71,25 +72,21 @@ class OpenApiService(
                     "FID_INPUT_ISCD" to "005930", // 종목번호 6자리 ex) 삼성전자: 005930
                 ),
             )
-        val toEntity =
-            webClient
-                .requestInfo(info, queryParameters)
-                .headers { httpHeaders ->
-                    headers.forEach { (key, value) ->
-                        httpHeaders.set(key, value)
-                    }
-                }.retrieve()
-                .toEntity<String>()
-                .awaitSingleOrNull() ?: ResponseEntity
-                .notFound()
-                .build<String>()
+        val toEntity = webClient
+            .requestInfo(info, queryParameters)
+            .headers { httpHeaders ->
+                headers.forEach { (key, value) ->
+                    httpHeaders.set(key, value)
+                }
+            }.retrieve()
+            .toEntity<String>()
+            .awaitSingleOrNull() ?: ResponseEntity.notFound().build<String>()
         val response = parseJsonResponse(toEntity)
         return response
     }
 
     suspend fun getCurrentPriceOfInvestment(): OpenApiResponse {
-        val token = applicationContext.getBean(OpenApiService::class.java).getToken().token
-        require(token.isNotBlank())
+        val token = getToken()
         val info: RequestType = RequestType.GET_CURRENT_PRICE_OF_INVESTMENT
         val headers =
             mapOf(
@@ -115,10 +112,49 @@ class OpenApiService(
                     }
                 }.retrieve()
                 .toEntity<String>()
-                .awaitSingleOrNull() ?: ResponseEntity
-                .notFound()
-                .build<String>()
+                .awaitSingleOrNull() ?: ResponseEntity.notFound().build<String>()
         val response = parseJsonResponse(toEntity)
         return response
+    }
+
+    suspend fun getProgramTradeInfoPerIndividual(stockId: String, request: GetProgramTradeInfoPerIndividualRequest): OpenApiResponse {
+        val token = getToken()
+        val info: RequestType = RequestType.GET_CURRENT_PRICE_OF_INVESTMENT
+        val headers =
+            mapOf(
+                "authorization" to "Bearer $token",
+                "appkey" to APP_KEY,
+                "appsecret" to APP_SECRET,
+                "tr_id" to "FHPPG04650200", // 종목별 프로그램매매추이(일별) [국내주식-113]
+                "custtype" to "P", // 고객 타입 : 개인 P. 없어도 되는지 테스트 필요
+                /*"tr_cont" to "",   // TODO: tr_cont의 역할 check*/
+            )
+        val queryParameters = RequestQueryParameter(
+            mapOf(
+                // TODO: RequestQueryParameter를 일일히 넣는 것이 아니라, 고정적으로 들어갈 값은 고정으로 넣고, 동적으로 바뀌는 부분만 request 값으로 넣는 시스템 구조 필요
+                "FID_COND_MRKT_DIV_CODE" to "J", // 주식
+                "FID_INPUT_ISCD" to "005930", // 종목번호 6자리 ex) 삼성전자: 005930
+                "FID_INPUT_DATE_1" to request.date, // 기준일 기준일 (ex 0020240308)
+            ),
+        )
+        val toEntity =
+            webClient
+                .requestInfo(info, queryParameters)
+                .headers { httpHeaders ->
+                    headers.forEach { (key, value) ->
+                        httpHeaders.set(key, value)
+                    }
+                }.retrieve()
+                .toEntity<String>()
+                .awaitSingleOrNull() ?: ResponseEntity.notFound().build<String>()
+        val response = parseJsonResponse(toEntity)
+        return response
+        return TODO()
+    }
+
+    private suspend fun getToken(): String {
+        val token = applicationContext.getBean(OpenApiService::class.java).requestToken().token
+        require(token.isNotBlank())
+        return token
     }
 }

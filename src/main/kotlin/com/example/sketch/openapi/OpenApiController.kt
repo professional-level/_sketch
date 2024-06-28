@@ -2,6 +2,8 @@ package com.example.sketch.openapi
 
 import com.example.sketch.utils.OpenApiResponse
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.ModelAttribute
+import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
@@ -13,7 +15,7 @@ class OpenApiController(
 ) {
     @PostMapping("/token")
     suspend fun login(): TokenResponse { // TODO: java와의 호환성을 위해 Mono타입으로 변경 필요, suspend 제거
-        return service.getToken()
+        return service.requestToken()
     }
 
     @GetMapping("/current-price")
@@ -31,5 +33,28 @@ class OpenApiController(
          * - 당일 데이터는 장 종료 후 제공됩니다.
          * */
         return service.getCurrentPriceOfInvestment()
+    }
+
+    @GetMapping("/program/individual/{stockId}") // 주식현재가 투자자[v1_국내주식-012]
+    suspend fun getProgramTradeInfoPerIndividual(
+        @PathVariable("stockId") stockId: String,
+        @ModelAttribute request: GetProgramTradeInfoPerIndividualRequest,
+    ): OpenApiResponse { // TODO: 날짜를 동적으로 조회 가능 하도록 변경
+        /**
+         개요
+         국내주식 종목별 프로그램매매추이(일별) API입니다.
+         한국투자 HTS(eFriend Plus) > [0465] 종목별 프로그램 매매추이 화면(혹은 한국투자 MTS > 국내 현재가 > 기타수급 > 프로그램) 의
+         "일자별" 클릭 시 기능을 API로 개발한 사항으로,
+         해당 화면을 참고하시면 기능을 이해하기 쉽습니다.
+         * */
+        return service.getProgramTradeInfoPerIndividual(stockId, request)
+    }
+}
+
+data class GetProgramTradeInfoPerIndividualRequest(
+    val date: String,
+) {
+    fun toFormat() { // TODO: 추후 date format을 통일
+        TODO()
     }
 }

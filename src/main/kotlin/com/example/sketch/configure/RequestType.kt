@@ -1,6 +1,5 @@
 package com.example.sketch.configure
 
-import com.fasterxml.jackson.core.*
 import org.springframework.http.MediaType
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.util.UriComponentsBuilder
@@ -13,6 +12,12 @@ enum class RequestType(
     GET_TOKEN(requestURI = "/oauth2/tokenP", type = HttpMethod.POST),
     GET_CURRENT_PRICE(requestURI = "/uapi/domestic-stock/v1/quotations/inquire-price", type = HttpMethod.GET),
     GET_CURRENT_PRICE_OF_INVESTMENT(requestURI = "/uapi/domestic-stock/v1/quotations/inquire-investor", type = HttpMethod.GET),
+
+    // TODO: Intellij Hard Wrap이 안먹히는 버그...수정
+    GET_PROGRAM_TRADE_INFO_PER_INDIVIDUAL(
+        requestURI = "/uapi/domestic-stock/v1/quotations/program-trade-by-stock-daily",
+        type = HttpMethod.GET,
+    ),
     ;
 
     fun getRequestUri() = requestURI
