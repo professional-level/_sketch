@@ -1,6 +1,7 @@
 package com.example.sketch.openapi
 
 import com.example.sketch.utils.OpenApiResponse
+import com.example.sketch.utils.StringExtension.toRequestableDateFormat
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.ModelAttribute
 import org.springframework.web.bind.annotation.PathVariable
@@ -47,14 +48,14 @@ class OpenApiController(
          "일자별" 클릭 시 기능을 API로 개발한 사항으로,
          해당 화면을 참고하시면 기능을 이해하기 쉽습니다.
          * */
-        return service.getProgramTradeInfoPerIndividual(stockId, request)
+        return service.getProgramTradeInfoPerIndividual(stockId, request.toFormat())
     }
 }
 
 data class GetProgramTradeInfoPerIndividualRequest(
-    val date: String,
+    val date: String, // row date form 객체 만들어야 함.
 ) {
-    fun toFormat() { // TODO: 추후 date format을 통일
-        TODO()
+    fun toFormat(): String {
+        return date.toRequestableDateFormat()
     }
 }

@@ -117,7 +117,7 @@ class OpenApiService(
         return response
     }
 
-    suspend fun getProgramTradeInfoPerIndividual(stockId: String, request: GetProgramTradeInfoPerIndividualRequest): OpenApiResponse {
+    suspend fun getProgramTradeInfoPerIndividual(stockId: String, date: String): OpenApiResponse {
         val token = getToken()
         val info: RequestType = RequestType.GET_CURRENT_PRICE_OF_INVESTMENT
         val headers =
@@ -134,7 +134,7 @@ class OpenApiService(
                 // TODO: RequestQueryParameter를 일일히 넣는 것이 아니라, 고정적으로 들어갈 값은 고정으로 넣고, 동적으로 바뀌는 부분만 request 값으로 넣는 시스템 구조 필요
                 "FID_COND_MRKT_DIV_CODE" to "J", // 주식
                 "FID_INPUT_ISCD" to "005930", // 종목번호 6자리 ex) 삼성전자: 005930
-                "FID_INPUT_DATE_1" to request.date, // 기준일 기준일 (ex 0020240308)
+                "FID_INPUT_DATE_1" to date, // 기준일 기준일 (ex 0020240308)
             ),
         )
         val toEntity =
@@ -149,7 +149,6 @@ class OpenApiService(
                 .awaitSingleOrNull() ?: ResponseEntity.notFound().build<String>()
         val response = parseJsonResponse(toEntity)
         return response
-        return TODO()
     }
 
     private suspend fun getToken(): String {
