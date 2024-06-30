@@ -127,7 +127,6 @@ class OpenApiService(
                 "appsecret" to APP_SECRET,
                 "tr_id" to "FHPPG04650200", // 종목별 프로그램매매추이(일별) [국내주식-113]
                 "custtype" to "P", // 고객 타입 : 개인 P. 없어도 되는지 테스트 필요
-                /*"tr_cont" to "",   // TODO: tr_cont의 역할 check*/
             )
         val queryParameters = RequestQueryParameter(
             mapOf(
