@@ -5,6 +5,8 @@ import com.example.sketch.configure.Property.Companion.APP_SECRET
 import com.example.sketch.configure.RequestQueryParameter
 import com.example.sketch.configure.RequestType
 import com.example.sketch.configure.requestInfo
+import com.example.sketch.openapi.HeaderBuilder.Companion.addHeader
+import com.example.sketch.openapi.HeaderBuilder.Companion.build
 import com.example.sketch.utils.OpenApiResponse
 import com.example.sketch.utils.ParseJsonResponse.parseJsonResponse
 import kotlinx.coroutines.reactor.awaitSingleOrNull
@@ -53,7 +55,7 @@ class OpenApiService(
         // 변화 과정을 위해 일부로 inline 하지 않음
         val token = applicationContext.getBean(OpenApiService::class.java).requestToken().token
         /** TODO: Point 프록시 객체가 아닌 실제 메서드를 직접 호출하면 AOP가 적용되지 않아 캐싱이 동작하지 않는 문제
-         self-invocation을 피하기 위해, ApplicationContext 프록시 객체를 가져와서, 메서드 호출. 고도화 필요*/
+        self-invocation을 피하기 위해, ApplicationContext 프록시 객체를 가져와서, 메서드 호출. 고도화 필요*/
         require(token.isNotBlank()) // TODO: token validation 필요
 
         val info: RequestType = RequestType.GET_CURRENT_PRICE
@@ -88,13 +90,8 @@ class OpenApiService(
     suspend fun getCurrentPriceOfInvestment(): OpenApiResponse {
         val token = getToken()
         val info: RequestType = RequestType.GET_CURRENT_PRICE_OF_INVESTMENT
-        val headers =
-            mapOf(
-                "authorization" to "Bearer $token",
-                "appkey" to APP_KEY,
-                "appsecret" to APP_SECRET,
-                "tr_id" to "FHKST01010900", // 주식현재가 투자자
-            ) // TODO: Post나 Get이나 header이냐 body이냐의 차이이지 appkey와 appsecret을 map 객체를 쓰므로 통합적 관리 필요
+        val headers = HeaderBuilder.build(token = token, trId = "FHKST01010900")
+            .build() // 주식현재가 투자자 //TODO: trId를 RequestType에 종속 시켜야 함.
         val queryParameters =
             RequestQueryParameter(
                 mapOf(
@@ -120,14 +117,11 @@ class OpenApiService(
     suspend fun getProgramTradeInfoPerIndividual(stockId: String, date: String): OpenApiResponse {
         val token = getToken()
         val info: RequestType = RequestType.GET_CURRENT_PRICE_OF_INVESTMENT
-        val headers =
-            mapOf(
-                "authorization" to "Bearer $token",
-                "appkey" to APP_KEY,
-                "appsecret" to APP_SECRET,
-                "tr_id" to "FHPPG04650200", // 종목별 프로그램매매추이(일별) [국내주식-113]
-                "custtype" to "P", // 고객 타입 : 개인 P. 없어도 되는지 테스트 필요
-            )
+        val headers = HeaderBuilder
+            .build(token = token, trId = "FHPPG04650200") // 종목별 프로그램매매추이(일별) [국내주식-113]
+            .addHeader(HeaderBuilder.HeaderKey.CUSTOMER_TYPE, "P") // 고객 타입 : 개인 P. 없어도 되는지 테스트 필요
+            .build() // TODO: 해당 추가 header가 RequestType에 종속되도록 수정
+
         val queryParameters = RequestQueryParameter(
             mapOf(
                 // TODO: RequestQueryParameter를 일일히 넣는 것이 아니라, 고정적으로 들어갈 값은 고정으로 넣고, 동적으로 바뀌는 부분만 request 값으로 넣는 시스템 구조 필요
@@ -136,8 +130,7 @@ class OpenApiService(
                 "FID_INPUT_DATE_1" to date, // 기준일 기준일 (ex 0020240308)
             ),
         )
-        val toEntity =
-            webClient
+        val toEntity = webClient
                 .requestInfo(info, queryParameters)
                 .headers { httpHeaders ->
                     headers.forEach { (key, value) ->
