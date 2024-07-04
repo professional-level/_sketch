@@ -19,7 +19,7 @@ class SketchController(
     @GetMapping("/test/cache")
     fun testCache(): String {
         return cacheTestService.testCache()
-    }
+    } // TODO: move to test directory
 }
 
 @Service

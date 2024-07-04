@@ -50,6 +50,19 @@ class OpenApiController(
          * */
         return service.getProgramTradeInfoPerIndividual(stockId, request.toFormat())
     }
+
+    @GetMapping("/program/individual/{stockId}/detail") // 주식현재가 투자자[v1_국내주식-012]
+    suspend fun getProgramTradeInfoPerIndividualAtOneDay(
+        @PathVariable("stockId") stockId: String,
+    ): OpenApiResponse { // TODO: 시간을 동적으로 조회 가능 하도록 변경
+        /**
+         개요
+         국내주식 종목별 프로그램매매추이(체결) API입니다.
+         한국투자 HTS(eFriend Plus) > [0465] 종목별 프로그램 매매추이 화면(혹은 한국투자 MTS > 국내 현재가 > 기타수급 > 프로그램) 의 기능을 API로 개발한 사항으로,
+         해당 화면을 참고하시면 기능을 이해하기 쉽습니다.
+         * */
+        return service.getProgramTradeInfoPerIndividualAtOneDay(stockId)
+    }
 }
 
 data class GetProgramTradeInfoPerIndividualRequest(

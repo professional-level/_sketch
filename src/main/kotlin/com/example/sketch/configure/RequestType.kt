@@ -18,6 +18,10 @@ enum class RequestType(
         requestURI = "/uapi/domestic-stock/v1/quotations/program-trade-by-stock-daily",
         type = HttpMethod.GET,
     ),
+    GET_PROGRAM_TRADE_INFO_PER_INDIVIDUAL_AT_ONE_DAY(
+        requestURI = "/uapi/domestic-stock/v1/quotations/program-trade-by-stock",
+        type = HttpMethod.GET,
+    ),
     ;
 
     fun getRequestUri() = requestURI
