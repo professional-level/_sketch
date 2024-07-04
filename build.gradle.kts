@@ -74,6 +74,9 @@ dependencies {
  //3.1.8
     implementation("com.github.ben-manes.caffeine:caffeine:3.1.8")
     implementation("org.springframework.boot:spring-boot-starter-cache")
+    // coroutine for test
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test")
+
 }
 
 kotlin {
