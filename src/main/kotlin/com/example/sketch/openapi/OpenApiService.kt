@@ -21,6 +21,7 @@ import org.springframework.web.reactive.function.client.toEntity
 
 @Service
 class OpenApiService(
+    // TODO: 모든 api 응답이 캐싱 처리가 필요하다. 왜냐하면 외부와 통신하는 api의 경우 빈번하게 호출되기 때문에, 극도의 성능 필요
     @Autowired val applicationContext: ApplicationContext,
     @Autowired val webClient: WebClient,
 ) {
