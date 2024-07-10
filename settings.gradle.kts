@@ -3,3 +3,5 @@ plugins {
 }
 rootProject.name = "_sketch"
 include("stock-service")
+include("common")
+include("stock-search-service")
