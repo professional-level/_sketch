@@ -10,6 +10,7 @@ repositories {
 }
 
 dependencies {
+    implementation(project(":common"))
     testImplementation(kotlin("test"))
 }
 
