@@ -1,5 +1,9 @@
 plugins {
-    kotlin("jvm")
+    id("org.springframework.boot") version "3.3.0"
+    id("io.spring.dependency-management") version "1.0.13.RELEASE"
+    kotlin("jvm") version "1.8.0"
+//    kotlin("plugin.spring") version "1.8.0"
+//    kotlin("plugin.jpa") version "1.8.0"
 }
 
 group = "com.example"
@@ -10,6 +14,8 @@ repositories {
 }
 
 dependencies {
+    implementation("org.springframework.boot:spring-boot-starter-webflux")
+//    testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation(kotlin("test"))
 }
 
