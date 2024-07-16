@@ -1,4 +1,4 @@
-package com.example.common
+package com.example.stock.stock.common
 
 interface DomainRepository<TEntity, TId> {
 //    fun findAll(): List<TEntity>

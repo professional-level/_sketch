@@ -1,4 +1,4 @@
-package com.example.stock.common
+package com.example.common
 
 import org.springframework.web.bind.annotation.RestController
 

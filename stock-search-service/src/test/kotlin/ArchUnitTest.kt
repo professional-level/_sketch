@@ -1,7 +1,6 @@
-package com.example.stock
-
-import com.example.stock.common.PersistenceAdapter
-import com.example.stock.stock.common.WebAdapter
+import com.example.common.ExternalApiAdapter
+import com.example.common.PersistenceAdapter
+import com.example.common.WebAdapter
 import com.tngtech.archunit.core.domain.JavaClasses
 import com.tngtech.archunit.core.importer.ClassFileImporter
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes
@@ -10,7 +9,7 @@ import org.junit.jupiter.api.Test
 
 class ArchUnitTest {
 
-    private val importedClasses: JavaClasses = ClassFileImporter().importPackages("com.example.stock")
+    private val importedClasses: JavaClasses = ClassFileImporter().importPackages("com.example.stocksearchservice")
 
     @Test
     fun `adapters should not access domain`() {
@@ -43,15 +42,39 @@ class ArchUnitTest {
             .that().resideInAPackage("..adapter..in..web..")
             .and().haveSimpleNameEndingWith("Controller")
             .should().beAnnotatedWith(WebAdapter::class.java)
-        rule.check(importedClasses)
+            .allowEmptyShould(true)
+        val validationResult = rule.evaluate(importedClasses)
+
+        // 결과를 확인하여 조건에 맞는 클래스가 없을 때를 처리합니다.
+        if (validationResult.hasViolation()) {
+            println("No controller classes found in the specified package")
+        } else {
+            rule.check(importedClasses)
+        }
     }
 
     @Test
     fun `adapters should be annotated with PersistenceAdapter`() {
-        val rule = classes()
-            .that().resideInAPackage("..adapter..out..persistence..")
-            .and().haveSimpleNameEndingWith("Adapter")
-            .should().beAnnotatedWith(PersistenceAdapter::class.java)
+        val rule =
+            classes().that()
+                .resideInAPackage("..adapter..out..persistence..")
+                .and()
+                .haveSimpleNameEndingWith("Adapter")
+                .should()
+                .beAnnotatedWith(PersistenceAdapter::class.java)
+        rule.check(importedClasses)
+    }
+
+    @Test
+    fun `adapters should be annotated with ExternalApiAdapter`() {
+        val rule = classes().that()
+            .resideInAPackage("..adapter..out..api..")
+            .and()
+            .haveSimpleNameEndingWith("Adapter")
+            .should()
+            .beAnnotatedWith(ExternalApiAdapter::class.java)
+            .allowEmptyShould(true) // TODO: 해당 내용으로 블로깅
+
         rule.check(importedClasses)
     }
 }

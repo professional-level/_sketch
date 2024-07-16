@@ -6,7 +6,7 @@ plugins {
     kotlin("plugin.jpa") version "1.8.0"
 }
 
-group = "com.example.stock"
+group = "com.example.stocksearchservice"
 version = "0.0.1-SNAPSHOT"
 
 repositories {
@@ -72,7 +72,8 @@ dependencies {
     // jakarta
     implementation("jakarta.enterprise:jakarta.enterprise.cdi-api:3.0.0")
     // arch unit
-    testImplementation("com.tngtech.archunit:archunit-junit5:0.23.1")
+//    testImplementation("com.tngtech.archunit:archunit-junit5:0.23.1")
+    testImplementation("com.tngtech.archunit:archunit:1.3.0")
 }
 
 kotlin {

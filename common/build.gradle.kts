@@ -6,7 +6,7 @@ plugins {
 //    kotlin("plugin.jpa") version "1.8.0"
 }
 
-group = "com.example"
+group = "com.example.common"
 version = "0.0.1-SNAPSHOT"
 
 repositories {
