@@ -1,7 +1,7 @@
 package com.example.stock.adapter.out.persistence.repository
 
 
-import adapter.out.persistence.entity.StockJpaEntity
+import com.example.stock.adapter.out.persistence.entity.StockJpaEntity
 import org.springframework.stereotype.Repository
 
 @Repository

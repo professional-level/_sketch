@@ -1,4 +1,4 @@
-package adapter.`in`.web
+package com.example.stock.adapter.`in`.web
 
 import com.example.stock.application.port.`in`.AssembleStockInfoCommand
 import com.example.stock.application.port.`in`.AssembleStockInfoCommandResult

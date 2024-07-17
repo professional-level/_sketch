@@ -1,13 +1,13 @@
 package com.example.stock.adapter.out.persistence
 
-import adapter.out.persistence.repository.StockJpaRepository
+import com.example.stock.adapter.out.persistence.repository.StockJpaRepository
 import com.example.stock.application.port.out.AssembleStockInfoPort
 import com.example.stock.application.port.out.dto.StockDTO
 import com.example.stock.common.PersistenceAdapter
 
 @PersistenceAdapter
 class AssembleStockInfoAdapter(
-        private val repository: adapter.out.persistence.repository.StockJpaRepository,
+    private val repository: StockJpaRepository,
 ) : AssembleStockInfoPort {
     override fun assembleStockInfo(
         stockId: Int,
