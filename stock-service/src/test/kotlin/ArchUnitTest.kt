@@ -1,7 +1,7 @@
 package com.example.stock
 
 import com.example.stock.common.PersistenceAdapter
-import com.example.stock.stock.common.WebAdapter
+import com.example.stock.common.WebAdapter
 import com.tngtech.archunit.core.domain.JavaClasses
 import com.tngtech.archunit.core.importer.ClassFileImporter
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes

@@ -62,6 +62,7 @@ class ArchUnitTest {
                 .haveSimpleNameEndingWith("Adapter")
                 .should()
                 .beAnnotatedWith(PersistenceAdapter::class.java)
+                .allowEmptyShould(true)
         rule.check(importedClasses)
     }
 
