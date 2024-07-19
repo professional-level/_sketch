@@ -9,7 +9,9 @@ import org.junit.jupiter.api.Test
 
 class ArchUnitTest {
 
-    private val importedClasses: JavaClasses = ClassFileImporter().importPackages("com.example.stocksearchservice")
+    private val importedClasses: JavaClasses = ClassFileImporter().importPackages(
+        "com.example.stocksearchservice",
+    ) // TODO: import package를 동적 매핑이 가능해, 하나의 common 모듈에서 하나의 테스트 클래스로 관리할 수 있는 방법 고민 필요
 
     @Test
     fun `adapters should not access domain`() {
