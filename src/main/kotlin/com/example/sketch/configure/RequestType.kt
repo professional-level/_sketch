@@ -22,6 +22,10 @@ enum class RequestType(
         requestURI = "/uapi/domestic-stock/v1/quotations/program-trade-by-stock",
         type = HttpMethod.GET,
     ),
+    GET_QUOTATIONS_OF_VOLUME_RANK(
+        requestURI = "/uapi/domestic-stock/v1/quotations/volume-rank",
+        type = HttpMethod.GET,
+    ),
     ;
 
     fun getRequestUri() = requestURI

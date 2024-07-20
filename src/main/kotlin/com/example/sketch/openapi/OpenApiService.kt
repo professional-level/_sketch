@@ -172,6 +172,42 @@ class OpenApiService(
         return response
     }
 
+    suspend fun getQuotationsOfVolumeRank(): OpenApiResponse {
+        // 당일 거래 대금 순위
+        val token = getToken()
+        val info: RequestType = RequestType.GET_QUOTATIONS_OF_VOLUME_RANK
+        val headers = HeaderBuilder.build(
+            token = token,
+            trId = "FHPST01710000",
+        ).addHeader(HeaderBuilder.HeaderKey.CUSTOMER_TYPE, "P").build() // 거래량순위[v1_국내주식-047]
+
+        val queryParameters = RequestQueryParameter(
+            mapOf(
+                // TODO: RequestQueryParameter를 일일히 넣는 것이 아니라, 고정적으로 들어갈 값은 고정으로 넣고, 동적으로 바뀌는 부분만 request 값으로 넣는 시스템 구조 필요
+                "FID_COND_MRKT_DIV_CODE" to "J", // 조건 시장 분류 코드
+                "FID_COND_SCR_DIV_CODE" to "20171", // 조건 화면 분류 코드
+                "FID_INPUT_ISCD" to "0000", // 입력 종목코드
+                "FID_DIV_CLS_CODE" to "0", // 분류 구분 코드 0(전체) 1(보통주) 2(우선주)\
+                "FID_BLNG_CLS_CODE" to "3", // 소속 구분 코드	0 : 평균거래량 1:거래증가율 2:평균거래회전율 3:거래금액순 4:평균거래금액회전율 TODO: 3이지만 동적 처리 필요
+                "FID_TRGT_CLS_CODE" to "111111111", // 대상 구분 코드 1 or 0 9자리 (차례대로 증거금 30% 40% 50% 60% 100% 신용보증금 30% 40% 50% 60%)
+                "FID_TRGT_EXLS_CLS_CODE" to "0000000000", // 대상 제외 구분 코드 1 or 0 10자리 (차례대로 투자위험/경고/주의 관리종목 정리매매 불성실공시 우선주 거래정지 ETF ETN 신용주문불가 SPAC)
+                "FID_INPUT_DATE_1" to "", // 입력날짜 	""(공란) 입력 TODO: 날짜별 api로 만들 수 있는지 검증 필요
+            ),
+        )
+
+        val toEntity = webClient
+            .requestInfo(info, queryParameters)
+            .headers { httpHeaders ->
+                headers.forEach { (key, value) ->
+                    httpHeaders.set(key, value)
+                }
+            }.retrieve()
+            .toEntity<String>()
+            .awaitSingleOrNull() ?: ResponseEntity.notFound().build<String>()
+        val response = parseJsonResponse(toEntity)
+        return response
+    }
+
     //
     // private method
     private suspend fun getToken(): String {
