@@ -4,6 +4,7 @@ plugins {
     kotlin("jvm") version "1.8.0"
     kotlin("plugin.spring") version "1.8.0"
     kotlin("plugin.jpa") version "1.8.0"
+    id("com.palantir.docker") version "0.36.0"
 }
 
 group = "com.example.stocksearchservice"
@@ -82,4 +83,10 @@ kotlin {
 tasks.withType<Test> {
     useJUnitPlatform()
 }
-
+//
+//docker {
+//    name = "${rootProject.name}-${project.name}:${version}"
+//    setDockerfile(file("Dockerfile"))
+//    files(tasks.bootJar.get().outputs.files)
+//    buildArgs(mapOf("JAR_FILE" to tasks.bootJar.get().archiveFileName.get()))
+//}
