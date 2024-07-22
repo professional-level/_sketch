@@ -8,6 +8,7 @@ data class SimpleStockDTO(
     val stockPrice: Int, // 주식 현재가격
     val stockDerivative: Double, // 주식 증감율
     val stockVolume: Int, // 주식 거래 대금
+    val date: String, // 해당 날짜
 ) {
     fun toStock(): Stock {
         return Stock.default()
@@ -21,6 +22,7 @@ data class SimpleStockDTO(
                 stockPrice = stock.stockPrice.value,
                 stockDerivative = stock.stockDerivative.value,
                 stockVolume = stock.stockVolume.value,
+                date = "", // TODO: domain entity에 date가 있어야 할까? 추가에 대한 고민
             )
         }
     }
