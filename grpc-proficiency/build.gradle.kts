@@ -1,3 +1,5 @@
+import com.google.protobuf.gradle.id
+
 plugins {
     id("org.springframework.boot") version "3.3.0"
     id("io.spring.dependency-management") version "1.0.13.RELEASE"
@@ -48,17 +50,43 @@ dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test")
 
     // protobuf
-    implementation("com.google.protobuf:protobuf-kotlin:3.25.2")
-    implementation("com.google.protobuf:protobuf-java:3.25.2")
+    implementation("com.google.protobuf:protobuf-kotlin:4.27.2")
+    implementation("com.google.protobuf:protobuf-java:4.27.2")
+
+    // Grpc
+//    implementation("org.lognet:grpc-spring-boot-starter:4.8.0") // gRPC 스프링 부트 스타터
+//    implementation("net.devh:grpc-spring-boot-starter:2.12.0.RELEASE")
+    implementation("io.grpc:grpc-netty-shaded:1.65.1")
+    implementation("io.grpc:grpc-protobuf:1.65.1")
+    implementation("io.grpc:grpc-stub:1.65.1")
+    implementation("javax.annotation:javax.annotation-api:1.3.2")
+    implementation("io.grpc:grpc-kotlin-stub:1.4.1")
+    implementation("io.grpc:protoc-gen-grpc-kotlin:1.4.1")
+    implementation("io.grpc:protoc-gen-grpc-java:1.65.1")
 }
 protobuf {
     protoc {
         artifact = "com.google.protobuf:protoc:3.25.2" // 최신 protobuf 컴파일러 버전으로 교체
     }
+    plugins {
+        id("grpc") {
+            artifact = "io.grpc:protoc-gen-grpc-java:1.65.1"
+        }
+        id("grpckt") {
+            artifact = "io.grpc:protoc-gen-grpc-kotlin:1.4.1"
+        }
+    }
     generateProtoTasks {
         all().forEach { task ->
             task.builtins {
                 create("kotlin")
+            }
+//            task.plugins {
+//                id("grpc") {}
+//            }
+            task.plugins {
+                id("grpc")
+//                id("grpckt")
             }
         }
     }

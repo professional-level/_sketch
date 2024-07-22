@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package example;
 
+import "google/protobuf/empty.proto";
+// Entity
 message TestEntity {
   int32 id = 1;
   Address address = 2;
@@ -28,3 +30,21 @@ message TestEntity {
     int32 quantity = 4;
   }
 }
+
+// Service
+service TestEntityService {
+  // ID 없이 단일 TestEntity 요청
+  rpc GetOneTestEntity(google.protobuf.Empty) returns (TestEntityResponse);
+  rpc GetAllTestEntities(google.protobuf.Empty) returns (TestEntityList);
+}
+
+// Response message for a single TestEntity
+message TestEntityResponse {
+  TestEntity entity = 1;
+}
+
+// Response message containing a list of TestEntities
+message TestEntityList {
+  repeated TestEntity entities = 1;
+}
+
