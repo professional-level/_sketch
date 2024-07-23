@@ -1,19 +1,19 @@
 package com.example.stocksearchservice.domain
 
 class Stock private constructor(
-        val stockId: StockId,
-        val stockName: StockName,
-        val stockPrice: StockPrice,
-        val stockDerivative: StockDerivative,
-        val stockVolume: StockVolume,
+    val stockId: StockId,
+    val stockName: StockName,
+    val stockPrice: StockPrice,
+    val stockDerivative: StockDerivative,
+    val stockVolume: StockVolume,
 ) {
     companion object {
         fun of(
-                stockId: StockId,
-                stockName: StockName,
-                stockPrice: StockPrice,
-                stockDerivative: StockDerivative,
-                stockVolume: StockVolume,
+            stockId: StockId,
+            stockName: StockName,
+            stockPrice: StockPrice,
+            stockDerivative: StockDerivative,
+            stockVolume: StockVolume,
         ): Stock {
             return Stock(
                 stockId = stockId,
@@ -36,9 +36,16 @@ class Stock private constructor(
     }
 }
 
+// TODO: typealias말고 좀 더 고민이 필요 한 듯 하다.
+typealias ForeignerStockVolume = StockVolume
+typealias InstitutionStockVolume = StockVolume
+
 @JvmInline
 value class StockVolume private constructor(val value: Int) {
     companion object {
+        fun of(value: Int): StockVolume {
+            return StockVolume(value)
+        }
         fun default(): StockVolume = StockVolume(value = 0)
     }
 }

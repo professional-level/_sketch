@@ -11,4 +11,24 @@ class StockInformationAdapter : StockInformationPort {
     override fun getCurrentTop20StocksByTradingVolume(): List<SimpleStockDTO> {
         return emptyList() // TODO: 실제 구현 필요
     }
+
+    override fun getStockVolumeDuring7days(id: String): List<SimpleStockDTO> {
+        TODO("Not yet implemented")
+    }
+
+    override fun getHighestPriceAtCurrentDay(id: String): List<SimpleStockDTO> {
+        TODO("Not yet implemented")
+    }
+
+    override fun getCurrentProgramPureBuyingVolume(id: String): Long {
+        TODO("Not yet implemented")
+    }
+
+    override fun getCurrentPrice(id: String): SimpleStockDTO {
+        TODO("Not yet implemented")
+    }
+
+    override fun getInstitutionAndForeignerFlowsOfDay(id: String, date: String): SimpleStockDTO {
+        TODO("Not yet implemented")
+    }
 }
