@@ -9,7 +9,9 @@ import com.example.stocksearchservice.domain.StockId
 import com.example.stocksearchservice.domain.StockPrice
 import com.example.stocksearchservice.domain.StockVolume
 import com.example.stocksearchservice.domain.repository.StockInformationRepository
+import org.springframework.stereotype.Component
 
+@Component
 class StockInformationRepositoryImpl(
     val stockInformationPort: StockInformationPort,
 ) : StockInformationRepository {
