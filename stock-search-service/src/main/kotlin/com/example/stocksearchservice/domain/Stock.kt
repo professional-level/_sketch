@@ -41,17 +41,18 @@ typealias ForeignerStockVolume = StockVolume
 typealias InstitutionStockVolume = StockVolume
 
 @JvmInline
-value class StockVolume private constructor(val value: Int) {
+value class StockVolume private constructor(val value: Long) {
     companion object {
-        fun of(value: Int): StockVolume {
+        fun of(value: Long): StockVolume {
             return StockVolume(value)
         }
+
         fun default(): StockVolume = StockVolume(value = 0)
     }
 }
 
 @JvmInline
-value class StockId private constructor(val value: Long) {
+value class StockId private constructor(val value: Int) {
     companion object {
         fun default(): StockId = StockId(value = 0)
     }
@@ -68,6 +69,11 @@ value class StockName private constructor(val value: String) {
 value class StockPrice private constructor(val value: Int) {
     companion object {
         fun default(): StockPrice = StockPrice(value = 1000)
+        fun of(value: Int): StockPrice = StockPrice(value = value)
+        fun getDiffDerivativeBetween(high: StockPrice, low: StockPrice): StockDerivative {
+            val result = (high.value - low.value).toDouble() / high.value.toDouble() // TODO: high.value에 toDobule이 필요한지 check
+            return StockDerivative.of(result)
+        }
     }
 }
 
@@ -75,5 +81,6 @@ value class StockPrice private constructor(val value: Int) {
 value class StockDerivative private constructor(val value: Double) {
     companion object {
         fun default(): StockDerivative = StockDerivative(value = 3.3)
+        fun of(value: Double): StockDerivative = StockDerivative(value)
     }
 }
