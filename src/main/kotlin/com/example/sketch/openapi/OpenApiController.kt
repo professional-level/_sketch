@@ -42,11 +42,11 @@ class OpenApiController(
         @ModelAttribute request: GetProgramTradeInfoPerIndividualRequest,
     ): OpenApiResponse { // TODO: 날짜를 동적으로 조회 가능 하도록 변경
         /**
-         개요
-         국내주식 종목별 프로그램매매추이(일별) API입니다.
-         한국투자 HTS(eFriend Plus) > [0465] 종목별 프로그램 매매추이 화면(혹은 한국투자 MTS > 국내 현재가 > 기타수급 > 프로그램) 의
-         "일자별" 클릭 시 기능을 API로 개발한 사항으로,
-         해당 화면을 참고하시면 기능을 이해하기 쉽습니다.
+        개요
+        국내주식 종목별 프로그램매매추이(일별) API입니다.
+        한국투자 HTS(eFriend Plus) > [0465] 종목별 프로그램 매매추이 화면(혹은 한국투자 MTS > 국내 현재가 > 기타수급 > 프로그램) 의
+        "일자별" 클릭 시 기능을 API로 개발한 사항으로,
+        해당 화면을 참고하시면 기능을 이해하기 쉽습니다.
          * */
         return service.getProgramTradeInfoPerIndividual(stockId, request.toFormat())
     }
@@ -56,10 +56,10 @@ class OpenApiController(
         @PathVariable("stockId") stockId: String,
     ): OpenApiResponse { // TODO: 시간을 동적으로 조회 가능 하도록 변경
         /**
-         개요
-         국내주식 종목별 프로그램매매추이(체결) API입니다.
-         한국투자 HTS(eFriend Plus) > [0465] 종목별 프로그램 매매추이 화면(혹은 한국투자 MTS > 국내 현재가 > 기타수급 > 프로그램) 의 기능을 API로 개발한 사항으로,
-         해당 화면을 참고하시면 기능을 이해하기 쉽습니다.
+        개요
+        국내주식 종목별 프로그램매매추이(체결) API입니다.
+        한국투자 HTS(eFriend Plus) > [0465] 종목별 프로그램 매매추이 화면(혹은 한국투자 MTS > 국내 현재가 > 기타수급 > 프로그램) 의 기능을 API로 개발한 사항으로,
+        해당 화면을 참고하시면 기능을 이해하기 쉽습니다.
          * */
         return service.getProgramTradeInfoPerIndividualAtOneDay(stockId)
     }
@@ -67,15 +67,27 @@ class OpenApiController(
     @GetMapping("/quotations/volume-rank") // 거래량순위[v1_국내주식-047]
     suspend fun getQuotationsOfVolumeRank(): OpenApiResponse {
         /**
-         개요
-         국내주식 거래량순위 API입니다.
-         한국투자 HTS(eFriend Plus) > [0171] 거래량 순위 화면의 기능을 API로 개발한 사항으로, 해당 화면을 참고하시면 기능을 이해하기 쉽습니다.
-         최대 30건 확인 가능하며, 다음 조회가 불가합니다.
-         30건 이상의 목록 조회가 필요한 경우, 대안으로 종목조건검색 API를 이용해서 원하는 종목 100개까지 검색할 수 있는 기능을 제공하고 있습니다.
-         종목조건검색 API는 HTS(efriend Plus) [0110] 조건검색에서 등록 및 서버저장한 나의 조건 목록을 확인할 수 있는 API로,
-         HTS [0110]에서 여러가지 조건을 설정할 수 있는데, 그 중 거래량 순위(ex. 0봉전 거래량 상위순 100종목) 에 대해서도 설정해서 종목을 검색할 수 있습니다.
+        개요
+        국내주식 거래량순위 API입니다.
+        한국투자 HTS(eFriend Plus) > [0171] 거래량 순위 화면의 기능을 API로 개발한 사항으로, 해당 화면을 참고하시면 기능을 이해하기 쉽습니다.
+        최대 30건 확인 가능하며, 다음 조회가 불가합니다.
+        30건 이상의 목록 조회가 필요한 경우, 대안으로 종목조건검색 API를 이용해서 원하는 종목 100개까지 검색할 수 있는 기능을 제공하고 있습니다.
+        종목조건검색 API는 HTS(efriend Plus) [0110] 조건검색에서 등록 및 서버저장한 나의 조건 목록을 확인할 수 있는 API로,
+        HTS [0110]에서 여러가지 조건을 설정할 수 있는데, 그 중 거래량 순위(ex. 0봉전 거래량 상위순 100종목) 에 대해서도 설정해서 종목을 검색할 수 있습니다.
          **/
         return service.getQuotationsOfVolumeRank()
+    }
+
+    @GetMapping("/quotations/foreigner-trade-trend/{stockId}") // 거래량순위[v1_국내주식-047]
+    suspend fun getForeignerTradeTrend(
+        @PathVariable("stockId") stockId: String,
+    ): OpenApiResponse {
+        /**
+        개요
+        종목별 외국계 순매수추이 API입니다.
+        한국투자 HTS(eFriend Plus) > [0433] 종목별 외국계 순매수추이 화면의 기능을 API로 개발한 사항으로, 해당 화면을 참고하시면 기능을 이해하기 쉽습니다.
+         **/
+        return service.getForeignerTradeTrend(stockId)
     }
 }
 

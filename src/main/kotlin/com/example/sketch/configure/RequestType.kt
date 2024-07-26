@@ -1,8 +1,23 @@
 package com.example.sketch.configure
 
+import com.example.sketch.configure.QueryParameter.FID_BLNG_CLS_CODE
+import com.example.sketch.configure.QueryParameter.FID_COND_MRKT_DIV_CODE
+import com.example.sketch.configure.QueryParameter.FID_COND_SCR_DIV_CODE
+import com.example.sketch.configure.QueryParameter.FID_DIV_CLS_CODE
+import com.example.sketch.configure.QueryParameter.FID_INPUT_DATE_1
+import com.example.sketch.configure.QueryParameter.FID_INPUT_ISCD
+import com.example.sketch.configure.QueryParameter.FID_TRGT_CLS_CODE
+import com.example.sketch.configure.QueryParameter.FID_TRGT_EXLS_CLS_CODE
 import org.springframework.http.MediaType
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.util.UriComponentsBuilder
+
+class RequestTypeOverall(
+    val type: RequestType,
+) {
+    val headers: Map<String, String> = mapOf()
+    val parameters: RequestQueryParameter = RequestQueryParameter(mapOf())
+}
 
 enum class RequestType(
     // TODO: 전반적인 queryParameter를 반영하기 어려운 구조이므로 전체적인 리팩토링 필요
@@ -11,7 +26,10 @@ enum class RequestType(
 ) {
     GET_TOKEN(requestURI = "/oauth2/tokenP", type = HttpMethod.POST),
     GET_CURRENT_PRICE(requestURI = "/uapi/domestic-stock/v1/quotations/inquire-price", type = HttpMethod.GET),
-    GET_CURRENT_PRICE_OF_INVESTMENT(requestURI = "/uapi/domestic-stock/v1/quotations/inquire-investor", type = HttpMethod.GET),
+    GET_CURRENT_PRICE_OF_INVESTMENT(
+        requestURI = "/uapi/domestic-stock/v1/quotations/inquire-investor",
+        type = HttpMethod.GET,
+    ),
 
     // TODO: Intellij Hard Wrap이 안먹히는 버그...수정
     GET_PROGRAM_TRADE_INFO_PER_INDIVIDUAL(
@@ -25,6 +43,10 @@ enum class RequestType(
     GET_QUOTATIONS_OF_VOLUME_RANK(
         requestURI = "/uapi/domestic-stock/v1/quotations/volume-rank",
         type = HttpMethod.GET,
+    ),
+    GET_FOREIGNER_TRADE_TREND(
+        requestURI = "/uapi/domestic-stock/v1/quotations/frgnmem-pchs-trend",
+        type = HttpMethod.GET
     ),
     ;
 
@@ -42,8 +64,80 @@ enum class HttpMethod {
     OPTION,
 }
 
+enum class QueryParameter(
+    val default: String,
+) {
+    FID_COND_MRKT_DIV_CODE(""), // 주식
+    FID_INPUT_ISCD(""), // 종목번호 6자리 ex) 삼성전자: 005930 or 입력 종목코드
+    FID_INPUT_DATE_1(""), // 기준일 기준일 (ex 0020240308) or 입력날짜 	""(공란) 입력 TODO: 날짜별 api로 만들 수 있는지 검증 필요
+    FID_COND_SCR_DIV_CODE(""), // 조건 화면 분류 코드
+    FID_DIV_CLS_CODE(""), // 분류 구분 코드 0(전체) 1(보통주) 2(우선주)
+    FID_BLNG_CLS_CODE(""), // 소속 구분 코드	0 : 평균거래량 1:거래증가율 2:평균거래회전율 3:거래금액순 4:평균거래금액회전율 TODO: 3이지만 동적 처리 필요
+    FID_TRGT_CLS_CODE(""), // 대상 구분 코드 1 or 0 9자리 (차례대로 증거금 30% 40% 50% 60% 100% 신용보증금 30% 40% 50% 60%)
+    FID_TRGT_EXLS_CLS_CODE(""), // 대상 제외 구분 코드 1 or 0 10자리 (차례대로 투자위험/경고/주의 관리종목 정리매매 불성실공시 우선주 거래정지 ETF ETN 신용주문불가 SPAC)
+    FID_INPUT_ISCD_2("99999") // 외국계 전체(99999)
+    ;
+
+    companion object {
+        private fun List<QueryParameter>.toResult(additionalInfo: Map<QueryParameter, String>): Map<QueryParameter, String> =
+            associateWith { additionalInfo.getOrDefault(it, it.default) }
+
+        fun forType(
+            type: RequestType,
+            additionalInfo: Map<QueryParameter, String>,
+        ): Map<QueryParameter, String> =
+            when (type) {
+                RequestType.GET_TOKEN -> emptyList()
+                RequestType.GET_CURRENT_PRICE -> {
+                    requireNotNull(additionalInfo[FID_INPUT_ISCD])
+                    listOf(FID_COND_MRKT_DIV_CODE, FID_INPUT_ISCD)
+                }
+
+                RequestType.GET_CURRENT_PRICE_OF_INVESTMENT -> {
+                    requireNotNull(additionalInfo[FID_INPUT_ISCD])
+                    listOf(FID_COND_MRKT_DIV_CODE, FID_INPUT_ISCD)
+                }
+
+                RequestType.GET_PROGRAM_TRADE_INFO_PER_INDIVIDUAL -> {
+                    requireNotNull(additionalInfo[FID_INPUT_ISCD])
+                    requireNotNull(additionalInfo[FID_INPUT_DATE_1])
+                    listOf(
+                        FID_COND_MRKT_DIV_CODE,
+                        FID_INPUT_ISCD,
+                        FID_INPUT_DATE_1,
+                    )
+                }
+
+                RequestType.GET_PROGRAM_TRADE_INFO_PER_INDIVIDUAL_AT_ONE_DAY -> {
+                    requireNotNull(additionalInfo[FID_INPUT_ISCD])
+                    listOf(FID_INPUT_ISCD)
+                }
+
+                RequestType.GET_QUOTATIONS_OF_VOLUME_RANK ->
+                    listOf(
+                        FID_COND_MRKT_DIV_CODE,
+                        FID_COND_SCR_DIV_CODE,
+                        FID_INPUT_ISCD,
+                        FID_DIV_CLS_CODE,
+                        FID_BLNG_CLS_CODE,
+                        FID_TRGT_CLS_CODE,
+                        FID_TRGT_EXLS_CLS_CODE,
+                        FID_INPUT_DATE_1,
+                    )
+
+                RequestType.GET_FOREIGNER_TRADE_TREND -> {
+                    requireNotNull(additionalInfo[FID_INPUT_ISCD]) // TODO: requireNotNull에 해당하는지 아닌지를 객체 수준에서 식별이 가능해야 한다.
+                    listOf(
+                        FID_INPUT_ISCD,
+                        FID_INPUT_ISCD_2
+                    )
+                }
+            }.toResult(additionalInfo)
+    }
+}
+
 data class RequestQueryParameter(
-    val parameters: Map<String, String>,
+    val parameters: Map<QueryParameter, String>,
 ) {
     companion object {
         fun DEFAULT(): RequestQueryParameter = RequestQueryParameter(mapOf())
@@ -52,11 +146,11 @@ data class RequestQueryParameter(
 
 fun WebClient.requestInfo(
     requestType: RequestType,
-    queryParameters: RequestQueryParameter = RequestQueryParameter.DEFAULT(),
+    queryParameter: Map<QueryParameter, String> = mapOf(),
 ): WebClient.RequestHeadersSpec<*> {
     val uriBuilder = UriComponentsBuilder.fromPath(requestType.getRequestUri())
-    queryParameters.parameters.forEach { (key, value) ->
-        uriBuilder.queryParam(key, value)
+    queryParameter.forEach { (key, value) ->
+        uriBuilder.queryParam(key.name, value)
     }
     val uri = uriBuilder.toUriString()
 
