@@ -5,3 +5,4 @@ rootProject.name = "_sketch"
 include("stock-service")
 include("common")
 include("stock-search-service")
+include("grpc-proficiency")
