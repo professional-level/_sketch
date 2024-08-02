@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package example;
+
+message TestEntity {
+  int32 id = 1;
+  Address address = 2;
+  repeated Member members = 3;
+  repeated Product products = 4;
+
+  message Address {
+    string street = 1;
+    string city = 2;
+    string state = 3;
+    string zipCode = 4;
+    string country = 5;
+  }
+
+  message Member {
+    string name = 1;
+    int32 memberId = 2;
+  }
+
+  message Product {
+    int32 productId = 1;
+    string name = 2;
+    double price = 3;
+    int32 quantity = 4;
+  }
+}
