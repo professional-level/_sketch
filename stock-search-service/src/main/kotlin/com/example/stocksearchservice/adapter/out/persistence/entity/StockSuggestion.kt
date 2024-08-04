@@ -27,13 +27,11 @@ class StockSuggestion(
     @Column
     val algorithmType: AlgorithmType, // 알고리즘 타입
 ) {
-fun default(){
-
-}
+    fun default() {
+    }
 }
 
 enum class AlgorithmType {
     TradeWithFinalPriceStrategy, // 종가 베팅
-    Default // 기본값
-    ;
+    Default, // 기본값
 }

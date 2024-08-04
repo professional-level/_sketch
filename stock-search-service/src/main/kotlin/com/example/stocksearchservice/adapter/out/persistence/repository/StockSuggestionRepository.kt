@@ -5,7 +5,6 @@ import common.AbstractReactiveRepository
 import jakarta.enterprise.context.ApplicationScoped
 import org.springframework.stereotype.Repository
 
-
 @ApplicationScoped
 @Repository
 class StockSuggestionRepository : AbstractReactiveRepository<StockSuggestion, Long>()
