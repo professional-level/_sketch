@@ -5,6 +5,7 @@ import com.example.stocksearchservice.domain.InstitutionStockVolume
 import com.example.stocksearchservice.domain.Stock
 import com.example.stocksearchservice.domain.StockDerivative
 import com.example.stocksearchservice.domain.StockId
+import com.example.stocksearchservice.domain.StockLog
 import com.example.stocksearchservice.domain.StockPrice
 import com.example.stocksearchservice.domain.StockVolume
 
@@ -15,5 +16,7 @@ interface StockInformationRepository {
     fun getProgramPureBuyingVolumeAtEndOfDay(id: StockId): StockVolume? // 당일 프로그램 순매수량
     fun getPriceDifferenceDerivativeBetweenHighestAndEnd(id: StockId): StockDerivative
     fun getInstitutionAndForeignerFlowsOfDay(id: StockId): Pair<InstitutionStockVolume, ForeignerStockVolume>
+
     // TODO: StockVolume을 두개로 기관, 외국인으로 나눠야한다
+    suspend fun saveTop10VolumeStocks(stockLogs: List<StockLog>)
 }
