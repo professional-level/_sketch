@@ -1,11 +1,14 @@
 package com.example.stocksearchservice.application.repository
 
 import com.example.stocksearchservice.application.port.out.StockInformationPort
+import com.example.stocksearchservice.application.port.out.StockLogPort
+import com.example.stocksearchservice.application.port.out.dto.StockVolumeRankDTO
 import com.example.stocksearchservice.domain.ForeignerStockVolume
 import com.example.stocksearchservice.domain.InstitutionStockVolume
 import com.example.stocksearchservice.domain.Stock
 import com.example.stocksearchservice.domain.StockDerivative
 import com.example.stocksearchservice.domain.StockId
+import com.example.stocksearchservice.domain.StockLog
 import com.example.stocksearchservice.domain.StockPrice
 import com.example.stocksearchservice.domain.StockVolume
 import com.example.stocksearchservice.domain.repository.StockInformationRepository
@@ -14,6 +17,7 @@ import org.springframework.stereotype.Component
 @Component
 class StockInformationRepositoryImpl(
     val stockInformationPort: StockInformationPort,
+    val stockLogPort: StockLogPort, // TODO: stockLogPort(StockVolumeRankRepository)를 여기서 반영해도 되는지에 대한 고민 필요
 ) : StockInformationRepository {
     override fun findTop10VolumeStocks(): List<Stock> {
         return stockInformationPort.getCurrentTop20StocksByTradingVolume().take(10).map { it.toStock() }
@@ -31,7 +35,8 @@ class StockInformationRepositoryImpl(
 
     override fun getProgramPureBuyingVolumeAtEndOfDay(id: StockId): StockVolume? {
         timeValidator() // TODO: validator를 application logic으로 변경하는것이 어떨까
-        val volume = stockInformationPort.getCurrentProgramPureBuyingVolume(id.value, date = "") // TODO: 임시로 date는 ""로 입력
+        val volume =
+            stockInformationPort.getCurrentProgramPureBuyingVolume(id.value, date = "") // TODO: 임시로 date는 ""로 입력
         return volume?.let(StockVolume.Companion::of)
     }
 
@@ -48,6 +53,10 @@ class StockInformationRepositoryImpl(
         val first = stockInformationPort.getInstitutionFlowsOfDay(id = id.value, date = "").stockVolume
         val second = stockInformationPort.getForeignerFlowsOfDay(id = id.value, date = "").stockVolume
         return Pair(StockVolume.of(first), StockVolume.of(second))
+    }
+
+    override suspend fun saveTop10VolumeStocks(stockLogs: List<StockLog>) {
+        stockLogPort.saveStockVolumeRankInfo(stockLogs.map { StockVolumeRankDTO.fromStock(it) })
     }
 }
 
