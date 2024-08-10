@@ -1,8 +1,5 @@
 package com.example.sketch.sketch
 
-import com.example.sketch.proto.ProductTagsKt
-import com.example.sketch.proto.Test
-import com.example.sketch.proto.Test.ProductTags
 import org.springframework.cache.annotation.Cacheable
 import org.springframework.stereotype.Service
 import org.springframework.web.bind.annotation.GetMapping
@@ -25,12 +22,14 @@ class SketchController(
     } // TODO: move to test directory
 
     fun protoTest() {
-        val message = Test.ProductTags.newBuilder()
-            .setProductId(4)
-            .addAllTags(listOf("abc","test"))
-            .build().toByteArray()
+//        Test.ProductTags
+//        val message = Test.ProductTags.newBuilder()
+//            .setProductId(4)
+//            .addAllTags(listOf("abc","test"))
+//            .build().toByteArray()
     }
-}
+    }
+
 
 @Service
 class CacheTestService {
