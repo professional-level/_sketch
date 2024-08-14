@@ -7,6 +7,7 @@ import jakarta.persistence.Enumerated
 import jakarta.persistence.Id
 import jakarta.persistence.Table
 import java.time.LocalDateTime
+import java.time.ZonedDateTime
 
 @Table(name = "stock_suggestion")
 @Entity
@@ -21,8 +22,8 @@ class StockSuggestion(
     val derivative: Double?, // 주식 증감율
     @Column(nullable = true)
     val volume: Long?, // 주식 거래 대금
-    @Column
-    val dateTime: LocalDateTime, // 해당 날짜
+    @Column(nullable = true)
+    val dateTime: ZonedDateTime, // 해당 날짜 // TODO: ZonnedDateTime으로 수정 필요
     @Enumerated(EnumType.STRING)
     @Column
     val algorithmType: AlgorithmType, // 알고리즘 타입
@@ -32,6 +33,6 @@ class StockSuggestion(
 }
 
 enum class AlgorithmType {
-    TradeWithFinalPriceStrategy, // 종가 베팅
+    TradeWithFinalPriceStrategy, // 종가 베팅 // TODO:
     Default, // 기본값
 }
