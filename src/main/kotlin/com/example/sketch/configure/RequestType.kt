@@ -1,13 +1,5 @@
 package com.example.sketch.configure
 
-import com.example.sketch.configure.QueryParameter.FID_BLNG_CLS_CODE
-import com.example.sketch.configure.QueryParameter.FID_COND_MRKT_DIV_CODE
-import com.example.sketch.configure.QueryParameter.FID_COND_SCR_DIV_CODE
-import com.example.sketch.configure.QueryParameter.FID_DIV_CLS_CODE
-import com.example.sketch.configure.QueryParameter.FID_INPUT_DATE_1
-import com.example.sketch.configure.QueryParameter.FID_INPUT_ISCD
-import com.example.sketch.configure.QueryParameter.FID_TRGT_CLS_CODE
-import com.example.sketch.configure.QueryParameter.FID_TRGT_EXLS_CLS_CODE
 import org.springframework.http.MediaType
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.util.UriComponentsBuilder
@@ -67,15 +59,18 @@ enum class HttpMethod {
 enum class QueryParameter(
     val default: String,
 ) {
-    FID_COND_MRKT_DIV_CODE(""), // 주식
-    FID_INPUT_ISCD(""), // 종목번호 6자리 ex) 삼성전자: 005930 or 입력 종목코드
-    FID_INPUT_DATE_1(""), // 기준일 기준일 (ex 0020240308) or 입력날짜 	""(공란) 입력 TODO: 날짜별 api로 만들 수 있는지 검증 필요
-    FID_COND_SCR_DIV_CODE(""), // 조건 화면 분류 코드
-    FID_DIV_CLS_CODE(""), // 분류 구분 코드 0(전체) 1(보통주) 2(우선주)
-    FID_BLNG_CLS_CODE(""), // 소속 구분 코드	0 : 평균거래량 1:거래증가율 2:평균거래회전율 3:거래금액순 4:평균거래금액회전율 TODO: 3이지만 동적 처리 필요
-    FID_TRGT_CLS_CODE(""), // 대상 구분 코드 1 or 0 9자리 (차례대로 증거금 30% 40% 50% 60% 100% 신용보증금 30% 40% 50% 60%)
-    FID_TRGT_EXLS_CLS_CODE(""), // 대상 제외 구분 코드 1 or 0 10자리 (차례대로 투자위험/경고/주의 관리종목 정리매매 불성실공시 우선주 거래정지 ETF ETN 신용주문불가 SPAC)
-    FID_INPUT_ISCD_2("99999") // 외국계 전체(99999)
+    FID_COND_MRKT_DIV_CODE("J"), // 주식
+    FID_INPUT_ISCD(emptyQueryParam), // 종목번호 6자리 ex) 삼성전자: 005930 or 입력 종목코드
+    FID_INPUT_DATE_1(emptyQueryParam), // 기준일 기준일 (ex 0020240308) or 입력날짜 	""(공란) 입력 TODO: 날짜별 api로 만들 수 있는지 검증 필요
+    FID_COND_SCR_DIV_CODE(emptyQueryParam), // 조건 화면 분류 코드
+    FID_DIV_CLS_CODE(emptyQueryParam), // 분류 구분 코드 0(전체) 1(보통주) 2(우선주)
+    FID_BLNG_CLS_CODE(emptyQueryParam), // 소속 구분 코드	0 : 평균거래량 1:거래증가율 2:평균거래회전율 3:거래금액순 4:평균거래금액회전율 TODO: 3이지만 동적 처리 필요
+    FID_TRGT_CLS_CODE(emptyQueryParam), // 대상 구분 코드 1 or 0 9자리 (차례대로 증거금 30% 40% 50% 60% 100% 신용보증금 30% 40% 50% 60%)
+    FID_TRGT_EXLS_CLS_CODE(emptyQueryParam), // 대상 제외 구분 코드 1 or 0 10자리 (차례대로 투자위험/경고/주의 관리종목 정리매매 불성실공시 우선주 거래정지 ETF ETN 신용주문불가 SPAC)
+    FID_INPUT_ISCD_2("99999"), // 외국계 전체(99999)
+    FID_INPUT_PRICE_1(emptyQueryParam), // 입력 가격1, 가격~, 전체검색 공란
+    FID_INPUT_PRICE_2(emptyQueryParam), // 입력 가격 2 ~가격, 전체검색 공란
+    FID_VOL_CNT(emptyQueryParam), // 거래량~
     ;
 
     companion object {
@@ -114,6 +109,7 @@ enum class QueryParameter(
                 }
 
                 RequestType.GET_QUOTATIONS_OF_VOLUME_RANK ->
+                    // TODO: validation 추가 필요
                     listOf(
                         FID_COND_MRKT_DIV_CODE,
                         FID_COND_SCR_DIV_CODE,
@@ -123,6 +119,9 @@ enum class QueryParameter(
                         FID_TRGT_CLS_CODE,
                         FID_TRGT_EXLS_CLS_CODE,
                         FID_INPUT_DATE_1,
+                        FID_INPUT_PRICE_1,
+                        FID_INPUT_PRICE_2,
+                        FID_VOL_CNT,
                     )
 
                 RequestType.GET_FOREIGNER_TRADE_TREND -> {
@@ -162,3 +161,6 @@ fun WebClient.requestInfo(
         HttpMethod.OPTION -> this.options().uri(uri)
     }
 }
+//val emptyQueryParam: String get() = URLEncoder.encode("", StandardCharsets.UTF_8.toString()) // TODO: 최적화 가능한지 고려
+//const val emptyQueryParam = "\"\""
+const val emptyQueryParam = "0"
