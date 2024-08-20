@@ -2,14 +2,16 @@ package com.example.stocksearchservice.application.scheduler
 
 import com.example.stocksearchservice.domain.StockLog
 import com.example.stocksearchservice.domain.repository.StockInformationRepository
+import com.example.stocksearchservice.domain.repository.StockStrategyRepository
 import com.example.stocksearchservice.domain.strategy.FinalPriceBatingStrategyV1
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import java.time.ZonedDateTime
 
 @Component
-class StockSearchScheduler(
+internal class StockSearchScheduler(
     private val stockInformationRepository: StockInformationRepository,
+    private val stockStrategyRepository: StockStrategyRepository,
 ) {
     // example of cron = "초 분 시간-시간 ? * 요일-요일"
     //    @Scheduled(cron = "15 */2 9-18 ? * MON-FRI ")
@@ -58,10 +60,10 @@ class StockSearchScheduler(
             val foreignerVolume = stockInformationRepository.getProgramPureBuyingVolumeAtLatestOfDay(it.stock.stockId)
             it.setForeignerStockVolume(foreignerVolume?.value ?: -1) // TODO: null일경우 -1로 구성하는게 가능할지 필요
             it
-        }
-        .filter { it.isValidProgramForeignerTradeVolume() }
-        /*프로그램 순매수 5거래일중 최대*/
-        .filter { stockInformationRepository.isHighestProgramVolumeIn5Days(id = it.stock.stockId) }
+        } /*프로그램의 순매수량이 시가총액의 3% 이상*/
+            .filter { it.isValidProgramForeignerTradeVolume() }
+            /*프로그램 순매수 5거래일중 최대*/
+            .filter { stockInformationRepository.isHighestProgramVolumeIn5Days(id = it.stock.stockId) }
 
         println(programVolumeAdaptedList)
 
@@ -71,7 +73,8 @@ class StockSearchScheduler(
          * */
 
         /*db save 로직*/
-
+        stockStrategyRepository.saveAll(programVolumeAdaptedList)
         /*매수를 위한 microservice로 데이터 이관 로직*/
+
     }
 }

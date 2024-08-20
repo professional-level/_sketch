@@ -12,7 +12,6 @@ internal interface ApiHandler<C : HandlerContext<C>, T> : Handler<C, T> {
     val stockApiClient: WebClient
 }
 
-
 internal abstract class ApiCommandHandler<C : Command<C>, T> : ApiHandler<C, T> {
     @Transactional
     abstract override fun execute(context: C): T
