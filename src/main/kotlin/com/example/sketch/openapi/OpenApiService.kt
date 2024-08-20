@@ -6,7 +6,6 @@ import com.example.sketch.configure.QueryParameter
 import com.example.sketch.configure.QueryParameter.FID_INPUT_DATE_1
 import com.example.sketch.configure.QueryParameter.FID_INPUT_ISCD
 import com.example.sketch.configure.RequestType
-import com.example.sketch.configure.emptyQueryParam
 import com.example.sketch.configure.requestInfo
 import com.example.sketch.openapi.HeaderBuilder.Companion.addHeader
 import com.example.sketch.openapi.HeaderBuilder.Companion.build
@@ -60,7 +59,7 @@ class OpenApiService(
         // 변화 과정을 위해 일부로 inline 하지 않음
         val token = applicationContext.getBean(OpenApiService::class.java).requestToken().token
         /** TODO: Point 프록시 객체가 아닌 실제 메서드를 직접 호출하면 AOP가 적용되지 않아 캐싱이 동작하지 않는 문제
-        self-invocation을 피하기 위해, ApplicationContext 프록시 객체를 가져와서, 메서드 호출. 고도화 필요*/
+         self-invocation을 피하기 위해, ApplicationContext 프록시 객체를 가져와서, 메서드 호출. 고도화 필요*/
         require(token.isNotBlank()) // TODO: token validation 필요
 
         val info: RequestType = RequestType.GET_CURRENT_PRICE
@@ -80,7 +79,7 @@ class OpenApiService(
 //                ),
 //            )
         val queryParameters =
-            QueryParameter.forType(info, mapOf(FID_INPUT_ISCD to "005930"))   // 종목번호 6자리 ex) 삼성전자: 005930
+            QueryParameter.forType(info, mapOf(FID_INPUT_ISCD to "005930")) // 종목번호 6자리 ex) 삼성전자: 005930
         val toEntity =
             webClient
                 .requestInfo(info, queryParameters)
@@ -154,14 +153,19 @@ class OpenApiService(
                 .build() // 거래량순위[v1_국내주식-047]
 
         val queryParameters = QueryParameter.forType(
-            info, mapOf(
+            info,
+            mapOf(
                 QueryParameter.FID_COND_SCR_DIV_CODE to "20171",
                 QueryParameter.FID_INPUT_ISCD to "0000",
                 QueryParameter.FID_DIV_CLS_CODE to "0",
-                QueryParameter.FID_BLNG_CLS_CODE to "",
+                QueryParameter.FID_BLNG_CLS_CODE to "0",
                 QueryParameter.FID_TRGT_CLS_CODE to "111111111",
-                QueryParameter.FID_TRGT_EXLS_CLS_CODE to emptyQueryParam,
-            )
+                QueryParameter.FID_TRGT_EXLS_CLS_CODE to "000000",
+                QueryParameter.FID_INPUT_PRICE_1 to "0",
+                QueryParameter.FID_INPUT_PRICE_2 to "0",
+                QueryParameter.FID_VOL_CNT to "0",
+                QueryParameter.FID_INPUT_DATE_1 to "0",
+            ),
         )
         val response = executeHttpRequest(info, headers, queryParameters)
         return response

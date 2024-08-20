@@ -162,5 +162,5 @@ fun WebClient.requestInfo(
     }
 }
 //val emptyQueryParam: String get() = URLEncoder.encode("", StandardCharsets.UTF_8.toString()) // TODO: 최적화 가능한지 고려
-//const val emptyQueryParam = "\"\""
-const val emptyQueryParam = "0"
+const val emptyQueryParam = "\"\""
+//const val emptyQueryParam = "0"
