@@ -6,6 +6,7 @@ import com.example.sketch.configure.QueryParameter
 import com.example.sketch.configure.QueryParameter.FID_INPUT_DATE_1
 import com.example.sketch.configure.QueryParameter.FID_INPUT_ISCD
 import com.example.sketch.configure.RequestType
+import com.example.sketch.configure.emptyQueryParam
 import com.example.sketch.configure.requestInfo
 import com.example.sketch.openapi.HeaderBuilder.Companion.addHeader
 import com.example.sketch.openapi.HeaderBuilder.Companion.build
@@ -152,7 +153,16 @@ class OpenApiService(
                 ).addHeader(HeaderBuilder.HeaderKey.CUSTOMER_TYPE, "P")
                 .build() // 거래량순위[v1_국내주식-047]
 
-        val queryParameters = QueryParameter.forType(info, emptyMap())
+        val queryParameters = QueryParameter.forType(
+            info, mapOf(
+                QueryParameter.FID_COND_SCR_DIV_CODE to "20171",
+                QueryParameter.FID_INPUT_ISCD to "0000",
+                QueryParameter.FID_DIV_CLS_CODE to "0",
+                QueryParameter.FID_BLNG_CLS_CODE to "",
+                QueryParameter.FID_TRGT_CLS_CODE to "111111111",
+                QueryParameter.FID_TRGT_EXLS_CLS_CODE to emptyQueryParam,
+            )
+        )
         val response = executeHttpRequest(info, headers, queryParameters)
         return response
     }
@@ -173,6 +183,7 @@ class OpenApiService(
         return response
     }
 
+    // sub-method
     private suspend fun executeHttpRequest(
         info: RequestType,
         headers: Map<String, String>,
@@ -186,7 +197,7 @@ class OpenApiService(
                         httpHeaders.set(key, value)
                     }
                 }.retrieve()
-                .toEntity<String>()
+                .toEntity<String>() // TODO: 즉시 JsonNode로 반환이 가능한지 확인 필요
                 .awaitSingleOrNull() ?: ResponseEntity.notFound().build<String>()
         val response = parseJsonResponse(toEntity)
         return response
