@@ -11,6 +11,7 @@ import com.example.sketch.openapi.HeaderBuilder.Companion.addHeader
 import com.example.sketch.openapi.HeaderBuilder.Companion.build
 import com.example.sketch.utils.OpenApiResponse
 import com.example.sketch.utils.ParseJsonResponse.parseJsonResponse
+import com.fasterxml.jackson.databind.JsonNode
 import kotlinx.coroutines.reactor.awaitSingleOrNull
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.cache.annotation.Cacheable
@@ -158,11 +159,9 @@ class OpenApiService(
                 QueryParameter.FID_COND_SCR_DIV_CODE to "20171",
                 QueryParameter.FID_INPUT_ISCD to "0000",
                 QueryParameter.FID_DIV_CLS_CODE to "0",
-                QueryParameter.FID_BLNG_CLS_CODE to "0",
+                QueryParameter.FID_BLNG_CLS_CODE to "3",
                 QueryParameter.FID_TRGT_CLS_CODE to "111111111",
-                QueryParameter.FID_TRGT_EXLS_CLS_CODE to "000000",
-                QueryParameter.FID_INPUT_PRICE_1 to "0",
-                QueryParameter.FID_INPUT_PRICE_2 to "0",
+                QueryParameter.FID_TRGT_EXLS_CLS_CODE to "1111111111",
                 QueryParameter.FID_VOL_CNT to "0",
                 QueryParameter.FID_INPUT_DATE_1 to "0",
             ),
@@ -201,13 +200,13 @@ class OpenApiService(
                         httpHeaders.set(key, value)
                     }
                 }.retrieve()
-                .toEntity<String>() // TODO: 즉시 JsonNode로 반환이 가능한지 확인 필요
-                .awaitSingleOrNull() ?: ResponseEntity.notFound().build<String>()
-        val response = parseJsonResponse(toEntity)
+                .toEntity<JsonNode>() // TODO: 즉시 JsonNode로 반환이 가능한지 확인 필요
+                .awaitSingleOrNull() ?: ResponseEntity.notFound().build<String>() // TODO: 응답이 200 ok가 아닐때 에러 처리 필요
+        val response = toEntity.body as OpenApiResponse
+//            parseJsonResponse(toEntity)
         return response
     }
 
-    //
     // private method
     private suspend fun getToken(): String {
         val token = applicationContext.getBean(OpenApiService::class.java).requestToken().token

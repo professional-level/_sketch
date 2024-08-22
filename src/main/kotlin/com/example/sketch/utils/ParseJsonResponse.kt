@@ -3,7 +3,7 @@ package com.example.sketch.utils
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.http.ResponseEntity
-
+// TODO: 해당 parseJsonResponse()는 webclient에서 JsonNode타입으로 반환이 가능하므로 삭제 혹은 리팩토링 필요
 object ParseJsonResponse {
     fun parseJsonResponse(response: ResponseEntity<String>): OpenApiResponse = parseJsonString(response.body)
 
