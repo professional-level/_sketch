@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+message Stock {
+  string hts_kor_isnm = 1;
+  string mksc_shrn_iscd = 2;
+  string data_rank = 3;
+  string stck_prpr = 4;
+  string prdy_vrss_sign = 5;
+  string prdy_vrss = 6;
+  string prdy_ctrt = 7;
+  string acml_vol = 8;
+  string prdy_vol = 9;
+  string lstn_stcn = 10;
+  string avrg_vol = 11;
+  string n_befr_clpr_vrss_prpr_rate = 12;
+  string vol_inrt = 13;
+  string vol_tnrt = 14;
+  string nday_vol_tnrt = 15;
+  string avrg_tr_pbmn = 16;
+  string tr_pbmn_tnrt = 17;
+  string nday_tr_pbmn_tnrt = 18;
+  string acml_tr_pbmn = 19;
+}
+
+message StockMap {
+  map<string, Stock> items = 1;
+}
