@@ -167,7 +167,8 @@ class OpenApiService(
             ),
         )
         val response = executeHttpRequest(info, headers, queryParameters)
-        return response
+        val output = response.getOutput() // mksc_shrn_iscd -> 종목 코드
+        return output // TODO: map을 return 하게 되면 최종 반환타입이 OpenApiResponse를 사용할 수 없게 되는것을 고민
     }
 
     suspend fun getForeignerTradeTrend(stockId: String): OpenApiResponse {
@@ -202,8 +203,14 @@ class OpenApiService(
                 }.retrieve()
                 .toEntity<JsonNode>() // TODO: 즉시 JsonNode로 반환이 가능한지 확인 필요
                 .awaitSingleOrNull() ?: ResponseEntity.notFound().build<String>() // TODO: 응답이 200 ok가 아닐때 에러 처리 필요
-        val response = toEntity.body as OpenApiResponse
-//            parseJsonResponse(toEntity)
+
+        val status = toEntity.statusCode
+        val response = when {
+            status.is2xxSuccessful -> (toEntity.body as OpenApiResponse)
+            status.is4xxClientError -> throw RuntimeException("$status") // TODO: exception 처리 필요
+            status.is5xxServerError -> throw RuntimeException("$status")
+            else -> throw RuntimeException("$status")
+        }
         return response
     }
 
@@ -213,4 +220,10 @@ class OpenApiService(
         require(token.isNotBlank())
         return token
     }
+
+    private suspend fun JsonNode.getOutput() = get(ResponseParameter.OUTPUT.value)
+}
+
+enum class ResponseParameter(val value: String) {
+    OUTPUT("output"),
 }
