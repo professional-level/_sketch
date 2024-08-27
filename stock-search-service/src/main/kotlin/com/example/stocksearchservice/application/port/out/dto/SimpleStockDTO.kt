@@ -1,6 +1,11 @@
 package com.example.stocksearchservice.application.port.out.dto
 
 import com.example.stocksearchservice.domain.Stock
+import com.example.stocksearchservice.domain.StockDerivative
+import com.example.stocksearchservice.domain.StockId
+import com.example.stocksearchservice.domain.StockName
+import com.example.stocksearchservice.domain.StockPrice
+import com.example.stocksearchservice.domain.StockVolume
 
 data class SimpleStockDTO(
     val stockId: Int, // 주식코드
@@ -11,7 +16,13 @@ data class SimpleStockDTO(
     val date: String, // 해당 날짜
 ) {
     fun toStock(): Stock {
-        return Stock.default()
+        return Stock.of(
+            stockId = StockId.of(stockId),
+            stockName = StockName.of(stockName),
+            stockPrice = StockPrice.of(stockPrice),
+            stockDerivative = StockDerivative.of(stockDerivative),
+            stockVolume = StockVolume.of(stockVolume),
+        )
     }
 
     companion object {

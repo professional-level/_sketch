@@ -55,6 +55,7 @@ value class StockVolume private constructor(val value: Long) {
 value class StockId private constructor(val value: Int) {
     companion object {
         fun default(): StockId = StockId(value = 0)
+        fun of(stockId: Int): StockId = StockId(stockId)
     }
 }
 
@@ -62,6 +63,7 @@ value class StockId private constructor(val value: Int) {
 value class StockName private constructor(val value: String) {
     companion object {
         fun default(): StockName = StockName(value = "name")
+        fun of(stockName: String): StockName = StockName(stockName)
     }
 }
 

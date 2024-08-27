@@ -9,7 +9,7 @@ class StockLog private constructor(
     companion object {
         fun from(stockList: List<Stock>): List<StockLog> {
             val time = ZonedDateTime.now()
-           return stockList.mapIndexed { index, stock ->
+            return stockList.mapIndexed { index, stock ->
                 StockLog(
                     stock = stock,
                     stockLogInfo = StockLogInfo(
