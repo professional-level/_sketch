@@ -1,12 +1,13 @@
 package com.example.stocksearchservice.adapter.out
 
+import VolumeRank
 import com.example.stocksearchservice.application.port.out.dto.SimpleStockDTO
-import com.fasterxml.jackson.databind.JsonNode
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.MediaType
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
+import java.time.LocalDateTime
 
 // TODO: 좀 더 세분화 할 방법이 없을까?
 interface Handler<T> {
@@ -20,15 +21,22 @@ internal class GetCurrentTop20StocksByTradingVolumeHandler(
     fun execute(): List<SimpleStockDTO> {
         val response = stockApiClient
             .get()
-            .uri("/quotations/volume-rank")
+            .uri("/open-api/quotations/volume-rank")
             .accept(MediaType.APPLICATION_PROTOBUF)
             .retrieve()
-            .toEntity(JsonNode::class.java)
+            .toEntity(VolumeRank.StockMap::class.java)
             .block()
-        response.body.map {
-//            SimpleStockDTO()
-        }
-        return emptyList()
+
+        return response?.body?.itemsMap?.map {
+            SimpleStockDTO(
+                stockId = it.key.toInt(),
+                stockName = it.value.htsKorIsnm,
+                stockPrice = it.value.stckPrpr.toInt(),
+                stockDerivative = it.value.prdyCtrt.toDouble(), // TODO: raw data는 String으로 받는것을 고려 중
+                stockVolume = it.value.acmlVol.toLong(),
+                date = LocalDateTime.now().toString(), // TODO: date 맵핑을 어떻게 할지 고민 필요
+            )
+        } ?: throw RuntimeException("Error getting stock data") // TODO: exception 처리 제대로 필요
     }
 }
 

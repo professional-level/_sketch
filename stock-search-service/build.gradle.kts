@@ -5,6 +5,7 @@ plugins {
     kotlin("plugin.spring") version "1.8.0"
     kotlin("plugin.jpa") version "1.8.0"
     id("com.palantir.docker") version "0.36.0"
+    id("com.google.protobuf") version "0.9.4"
 }
 
 group = "com.example.stocksearchservice"
@@ -75,8 +76,22 @@ dependencies {
     // arch unit
 //    testImplementation("com.tngtech.archunit:archunit-junit5:0.23.1")
     testImplementation("com.tngtech.archunit:archunit:1.3.0")
+    // protobuf
+    implementation("com.google.protobuf:protobuf-kotlin:3.25.2")
+    implementation("com.google.protobuf:protobuf-java:3.25.2")
 }
-
+protobuf {
+    protoc {
+        artifact = "com.google.protobuf:protoc:3.25.2" // 최신 protobuf 컴파일러 버전으로 교체
+    }
+    generateProtoTasks {
+        all().forEach { task ->
+            task.builtins {
+                create("kotlin")
+            }
+        }
+    }
+}
 kotlin {
     jvmToolchain(17)
 }
