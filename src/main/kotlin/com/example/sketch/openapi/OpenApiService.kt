@@ -118,7 +118,7 @@ class OpenApiService(
                 .addHeader(HeaderBuilder.HeaderKey.CUSTOMER_TYPE, "P") // 고객 타입 : 개인 P. 없어도 되는지 테스트 필요
                 .build() // TODO: 해당 추가 header가 RequestType에 종속되도록 수정
 
-        val queryParameters = QueryParameter.forType(info, mapOf(FID_INPUT_ISCD to "005930", FID_INPUT_DATE_1 to date))
+        val queryParameters = QueryParameter.forType(info, mapOf(FID_INPUT_ISCD to stockId, FID_INPUT_DATE_1 to date))
 
         val response = executeHttpRequest(info, headers, queryParameters)
         return response
@@ -135,7 +135,7 @@ class OpenApiService(
                 ).addHeader(HeaderBuilder.HeaderKey.CUSTOMER_TYPE, "P")
                 .build() // 종목별 프로그램매매추이(체결)[v1_국내주식-044] // 고객 타입 : 개인 P. 없어도 되는지 테스트 필요
         // "tr_cont" to "N" // TODO: check tr_count one more
-        val queryParameters = QueryParameter.forType(info, mapOf(FID_INPUT_ISCD to "005930"))
+        val queryParameters = QueryParameter.forType(info, mapOf(FID_INPUT_ISCD to stockId))
 
         val response = executeHttpRequest(info, headers, queryParameters)
         return response
