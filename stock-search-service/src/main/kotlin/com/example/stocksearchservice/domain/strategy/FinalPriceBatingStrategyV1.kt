@@ -3,7 +3,7 @@ package com.example.stocksearchservice.domain.strategy
 import com.example.stocksearchservice.domain.Stock
 
 class FinalPriceBatingStrategyV1 private constructor(
-    private val stock: Stock,
+    val stock: Stock,
 ) {
     fun isValidCurrentValue(): Boolean {
         return validCurrentStockDerivative() && validCurrentStockVolume()
@@ -18,6 +18,11 @@ class FinalPriceBatingStrategyV1 private constructor(
     }
 
     companion object {
-        fun of(stock: Stock): FinalPriceBatingStrategyV1 = FinalPriceBatingStrategyV1(stock)
+        private fun of(stock: Stock): FinalPriceBatingStrategyV1 = FinalPriceBatingStrategyV1(stock)
+        fun validListOf(stocks: List<Stock>): List<FinalPriceBatingStrategyV1> {
+            return stocks.map { of(it) }.filter { it.isValidCurrentValue() }
+        }
+
+        fun validOf(stock: Stock): FinalPriceBatingStrategyV1? = validListOf(listOf(stock)).firstOrNull()
     }
 }
