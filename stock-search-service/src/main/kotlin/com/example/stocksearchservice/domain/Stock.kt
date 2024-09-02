@@ -1,11 +1,12 @@
 package com.example.stocksearchservice.domain
 
 class Stock private constructor(
-    val stockId: StockId,
-    val stockName: StockName,
-    val stockPrice: StockPrice,
-    val stockDerivative: StockDerivative,
-    val stockVolume: StockVolume,
+    val stockId: StockId, // 불변하는 값
+    val stockName: StockName, // 불변하는 값
+    val stockPrice: StockPrice, // 변하는 값. state를 가져야 하나 ?
+    val stockDerivative: StockDerivative, // 변하는 값. state를 가져야 하나 ?
+    val stockVolume: StockVolume, // 변하는 값. state를 가져야 하나 ?
+    val stockTotalVolume: StockTotalVolume,
 ) {
     companion object {
         fun of(
@@ -14,6 +15,7 @@ class Stock private constructor(
             stockPrice: StockPrice,
             stockDerivative: StockDerivative,
             stockVolume: StockVolume,
+            stockTotalVolume: StockTotalVolume,
         ): Stock {
             return Stock(
                 stockId = stockId,
@@ -21,6 +23,7 @@ class Stock private constructor(
                 stockPrice = stockPrice,
                 stockDerivative = stockDerivative,
                 stockVolume = stockVolume,
+                stockTotalVolume = stockTotalVolume,
             )
         }
 
@@ -31,6 +34,7 @@ class Stock private constructor(
                 stockPrice = StockPrice.default(),
                 stockDerivative = StockDerivative.default(),
                 stockVolume = StockVolume.default(),
+                stockTotalVolume = StockTotalVolume.default(),
             )
         }
     }
@@ -41,12 +45,17 @@ typealias ForeignerStockVolume = StockVolume
 typealias InstitutionStockVolume = StockVolume
 
 @JvmInline
+value class StockTotalVolume private constructor(val value: Long) {
+    companion object {
+        fun of(value: Long): StockTotalVolume = StockTotalVolume(value)
+        fun default(): StockTotalVolume = StockTotalVolume(value = 0)
+    }
+}
+
+@JvmInline
 value class StockVolume private constructor(val value: Long) {
     companion object {
-        fun of(value: Long): StockVolume {
-            return StockVolume(value)
-        }
-
+        fun of(value: Long): StockVolume = StockVolume(value)
         fun default(): StockVolume = StockVolume(value = 0)
     }
 }
