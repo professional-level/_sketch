@@ -1,6 +1,7 @@
 package com.example.stocksearchservice.application.port.out
 
 import com.example.stocksearchservice.application.port.out.dto.SimpleStockDTO
+import com.example.stocksearchservice.application.port.out.dto.StockProgramVolume
 
 interface StockInformationPort {
     // 당일, 현재 거래대금 상위 20종목을 가져옵니다.
@@ -24,6 +25,9 @@ interface StockInformationPort {
     fun getInstitutionFlowsOfDay(id: Int, date: String): SimpleStockDTO
 
     fun getForeignerFlowsOfDay(id: Int, date: String): SimpleStockDTO
+
+    // ~거래일동안의 프로그램 거래대금
+    fun getProgramVolumeIn(days: Int): StockProgramVolume
 
     /** TODO: 추가적으로 개발 필요
      // 당일 개인 수급이 -

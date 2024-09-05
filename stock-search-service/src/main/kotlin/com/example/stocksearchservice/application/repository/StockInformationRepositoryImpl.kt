@@ -40,6 +40,11 @@ class StockInformationRepositoryImpl(
         return volume?.let(StockVolume.Companion::of)
     }
 
+    override fun isHighestProgramVolumeIn5Days(id: StockId): Boolean {
+        stockInformationPort.getProgramVolumeIn(5)
+        return TODO()
+    }
+
     override fun getPriceDifferenceDerivativeBetweenHighestAndEnd(id: StockId): StockDerivative {
         val high = getHighestPriceAtCurrentDay(id)
         val end = StockPrice.of(stockInformationPort.getCurrentPrice(id.value).stockPrice)
@@ -56,7 +61,7 @@ class StockInformationRepositoryImpl(
     }
 
     override suspend fun saveTop10VolumeStocks(stockLogs: List<StockLog>) {
-        stockLogPort.saveStockVolumeRankInfo(stockLogs.map { StockVolumeRankDTO.fromStock(it) })
+        stockLogPort.saveStockVolumeRankInfo(stockLogs.map { StockVolumeRankDTO.fromStockLog(it) })
     }
 }
 
