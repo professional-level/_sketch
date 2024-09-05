@@ -17,14 +17,25 @@ data class StockVolumeRankDTO(
     }
 
     companion object {
-        fun fromStock(log: StockLog): StockVolumeRankDTO {
+        fun fromStockLog(log: StockLog): StockVolumeRankDTO {
             return StockVolumeRankDTO(
                 stockId = log.stock.stockId.value,
                 stockPrice = log.stock.stockPrice.value,
                 stockDerivative = log.stock.stockDerivative.value,
                 stockVolume = log.stock.stockVolume.value,
                 dateTime = requireNotNull(log.stockLogInfo).dateTime,
-                rank = requireNotNull(log.stockLogInfo).rank
+                rank = requireNotNull(log.stockLogInfo).rank,
+            )
+        }
+
+        fun fromStock(stock: Stock, dateTime: ZonedDateTime, rank: Int): StockVolumeRankDTO {
+            return StockVolumeRankDTO(
+                stockId = stock.stockId.value,
+                stockPrice = stock.stockPrice.value,
+                stockDerivative = stock.stockDerivative.value,
+                stockVolume = stock.stockVolume.value,
+                dateTime = dateTime,
+                rank = rank,
             )
         }
     }
