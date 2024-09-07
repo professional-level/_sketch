@@ -21,7 +21,7 @@ message Stock {
   string nday_tr_pbmn_tnrt = 18;
   string acml_tr_pbmn = 19;
 }
-
+// stock을 분리가 필요
 message StockMap {
   map<string, Stock> items = 1;
 }
