@@ -18,8 +18,8 @@ internal class StockInformationAdapter(
         return getCurrentTop20StocksByTradingVolumeHandler.execute()
     }
 
-    override fun getProgramVolumeIn(days: Int): StockProgramVolume {
-        getProgramVolumeInHandler.execute()
+    override fun getProgramVolumeByStockIdIn(id: Int, days: Int): StockProgramVolume {
+        getProgramVolumeInHandler.execute(id, days)
         return TODO()
     }
 

@@ -27,7 +27,7 @@ interface StockInformationPort {
     fun getForeignerFlowsOfDay(id: Int, date: String): SimpleStockDTO
 
     // ~거래일동안의 프로그램 거래대금
-    fun getProgramVolumeIn(days: Int): StockProgramVolume
+    fun getProgramVolumeByStockIdIn(id: Int, days: Int): StockProgramVolume
 
     /** TODO: 추가적으로 개발 필요
      // 당일 개인 수급이 -

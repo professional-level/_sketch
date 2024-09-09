@@ -41,7 +41,7 @@ class StockInformationRepositoryImpl(
     }
 
     override fun isHighestProgramVolumeIn5Days(id: StockId): Boolean {
-        stockInformationPort.getProgramVolumeIn(5)
+        stockInformationPort.getProgramVolumeByStockIdIn(id = id.value, days = 5)
         return TODO()
     }
 
