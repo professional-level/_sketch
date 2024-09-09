@@ -121,6 +121,7 @@ class OpenApiService(
         val queryParameters = QueryParameter.forType(info, mapOf(FID_INPUT_ISCD to stockId, FID_INPUT_DATE_1 to date))
 
         val response = executeHttpRequest(info, headers, queryParameters)
+
         return response
     }
 
@@ -138,7 +139,7 @@ class OpenApiService(
         val queryParameters = QueryParameter.forType(info, mapOf(FID_INPUT_ISCD to stockId))
 
         val response = executeHttpRequest(info, headers, queryParameters)
-        return response
+        return response.getOutput()
     }
 
     suspend fun getQuotationsOfVolumeRank(): OpenApiResponse {

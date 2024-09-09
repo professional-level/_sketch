@@ -1,5 +1,6 @@
 package com.example.sketch.openapi
 
+import ProgramTradeVolume
 import VolumeRank
 import com.example.sketch.utils.OpenApiResponse
 import com.example.sketch.utils.StringExtension.toRequestableDateFormat
@@ -9,6 +10,8 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
+import programStockList
+import programStockVolume
 import stock
 import stockMap
 
@@ -57,14 +60,14 @@ class OpenApiController(
     @GetMapping("/program/individual/{stockId}/detail") // 주식현재가 투자자[v1_국내주식-012]
     suspend fun getProgramTradeInfoPerIndividualAtOneDay(
         @PathVariable("stockId") stockId: String,
-    ): OpenApiResponse { // TODO: 시간을 동적으로 조회 가능 하도록 변경
+    ): ProgramTradeVolume.ProgramStockList { // TODO: 시간을 동적으로 조회 가능 하도록 변경
         /**
          개요
          국내주식 종목별 프로그램매매추이(체결) API입니다.
          한국투자 HTS(eFriend Plus) > [0465] 종목별 프로그램 매매추이 화면(혹은 한국투자 MTS > 국내 현재가 > 기타수급 > 프로그램) 의 기능을 API로 개발한 사항으로,
          해당 화면을 참고하시면 기능을 이해하기 쉽습니다.
          * */
-        return service.getProgramTradeInfoPerIndividualAtOneDay(stockId)
+        return service.getProgramTradeInfoPerIndividualAtOneDay(stockId).toGetProgramTradeInfoPerIndividual()
     }
 
     @GetMapping("/quotations/volume-rank") // 거래량순위[v1_국내주식-047]
@@ -81,7 +84,7 @@ class OpenApiController(
         return service.getQuotationsOfVolumeRank().toGetQuotationsOfVolumeRankResponse()
     }
 
-    @GetMapping("/quotations/foreigner-trade-trend/{stockId}") // 거래량순위[v1_국내주식-047]
+    @GetMapping("/quotations/foreigner-trade-trend/{stockId}") //  종목별 외국계 순매수추이
     suspend fun getForeignerTradeTrend(
         @PathVariable("stockId") stockId: String,
     ): OpenApiResponse {
@@ -124,6 +127,29 @@ private fun OpenApiResponse.toGetQuotationsOfVolumeRankResponse(): VolumeRank.St
             items[it.first] = it.second
         }
     }
+}
+
+private fun OpenApiResponse.toGetProgramTradeInfoPerIndividual(): ProgramTradeVolume.ProgramStockList {
+    val stocks = this.take(10).map {
+        programStockVolume {
+            stckBsopDate = it.get("stck_bsop_date").asText()
+            stckClpr = it.get("stck_clpr").asText()
+            prdyVrss = it.get("prdy_vrss").asText()
+            prdyVrssSign = it.get("prdy_vrss_sign").asText()
+            prdyCtrt = it.get("prdy_ctrt").asText()
+            acmlVol = it.get("acml_vol").asText()
+            acmlTrPbmn = it.get("acml_tr_pbmn").asText()
+            wholSmtnSelnVol = it.get("whol_smtn_seln_vol").asText()
+            wholSmtnShnuVol = it.get("whol_smtn_shnu_vol").asText()
+            wholSmtnNtbyQty = it.get("whol_smtn_ntby_qty").asText()
+            wholSmtnSelnVol = it.get("whol_smtn_seln_tr_pbmn").asText()
+            wholSmtnShnuVol = it.get("whol_smtn_shnu_tr_pbmn").asText()
+            wholSmtnNtbyTrPbmn = it.get("whol_smtn_ntby_tr_pbmn").asText()
+            wholNtbyVolIcdc = it.get("whol_ntby_vol_icdc").asText()
+            wholNtbyTrPbmnIcdc2 = it.get("whol_ntby_tr_pbmn_icdc2").asText()
+        }
+    }
+    return programStockList { items.addAll(stocks) }
 }
 
 data class GetProgramTradeInfoPerIndividualRequest(
