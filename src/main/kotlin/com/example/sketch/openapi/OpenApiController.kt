@@ -97,6 +97,7 @@ class OpenApiController(
     }
 }
 
+// TODO: 해당 to~로직을 다른 interface로 변경
 private fun OpenApiResponse.toGetQuotationsOfVolumeRankResponse(): VolumeRank.StockMap {
     val stocks = this.map {
         it.get("mksc_shrn_iscd").asText() to
