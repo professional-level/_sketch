@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+message ProgramStockVolume{
+  string stck_bsop_date = 1;
+  string stck_clpr = 2;
+  string prdy_vrss = 3;
+  string prdy_vrss_sign = 4;
+  string prdy_ctrt = 5;
+  string acml_vol = 6;
+  string acml_tr_pbmn = 7;
+  string whol_smtn_seln_vol = 8;
+  string whol_smtn_shnu_vol = 9;
+  string whol_smtn_ntby_qty = 10;
+  string whol_smtn_seln_tr_pbmn = 11;
+  string whol_smtn_shnu_tr_pbmn = 12;
+  string whol_smtn_ntby_tr_pbmn = 13;
+  string whol_ntby_vol_icdc = 14;
+  string whol_ntby_tr_pbmn_icdc2 = 15;
+}
+
+message ProgramStockList {
+  repeated ProgramStockVolume items = 1;
+}
