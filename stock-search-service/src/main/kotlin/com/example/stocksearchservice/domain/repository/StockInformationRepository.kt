@@ -17,7 +17,7 @@ interface StockInformationRepository {
     fun isHighestProgramVolumeIn5Days(id: StockId): Boolean // 5거래일간 최대 프로그램 순매수량이 최상위
     fun getPriceDifferenceDerivativeBetweenHighestAndEnd(id: StockId): StockDerivative
     fun getInstitutionAndForeignerFlowsOfDay(id: StockId): Pair<InstitutionStockVolume, ForeignerStockVolume>
-
+    // save
     // TODO: StockVolume을 두개로 기관, 외국인으로 나눠야한다
     suspend fun saveTop10VolumeStocks(stockLogs: List<StockLog>)
 }

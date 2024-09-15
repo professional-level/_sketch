@@ -12,6 +12,7 @@ import com.example.stocksearchservice.domain.StockLog
 import com.example.stocksearchservice.domain.StockPrice
 import com.example.stocksearchservice.domain.StockVolume
 import com.example.stocksearchservice.domain.repository.StockInformationRepository
+import common.StringExtension
 import org.springframework.stereotype.Component
 
 @Component
@@ -41,8 +42,9 @@ class StockInformationRepositoryImpl(
     }
 
     override fun isHighestProgramVolumeIn5Days(id: StockId): Boolean {
-        stockInformationPort.getProgramVolumeByStockIdIn(id = id.value, days = 5)
-        return TODO()
+        val programVolumeInfo = stockInformationPort.getProgramVolumeByStockIdIn(id = id.value, days = 5)
+        val maxProgramVolumeDate = programVolumeInfo.maxBy { it.programVolume }.date
+        return StringExtension.isCurrentDate(maxProgramVolumeDate)
     }
 
     override fun getPriceDifferenceDerivativeBetweenHighestAndEnd(id: StockId): StockDerivative {
