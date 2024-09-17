@@ -61,10 +61,10 @@ value class StockVolume private constructor(val value: Long) {
 }
 
 @JvmInline
-value class StockId private constructor(val value: Int) {
+value class StockId private constructor(val value: String) {
     companion object {
-        fun default(): StockId = StockId(value = 0)
-        fun of(stockId: Int): StockId = StockId(stockId)
+        fun default(): StockId = StockId(value = "000000")
+        fun of(stockId: String): StockId = StockId(stockId)
     }
 }
 

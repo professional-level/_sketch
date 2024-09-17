@@ -30,7 +30,7 @@ internal class GetCurrentTop20StocksByTradingVolumeHandler(
         return response?.body?.itemsMap?.map {
             val stockPrice = it.value.stckPrpr.toInt()
             SimpleStockDTO(
-                stockId = it.key.toInt(),
+                stockId = it.key,
                 stockName = it.value.htsKorIsnm,
                 stockPrice = stockPrice,
                 stockDerivative = it.value.prdyCtrt.toDouble(), // TODO: raw data는 String으로 받는것을 고려 중

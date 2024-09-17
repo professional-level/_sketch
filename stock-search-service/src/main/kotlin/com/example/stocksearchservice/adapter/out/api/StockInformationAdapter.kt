@@ -18,23 +18,23 @@ internal class StockInformationAdapter(
         return getCurrentTop20StocksByTradingVolumeHandler.execute()
     }
 
-    override fun getProgramVolumeByStockIdIn(id: Int, days: Int): List<StockProgramVolume> {
+    override fun getProgramVolumeByStockIdIn(id: String, days: Int): List<StockProgramVolume> {
         return getProgramVolumeInHandler.execute(id).take(days)
     }
 
-    override fun getStockVolumeDuring7days(id: Int): List<SimpleStockDTO> {
+    override fun getStockVolumeDuring7days(id: String): List<SimpleStockDTO> {
         TODO("Not yet implemented")
     }
 
-    override fun getHighestPriceAtCurrentDay(id: Int): SimpleStockDTO {
+    override fun getHighestPriceAtCurrentDay(id: String): SimpleStockDTO {
         TODO("Not yet implemented")
     }
 
-    override fun getCurrentProgramPureBuyingVolume(id: Int, date: String): Long {
+    override fun getCurrentProgramPureBuyingVolume(id: String, date: String): Long {
         TODO("Not yet implemented")
     }
 
-    override fun getCurrentPrice(id: Int): SimpleStockDTO {
+    override fun getCurrentPrice(id: String): SimpleStockDTO {
         TODO("Not yet implemented")
     }
 
@@ -42,11 +42,11 @@ internal class StockInformationAdapter(
         TODO("Not yet implemented")
     }
 
-    override fun getInstitutionFlowsOfDay(id: Int, date: String): SimpleStockDTO {
+    override fun getInstitutionFlowsOfDay(id: String, date: String): SimpleStockDTO {
         TODO("Not yet implemented")
     }
 
-    override fun getForeignerFlowsOfDay(id: Int, date: String): SimpleStockDTO {
+    override fun getForeignerFlowsOfDay(id: String, date: String): SimpleStockDTO {
         TODO("Not yet implemented")
     }
 }

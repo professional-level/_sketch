@@ -10,7 +10,7 @@ import org.springframework.web.reactive.function.client.WebClient
 internal class GetProgramVolumeInHandler(
     private val stockApiClient: WebClient,
 ) {
-    fun execute(id: Int): List<StockProgramVolume> {
+    fun execute(id: String): List<StockProgramVolume> {
         val response = stockApiClient
             .get()
             .uri("/open-api/program/individual/$id")
@@ -26,7 +26,7 @@ internal class GetProgramVolumeInHandler(
                 stockDerivative = it.prdyCtrt.toDouble(), // TODO: raw data는 String으로 받는것을 고려 중
                 stockVolume = it.acmlVol.toLong(),
                 programVolume = it.wholSmtnNtbyTrPbmn.toLong(),
-                date = it.stckBsopDate
+                date = it.stckBsopDate,
             )
         } ?: throw RuntimeException("Error getting stock data") // TODO: exception 처리 제대로 필요
     }

@@ -15,7 +15,7 @@ class StockVolumeRank private constructor(
     @Id
     val sequence: Long? = null,
     @Column(nullable = false) // TODO: index 설정 필요
-    val stockId: Int,
+    val stockId: String,
     @Column(nullable = false)
     val price: Int, // 현재 주식 가격
     @Column(nullable = false)
@@ -39,7 +39,7 @@ class StockVolumeRank private constructor(
         stockDerivative = derivative,
         stockVolume = volume,
         dateTime = dateTime,
-        rank = rank
+        rank = rank,
     )
 
     companion object {
@@ -51,7 +51,7 @@ class StockVolumeRank private constructor(
                 volume = dto.stockVolume,
                 dateTime = dto.dateTime,
                 infoType = InfoType.StockVolumeRank,
-                rank = dto.rank
+                rank = dto.rank,
             )
         }
     }

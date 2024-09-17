@@ -9,7 +9,7 @@ import com.example.stocksearchservice.domain.StockTotalVolume
 import com.example.stocksearchservice.domain.StockVolume
 
 data class SimpleStockDTO(
-    val stockId: Int, // 주식코드
+    val stockId: String, // 주식코드
     val stockName: String, // 주식이름
     val stockPrice: Int, // 주식 현재가격
     val stockDerivative: Double, // 주식 증감율
