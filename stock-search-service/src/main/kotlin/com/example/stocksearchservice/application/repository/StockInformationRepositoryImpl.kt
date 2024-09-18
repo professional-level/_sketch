@@ -13,6 +13,7 @@ import com.example.stocksearchservice.domain.StockPrice
 import com.example.stocksearchservice.domain.StockVolume
 import com.example.stocksearchservice.domain.repository.StockInformationRepository
 import common.StringExtension
+import common.StringExtension.defaultCurrentTime
 import org.springframework.stereotype.Component
 
 @Component
@@ -36,9 +37,11 @@ class StockInformationRepositoryImpl(
 
     override fun getProgramPureBuyingVolumeAtEndOfDay(id: StockId): StockVolume? {
         timeValidator() // TODO: validator를 application logic으로 변경하는것이 어떨까
-        val volume =
-            stockInformationPort.getCurrentProgramPureBuyingVolume(id.value, date = "") // TODO: 임시로 date는 ""로 입력
-        return volume?.let(StockVolume.Companion::of)
+        val volume = stockInformationPort.getCurrentProgramPureBuyingVolume(
+            id.value,
+            date = defaultCurrentTime(),
+        )
+        return volume?.let(StockVolume::of)
     }
 
     override fun isHighestProgramVolumeIn5Days(id: StockId): Boolean {
