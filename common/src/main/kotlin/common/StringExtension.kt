@@ -13,4 +13,9 @@ object StringExtension {
     fun isCurrentDate(targetDate: String, now: ZonedDateTime = ZonedDateTime.now()): Boolean {
         return now.toDefaultDateStringFormat() == targetDate
     }
+
+    /* format example: 20240919*/
+    fun defaultCurrentTime(): String {
+        return ZonedDateTime.now().toDefaultDateStringFormat()
+    }
 }
