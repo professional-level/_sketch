@@ -21,3 +21,21 @@ message ProgramStockVolume{
 message ProgramStockList {
   repeated ProgramStockVolume items = 1;
 }
+
+
+message ProgramStockOfDateTime{
+  string bsop_hour = 1;
+  string stck_prpr = 2;
+  string prdy_vrss = 3;
+  string prdy_vrss_sign = 4;
+  string prdy_ctrt = 5;
+  string acml_vol = 6;
+  string whol_smtn_seln_vol = 7;
+  string whol_smtn_shnu_vol = 8;
+  string whol_smtn_ntby_qty = 9;
+  string whol_smtn_seln_tr_pbmn = 10;
+  string whol_smtn_shnu_tr_pbmn = 11;
+  string whol_smtn_ntby_tr_pbmn = 12;
+  string whol_ntby_vol_icdc = 13;
+  string whol_ntby_tr_pbmn_icdc = 14;
+}
