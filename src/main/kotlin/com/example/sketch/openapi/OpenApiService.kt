@@ -122,7 +122,7 @@ class OpenApiService(
 
         val response = executeHttpRequest(info, headers, queryParameters)
 
-        return response
+        return response.getOutput()
     }
 
     suspend fun getProgramTradeInfoPerIndividualAtOneDay(stockId: String): OpenApiResponse {
@@ -222,7 +222,7 @@ class OpenApiService(
         return token
     }
 
-    private suspend fun JsonNode.getOutput() = get(ResponseParameter.OUTPUT.value)
+    private fun JsonNode.getOutput() = get(ResponseParameter.OUTPUT.value)
 }
 
 enum class ResponseParameter(val value: String) {

@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 import programStockList
+import programStockOfDateTime
 import programStockVolume
 import stock
 import stockMap
@@ -46,7 +47,7 @@ class OpenApiController(
     suspend fun getProgramTradeInfoPerIndividual(
         @PathVariable("stockId") stockId: String,
         @ModelAttribute request: GetProgramTradeInfoPerIndividualRequest,
-    ): OpenApiResponse { // TODO: 날짜를 동적으로 조회 가능 하도록 변경
+    ): ProgramTradeVolume.ProgramStockList { // TODO: 날짜를 동적으로 조회 가능 하도록 변경
         /**
          개요
          국내주식 종목별 프로그램매매추이(일별) API입니다.
@@ -54,20 +55,20 @@ class OpenApiController(
          "일자별" 클릭 시 기능을 API로 개발한 사항으로,
          해당 화면을 참고하시면 기능을 이해하기 쉽습니다.
          * */
-        return service.getProgramTradeInfoPerIndividual(stockId, request.toFormat())
+        return service.getProgramTradeInfoPerIndividual(stockId, request.toFormat()).toGetProgramTradeInfoPerIndividual()
     }
 
-    @GetMapping("/program/individual/{stockId}/detail") // 주식현재가 투자자[v1_국내주식-012]
+    @GetMapping("/program/individual/{stockId}/detail") // 일별 프로그램 거래대금 조회
     suspend fun getProgramTradeInfoPerIndividualAtOneDay(
         @PathVariable("stockId") stockId: String,
-    ): ProgramTradeVolume.ProgramStockList { // TODO: 시간을 동적으로 조회 가능 하도록 변경
+    ): ProgramTradeVolume.ProgramStockOfDateTime { // TODO: 시간을 동적으로 조회 가능 하도록 변경
         /**
          개요
          국내주식 종목별 프로그램매매추이(체결) API입니다.
          한국투자 HTS(eFriend Plus) > [0465] 종목별 프로그램 매매추이 화면(혹은 한국투자 MTS > 국내 현재가 > 기타수급 > 프로그램) 의 기능을 API로 개발한 사항으로,
          해당 화면을 참고하시면 기능을 이해하기 쉽습니다.
          * */
-        return service.getProgramTradeInfoPerIndividualAtOneDay(stockId).toGetProgramTradeInfoPerIndividual()
+        return service.getProgramTradeInfoPerIndividualAtOneDay(stockId).toGetProgramTradeInfoPerIndividualAtOneDayResponse()
     }
 
     @GetMapping("/quotations/volume-rank") // 거래량순위[v1_국내주식-047]
@@ -98,6 +99,29 @@ class OpenApiController(
 }
 
 // TODO: 해당 to~로직을 다른 interface로 변경
+
+private fun OpenApiResponse.toGetProgramTradeInfoPerIndividualAtOneDayResponse(): ProgramTradeVolume.ProgramStockOfDateTime {
+    val stock = this.get(0)?.let { // TODO: get()이 null일경우 처리
+        programStockOfDateTime {
+            bsopHour = it.get("bsop_hour").asText()
+            stckPrpr = it.get("stck_prpr").asText()
+            prdyVrss = it.get("prdy_vrss").asText()
+            prdyVrssSign = it.get("prdy_vrss_sign").asText()
+            prdyCtrt = it.get("prdy_ctrt").asText()
+            acmlVol = it.get("acml_vol").asText()
+            wholSmtnSelnVol = it.get("whol_smtn_seln_vol").asText()
+            wholSmtnShnuVol = it.get("whol_smtn_shnu_vol").asText()
+            wholSmtnNtbyQty = it.get("whol_smtn_ntby_qty").asText()
+            wholSmtnSelnVol = it.get("whol_smtn_seln_tr_pbmn").asText()
+            wholSmtnShnuVol = it.get("whol_smtn_shnu_tr_pbmn").asText()
+            wholSmtnNtbyTrPbmn = it.get("whol_smtn_ntby_tr_pbmn").asText()
+            wholNtbyVolIcdc = it.get("whol_ntby_vol_icdc").asText()
+            wholNtbyTrPbmnIcdc = it.get("whol_ntby_tr_pbmn_icdc").asText()
+        }
+    } ?: programStockOfDateTime {}
+    return stock
+}
+
 private fun OpenApiResponse.toGetQuotationsOfVolumeRankResponse(): VolumeRank.StockMap {
     val stocks = this.map {
         it.get("mksc_shrn_iscd").asText() to
