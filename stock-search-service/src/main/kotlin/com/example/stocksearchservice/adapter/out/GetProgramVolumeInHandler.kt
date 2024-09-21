@@ -2,6 +2,7 @@ package com.example.stocksearchservice.adapter.out
 
 import ProgramTradeVolume
 import com.example.stocksearchservice.application.port.out.dto.StockProgramVolume
+import common.StringExtension
 import org.springframework.http.MediaType
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
@@ -11,9 +12,10 @@ internal class GetProgramVolumeInHandler(
     private val stockApiClient: WebClient,
 ) {
     fun execute(id: String): List<StockProgramVolume> {
+        val date = StringExtension.defaultCurrentTime()
         val response = stockApiClient
             .get()
-            .uri("/open-api/program/individual/$id")
+            .uri("/open-api/program/individual/$id?date=$date") // TODO: 이 date가 사실은 handler 이전에 넘어와야함
             .accept(MediaType.APPLICATION_PROTOBUF)
             .retrieve()
             .toEntity(ProgramTradeVolume.ProgramStockList::class.java)
