@@ -28,7 +28,10 @@ class FinalPriceBatingStrategyV1 private constructor(
 
     fun isValidProgramForeignerTradeVolume(): Boolean {
         // TODO: 비율에 대한 조정 필요
-        return foreignerStockVolume.value >= (stock.stockTotalVolume.value) * 0.3
+        // stockTotalVolume / 100000000
+        // foreignerStockVolume.value / 1000000
+        // stockTotalVolume / 100, foreignerStockVolume.value
+        return foreignerStockVolume.value >= (stock.stockTotalVolume.value/100) * 0.3
     }
 
     private fun validCurrentStockDerivative(): Boolean {
