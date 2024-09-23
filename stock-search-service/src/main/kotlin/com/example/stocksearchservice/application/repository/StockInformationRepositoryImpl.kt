@@ -35,8 +35,7 @@ class StockInformationRepositoryImpl(
         return StockPrice.of(price)
     }
 
-    override fun getProgramPureBuyingVolumeAtEndOfDay(id: StockId): StockVolume? {
-        timeValidator() // TODO: validator를 application logic으로 변경하는것이 어떨까
+    override fun getProgramPureBuyingVolumeAtLatestOfDay(id: StockId): StockVolume? {
         val volume = stockInformationPort.getCurrentProgramPureBuyingVolume(
             id.value,
             date = defaultCurrentTime(),
