@@ -29,12 +29,12 @@ class StockSearchScheduler(
     }
 
     // TODO: 해당 알고리즘을 관리하는것을 어떻게 해야 할지 고민이 필요.
-    @Scheduled(cron = "0 50 15 ? * MON-FRI")
+//    @Scheduled(cron = "0 50 15 ? * MON-FRI")
+    @Scheduled(cron = "0 */1 * ? * MON-FRI")
     suspend fun finalPriceBatingStrategy1() {
         // TODO: 휴장일인지 체크하는 로직이 필요
         // TODO: dateTime을 여기서 받을것인지, 혹은 findTop10VolumeStocks시점에서 가져와야할지 고민 필요
         val dateTime = ZonedDateTime.now()
-
         val top10VolumeStockList = stockInformationRepository.findTop10VolumeStocks() // TODO: 조회 실패에 대한 retry 관련 로직 필요
         /*
          * 당일 거래대금 상위 10
@@ -55,12 +55,15 @@ class StockSearchScheduler(
         // TODO: api 호출 횟수에 대한 지연을 생각 해야함
         // TODO: cache 적용 고려
         val programVolumeAdaptedList = validStocks.map {
-            val foreignerVolume = stockInformationRepository.getProgramPureBuyingVolumeAtEndOfDay(it.stock.stockId)
+            val foreignerVolume = stockInformationRepository.getProgramPureBuyingVolumeAtLatestOfDay(it.stock.stockId)
             it.setForeignerStockVolume(foreignerVolume?.value ?: -1) // TODO: null일경우 -1로 구성하는게 가능할지 필요
             it
-        }.filter { it.isValidProgramForeignerTradeVolume() }
-        /*프로그램 순매수 5거래일중 최대*/
-        stockInformationRepository
+        }
+            .filter { it.isValidProgramForeignerTradeVolume() }
+            /*프로그램 순매수 5거래일중 최대*/
+            .filter { stockInformationRepository.isHighestProgramVolumeIn5Days(id = it.stock.stockId) }
+
+        println(programVolumeAdaptedList)
         /*
          * 거래량이 5거래일중 최대치
          * */
