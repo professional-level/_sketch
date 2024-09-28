@@ -209,7 +209,7 @@ class OpenApiService(
         val response = when {
             status.is2xxSuccessful -> (toEntity.body as OpenApiResponse)
             status.is4xxClientError -> throw RuntimeException("$status") // TODO: exception 처리 필요
-            status.is5xxServerError -> throw RuntimeException("$status")
+            status.is5xxServerError -> throw RuntimeException("$status") // TODO: token expire에 대한 분기 처리 필요
             else -> throw RuntimeException("$status")
         }
         return response

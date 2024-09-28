@@ -38,7 +38,7 @@ class StockSearchScheduler(
         val top10VolumeStockList = stockInformationRepository.findTop10VolumeStocks() // TODO: 조회 실패에 대한 retry 관련 로직 필요
         /*
          * 당일 거래대금 상위 10
-         * 당일 거래대금 30이상
+         * 당일 거래대금 20이상
          * 당일 상승률 0% 이상 // TODO: 조건 확인
          * */
 
@@ -47,7 +47,7 @@ class StockSearchScheduler(
         ) // TODO: 이 단계에서 FinalPriceBatingStrategyV1에 rank를 넣는 것 빼야할지도
 
         /*
-         * 프로그램 순매수가 시가총액의 50% ?
+         * 프로그램 순매수가 시가총액의 3% ?
          * 프로그램 순매수의 5거래일중 최대
          *
          * */
@@ -59,13 +59,19 @@ class StockSearchScheduler(
             it.setForeignerStockVolume(foreignerVolume?.value ?: -1) // TODO: null일경우 -1로 구성하는게 가능할지 필요
             it
         }
-            .filter { it.isValidProgramForeignerTradeVolume() }
-            /*프로그램 순매수 5거래일중 최대*/
-            .filter { stockInformationRepository.isHighestProgramVolumeIn5Days(id = it.stock.stockId) }
+        .filter { it.isValidProgramForeignerTradeVolume() }
+        /*프로그램 순매수 5거래일중 최대*/
+        .filter { stockInformationRepository.isHighestProgramVolumeIn5Days(id = it.stock.stockId) }
 
         println(programVolumeAdaptedList)
+
         /*
-         * 거래량이 5거래일중 최대치
+         * 거래량이 3거래일중 최대치
+         * 거래량이 5거래일중 최고치중 70% 이상(당일 제외)
          * */
+
+        /*db save 로직*/
+
+        /*매수를 위한 microservice로 데이터 이관 로직*/
     }
 }
