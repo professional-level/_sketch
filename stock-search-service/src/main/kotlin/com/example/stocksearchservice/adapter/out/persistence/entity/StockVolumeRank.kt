@@ -26,7 +26,7 @@ class StockVolumeRank private constructor(
     val dateTime: ZonedDateTime, // 해당 날짜와 시간
     @Enumerated(EnumType.STRING)
     @Column
-    val infoType: InfoType, //  타입 TODO: table이 다 쪼개진다면 필요 없을 수도 있다
+    val infoType: InfoType, //  타입 // TODO: table이 다 쪼개진다면 필요 없을 수도 있다
     @Column(columnDefinition = "TINYINT UNSIGNED", nullable = false) // Rank는 0~255 사이면 충분하므로 unsigned tynyint로 설정
     val rank: Int,
 ) {
