@@ -13,3 +13,7 @@ class StockSuggestionRepository : AbstractReactiveRepository<StockSuggestion, Lo
 @ApplicationScoped
 @Repository
 class StockVolumeRankRepository : AbstractReactiveRepository<StockVolumeRank, Long>()
+
+@ApplicationScoped
+@Repository
+class StockStrategyRepository : AbstractReactiveRepository<StockVolumeRank, Long>()
