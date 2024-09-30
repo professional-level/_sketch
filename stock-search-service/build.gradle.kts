@@ -79,7 +79,10 @@ dependencies {
     // protobuf
     implementation("com.google.protobuf:protobuf-kotlin:3.25.2")
     implementation("com.google.protobuf:protobuf-java:3.25.2")
+    // kafka
+    implementation("org.springframework.kafka:spring-kafka")
 }
+
 protobuf {
     protoc {
         artifact = "com.google.protobuf:protoc:3.25.2" // 최신 protobuf 컴파일러 버전으로 교체

@@ -1,0 +1,24 @@
+spring:
+  #  data:
+  #    redis:
+  #      host: myredis
+  #      port: 6379
+
+  kafka:
+    bootstrap-servers:
+#      - kafka1:9092
+#      - kafka2:9092
+#      - kafka3:9092
+      - 127.0.0.1:19092
+      - 127.0.0.1:19093
+      - 127.0.0.1:19094
+    consumer:
+      group-id: orgroup
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer # key 값은 String
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+#      value-deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer # protobuff 파일을 위해 ByteArrayDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer  # key 값은 String
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+#      value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer # protobuff 파일을 위해 ByteArrayDeserializer
