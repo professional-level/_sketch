@@ -9,7 +9,7 @@ import org.springframework.web.reactive.function.client.WebClient
 @Component
 internal class GetCurrentProgramPureBuyingVolumeHandler(
     override val stockApiClient: WebClient,
-) : ApiQueryHandler<GetCurrentProgramPureBuyingVolumeQuery, Long>(){
+) : ApiQueryHandler<GetCurrentProgramPureBuyingVolumeQuery, Long>() {
     // TODO: handler에 대한 법칙 정의 필요
     override fun execute(context: GetCurrentProgramPureBuyingVolumeQuery): Long {
         val response = stockApiClient
@@ -19,11 +19,12 @@ internal class GetCurrentProgramPureBuyingVolumeHandler(
             .retrieve()
             .toEntity(ProgramTradeVolume.ProgramStockOfDateTime::class.java)
             .block()
-        val volume = response.body.wholSmtnNtbyTrPbmn
+        val volume = response?.body?.wholSmtnNtbyTrPbmn ?: throw RuntimeException("Error getting stock data")
         return volume.toLong()
     }
 }
 
 internal data class GetCurrentProgramPureBuyingVolumeQuery(
-    val id: String, val date: String,
-): Query<GetCurrentProgramPureBuyingVolumeQuery>
+    val id: String,
+    val date: String,
+) : Query<GetCurrentProgramPureBuyingVolumeQuery>
