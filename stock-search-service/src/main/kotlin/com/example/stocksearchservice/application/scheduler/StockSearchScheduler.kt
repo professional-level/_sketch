@@ -74,7 +74,7 @@ internal class StockSearchScheduler(
 
         /*db save 로직*/
         stockStrategyRepository.saveAll(programVolumeAdaptedList)
-        /*매수를 위한 microservice로 데이터 이관 로직*/
 
+        /*매수를 위한 microservice로 데이터 이관 로직*/
     }
 }
