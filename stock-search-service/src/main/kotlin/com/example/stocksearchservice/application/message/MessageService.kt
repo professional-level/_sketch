@@ -70,3 +70,11 @@ internal class KafkaMessageService(
 //        }
 //    }
 }
+
+// TODO: 추후 common module로 이동 필요
+internal interface Message
+internal interface Event
+internal abstract class ApiEvent : Event
+internal abstract class ApiHandlerMessage : Message {
+    lateinit var event: ApiEvent
+}
