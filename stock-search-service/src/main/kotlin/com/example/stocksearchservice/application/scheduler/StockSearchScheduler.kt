@@ -3,7 +3,7 @@ package com.example.stocksearchservice.application.scheduler
 import com.example.stocksearchservice.application.message.KafkaMessageService
 import com.example.stocksearchservice.domain.StockLog
 import com.example.stocksearchservice.domain.repository.StockInformationRepository
-import com.example.stocksearchservice.domain.repository.StockStrategyRepository
+import com.example.stocksearchservice.domain.repository.FinalPriceBatingStrategyV1Repository
 import com.example.stocksearchservice.domain.strategy.FinalPriceBatingStrategyV1
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
@@ -12,7 +12,7 @@ import java.time.ZonedDateTime
 @Component
 internal class StockSearchScheduler(
     private val stockInformationRepository: StockInformationRepository,
-    private val stockStrategyRepository: StockStrategyRepository,
+    private val finalPriceBatingStrategyV1Repository: FinalPriceBatingStrategyV1Repository,
     private val kafkaMessageService: KafkaMessageService, // 이 service가 여기에 있는것이 맞는가
 ) {
     // example of cron = "초 분 시간-시간 ? * 요일-요일"
@@ -46,10 +46,10 @@ internal class StockSearchScheduler(
          * 당일 상승률 0% 이상 // TODO: 조건 확인
          * */
 
+        /* stock list를 FinalPrice~ 객체로 초기화 할때, validation을 체크하는 로직이 필요 할 것 같다. fun create 반환 타입 nullable*/
         val validStocks = FinalPriceBatingStrategyV1.validListOf(
             top10VolumeStockList,
         ) // TODO: 이 단계에서 FinalPriceBatingStrategyV1에 rank를 넣는 것 빼야할지도
-
         /*
          * 프로그램 순매수가 시가총액의 3% ?
          * 프로그램 순매수의 5거래일중 최대
@@ -58,14 +58,15 @@ internal class StockSearchScheduler(
 
         // TODO: api 호출 횟수에 대한 지연을 생각 해야함
         // TODO: cache 적용 고려
-        val programVolumeAdaptedList = validStocks.map {
-            val foreignerVolume = stockInformationRepository.getProgramPureBuyingVolumeAtLatestOfDay(it.stock.stockId)
-            it.setForeignerStockVolume(foreignerVolume?.value ?: -1) // TODO: null일경우 -1로 구성하는게 가능할지 필요
-            it
+        val programVolumeAdaptedList = validStocks.map { entity ->
+            val foreignerVolume = stockInformationRepository.getProgramPureBuyingVolumeAtLatestOfDay(entity.stock.stockId)
+            entity.setForeignerStockVolume(foreignerVolume?.value ?: -1) // TODO: null일경우 -1로 구성하는게 가능할지 필요
+            entity
         } /*프로그램의 순매수량이 시가총액의 3% 이상*/
             .filter { it.isValidProgramForeignerTradeVolume() }
             /*프로그램 순매수 5거래일중 최대*/
             .filter { stockInformationRepository.isHighestProgramVolumeIn5Days(id = it.stock.stockId) }
+        // TODO: 2개의 repository를 동시에 호출 하는 성능 중심 vs filter를 걸어 호출 하는 객체 list를 작게 하는 전략 고민
 
         println(programVolumeAdaptedList)
 
@@ -75,11 +76,10 @@ internal class StockSearchScheduler(
          * */
 
         /*db save 로직*/
-        stockStrategyRepository.saveAll(programVolumeAdaptedList)
+        finalPriceBatingStrategyV1Repository.saveAll(programVolumeAdaptedList)
 
         /*매수를 위한 microservice로 데이터 이관 로직*/
         // TODO: publish를 위한 Event 관련 설계 필요
-        kafkaMessageService.publish()
-
+//        kafkaMessageService.publish()
     }
 }
