@@ -2,10 +2,13 @@ package com.example.stocksearchservice.domain.strategy
 
 import com.example.stocksearchservice.domain.Stock
 
+// TODO: 적확한 위치 필요, Strategy Entity를 묶기 위한 interface. 추가적인 정보를 담아볼까
+interface StockStrategy
+
 class FinalPriceBatingStrategyV1 private constructor(
     val stock: Stock,
     val rank: Int,
-) {
+) : StockStrategy {
     constructor(stock: Stock, rank: Int, foreignerStockVolume: ForeignerStockVolume) : this(
         stock = stock,
         rank = rank,
@@ -15,6 +18,11 @@ class FinalPriceBatingStrategyV1 private constructor(
 
     // TODO: 훨씬 좋은 구조가 있을 것 같다
     lateinit var foreignerStockVolume: ForeignerStockVolume
+
+    init {
+        /* TODO: 초기화 시점에, 조건을 충족하는 객체만 반환 할 수 있도록 하는 방법이 있을까 */
+        // this.isValidCurrentValue()
+    }
 
     data class ForeignerStockVolume(val value: Long)
 
@@ -31,7 +39,7 @@ class FinalPriceBatingStrategyV1 private constructor(
         // stockTotalVolume / 100000000
         // foreignerStockVolume.value / 1000000
         // stockTotalVolume / 100, foreignerStockVolume.value
-        return foreignerStockVolume.value >= (stock.stockTotalVolume.value/100) * 0.3
+        return foreignerStockVolume.value >= (stock.stockTotalVolume.value / 100) * 0.3
     }
 
     private fun validCurrentStockDerivative(): Boolean {

@@ -3,15 +3,15 @@ package com.example.stocksearchservice.application.repository
 import com.example.stocksearchservice.application.port.out.StockStrategyPort
 import com.example.stocksearchservice.application.port.out.dto.StockStrategyDTO
 import com.example.stocksearchservice.application.port.out.dto.StrategyType
-import com.example.stocksearchservice.domain.repository.StockStrategyRepository
+import com.example.stocksearchservice.domain.repository.FinalPriceBatingStrategyV1Repository
 import com.example.stocksearchservice.domain.strategy.FinalPriceBatingStrategyV1
 import org.springframework.stereotype.Component
 import java.time.ZonedDateTime
 
 @Component
-class StockStrategyRepositoryImpl(
+class FinalPriceBatingStrategyV1RepositoryImpl(
     private val stockStrategyPort: StockStrategyPort,
-) : StockStrategyRepository {
+) : FinalPriceBatingStrategyV1Repository {
     override suspend fun save(entity: FinalPriceBatingStrategyV1, date: ZonedDateTime) {
         val stockId = entity.stock.stockId.value
         val type = StrategyType.FinalPriceBatingV1
