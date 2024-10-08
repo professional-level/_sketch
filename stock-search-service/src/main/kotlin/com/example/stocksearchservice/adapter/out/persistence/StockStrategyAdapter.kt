@@ -13,5 +13,6 @@ class StockStrategyAdapter(
     override suspend fun save(dto: StockStrategyDTO) {
         val entity = StockSuggestion.of(dto)
         stockSuggestionRepository.save(entity)
+        // save가 실패하면?
     }
 }
