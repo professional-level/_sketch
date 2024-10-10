@@ -1,9 +1,14 @@
 package com.example.stocksearchservice.domain.strategy
 
 import com.example.stocksearchservice.domain.Stock
+import com.example.stocksearchservice.domain.event.DomainEvent
+import com.example.stocksearchservice.domain.event.EventSupportedEntity
+import com.example.stocksearchservice.domain.event.StrategiesSavedEvent
+import com.example.stocksearchservice.domain.event.StrategyType
+import java.time.ZonedDateTime
 
 // TODO: 적확한 위치 필요, Strategy Entity를 묶기 위한 interface. 추가적인 정보를 담아볼까
-interface StockStrategy
+interface StockStrategy : EventSupportedEntity
 
 class FinalPriceBatingStrategyV1 private constructor(
     val stock: Stock,
@@ -58,5 +63,18 @@ class FinalPriceBatingStrategyV1 private constructor(
 
         // TODO: 단건 validation의 경우에는 순위에 대한 보장이 필요하다
         fun validOf(stock: Stock): FinalPriceBatingStrategyV1? = validListOf(listOf(stock)).firstOrNull()
+    }
+
+    override val events: MutableList<DomainEvent>
+        get() = TODO("Not yet implemented")
+
+    override fun complete() {
+        events.add(
+            StrategiesSavedEvent(
+                stockId = this.stock.stockId.value,
+                savedAt = ZonedDateTime.now(), // TODO: event 발행 시점에 넣는 것이 아니라 객체가 이미 갖고 있도록.
+                type = StrategyType.FinalPriceBatingStrategyV1,
+            ),
+        )
     }
 }

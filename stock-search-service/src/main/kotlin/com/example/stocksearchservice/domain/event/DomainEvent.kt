@@ -11,6 +11,12 @@ interface DomainEvent {
     val id: UUID // TODO: FriendlyUuid나 다른 최적화 id 적용 필요
     val occurredAt: ZonedDateTime
 }
+
+interface EventSupportedEntity {
+    val events: MutableList<DomainEvent>
+    fun complete()
+}
+
 data class StrategiesSavedEvent(
     val stockId: String,
     val savedAt: ZonedDateTime,
