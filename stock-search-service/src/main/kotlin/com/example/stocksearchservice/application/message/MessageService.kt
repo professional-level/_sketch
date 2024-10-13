@@ -1,20 +1,25 @@
 package com.example.stocksearchservice.application.message
 
+import com.example.stocksearchservice.domain.event.DomainEvent
+import com.fasterxml.jackson.databind.ObjectMapper
 import kotlinx.coroutines.future.await
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Configuration
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.kafka.core.ConsumerFactory
 import org.springframework.kafka.core.KafkaTemplate
+import org.springframework.stereotype.Component
 import org.springframework.stereotype.Service
 
 interface MessageService {
     suspend fun publish(topic: MessageTopic, message: String)
-//    fun consume(message: String) // TODO: 반환 타입 고민 필요
-// //    fun consume(topic: MessageTopic): Flow<String>
 }
 
 enum class MessageTopic(val topicName: String) {
     TOPIC1(Topic.TOPIC1),
     TOPIC2(Topic.TOPIC2),
+    STRATEGIES_SAVED("strategies-saved-topic"),
+    DEFAULT("default"),
     ;
 
     companion object {
@@ -77,4 +82,46 @@ internal interface Event
 internal abstract class ApiEvent : Event
 internal abstract class ApiHandlerMessage : Message {
     lateinit var event: ApiEvent
+}
+
+//
+//
+//
+
+@Component
+class DomainEventDispatcher(
+    private val messageService: MessageService,
+    private val objectMapper: ObjectMapper,
+) {
+    suspend fun dispatch(events: List<DomainEvent>) {
+        events.forEach { event ->
+            val topic = mapEventToTopic(event)
+            val message = serializeEvent(event)
+            messageService.publish(topic, message)
+        }
+    }
+
+    private fun mapEventToTopic(event: DomainEvent): MessageTopic {
+        return when (event) {
+            is com.example.stocksearchservice.domain.event.StrategiesSavedEvent -> MessageTopic.STRATEGIES_SAVED
+            // 다른 이벤트 타입에 따른 매핑 추가
+            else -> {
+//                throw IllegalArgumentException("Unsupported event type: ${event::class.java}")
+                println("Unsupported event type: ${event::class.java}")
+                MessageTopic.DEFAULT
+            }
+        }
+    }
+
+    private fun serializeEvent(event: DomainEvent): String {
+        return objectMapper.writeValueAsString(event)
+    }
+}
+
+@Configuration
+class ObjectMapperConfig {
+    @Bean
+    fun objectMapper(): ObjectMapper {
+        return ObjectMapper()
+    }
 }
