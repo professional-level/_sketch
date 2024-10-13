@@ -1,7 +1,5 @@
 package com.example.stocksearchservice.application.scheduler
 
-import com.example.stocksearchservice.application.message.KafkaMessageService
-import com.example.stocksearchservice.config.StockStrategyService
 import com.example.stocksearchservice.domain.StockLog
 import com.example.stocksearchservice.domain.repository.FinalPriceBatingStrategyV1Repository
 import com.example.stocksearchservice.domain.repository.StockInformationRepository
@@ -14,8 +12,6 @@ import java.time.ZonedDateTime
 internal class StockSearchScheduler(
     private val stockInformationRepository: StockInformationRepository,
     private val finalPriceBatingStrategyV1Repository: FinalPriceBatingStrategyV1Repository,
-    private val kafkaMessageService: KafkaMessageService, // 이 service가 여기에 있는것이 맞는가
-    private val stockStrategyService: StockStrategyService,
 ) {
     // example of cron = "초 분 시간-시간 ? * 요일-요일"
     //    @Scheduled(cron = "15 */2 9-18 ? * MON-FRI ")
@@ -77,12 +73,10 @@ internal class StockSearchScheduler(
          * 거래량이 5거래일중 최고치중 70% 이상(당일 제외)
          * */
 
-        /*db save 로직*/ // TODO: stockStrategyService를 통하도록 수정
+        /*db save 로직*/
         finalPriceBatingStrategyV1Repository.saveAll(programVolumeAdaptedList)
-//        stockStrategyService.saveStrategies(programVolumeAdaptedList, dateTime)
 
         /*매수를 위한 microservice로 데이터 이관 로직*/
-        // TODO: publish를 위한 Event 관련 설계 필요
-//        kafkaMessageService.publish()
+        /* event publish를 통해 해결*/
     }
 }

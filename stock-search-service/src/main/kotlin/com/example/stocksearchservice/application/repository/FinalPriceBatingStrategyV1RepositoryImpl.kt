@@ -19,6 +19,7 @@ class FinalPriceBatingStrategyV1RepositoryImpl(
         stockStrategyPort.save(dto)
     }
 
+    // TODO: 같은 class(Component)의 save()를 호출할때 aop를 고려하도록 수정 필요
     override suspend fun saveAll(entities: List<FinalPriceBatingStrategyV1>, date: ZonedDateTime) {
         entities.forEach { save(it, date) }
     }
