@@ -1,6 +1,8 @@
 package com.example.stocksearchservice.domain.event
 
+import com.example.stocksearchservice.application.message.DomainEventDispatcher
 import org.aspectj.lang.JoinPoint
+import org.aspectj.lang.annotation.AfterReturning
 import org.aspectj.lang.annotation.Aspect
 import org.aspectj.lang.annotation.Before
 import org.springframework.stereotype.Component
@@ -35,7 +37,9 @@ enum class StrategyType {
 // AOP의 위치는 결론적으로 domain이 아닌 application 패키지에 있어야 할 듯
 @Aspect
 @Component
-class CompleteEntityAspect {
+class CompleteEntityAspect(
+    private val domainEventDispatcher: DomainEventDispatcher,
+) {
     // Event 발행의 순서가.. save 이후에 하는것이 맞을까?
     // after에 건다면, save과정에서 에러 발생 시, AOP관련 로직이 동작하는가? 동작하지 않도록 하려면?
     @Before("execution(* com.example.stocksearchservice.application.repository.*.save(..))") // 표현식 점검
@@ -55,6 +59,41 @@ class CompleteEntityAspect {
                 if (entity is EventSupportedEntity) {
                     entity.complete()
                 }
+            }
+        }
+    }
+
+    // AfterReturning advice to dispatch events after single entity save
+    @AfterReturning(
+        pointcut = "execution(* com.example.stocksearchservice.application.repository.*.save(..))",
+        returning = "result",
+    )
+    suspend fun afterSave(joinPoint: JoinPoint, result: Any?) {
+        if (result is EventSupportedEntity) {
+            val events = result.events.toList() // Immutable copy to prevent concurrent modification
+            if (events.isNotEmpty()) {
+                domainEventDispatcher.dispatch(events)
+                result.events.clear()
+            }
+        }
+    }
+
+    // AfterReturning advice to dispatch events after saveAll
+    @AfterReturning(
+        pointcut = "execution(* com.example.stocksearchservice.application.repository.*.saveAll(..))",
+        returning = "result",
+    )
+    suspend fun afterSaveAll(joinPoint: JoinPoint, result: Any?) {
+        if (result is Iterable<*>) {
+            val allEvents = mutableListOf<com.example.stocksearchservice.domain.event.DomainEvent>()
+            result.forEach { entity ->
+                if (entity is EventSupportedEntity) {
+                    allEvents.addAll(entity.events)
+                    entity.events.clear()
+                }
+            }
+            if (allEvents.isNotEmpty()) {
+                domainEventDispatcher.dispatch(allEvents)
             }
         }
     }
