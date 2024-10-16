@@ -81,6 +81,8 @@ dependencies {
     implementation("com.google.protobuf:protobuf-java:3.25.2")
     // kafka
     implementation("org.springframework.kafka:spring-kafka")
+    // aop 추가
+    implementation("org.springframework.boot:spring-boot-starter-aop")
 }
 
 protobuf {
@@ -102,9 +104,9 @@ tasks.withType<Test> {
     useJUnitPlatform()
 }
 //
-//docker {
+// docker {
 //    name = "${rootProject.name}-${project.name}:${version}"
 //    setDockerfile(file("Dockerfile"))
 //    files(tasks.bootJar.get().outputs.files)
 //    buildArgs(mapOf("JAR_FILE" to tasks.bootJar.get().archiveFileName.get()))
-//}
+// }
