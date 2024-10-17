@@ -2,7 +2,10 @@ package com.example.stocksearchservice.application.message
 
 import com.example.stocksearchservice.domain.event.DomainEvent
 import com.fasterxml.jackson.databind.ObjectMapper
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.future.await
+import kotlinx.coroutines.launch
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.kafka.annotation.KafkaListener
@@ -92,12 +95,15 @@ internal abstract class ApiHandlerMessage : Message {
 class DomainEventDispatcher(
     private val messageService: MessageService,
     private val objectMapper: ObjectMapper,
+    private val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.IO),
 ) {
-    suspend fun dispatch(events: List<DomainEvent>) {
-        events.forEach { event ->
-            val topic = mapEventToTopic(event)
-            val message = serializeEvent(event)
-            messageService.publish(topic, message)
+    fun dispatch(events: List<DomainEvent>) {
+        coroutineScope.launch {
+            events.forEach { event ->
+                val topic = mapEventToTopic(event)
+                val message = serializeEvent(event)
+                messageService.publish(topic, message)
+            }
         }
     }
 
