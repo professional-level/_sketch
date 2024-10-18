@@ -56,6 +56,7 @@ class FinalPriceBatingStrategyV1 private constructor(
     }
 
     companion object {
+        fun default() = FinalPriceBatingStrategyV1(Stock.default(), 0) // Debug용 함수
         private fun of(stock: Stock, rank: Int): FinalPriceBatingStrategyV1 = FinalPriceBatingStrategyV1(stock, rank)
         fun validListOf(stocks: List<Stock>): List<FinalPriceBatingStrategyV1> {
             return stocks.mapIndexed { rank, stock -> of(stock, rank + 1) }.filter { it.isValidCurrentValue() }
@@ -66,7 +67,7 @@ class FinalPriceBatingStrategyV1 private constructor(
     }
 
     override val events: MutableList<DomainEvent>
-        get() = TODO("Not yet implemented")
+        get() = mutableListOf()
 
     override fun complete() {
         events.add(

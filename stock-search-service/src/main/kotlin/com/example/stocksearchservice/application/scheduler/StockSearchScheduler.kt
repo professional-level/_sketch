@@ -75,6 +75,10 @@ internal class StockSearchScheduler(
 
         /*db save 로직*/
         finalPriceBatingStrategyV1Repository.saveAll(programVolumeAdaptedList)
+        // debuging code
+//        programVolumeAdaptedList.forEach finalPriceBatingStrategyV1Repository.save(it) }
+//        FinalPriceBatingStrategyV1.default().let { finalPriceBatingStrategyV1Repository.save(it) }
+//        FinalPriceBatingStrategyV1.default().let(::listOf).let { finalPriceBatingStrategyV1Repository.saveAll(it) }
 
         /*매수를 위한 microservice로 데이터 이관 로직*/
         /* event publish를 통해 해결*/
