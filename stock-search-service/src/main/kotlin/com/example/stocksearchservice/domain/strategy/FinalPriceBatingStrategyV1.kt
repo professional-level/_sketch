@@ -44,7 +44,7 @@ class FinalPriceBatingStrategyV1 private constructor(
         // stockTotalVolume / 100000000
         // foreignerStockVolume.value / 1000000
         // stockTotalVolume / 100, foreignerStockVolume.value
-        return foreignerStockVolume.value >= (stock.stockTotalVolume.value / 100) * 0.3
+        return foreignerStockVolume.value >= ((stock.stockTotalVolume.value / 100) * 0.3).toLong()
     }
 
     private fun validCurrentStockDerivative(): Boolean {
