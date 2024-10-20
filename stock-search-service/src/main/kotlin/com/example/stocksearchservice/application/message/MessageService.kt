@@ -98,6 +98,7 @@ class DomainEventDispatcher(
     private val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.IO),
 ) {
     fun dispatch(events: List<DomainEvent>) {
+        /*TODO: 추후 비동기 로직 적용 필요*/
         coroutineScope.launch {
             events.forEach { event ->
                 val topic = mapEventToTopic(event)

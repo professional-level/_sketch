@@ -1,13 +1,19 @@
 package com.example.stocksearchservice.domain.event
 
 import com.example.stocksearchservice.application.message.DomainEventDispatcher
+import kotlinx.coroutines.reactor.mono
 import org.aspectj.lang.JoinPoint
+import org.aspectj.lang.ProceedingJoinPoint
 import org.aspectj.lang.annotation.AfterReturning
 import org.aspectj.lang.annotation.Aspect
 import org.aspectj.lang.annotation.Before
 import org.springframework.stereotype.Component
+import reactor.core.publisher.Mono
 import java.time.ZonedDateTime
 import java.util.UUID
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlin.coroutines.suspendCoroutine
 
 interface DomainEvent {
     val id: UUID // TODO: FriendlyUuid나 다른 최적화 id 적용 필요
@@ -104,8 +110,62 @@ class CompleteEntityAspect(
 //            }
 //        }
 //    }
+
+    //
+    // TODO: 추후 reactive 적용
+//    @Around("@within(com.example.stocksearchservice.domain.event.EventPublishingRepository) && execution(* save(..))")
+//    fun aroundSave(joinPoint: ProceedingJoinPoint): Any? {
+//        val result = joinPoint.proceed()
+//
+//        when (result) {
+//            is Mono<*> -> {
+//                (result as Mono<EventSupportedEntity>).doOnSuccess { entity ->
+//                    if (entity.events.isNotEmpty()) {
+//                        logger.info("Dispatching events for entity: ${entity.id}")
+//                        domainEventDispatcher.dispatch(entity.events)
+//                        entity.events.clear()
+//                    }
+//                }
+//            }
+//            is EventSupportedEntity -> {
+//                if (result.events.isNotEmpty()) {
+//                    logger.info("Dispatching events for entity: ${result.id}")
+//                    domainEventDispatcher.dispatch(result.events)
+//                    result.events.clear()
+//                }
+//            }
+//            else -> logger.warn("Unexpected return type from save method: ${result?.javaClass}")
+//        }
+//
+//        return result
+//    }
 }
 
+/*TODO: 추후 비동기 로직 적용 필요*/
 @Target(AnnotationTarget.CLASS)
 @Retention(AnnotationRetention.RUNTIME)
 annotation class EventPublishingRepository
+
+val ProceedingJoinPoint.coroutineArgs: Array<Any?>
+    get() = this.args.sliceArray(0 until this.args.size - 1)
+
+suspend fun ProceedingJoinPoint.proceedCoroutine(
+    args: Array<Any?> = this.coroutineArgs,
+): Any? {
+    return suspendCoroutine { continuation ->
+        try {
+            val result = this.proceed(args + continuation) // 마지막 인자에 continuation 정보 추가
+            continuation.resume(result)
+        } catch (ex: Throwable) {
+            continuation.resumeWithException(ex)
+        }
+    }
+}
+
+fun ProceedingJoinPoint.runCoroutine(
+    block: suspend () -> Any?,
+): Mono<*> {
+    return mono {
+        block()
+    }
+}
