@@ -82,5 +82,6 @@ internal class StockSearchScheduler(
 
         /*매수를 위한 microservice로 데이터 이관 로직*/
         /* event publish를 통해 해결*/
+
     }
 }

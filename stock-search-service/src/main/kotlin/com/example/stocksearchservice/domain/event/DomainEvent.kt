@@ -1,14 +1,12 @@
 package com.example.stocksearchservice.domain.event
 
 import com.example.stocksearchservice.application.message.DomainEventDispatcher
-import kotlinx.coroutines.reactor.mono
 import org.aspectj.lang.JoinPoint
 import org.aspectj.lang.ProceedingJoinPoint
 import org.aspectj.lang.annotation.AfterReturning
 import org.aspectj.lang.annotation.Aspect
 import org.aspectj.lang.annotation.Before
 import org.springframework.stereotype.Component
-import reactor.core.publisher.Mono
 import java.time.ZonedDateTime
 import java.util.UUID
 import kotlin.coroutines.resume
@@ -35,7 +33,7 @@ data class StrategiesSavedEvent(
 }
 
 enum class StrategyType {
-    FinalPriceBatingStrategyV1,
+    FinalPriceBatingV1,
 }
 
 // Aspect적 문제를 해결하기 위한 AOP
@@ -162,10 +160,10 @@ suspend fun ProceedingJoinPoint.proceedCoroutine(
     }
 }
 
-fun ProceedingJoinPoint.runCoroutine(
-    block: suspend () -> Any?,
-): Mono<*> {
-    return mono {
-        block()
-    }
-}
+//fun ProceedingJoinPoint.runCoroutine(
+//    block: suspend () -> Any?,
+//): Mono<*> {
+//    return mono {
+//        block()
+//    }
+//}

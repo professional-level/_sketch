@@ -1,6 +1,7 @@
 package com.example.stocksearchservice.application.message
 
 import com.example.stocksearchservice.domain.event.DomainEvent
+import com.example.stocksearchservice.domain.event.StrategiesSavedEvent
 import com.fasterxml.jackson.databind.ObjectMapper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -123,6 +124,9 @@ class DomainEventDispatcher(
     private fun serializeEvent(event: DomainEvent): String {
         return objectMapper.writeValueAsString(event)
     }
+}
+
+private fun StrategiesSavedEvent.toMessage(): Message {
 }
 
 @Configuration

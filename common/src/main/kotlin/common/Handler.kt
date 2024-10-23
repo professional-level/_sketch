@@ -9,5 +9,5 @@ interface Handler<C, T> {
 interface HandlerContext<C>
 interface Command<C> : HandlerContext<C>
 interface Query<C> : HandlerContext<C>
-class UnitQuery : Query<UnitQuery> // TODO: UnitQuery가 아닌 다른 방법으로 Unit을 표현하고 싶다.
+object UnitQuery : Query<UnitQuery> // TODO: UnitQuery가 아닌 다른 방법으로 Unit을 표현하고 싶다.
 //
