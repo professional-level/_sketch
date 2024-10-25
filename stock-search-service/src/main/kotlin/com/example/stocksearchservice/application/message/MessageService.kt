@@ -3,6 +3,8 @@ package com.example.stocksearchservice.application.message
 import com.example.stocksearchservice.domain.event.DomainEvent
 import com.example.stocksearchservice.domain.event.StrategiesSavedEvent
 import com.fasterxml.jackson.databind.ObjectMapper
+import common.MessageTopic
+import common.Topic.TOPIC1
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.future.await
@@ -19,29 +21,6 @@ interface MessageService {
     suspend fun publish(topic: MessageTopic, message: String)
 }
 
-enum class MessageTopic(val topicName: String) {
-    TOPIC1(Topic.TOPIC1),
-    TOPIC2(Topic.TOPIC2),
-    STRATEGIES_SAVED("strategies-saved-topic"),
-    DEFAULT("default"),
-    ;
-
-    companion object {
-        private fun from(topic: String): MessageTopic? {
-            return values().find { it.topicName == topic }
-        }
-
-        fun fromOrThrow(topic: String): MessageTopic {
-            return from(topic) ?: throw IllegalArgumentException("Unknown topic: $topic")
-        }
-    }
-}
-
-object Topic {
-    const val TOPIC1 = "topic1"
-    const val TOPIC2 = "topic2"
-} // TODO: Topic과 MessageTopic이 나눠지는 현상 수정
-
 @Service
 internal class KafkaMessageService(
     private val kafkaTemplate: KafkaTemplate<String, String>,
@@ -53,9 +32,9 @@ internal class KafkaMessageService(
     }
 
     /*접근 제한자가 혹시 private이어도 되는가?*/
-    @KafkaListener(topics = [Topic.TOPIC1])
+    @KafkaListener(topics = [TOPIC1])
     fun consume(message: String) {
-        val temp = MessageTopic.fromOrThrow(Topic.TOPIC1)
+        val temp = MessageTopic.fromOrThrow(TOPIC1)
         TODO("Not yet implemented")
     }
 
@@ -111,7 +90,7 @@ class DomainEventDispatcher(
 
     private fun mapEventToTopic(event: DomainEvent): MessageTopic {
         return when (event) {
-            is com.example.stocksearchservice.domain.event.StrategiesSavedEvent -> MessageTopic.STRATEGIES_SAVED
+            is com.example.stocksearchservice.domain.event.StrategiesSavedEvent -> MessageTopic.STRATEGY_SAVED
             // 다른 이벤트 타입에 따른 매핑 추가
             else -> {
 //                throw IllegalArgumentException("Unsupported event type: ${event::class.java}")
