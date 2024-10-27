@@ -23,7 +23,7 @@ interface EventSupportedEntity {
     fun complete()
 }
 
-data class StrategiesSavedEvent(
+data class StrategyCreatedEvent(
     val stockId: String,
     val savedAt: ZonedDateTime,
     val type: StrategyType,

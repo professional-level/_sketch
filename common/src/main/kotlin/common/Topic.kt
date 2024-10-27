@@ -5,15 +5,14 @@ object Topic {
     const val TOPIC1 = "topic1"
     const val TOPIC2 = "topic2"
     const val STRATEGY_SAVED = "strategies-saved"
-    const val DEFAULT = "default"
+    const val INVALID_EVENT = "invalid-event"
 }
-
 
 enum class MessageTopic(val topicName: String) {
     TOPIC1(Topic.TOPIC1),
     TOPIC2(Topic.TOPIC2),
     STRATEGY_SAVED(Topic.STRATEGY_SAVED),
-    DEFAULT("default"),
+    INVALID_EVENT(Topic.INVALID_EVENT),
     ;
 
     companion object {

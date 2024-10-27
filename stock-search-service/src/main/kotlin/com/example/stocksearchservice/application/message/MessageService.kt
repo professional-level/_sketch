@@ -1,7 +1,7 @@
 package com.example.stocksearchservice.application.message
 
 import com.example.stocksearchservice.domain.event.DomainEvent
-import com.example.stocksearchservice.domain.event.StrategiesSavedEvent
+import com.example.stocksearchservice.domain.event.StrategyCreatedEvent
 import com.fasterxml.jackson.databind.ObjectMapper
 import common.MessageTopic
 import common.Topic.TOPIC1
@@ -90,12 +90,12 @@ class DomainEventDispatcher(
 
     private fun mapEventToTopic(event: DomainEvent): MessageTopic {
         return when (event) {
-            is com.example.stocksearchservice.domain.event.StrategiesSavedEvent -> MessageTopic.STRATEGY_SAVED
+            is com.example.stocksearchservice.domain.event.StrategyCreatedEvent -> MessageTopic.STRATEGY_SAVED
             // 다른 이벤트 타입에 따른 매핑 추가
             else -> {
 //                throw IllegalArgumentException("Unsupported event type: ${event::class.java}")
-                println("Unsupported event type: ${event::class.java}")
-                MessageTopic.DEFAULT
+                println("Unsupported event type: ${event::class.java}") // TODO: log로 변경
+                MessageTopic.INVALID_EVENT
             }
         }
     }
@@ -105,7 +105,7 @@ class DomainEventDispatcher(
     }
 }
 
-private fun StrategiesSavedEvent.toMessage(): Message {
+private fun StrategyCreatedEvent.toMessage(): Message {
 }
 
 @Configuration

@@ -3,7 +3,7 @@ package com.example.stocksearchservice.domain.strategy
 import com.example.stocksearchservice.domain.Stock
 import com.example.stocksearchservice.domain.event.DomainEvent
 import com.example.stocksearchservice.domain.event.EventSupportedEntity
-import com.example.stocksearchservice.domain.event.StrategiesSavedEvent
+import com.example.stocksearchservice.domain.event.StrategyCreatedEvent
 import com.example.stocksearchservice.domain.event.StrategyType
 import java.time.ZonedDateTime
 
@@ -71,7 +71,7 @@ class FinalPriceBatingStrategyV1 private constructor(
 
     override fun complete() {
         events.add(
-            StrategiesSavedEvent(
+            StrategyCreatedEvent(
                 stockId = this.stock.stockId.value,
                 savedAt = ZonedDateTime.now(), // TODO: event 발행 시점에 넣는 것이 아니라 객체가 이미 갖고 있도록.
                 type = StrategyType.FinalPriceBatingV1,
