@@ -1,6 +1,6 @@
 package com.example.stocksearchservice.domain.event
 
-import com.example.stocksearchservice.application.message.DomainEventDispatcher
+import com.example.stocksearchservice.application.event.DomainEventDispatcher
 import org.aspectj.lang.JoinPoint
 import org.aspectj.lang.ProceedingJoinPoint
 import org.aspectj.lang.annotation.AfterReturning
@@ -160,10 +160,10 @@ suspend fun ProceedingJoinPoint.proceedCoroutine(
     }
 }
 
-//fun ProceedingJoinPoint.runCoroutine(
+// fun ProceedingJoinPoint.runCoroutine(
 //    block: suspend () -> Any?,
-//): Mono<*> {
+// ): Mono<*> {
 //    return mono {
 //        block()
 //    }
-//}
+// }
