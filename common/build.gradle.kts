@@ -2,8 +2,7 @@ plugins {
     id("org.springframework.boot") version "3.3.0"
     id("io.spring.dependency-management") version "1.0.13.RELEASE"
     kotlin("jvm") version "1.8.0"
-//    kotlin("plugin.spring") version "1.8.0"
-//    kotlin("plugin.jpa") version "1.8.0"
+    id("com.google.protobuf") version "0.9.4"
 }
 
 group = "com.example.common"
@@ -25,8 +24,22 @@ dependencies {
 //    implementation("io.agroal:agroal-pool:2.3")
     // jakarta inject
     implementation("jakarta.inject:jakarta.inject-api:2.0.1")
+    // protobuf
+    implementation("com.google.protobuf:protobuf-kotlin:3.25.2")
+    implementation("com.google.protobuf:protobuf-java:3.25.2")
 }
-
+protobuf {
+    protoc {
+        artifact = "com.google.protobuf:protoc:3.25.2" // 최신 protobuf 컴파일러 버전으로 교체
+    }
+    generateProtoTasks {
+        all().forEach { task ->
+            task.builtins {
+                create("kotlin")
+            }
+        }
+    }
+}
 tasks.test {
     useJUnitPlatform()
 }
