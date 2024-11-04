@@ -2,12 +2,9 @@ package com.example.com.example.stockpurchaseservice.adapter.`in`.event
 
 import Event
 import com.example.common.ExternalApiAdapter
-import com.google.protobuf.Timestamp
 import common.Topic.STRATEGY_SAVED
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Service
-import java.time.Instant
-import java.time.ZoneId
 import java.time.ZonedDateTime
 
 @ExternalApiAdapter // TODO: 정확한 annotation 매칭
@@ -20,7 +17,7 @@ internal class ExternalEventListenerAdapter(
         println(message)
         val tempMessage: ByteArray = byteArrayOf()
         val event = Event.StrategiesSavedEvent.parseFrom(tempMessage)
-        buyingStockPurchaseUseCase.execute(event.toCommand())
+//        buyingStockPurchaseUseCase.execute(event.toCommand())
     }
 }
 
@@ -35,16 +32,23 @@ interface UseCase<T, R> {
 @Service
 class BuyingStockPurchaseService : BuyingStockPurchaseUseCase {
     override fun execute(request: BuyingStockPurchaseCommand): BuyingStockPurchaseResult {
-        TODO("Not yet implemented")
+        val stockId = request.stockId
+        val requestAt = request.requestAt
+        val requestType = request.type // TODO: typeMapper, mapper 공통기능 만들필요 있을 듯
+        val stockInfo = stockInfoRepository.findByStockId(stockId)
+
+        // TODO: BuyingStockPurchaseService가 아니라 전략별로 Domain 로직을 만들어, 상세조건, 구매 가격, 익절,손절라인 등 지정필요
+        return TODO()
     }
 }
-fun Event.StrategiesSavedEvent.toCommand(): BuyingStockPurchaseCommand {
-   return BuyingStockPurchaseCommand(
-        stockId = stockId,
-        requestAt = savedAt.toZonedDateTime(),
-        type = type.convert()
-    )
-}
+
+//fun Event.StrategiesSavedEvent.toCommand(): BuyingStockPurchaseCommand {
+//    return BuyingStockPurchaseCommand(
+//        stockId = stockId,
+//        requestAt = savedAt.toZonedDateTime(),
+//        type = type.convert(),
+//    )
+//}
 
 data class BuyingStockPurchaseResult(
     val temp: String,
@@ -63,7 +67,7 @@ value class StockId(val value: String)
 
 enum class StrategyType {
     Undefined,
-    FinalPriceBatingV1
+    FinalPriceBatingV1,
 }
 
 // 확장함수
@@ -73,10 +77,4 @@ fun Event.StrategyType.convert(): StrategyType {
         Event.StrategyType.FINAL_PRICE_BATING_V1 -> StrategyType.FinalPriceBatingV1
         Event.StrategyType.UNRECOGNIZED -> StrategyType.Undefined
     }
-}
-
-// protobuff 용 timestamp 값을 convert
-fun Timestamp.toZonedDateTime(zone: ZoneId = ZoneId.systemDefault()): ZonedDateTime {
-    val instant = Instant.ofEpochSecond(this.seconds, this.nanos.toLong())
-    return ZonedDateTime.ofInstant(instant, zone)
 }
