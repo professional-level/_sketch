@@ -1,5 +1,7 @@
 package com.example.stocksearchservice.domain.event
 
+import com.example.common.domain.event.DomainEvent
+import com.example.common.domain.event.EventSupportedEntity
 import com.example.stocksearchservice.application.event.DomainEventDispatcher
 import org.aspectj.lang.JoinPoint
 import org.aspectj.lang.ProceedingJoinPoint
@@ -12,16 +14,6 @@ import java.util.UUID
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
-
-interface DomainEvent {
-    val id: UUID // TODO: FriendlyUuid나 다른 최적화 id 적용 필요
-    val occurredAt: ZonedDateTime
-}
-
-interface EventSupportedEntity {
-    val events: MutableList<DomainEvent>
-    fun complete()
-}
 
 data class StrategyCreatedEvent(
     val stockId: String,
