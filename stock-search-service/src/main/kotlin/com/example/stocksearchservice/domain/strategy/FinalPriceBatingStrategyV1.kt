@@ -1,8 +1,8 @@
 package com.example.stocksearchservice.domain.strategy
 
+import com.example.common.domain.event.DomainEvent
+import com.example.common.domain.event.EventSupportedEntity
 import com.example.stocksearchservice.domain.Stock
-import com.example.stocksearchservice.domain.event.DomainEvent
-import com.example.stocksearchservice.domain.event.EventSupportedEntity
 import com.example.stocksearchservice.domain.event.StrategyCreatedEvent
 import com.example.stocksearchservice.domain.event.StrategyType
 import java.time.ZonedDateTime
