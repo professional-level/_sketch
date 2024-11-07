@@ -1,6 +1,6 @@
 syntax = "proto3";
 import "google/protobuf/timestamp.proto";
-
+// TODO: targetPrice(구매 목표가)가 있어야 할 듯
 message StrategySavedEvent{
   string stock_id = 1;
   google.protobuf.Timestamp saved_at = 2;

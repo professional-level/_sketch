@@ -17,6 +17,7 @@ import kotlin.coroutines.suspendCoroutine
 
 data class StrategyCreatedEvent(
     val stockId: String,
+    val stockName: String,
     val savedAt: ZonedDateTime,
     val type: StrategyType,
 ) : DomainEvent {

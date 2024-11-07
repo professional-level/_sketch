@@ -73,6 +73,7 @@ class FinalPriceBatingStrategyV1 private constructor(
         events.add(
             StrategyCreatedEvent(
                 stockId = this.stock.stockId.value,
+                stockName = this.stock.stockName.value,
                 savedAt = ZonedDateTime.now(), // TODO: event 발행 시점에 넣는 것이 아니라 객체가 이미 갖고 있도록.
                 type = StrategyType.FinalPriceBatingV1,
             ),

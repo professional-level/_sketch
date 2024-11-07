@@ -6,9 +6,9 @@ import com.example.stocksearchservice.domain.event.StrategyType.FinalPriceBating
 import java.time.ZonedDateTime
 import java.util.UUID
 
-
 data class StrategyCreatedApplicationEvent(
     val stockId: String,
+    val stockName: String,
     val type: StrategyTypeDto,
     val savedAt: ZonedDateTime,
     override val id: UUID,

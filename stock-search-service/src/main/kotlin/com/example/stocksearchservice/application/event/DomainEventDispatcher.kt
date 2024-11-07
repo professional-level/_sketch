@@ -1,7 +1,7 @@
 package com.example.stocksearchservice.application.event
 
+import com.example.common.domain.event.DomainEvent
 import com.example.stocksearchservice.application.port.out.message.MessageServicePort
-import com.example.stocksearchservice.domain.event.DomainEvent
 import com.example.stocksearchservice.domain.event.StrategyCreatedEvent
 import com.fasterxml.jackson.databind.ObjectMapper
 import kotlinx.coroutines.CoroutineScope
