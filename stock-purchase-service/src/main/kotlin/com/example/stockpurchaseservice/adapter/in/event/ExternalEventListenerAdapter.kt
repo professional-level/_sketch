@@ -38,11 +38,12 @@ class BuyingStockPurchaseService : BuyingStockPurchaseUseCase {
         TODO("Not yet implemented")
     }
 }
+
 fun Event.StrategiesSavedEvent.toCommand(): BuyingStockPurchaseCommand {
-   return BuyingStockPurchaseCommand(
+    return BuyingStockPurchaseCommand(
         stockId = stockId,
         requestAt = savedAt.toZonedDateTime(),
-        type = type.convert()
+        type = type.convert(),
     )
 }
 
@@ -63,7 +64,7 @@ value class StockId(val value: String)
 
 enum class StrategyType {
     Undefined,
-    FinalPriceBatingV1
+    FinalPriceBatingV1,
 }
 
 // 확장함수
@@ -73,10 +74,4 @@ fun Event.StrategyType.convert(): StrategyType {
         Event.StrategyType.FINAL_PRICE_BATING_V1 -> StrategyType.FinalPriceBatingV1
         Event.StrategyType.UNRECOGNIZED -> StrategyType.Undefined
     }
-}
-
-// protobuff 용 timestamp 값을 convert
-fun Timestamp.toZonedDateTime(zone: ZoneId = ZoneId.systemDefault()): ZonedDateTime {
-    val instant = Instant.ofEpochSecond(this.seconds, this.nanos.toLong())
-    return ZonedDateTime.ofInstant(instant, zone)
 }

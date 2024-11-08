@@ -1,10 +1,15 @@
 package com.example.stocksearchservice.application.message
 
+import Event
 import com.example.stocksearchservice.domain.event.DomainEvent
 import com.example.stocksearchservice.domain.event.StrategyCreatedEvent
+import com.example.stocksearchservice.domain.event.StrategyType
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.google.protobuf.ByteString
+import com.google.protobuf.ByteString.copyFrom
 import common.MessageTopic
 import common.Topic.TOPIC1
+import common.proto.ProtoUtils.toByteString
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.future.await
@@ -16,19 +21,27 @@ import org.springframework.kafka.core.ConsumerFactory
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.stereotype.Component
 import org.springframework.stereotype.Service
+import java.nio.ByteBuffer
+import java.util.UUID
 
 interface MessageService {
     suspend fun publish(topic: MessageTopic, message: String)
+    suspend fun publish(topic: MessageTopic, message: ByteArray)
 }
 
 @Service
 internal class KafkaMessageService(
-    private val kafkaTemplate: KafkaTemplate<String, String>,
+    private val kafkaStringTypeTemplate: KafkaTemplate<String, String>,
+    private val kafkaProtoTypeTemplate: KafkaTemplate<String, ByteArray>,
     private val consumerFactory: ConsumerFactory<String, String>,
 ) : MessageService {
 
     override suspend fun publish(topic: MessageTopic, message: String) {
-        kafkaTemplate.send(topic.topicName, message).await()
+        kafkaStringTypeTemplate.send(topic.topicName, message).await()
+    }
+
+    override suspend fun publish(topic: MessageTopic, message: ByteArray) {
+        kafkaProtoTypeTemplate.send(topic.topicName, message).await()
     }
 
     /*접근 제한자가 혹시 private이어도 되는가?*/
@@ -61,7 +74,8 @@ internal class KafkaMessageService(
 
 // TODO: 추후 common module로 이동 필요
 internal interface Message
-internal interface Event
+
+// internal interface Event
 internal abstract class ApiEvent : Event
 internal abstract class ApiHandlerMessage : Message {
     lateinit var event: ApiEvent
@@ -100,12 +114,44 @@ class DomainEventDispatcher(
         }
     }
 
+    private fun temp(event: DomainEvent) {
+        when (event) {
+            is StrategyCreatedEvent -> {
+                Event.StrategySavedEvent.newBuilder()
+                    .setStockId(event.stockId)
+                    .setMeta()
+                    .setSavedAt(event.savedAt)
+                    .setType(event.toProtoStrategyType())
+            }
+        }
+    }
+
+    private fun StrategyCreatedEvent.toProto() {
+        Event.StrategySavedEvent.newBuilder()
+            .setStockId(this.stockId)
+            .setMeta(this.getMeta())
+            .setSavedAt(this.savedAt)
+            .setType(this.toProtoStrategyType())
+    }
+
+    private fun DomainEvent.getMeta() {
+        this.id
+        Event.EventMeta.newBuilder()
+            .setId(this.id.toByteString())
+            .setOccurredAt(this.occurredAt)
+    }
+
+    private fun StrategyCreatedEvent.toProtoStrategyType() = when (this.type) {
+        StrategyType.FinalPriceBatingV1 -> Event.StrategyType.FINAL_PRICE_BATING_V1
+    }
+
     private fun serializeEvent(event: DomainEvent): String {
         return objectMapper.writeValueAsString(event)
     }
 }
 
 private fun StrategyCreatedEvent.toMessage(): Message {
+    return TODO()
 }
 
 @Configuration

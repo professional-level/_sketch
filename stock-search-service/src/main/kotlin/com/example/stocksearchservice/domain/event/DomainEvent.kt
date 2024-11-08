@@ -18,6 +18,8 @@ interface DomainEvent {
     val occurredAt: ZonedDateTime
 }
 
+interface ProtoTypeDomainEvent : DomainEvent
+
 interface EventSupportedEntity {
     val events: MutableList<DomainEvent>
     fun complete()
@@ -160,10 +162,10 @@ suspend fun ProceedingJoinPoint.proceedCoroutine(
     }
 }
 
-//fun ProceedingJoinPoint.runCoroutine(
+// fun ProceedingJoinPoint.runCoroutine(
 //    block: suspend () -> Any?,
-//): Mono<*> {
+// ): Mono<*> {
 //    return mono {
 //        block()
 //    }
-//}
+// }
