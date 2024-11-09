@@ -11,25 +11,20 @@ class FinalPriceBatingV1 private constructor(
     val requestedAt: ZonedDateTime,
     val strategyType: StrategyType,
     val purchasePrice: Money,
-    val currentPrice: Money,
+    val purchasedAt: ZonedDateTime?,
 ) : StockStrategy {
+
+    val isPurchased: Boolean = (purchasedAt == null)
 
     // 이벤트 목록 관리
     override val events: MutableList<DomainEvent> = mutableListOf()
 
-    init {
-//        // 객체 생성 시점에 검증 로직 수행
-//        if (!isValidPriceGap()) {
-//            throw InvalidPurchaseException("가격 격차가 허용 범위를 초과했습니다.")
-//        }
-    }
-
-    // 가격 격차 검증 로직
-    private fun isValidPriceGap(): Boolean {
-        val priceDifference = currentPrice.price - purchasePrice.price
-        val percentageDifference = (priceDifference / purchasePrice.price) * 100
-        return percentageDifference <= ALLOWED_PRICE_GAP_PERCENTAGE
-    }
+//    // 가격 격차 검증 로직
+//    fun isValidPriceGap(): Boolean {
+//        val priceDifference = currentPrice.price - purchasePrice.price
+//        val percentageDifference = (priceDifference / purchasePrice.price) * 100
+//        return percentageDifference <= ALLOWED_PRICE_GAP_PERCENTAGE
+//    }
 
     // 구매 주문 생성
     fun createPurchaseOrder(): PurchaseOrder {
@@ -38,21 +33,21 @@ class FinalPriceBatingV1 private constructor(
         val stopLossPrice = calculateStopLossPrice(purchasePrice)
 
         val purchaseOrder = PurchaseOrder(
-            stockId = stock.stockId,
+            stockId = stock.id,
             purchasePrice = purchasePrice,
             takeProfitPrice = takeProfitPrice,
             stopLossPrice = stopLossPrice,
             strategyType = strategyType,
-            requestedAt = requestedAt
+            requestedAt = requestedAt,
         )
 
         // 이벤트 추가
         events.add(
             StrategyExecutedEvent(
-                stockId = stock.stockId.value,
+                stockId = stock.id.value,
                 executedAt = ZonedDateTime.now(),
                 type = strategyType,
-            )
+            ),
         )
         return purchaseOrder
     }
@@ -66,9 +61,10 @@ class FinalPriceBatingV1 private constructor(
     }
 
     companion object {
-        private const val ALLOWED_PRICE_GAP_PERCENTAGE = 2.0 // 허용 가격 격차 퍼센트
-        private const val TAKE_PROFIT_MARGIN = 0.05
-        private const val STOP_LOSS_MARGIN = 0.05
+        // 전략 설계
+        private const val ALLOWED_PRICE_GAP_PERCENTAGE = 2.5 // 허용 가격 격차 퍼센트
+        private const val TAKE_PROFIT_MARGIN = 0.03
+        private const val STOP_LOSS_MARGIN = 0.03
 
         // 객체 생성용 팩토리 메서드
         fun of(
@@ -76,14 +72,14 @@ class FinalPriceBatingV1 private constructor(
             requestedAt: ZonedDateTime,
             strategyType: StrategyType,
             purchasePrice: Money,
-            currentPrice: Money,
+            purchasedAt: ZonedDateTime? = null,
         ): FinalPriceBatingV1 {
             return FinalPriceBatingV1(
                 stock = stock,
                 requestedAt = requestedAt,
                 strategyType = strategyType,
                 purchasePrice = purchasePrice,
-                currentPrice = currentPrice
+                purchasedAt = purchasedAt,
             )
         }
     }
@@ -124,7 +120,7 @@ enum class StrategyType {
 
 // 기타 필요한 클래스와 인터페이스
 data class Stock(
-    val stockId: StockId,
+    val id: StockId,
     val name: String,
     // 기타 필요한 정보
 )
