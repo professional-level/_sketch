@@ -3,9 +3,9 @@ package com.example.common.domain.event
 import java.time.ZonedDateTime
 import java.util.UUID
 
-interface DomainEvent {
-    val id: UUID // TODO: FriendlyUuid나 다른 최적화 id 적용 필요
-    val occurredAt: ZonedDateTime
+abstract class DomainEvent {
+    val id: UUID = UUID.randomUUID() // TODO: FriendlyUuid나 다른 최적화 id 적용 필요
+    val occurredAt: ZonedDateTime = ZonedDateTime.now()
 }
 
 interface EventSupportedEntity {

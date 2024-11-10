@@ -10,7 +10,6 @@ import org.aspectj.lang.annotation.Aspect
 import org.aspectj.lang.annotation.Before
 import org.springframework.stereotype.Component
 import java.time.ZonedDateTime
-import java.util.UUID
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
@@ -20,10 +19,7 @@ data class StrategyCreatedEvent(
     val stockName: String,
     val savedAt: ZonedDateTime,
     val type: StrategyType,
-) : DomainEvent {
-    override val id: UUID = UUID.randomUUID()
-    override val occurredAt: ZonedDateTime = ZonedDateTime.now()
-}
+) : DomainEvent()
 
 enum class StrategyType {
     FinalPriceBatingV1,
