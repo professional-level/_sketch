@@ -3,9 +3,10 @@ import "google/protobuf/timestamp.proto";
 // TODO: targetPrice(구매 목표가)가 있어야 할 듯
 message StrategySavedEvent{
   string stock_id = 1;
-  google.protobuf.Timestamp saved_at = 2;
-  StrategyType type = 3;
-  EventMeta meta = 4;
+  string stock_name = 2;
+  google.protobuf.Timestamp saved_at = 3;
+  StrategyType type = 4;
+  EventMeta meta = 5;
 }
 
 message EventMeta{
