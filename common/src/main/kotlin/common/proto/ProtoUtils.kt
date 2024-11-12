@@ -16,6 +16,15 @@ object ProtoUtils {
         return this.toByteArray().toByteString()
     }
 
+    fun ByteString.toUUID(): UUID? {
+        val bytes = this.toByteArray()
+        if (bytes.size != 16) return null
+        val buffer = ByteBuffer.wrap(bytes)
+        val mostSigBits = buffer.long
+        val leastSigBits = buffer.long
+        return UUID(mostSigBits, leastSigBits)
+    }
+
     // private methods
     private fun UUID.toByteArray(): ByteArray {
         val buffer = ByteBuffer.allocate(16)
@@ -33,6 +42,7 @@ object ProtoUtils {
         val instant = java.time.Instant.ofEpochSecond(this.seconds, this.nanos.toLong())
         return java.time.ZonedDateTime.ofInstant(instant, zone)
     }
+
     fun ZonedDateTime.toProtobufTimestamp(): Timestamp {
         val instant = this.toInstant()
         return Timestamp.newBuilder().setSeconds(instant.epochSecond).setNanos(instant.nano).build()
