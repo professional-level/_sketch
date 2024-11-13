@@ -1,10 +1,13 @@
 package common
 
+import common.MessageTopic.values
+
+
 // TODO: Topic과 MessageTopic이 나눠지는 현상 수정
 object Topic {
     const val TOPIC1 = "topic1"
     const val TOPIC2 = "topic2"
-    const val STRATEGY_SAVED = "strategies-saved"
+    const val STRATEGY_SAVED = "strategy-saved"
     const val INVALID_EVENT = "invalid-event"
 }
 
@@ -24,4 +27,9 @@ enum class MessageTopic(val topicName: String) {
             return from(topic) ?: throw IllegalArgumentException("Unknown topic: $topic")
         }
     }
+}
+
+object ConsumerGroupId {
+    const val PURCHASE_SERVICE = "purchase"
+    const val SEARCH_SERVICE = "search"
 }
