@@ -1,19 +1,31 @@
+package com.example.stockpurchaseservice.domain
+
 import com.example.common.domain.event.DomainEvent
 import com.example.common.domain.event.EventSupportedEntity
 import java.time.ZonedDateTime
 import java.util.UUID
 
 // StockStrategy 인터페이스 구현
-interface StockStrategy : EventSupportedEntity
+interface StockStrategy : EventSupportedEntity {
+    fun createPurchaseOrder(): PurchaseOrder
+}
 
 class FinalPriceBatingV1 private constructor(
     val stock: Stock,
     val requestedAt: ZonedDateTime,
-    val strategyType: StrategyType,
     val purchasePrice: Money,
     val purchasedAt: ZonedDateTime?,
 ) : StockStrategy {
-
+    /* TODO:
+        1. 구매를 하는 행위에 대한 전략이 필요하다
+        예를 들면, Target Price를 설정하는 전략
+        목표 price가 1000원 이라면, 1000원에 70% 구매 900원에 15% 구매, 11000원에 15% 구매 등
+        전략 타입에 따른, 목표금액의 분산화 로직 필요
+        2. 매수 틱 단가를 계산하는 것이 필요하다.
+        하나의 틱이 얼마인지 계산하여 몇 틱을 분산화 할 것 인지에 대한 로직이 필요
+        3. 매수의 총 비용이 얼마인지를 반환하는 것이 필요하다.
+        전략마다, 매수하는 금액도 다를 것이고, 총 매수 가능한 금액을 계산하는것도 필요하다.
+    */
     val isPurchased: Boolean = (purchasedAt == null)
 
     // 이벤트 목록 관리
@@ -27,7 +39,7 @@ class FinalPriceBatingV1 private constructor(
 //    }
 
     // 구매 주문 생성
-    fun createPurchaseOrder(): PurchaseOrder {
+    override fun createPurchaseOrder(): PurchaseOrder {
         // 익절, 손절 가격 계산
         val takeProfitPrice = calculateTakeProfitPrice(purchasePrice)
         val stopLossPrice = calculateStopLossPrice(purchasePrice)
@@ -37,7 +49,7 @@ class FinalPriceBatingV1 private constructor(
             purchasePrice = purchasePrice,
             takeProfitPrice = takeProfitPrice,
             stopLossPrice = stopLossPrice,
-            strategyType = strategyType,
+            strategyType = StrategyType.FinalPriceBatingV1,
             requestedAt = requestedAt,
         )
 
@@ -46,7 +58,7 @@ class FinalPriceBatingV1 private constructor(
             StrategyExecutedEvent(
                 stockId = stock.id.value,
                 executedAt = ZonedDateTime.now(),
-                type = strategyType,
+                type = StrategyType.FinalPriceBatingV1,
             ),
         )
         return purchaseOrder
@@ -70,14 +82,12 @@ class FinalPriceBatingV1 private constructor(
         fun of(
             stock: Stock,
             requestedAt: ZonedDateTime,
-            strategyType: StrategyType,
             purchasePrice: Money,
             purchasedAt: ZonedDateTime? = null,
         ): FinalPriceBatingV1 {
             return FinalPriceBatingV1(
                 stock = stock,
                 requestedAt = requestedAt,
-                strategyType = strategyType,
                 purchasePrice = purchasePrice,
                 purchasedAt = purchasedAt,
             )
@@ -90,9 +100,6 @@ class FinalPriceBatingV1 private constructor(
     }
 }
 
-// 예외 클래스
-class InvalidPurchaseException(message: String) : RuntimeException(message)
-
 // 구매 주문 엔티티
 data class PurchaseOrder(
     val stockId: StockId,
@@ -102,16 +109,45 @@ data class PurchaseOrder(
     val strategyType: StrategyType,
     val requestedAt: ZonedDateTime,
     val id: OrderId = OrderId.generate(),
-)
+) : EventSupportedEntity {
+    override val events: MutableList<DomainEvent> = mutableListOf()
+
+    private var _isSuccess: Boolean = false
+    val isSuccess get() = _isSuccess
+    fun success() {
+        _isSuccess = true
+        events.add(PurchaseSuccessEvent(orderId = this.id))
+    }
+
+    fun failed(message: String?, purchaseErrorCode: PurchaseErrorCode = PurchaseErrorCode.UNDEFINED) {
+        _isSuccess = false
+        events.add(PurchaseFailedEvent(orderId = this.id, message = message ?: "", errorCode = purchaseErrorCode))
+    }
+
+    override fun complete() {
+        TODO("Not yet implemented")
+    }
+}
+
+data class PurchaseSuccessEvent(
+    val orderId: OrderId,
+) : DomainEvent()
+
+data class PurchaseFailedEvent(
+    val orderId: OrderId,
+    val message: String,
+    val errorCode: PurchaseErrorCode,
+) : DomainEvent()
+
+enum class PurchaseErrorCode {
+    UNDEFINED
+}
 
 data class StrategyExecutedEvent(
     val stockId: String,
     val executedAt: ZonedDateTime,
     val type: StrategyType,
-) : DomainEvent {
-    override val id: UUID = UUID.randomUUID()
-    override val occurredAt: ZonedDateTime = ZonedDateTime.now()
-}
+) : DomainEvent()
 
 enum class StrategyType {
     Undefined,
@@ -129,9 +165,9 @@ data class Stock(
 value class StockId(val value: String)
 
 @JvmInline
-value class OrderId(val value: String) {
+value class OrderId(val value: UUID) {
     companion object {
-        fun generate(): OrderId = OrderId(java.util.UUID.randomUUID().toString())
+        fun generate(): OrderId = OrderId(UUID.randomUUID())
     }
 }
 
