@@ -2,6 +2,9 @@ package com.example.sketch.openapi
 
 import com.example.sketch.configure.Property.Companion.APP_KEY
 import com.example.sketch.configure.Property.Companion.APP_SECRET
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import java.security.MessageDigest
+import java.util.Base64
 
 class HeaderBuilder {
     companion object {
@@ -15,6 +18,21 @@ class HeaderBuilder {
 
         fun Map<HeaderKey, String>.addHeader(key: HeaderKey, value: String): Map<HeaderKey, String> {
             return this + mapOf(key to value)
+        }
+
+        fun Map<HeaderKey, String>.addHashKey(body: Any): Map<HeaderKey, String> {
+            val hashKey = generateHashKey(body)
+            return this + mapOf(HeaderKey.HASH_KEY to hashKey)
+        }
+
+        private fun generateHashKey(body: Any): String {
+            // HASH 암호화 로직 구현
+            val mapper = jacksonObjectMapper()
+            val jsonString = mapper.writeValueAsString(body)
+            // SHA-512 또는 다른 알고리즘으로 해싱
+            val digest = MessageDigest.getInstance("SHA-512")
+            val hashBytes = digest.digest(jsonString.toByteArray(Charsets.UTF_8))
+            return Base64.getEncoder().encodeToString(hashBytes)
         }
 
         private fun default(token: String, trId: String): Map<HeaderKey, String> {
@@ -38,6 +56,7 @@ class HeaderBuilder {
         APP_SECRET("appsecret"),
         TR_ID("tr_id"),
         CUSTOMER_TYPE("custtype"),
+        HASH_KEY("hashkey"), // HASH_KEY 추가
         ;
 
         companion object { // TODO: 삭제

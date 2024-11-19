@@ -38,7 +38,11 @@ enum class RequestType(
     ),
     GET_FOREIGNER_TRADE_TREND(
         requestURI = "/uapi/domestic-stock/v1/quotations/frgnmem-pchs-trend",
-        type = HttpMethod.GET
+        type = HttpMethod.GET,
+    ),
+    POST_STOCK_ORDER(
+        requestURI = "/uapi/domestic-stock/v1/trading/order-cash", // 주식주문(현금) URI
+        type = HttpMethod.POST,
     ),
     ;
 
@@ -128,9 +132,11 @@ enum class QueryParameter(
                     requireNotNull(additionalInfo[FID_INPUT_ISCD]) // TODO: requireNotNull에 해당하는지 아닌지를 객체 수준에서 식별이 가능해야 한다.
                     listOf(
                         FID_INPUT_ISCD,
-                        FID_INPUT_ISCD_2
+                        FID_INPUT_ISCD_2,
                     )
                 }
+
+                RequestType.POST_STOCK_ORDER -> TODO()
             }.toResult(additionalInfo)
     }
 }
@@ -161,6 +167,7 @@ fun WebClient.requestInfo(
         HttpMethod.OPTION -> this.options().uri(uri)
     }
 }
-//val emptyQueryParam: String get() = URLEncoder.encode("", StandardCharsets.UTF_8.toString()) // TODO: 최적화 가능한지 고려
+
+// val emptyQueryParam: String get() = URLEncoder.encode("", StandardCharsets.UTF_8.toString()) // TODO: 최적화 가능한지 고려
 const val emptyQueryParam = "\"\""
-//const val emptyQueryParam = "0"
+// const val emptyQueryParam = "0"

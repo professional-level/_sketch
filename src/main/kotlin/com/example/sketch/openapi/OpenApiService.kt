@@ -1,7 +1,10 @@
 package com.example.sketch.openapi
 
+import com.example.sketch.configure.Property
 import com.example.sketch.configure.Property.Companion.APP_KEY
 import com.example.sketch.configure.Property.Companion.APP_SECRET
+import com.example.sketch.configure.Property.Companion.MOCK_APP_KEY
+import com.example.sketch.configure.Property.Companion.MOCK_APP_SECRET
 import com.example.sketch.configure.QueryParameter
 import com.example.sketch.configure.QueryParameter.FID_INPUT_DATE_1
 import com.example.sketch.configure.QueryParameter.FID_INPUT_ISCD
@@ -14,6 +17,7 @@ import com.example.sketch.utils.ParseJsonResponse.parseJsonResponse
 import com.fasterxml.jackson.databind.JsonNode
 import kotlinx.coroutines.reactor.awaitSingleOrNull
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.cache.annotation.Cacheable
 import org.springframework.context.ApplicationContext
 import org.springframework.http.ResponseEntity
@@ -26,7 +30,8 @@ import org.springframework.web.reactive.function.client.toEntity
 class OpenApiService(
     // TODO: 모든 api 응답이 캐싱 처리가 필요하다. 왜냐하면 외부와 통신하는 api의 경우 빈번하게 호출되기 때문에, 극도의 성능 필요
     @Autowired val applicationContext: ApplicationContext,
-    @Autowired val webClient: WebClient,
+    @Qualifier("webClient") @Autowired val webClient: WebClient,
+    @Qualifier("mockWebclient") @Autowired val mockWebClient: WebClient,
 ) {
     @Cacheable(cacheNames = ["authentication"], key = "'api_token'")
     suspend fun requestToken(
@@ -53,6 +58,30 @@ class OpenApiService(
          *   repository.save(accessToken)
          * */
         // TODO: response가 정상값이 아닐때, 에러처리.
+        return TokenResponse(token = accessToken)
+    }
+
+    // TODO: 모의계좌, 실전계좌의 토큰 발급 로직을 좀 더 체계적으로 변경
+    @Cacheable(cacheNames = ["mock_authentication"], key = "'mock_api_token'")
+    suspend fun requestMockToken(
+        info: RequestType = RequestType.GET_TOKEN,
+        requestBody: Map<String, String> =
+            mapOf(
+                "grant_type" to "client_credentials",
+                "appkey" to MOCK_APP_KEY,
+                "appsecret" to MOCK_APP_SECRET,
+            ),
+    ): TokenResponse {
+        val toEntity: ResponseEntity<String> =
+            (mockWebClient.requestInfo(info) as RequestBodySpec) // TODO: as RequestBodySpec 이 부분을 고민해야함
+                .bodyValue(requestBody)
+                .retrieve()
+                .toEntity<String>()
+                .awaitSingleOrNull() ?: ResponseEntity
+                .notFound()
+                .build<String>() // webflux이므로 block이 제한되며, 테스트코드는 작동하나 여기선 작동하지 않는 포인트가 된다.
+        val response = parseJsonResponse(toEntity)
+        val accessToken = response.get("access_token").textValue()
         return TokenResponse(token = accessToken)
     }
 
@@ -98,10 +127,9 @@ class OpenApiService(
     suspend fun getCurrentPriceOfInvestment(): OpenApiResponse {
         val token = getToken()
         val info: RequestType = RequestType.GET_CURRENT_PRICE_OF_INVESTMENT
-        val headers = HeaderBuilder
-            .build(token = token, trId = "FHKST01010900")
+        val headers = build(token = token, trId = "FHKST01010900")
             .build() // 주식현재가 투자자 //TODO: trId를 RequestType에 종속 시켜야 함.
-        val queryParameters = QueryParameter.forType(info, mapOf(QueryParameter.FID_INPUT_ISCD to "005930"))
+        val queryParameters = QueryParameter.forType(info, mapOf(FID_INPUT_ISCD to "005930"))
         val response = executeHttpRequest(info, headers, queryParameters)
         return response
     }
@@ -113,8 +141,7 @@ class OpenApiService(
         val token = getToken()
         val info: RequestType = RequestType.GET_PROGRAM_TRADE_INFO_PER_INDIVIDUAL
         val headers =
-            HeaderBuilder
-                .build(token = token, trId = "FHPPG04650200") // 종목별 프로그램매매추이(일별) [국내주식-113]
+            build(token = token, trId = "FHPPG04650200") // 종목별 프로그램매매추이(일별) [국내주식-113]
                 .addHeader(HeaderBuilder.HeaderKey.CUSTOMER_TYPE, "P") // 고객 타입 : 개인 P. 없어도 되는지 테스트 필요
                 .build() // TODO: 해당 추가 header가 RequestType에 종속되도록 수정
 
@@ -129,11 +156,10 @@ class OpenApiService(
         val token = getToken()
         val info: RequestType = RequestType.GET_PROGRAM_TRADE_INFO_PER_INDIVIDUAL_AT_ONE_DAY
         val headers =
-            HeaderBuilder
-                .build(
-                    token = token,
-                    trId = "FHPPG04650100",
-                ).addHeader(HeaderBuilder.HeaderKey.CUSTOMER_TYPE, "P")
+            build(
+                token = token,
+                trId = "FHPPG04650100",
+            ).addHeader(HeaderBuilder.HeaderKey.CUSTOMER_TYPE, "P")
                 .build() // 종목별 프로그램매매추이(체결)[v1_국내주식-044] // 고객 타입 : 개인 P. 없어도 되는지 테스트 필요
         // "tr_cont" to "N" // TODO: check tr_count one more
         val queryParameters = QueryParameter.forType(info, mapOf(FID_INPUT_ISCD to stockId))
@@ -147,24 +173,23 @@ class OpenApiService(
         val token = getToken()
         val info: RequestType = RequestType.GET_QUOTATIONS_OF_VOLUME_RANK
         val headers =
-            HeaderBuilder
-                .build(
-                    token = token,
-                    trId = "FHPST01710000",
-                ).addHeader(HeaderBuilder.HeaderKey.CUSTOMER_TYPE, "P")
+            build(
+                token = token,
+                trId = "FHPST01710000",
+            ).addHeader(HeaderBuilder.HeaderKey.CUSTOMER_TYPE, "P")
                 .build() // 거래량순위[v1_국내주식-047]
 
         val queryParameters = QueryParameter.forType(
             info,
             mapOf(
                 QueryParameter.FID_COND_SCR_DIV_CODE to "20171",
-                QueryParameter.FID_INPUT_ISCD to "0000",
+                FID_INPUT_ISCD to "0000",
                 QueryParameter.FID_DIV_CLS_CODE to "0",
                 QueryParameter.FID_BLNG_CLS_CODE to "3",
                 QueryParameter.FID_TRGT_CLS_CODE to "111111111",
                 QueryParameter.FID_TRGT_EXLS_CLS_CODE to "1111111111",
                 QueryParameter.FID_VOL_CNT to "0",
-                QueryParameter.FID_INPUT_DATE_1 to "0",
+                FID_INPUT_DATE_1 to "0",
             ),
         )
         val response = executeHttpRequest(info, headers, queryParameters)
@@ -176,11 +201,10 @@ class OpenApiService(
         val token = getToken()
         val info: RequestType = RequestType.GET_FOREIGNER_TRADE_TREND
         val headers =
-            HeaderBuilder
-                .build(
-                    token = token,
-                    trId = "FHKST644400C0",
-                ).addHeader(HeaderBuilder.HeaderKey.CUSTOMER_TYPE, "P")
+            build(
+                token = token,
+                trId = "FHKST644400C0",
+            ).addHeader(HeaderBuilder.HeaderKey.CUSTOMER_TYPE, "P")
                 .build()
         val queryParameters =
             QueryParameter.forType(info, mapOf(FID_INPUT_ISCD to stockId /* 종목코드(ex) 005930(삼성전자))*/))
@@ -188,26 +212,76 @@ class OpenApiService(
         return response
     }
 
+    suspend fun postStockOrder(request: StockOrderRequest): OpenApiResponse {
+        val token = getToken(isMock = request.isMock)
+        val info: RequestType = RequestType.POST_STOCK_ORDER
+
+        val trId = getTrIdForOrder(request.ORD_DVSN)
+
+        val headers = build(token = token, trId = trId)
+            .addHeader(HeaderBuilder.HeaderKey.CUSTOMER_TYPE, "P") // 개인 고객 타입
+//            .addHashKey(request)
+            .build()
+        val cano = when (request.isMock) {
+            true -> Property.MOCK_ACCOUNT
+            false -> Property.MOCK_ACCOUNT // TODO: 추후 실전계좌 매핑
+        }
+        val acntPrdtCd = when (request.isMock) {
+            true -> Property.MOCK_ACCOUNT_TAIL // TODO: 추후 실전계좌 매핑
+            false -> Property.MOCK_ACCOUNT_TAIL
+        }
+        val body = mapOf(
+            BodyParameter.CANO to cano,
+            BodyParameter.ACNT_PRDT_CD to acntPrdtCd,
+            BodyParameter.PDNO to request.PDNO, // 종목코드 6자리
+            BodyParameter.ORD_DVSN to request.ORD_DVSN, // 주문구분 00 지정가 01 시장가
+            BodyParameter.ORD_QTY to request.ORD_QTY, // 주문수량
+            BodyParameter.ORD_UNPR to request.ORD_UNPR, // 주문단가
+        )
+
+        val response = executeHttpRequest(info = info, headers = headers, body = body, isMockApi = true)
+        return response
+    }
+
+    // end
     // sub-method
+    private fun getTrIdForOrder(ordDvsn: String): String {
+        val isMock = true // TODO: 실제 환경에 맞게 변경 (true: 모의투자, false: 실전투자)
+        return when (ordDvsn) {
+            "00", "02", "03", "13", "16" -> if (isMock) "VTTC0802U" else "TTTC0802U" // 매수
+            "01", "07", "08", "14", "17" -> if (isMock) "VTTC0801U" else "TTTC0801U" // 매도
+            else -> throw IllegalArgumentException("유효하지 않은 주문구분 코드입니다.")
+        }
+    }
+
     private suspend fun executeHttpRequest(
         info: RequestType,
         headers: Map<String, String>,
-        queryParameters: Map<QueryParameter, String>,
+        queryParameters: Map<QueryParameter, String> = emptyMap(),
+        body: Any? = null,
+        isMockApi: Boolean = false,
     ): OpenApiResponse {
-        val toEntity =
-            webClient
-                .requestInfo(info, queryParameters)
-                .headers { httpHeaders ->
-                    headers.forEach { (key, value) ->
-                        httpHeaders.set(key, value)
-                    }
-                }.retrieve()
-                .toEntity<JsonNode>() // TODO: 즉시 JsonNode로 반환이 가능한지 확인 필요
-                .awaitSingleOrNull() ?: ResponseEntity.notFound().build<String>() // TODO: 응답이 200 ok가 아닐때 에러 처리 필요
+        val client = when (isMockApi) {
+            true -> mockWebClient
+            false -> webClient
+        }
+        val requestSpec = client
+            .requestInfo(info, queryParameters)
+            .headers { httpHeaders ->
+                headers.forEach { (key, value) ->
+                    httpHeaders.set(key, value)
+                }
+            }
+        val responseEntity = when (body != null) {
+            true -> (requestSpec as RequestBodySpec).bodyValue(body)
+            false -> requestSpec
+        }.retrieve()
+            .toEntity<JsonNode>()
+            .awaitSingleOrNull() ?: ResponseEntity.notFound().build<String>()
 
-        val status = toEntity.statusCode
+        val status = responseEntity.statusCode
         val response = when {
-            status.is2xxSuccessful -> (toEntity.body as OpenApiResponse)
+            status.is2xxSuccessful -> (responseEntity.body as OpenApiResponse)
             status.is4xxClientError -> throw RuntimeException("$status") // TODO: exception 처리 필요
             status.is5xxServerError -> throw RuntimeException("$status") // TODO: token expire에 대한 분기 처리 필요
             else -> throw RuntimeException("$status")
@@ -216,8 +290,12 @@ class OpenApiService(
     }
 
     // private method
-    private suspend fun getToken(): String {
-        val token = applicationContext.getBean(OpenApiService::class.java).requestToken().token
+    private suspend fun getToken(isMock: Boolean = false): String {
+        val self = applicationContext.getBean(OpenApiService::class.java)
+        val token = when (isMock) {
+            false -> self.requestToken().token
+            true -> self.requestMockToken().token
+        }
         require(token.isNotBlank())
         return token
     }
@@ -227,4 +305,13 @@ class OpenApiService(
 
 enum class ResponseParameter(val value: String) {
     OUTPUT("output"),
+}
+
+object BodyParameter {
+    const val CANO = "CANO"
+    const val ACNT_PRDT_CD = "ACNT_PRDT_CD"
+    const val PDNO = "PDNO"
+    const val ORD_DVSN = "ORD_DVSN"
+    const val ORD_QTY = "ORD_QTY"
+    const val ORD_UNPR = "ORD_UNPR"
 }
