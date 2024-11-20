@@ -1,7 +1,8 @@
-package com.example.com.example.stockpurchaseservice.application.port.`in`
+package com.example.stockpurchaseservice.application.port.`in`
 
-import com.example.com.example.stockpurchaseservice.application.service.BuyingStockPurchaseCommand
-import com.example.com.example.stockpurchaseservice.application.service.BuyingStockPurchaseResult
+import com.example.stockpurchaseservice.application.service.BuyingStockPurchaseCommand
+import com.example.stockpurchaseservice.application.service.BuyingStockPurchaseResult
+
 
 interface BuyingStockPurchaseUseCase : UseCase<BuyingStockPurchaseCommand, BuyingStockPurchaseResult>
 

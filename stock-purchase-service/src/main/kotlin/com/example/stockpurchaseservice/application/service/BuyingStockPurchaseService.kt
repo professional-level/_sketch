@@ -1,7 +1,7 @@
-package com.example.com.example.stockpurchaseservice.application.service
+package com.example.stockpurchaseservice.application.service
 
-import com.example.com.example.stockpurchaseservice.application.port.`in`.BuyingStockPurchaseUseCase
-import com.example.com.example.stockpurchaseservice.application.service.strategy.StockPurchaseHandlerFactory
+import com.example.stockpurchaseservice.application.port.`in`.BuyingStockPurchaseUseCase
+import com.example.stockpurchaseservice.application.service.strategy.StockPurchaseHandlerFactory
 import com.example.stockpurchaseservice.domain.Money
 import com.example.stockpurchaseservice.domain.OrderId
 import org.springframework.stereotype.Service

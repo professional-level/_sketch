@@ -1,10 +1,10 @@
-package com.example.com.example.stockpurchaseservice.application.service.strategy
+package com.example.stockpurchaseservice.application.service.strategy
 
-import com.example.com.example.stockpurchaseservice.application.port.out.MarketServicePort
-import com.example.com.example.stockpurchaseservice.application.port.out.PurchaseOrderDto
-import com.example.com.example.stockpurchaseservice.application.service.BuyingStockPurchaseCommand.OfFinalPriceBatingV1
-import com.example.com.example.stockpurchaseservice.application.service.BuyingStockPurchaseResult
-import com.example.com.example.stockpurchaseservice.application.service.PurchaseStatus
+import com.example.stockpurchaseservice.application.port.out.MarketServicePort
+import com.example.stockpurchaseservice.application.port.out.PurchaseOrderDto
+import com.example.stockpurchaseservice.application.service.BuyingStockPurchaseCommand
+import com.example.stockpurchaseservice.application.service.BuyingStockPurchaseResult
+import com.example.stockpurchaseservice.application.service.PurchaseStatus
 import com.example.stockpurchaseservice.domain.FinalPriceBatingV1
 import com.example.stockpurchaseservice.domain.PurchaseErrorCode
 import com.example.stockpurchaseservice.domain.PurchaseOrder
@@ -15,9 +15,9 @@ import org.springframework.stereotype.Component
 @Component
 internal class FinalPriceBatingV1Handler(
     private val marketService: MarketServicePort,
-) : StockPurchaseHandler<OfFinalPriceBatingV1> {
+) : StockPurchaseHandler<BuyingStockPurchaseCommand.OfFinalPriceBatingV1> {
 
-    override fun handle(command: OfFinalPriceBatingV1): BuyingStockPurchaseResult {
+    override fun handle(command: BuyingStockPurchaseCommand.OfFinalPriceBatingV1): BuyingStockPurchaseResult {
         val stockId = command.stockId
         val stockName = command.stockName
         val requestedAt = command.requestAt

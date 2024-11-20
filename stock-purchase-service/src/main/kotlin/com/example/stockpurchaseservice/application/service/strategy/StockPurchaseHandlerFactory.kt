@@ -1,8 +1,8 @@
-package com.example.com.example.stockpurchaseservice.application.service.strategy
+package com.example.stockpurchaseservice.application.service.strategy
 
-import com.example.com.example.stockpurchaseservice.application.service.BuyingStockPurchaseCommand
-import com.example.com.example.stockpurchaseservice.application.service.BuyingStockPurchaseResult
-import com.example.com.example.stockpurchaseservice.application.service.StrategyType
+import com.example.stockpurchaseservice.application.service.BuyingStockPurchaseCommand
+import com.example.stockpurchaseservice.application.service.BuyingStockPurchaseResult
+import com.example.stockpurchaseservice.application.service.StrategyType
 import org.springframework.stereotype.Component
 
 interface StockPurchaseHandler<T : BuyingStockPurchaseCommand> {

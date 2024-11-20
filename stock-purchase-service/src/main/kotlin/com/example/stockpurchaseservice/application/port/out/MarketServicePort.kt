@@ -1,4 +1,4 @@
-package com.example.com.example.stockpurchaseservice.application.port.out
+package com.example.stockpurchaseservice.application.port.out
 
 import java.util.UUID
 

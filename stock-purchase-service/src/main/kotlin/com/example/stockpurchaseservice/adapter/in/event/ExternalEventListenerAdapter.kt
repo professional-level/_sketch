@@ -1,11 +1,11 @@
-package com.example.com.example.stockpurchaseservice.adapter.`in`.event
+package com.example.stockpurchaseservice.adapter.`in`.event
 
 import Event
-import com.example.com.example.stockpurchaseservice.application.port.`in`.BuyingStockPurchaseUseCase
-import com.example.com.example.stockpurchaseservice.application.service.BuyingStockPurchaseCommand
-import com.example.com.example.stockpurchaseservice.application.service.StockId
-import com.example.com.example.stockpurchaseservice.application.service.StrategyType
 import com.example.common.ExternalApiAdapter
+import com.example.stockpurchaseservice.application.port.`in`.BuyingStockPurchaseUseCase
+import com.example.stockpurchaseservice.application.service.BuyingStockPurchaseCommand
+import com.example.stockpurchaseservice.application.service.StockId
+import com.example.stockpurchaseservice.application.service.StrategyType
 import common.ConsumerGroupId.PURCHASE_SERVICE
 import common.Topic.STRATEGY_SAVED
 import common.proto.ProtoUtils.toZonedDateTime
@@ -16,7 +16,7 @@ internal class ExternalEventListenerAdapter(
     private val buyingStockPurchaseUseCase: BuyingStockPurchaseUseCase, // TODO: ServiceMapper class 필요
 ) {
     @KafkaListener(topics = [STRATEGY_SAVED], groupId = PURCHASE_SERVICE) // TODO: topic enum으로 관리하며 common으로 이동 필요
-    fun createdStrategies(message: ByteArray ) {
+    fun createdStrategies(message: ByteArray) {
         // 구현
         println(message) // TODO: 테스트 후 제거
         val tempMessage: ByteArray = byteArrayOf()
@@ -43,7 +43,7 @@ fun Event.StrategySavedEvent.toCommand(): BuyingStockPurchaseCommand {
             stockName = event.stockName,
             requestAt = event.savedAt.toZonedDateTime(),
             type = strategyType,
-            purchasePrice = 0.0 // TODO: 실제 구매 가격으로 변경 필요
+            purchasePrice = 0.0, // TODO: 실제 구매 가격으로 변경 필요
         )
 
         else -> throw IllegalArgumentException("지원하지 않는 전략 타입입니다: $strategyType")

@@ -1,8 +1,8 @@
-package com.example.com.example.stockpurchaseservice.adapter.out
+package com.example.stockpurchaseservice.adapter.out
 
-import com.example.com.example.stockpurchaseservice.application.port.out.MarketServicePort
-import com.example.com.example.stockpurchaseservice.application.port.out.PurchaseOrderDto
 import com.example.common.ExternalApiAdapter
+import com.example.stockpurchaseservice.application.port.out.MarketServicePort
+import com.example.stockpurchaseservice.application.port.out.PurchaseOrderDto
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.MediaType
@@ -36,7 +36,6 @@ internal class BuyStockHandler(
         response?.body?.body
     }
 }
-
 
 @Configuration
 class WebClientConfig {
