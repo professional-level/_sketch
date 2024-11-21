@@ -1,9 +1,9 @@
 package com.example.stocksearchservice.application.repository
 
+import com.example.common.domain.event.EventPublishingRepository
 import com.example.stocksearchservice.application.port.out.StockStrategyPort
 import com.example.stocksearchservice.application.port.out.dto.StockStrategyDTO
 import com.example.stocksearchservice.application.port.out.dto.StrategyType
-import com.example.stocksearchservice.domain.event.EventPublishingRepository
 import com.example.stocksearchservice.domain.repository.FinalPriceBatingStrategyV1Repository
 import com.example.stocksearchservice.domain.strategy.FinalPriceBatingStrategyV1
 import org.springframework.context.annotation.Lazy
