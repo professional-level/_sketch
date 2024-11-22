@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+// ApiResponse는 응답 구조를 나타냅니다.
+message StockOrderRsponse {
+  string rt_cd = 1;       // 반환 코드
+  string msg_cd = 2;      // 메시지 코드
+  string msg1 = 3;        // 메시지 내용
+  Output output = 4;      // 출력 데이터
+}
+
+// Output은 output 객체의 세부 정보를 나타냅니다.
+message Output {
+  string KRX_FWDG_ORD_ORGNO = 1; // KRX_FWDG_ORD_ORGNO 필드
+  string ODNO = 2;                // ODNO 필드
+  string ORD_TMD = 3;             // ORD_TMD 필드
+}
