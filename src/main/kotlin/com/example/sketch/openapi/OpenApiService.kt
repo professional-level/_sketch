@@ -12,6 +12,7 @@ import com.example.sketch.configure.RequestType
 import com.example.sketch.configure.requestInfo
 import com.example.sketch.openapi.HeaderBuilder.Companion.addHeader
 import com.example.sketch.openapi.HeaderBuilder.Companion.build
+import com.example.sketch.openapi.HeaderBuilder.HeaderKey
 import com.example.sketch.utils.OpenApiResponse
 import com.example.sketch.utils.ParseJsonResponse.parseJsonResponse
 import com.fasterxml.jackson.databind.JsonNode
@@ -218,10 +219,16 @@ class OpenApiService(
 
         val trId = getTrIdForOrder(request.ORD_DVSN)
 
-        val headers = build(token = token, trId = trId)
+        var headers = build(token = token, trId = trId)
             .addHeader(HeaderBuilder.HeaderKey.CUSTOMER_TYPE, "P") // 개인 고객 타입
 //            .addHashKey(request)
             .build()
+        // TODO: mock 인지 아닌지 ThreadLocal 혹은, Context로 전달 해야 함
+        val mockHeader = headers + mapOf(
+            HeaderKey.APP_KEY.value to MOCK_APP_KEY,
+            HeaderKey.APP_SECRET.value to MOCK_APP_SECRET,
+        )
+
         val cano = when (request.isMock) {
             true -> Property.MOCK_ACCOUNT
             false -> Property.MOCK_ACCOUNT // TODO: 추후 실전계좌 매핑
@@ -239,7 +246,7 @@ class OpenApiService(
             BodyParameter.ORD_UNPR to request.ORD_UNPR, // 주문단가
         )
 
-        val response = executeHttpRequest(info = info, headers = headers, body = body, isMockApi = true)
+        val response = executeHttpRequest(info = info, headers = mockHeader, body = body, isMockApi = true)
         return response
     }
 
@@ -275,7 +282,8 @@ class OpenApiService(
         val responseEntity = when (body != null) {
             true -> (requestSpec as RequestBodySpec).bodyValue(body)
             false -> requestSpec
-        }.retrieve()
+        }
+            .retrieve()
             .toEntity<JsonNode>()
             .awaitSingleOrNull() ?: ResponseEntity.notFound().build<String>()
 

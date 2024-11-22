@@ -96,6 +96,17 @@ class OpenApiController(
          **/
         return service.getForeignerTradeTrend(stockId)
     }
+
+    @PostMapping("/temp/test")
+    suspend fun postStockOrder() {
+        service.postStockOrder(
+            request = StockOrderRequest(
+                PDNO = "005930",
+                ORD_QTY = "1",
+                ORD_UNPR = "56500",
+            ),
+        )
+    }
 }
 
 // TODO: 해당 to~로직을 다른 interface로 변경
