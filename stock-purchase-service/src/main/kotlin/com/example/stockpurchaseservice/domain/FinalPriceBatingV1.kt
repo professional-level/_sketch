@@ -6,16 +6,19 @@ import java.time.ZonedDateTime
 import java.util.UUID
 
 // StockStrategy 인터페이스 구현
-interface StockStrategy : EventSupportedEntity {
-    fun createPurchaseOrder(): PurchaseOrder
+abstract class StockStrategy : EventSupportedEntity {
+    abstract fun createPurchaseOrder(): PurchaseOrder
+    abstract fun createSellingOrder(): SellingOrder?
+    abstract val purchasedAt: ZonedDateTime?
+    fun isPurchased() = (purchasedAt != null)
 }
 
 class FinalPriceBatingV1 private constructor(
     val stock: Stock,
     val requestedAt: ZonedDateTime,
     val purchasePrice: Money,
-    val purchasedAt: ZonedDateTime?,
-) : StockStrategy {
+    override val purchasedAt: ZonedDateTime?,
+) : StockStrategy() {
     /* TODO:
         1. 구매를 하는 행위에 대한 전략이 필요하다
         예를 들면, Target Price를 설정하는 전략
@@ -26,7 +29,6 @@ class FinalPriceBatingV1 private constructor(
         3. 매수의 총 비용이 얼마인지를 반환하는 것이 필요하다.
         전략마다, 매수하는 금액도 다를 것이고, 총 매수 가능한 금액을 계산하는것도 필요하다.
     */
-    val isPurchased: Boolean = (purchasedAt == null)
 
     // 이벤트 목록 관리
     override val events: MutableList<DomainEvent> = mutableListOf()
@@ -64,6 +66,11 @@ class FinalPriceBatingV1 private constructor(
         return purchaseOrder
     }
 
+    override fun createSellingOrder(): SellingOrder? {
+        if (!isPurchased()) throw IllegalStateException("purchasedAt is null")
+        TODO()
+    }
+
     private fun calculateTakeProfitPrice(purchasePrice: Money): Money {
         return purchasePrice * (1 + TAKE_PROFIT_MARGIN)
     }
@@ -98,6 +105,45 @@ class FinalPriceBatingV1 private constructor(
     override fun complete() {
         // 필요한 경우 추가 로직 수행
     }
+}
+
+ class Order private constructor(
+    val id: OrderId,
+    val stockId: StockId,
+    val requestedAt: ZonedDateTime,
+    val strategyType: StrategyType,
+    val purchasedAt: ZonedDateTime?,
+    val sellingAt: ZonedDateTime?,
+    val purchasePrice: Money?,
+    val sellingPrice: Money?,
+){
+  companion object{
+      fun from(purchaseOrder: PurchaseOrder): Order { TODO()}
+      fun from(sellingOrder: SellingOrder): Order { TODO()}
+  }
+}
+// 판매 주문 엔티티
+    class SellingOrder : EventSupportedEntity {
+    override val events: MutableList<DomainEvent>
+        get() = TODO("Not yet implemented")
+
+    override fun complete() {
+        TODO("Not yet implemented")
+    }
+}
+
+data class SellingSuccessEvent(
+    val orderId: OrderId,
+) : DomainEvent()
+
+data class SellingFailedEvent(
+    val orderId: OrderId,
+    val message: String,
+    val errorCode: SellingErrorCode,
+) : DomainEvent()
+
+enum class SellingErrorCode {
+    UNDEFINED
 }
 
 // 구매 주문 엔티티
