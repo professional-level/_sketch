@@ -68,7 +68,6 @@ sealed class BuyingStockPurchaseCommand(
 data class BuyingStockPurchaseResult(
     val orderId: OrderId,
     val status: PurchaseStatus,
-    val message: String,
 )
 
 enum class PurchaseStatus {

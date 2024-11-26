@@ -46,6 +46,9 @@ internal class FinalPriceBatingV1Handler(
         strategy.events.forEach { event ->
             // 이벤트 퍼블리싱 로직 추가
         }
+        purchaseOrder.events.forEach { event ->
+            // 이벤트 퍼블리싱 로직 추가
+        }
 
         return BuyingStockPurchaseResult(
             orderId = purchaseOrder.id,
@@ -53,7 +56,6 @@ internal class FinalPriceBatingV1Handler(
                 true -> PurchaseStatus.CREATED
                 false -> PurchaseStatus.FAILED
             },
-            message = "구매 주문이 성공적으로 생성되었습니다." // TODO: message 제거?
         )
     }
 }
