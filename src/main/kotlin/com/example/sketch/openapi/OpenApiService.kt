@@ -90,7 +90,7 @@ class OpenApiService(
         // 변화 과정을 위해 일부로 inline 하지 않음
         val token = applicationContext.getBean(OpenApiService::class.java).requestToken().token
         /** TODO: Point 프록시 객체가 아닌 실제 메서드를 직접 호출하면 AOP가 적용되지 않아 캐싱이 동작하지 않는 문제
-         self-invocation을 피하기 위해, ApplicationContext 프록시 객체를 가져와서, 메서드 호출. 고도화 필요*/
+        self-invocation을 피하기 위해, ApplicationContext 프록시 객체를 가져와서, 메서드 호출. 고도화 필요*/
         require(token.isNotBlank()) // TODO: token validation 필요
 
         val info: RequestType = RequestType.GET_CURRENT_PRICE
@@ -242,11 +242,29 @@ class OpenApiService(
             BodyParameter.ACNT_PRDT_CD to acntPrdtCd,
             BodyParameter.PDNO to request.PDNO, // 종목코드 6자리
             BodyParameter.ORD_DVSN to request.ORD_DVSN, // 주문구분 00 지정가 01 시장가
-            BodyParameter.ORD_QTY to request.ORD_QTY, // 주문수량
-            BodyParameter.ORD_UNPR to request.ORD_UNPR, // 주문단가
+            BodyParameter.ORD_QTY to request.ORD_QTY.toString(), // 주문수량
+            BodyParameter.ORD_UNPR to request.ORD_UNPR.toString(), // 주문단가
         )
 
         val response = executeHttpRequest(info = info, headers = mockHeader, body = body, isMockApi = true)
+        return response
+    }
+
+    suspend fun getExecutionOrders(): OpenApiResponse {
+        val token = getToken(isMock = true)
+        val info: RequestType = RequestType.GET_EXECUTION_ORDERS
+
+        val trId = "VTTC8001R" // 모의투자 3개월 이내, TODO: 상황별 mapping 필요
+        var headers = build(token = token, trId = trId)
+            .addHeader(HeaderBuilder.HeaderKey.CUSTOMER_TYPE, "P") // 개인 고객 타입
+//            .addHashKey(request)
+            .build()
+        // TODO: mock 인지 아닌지 ThreadLocal 혹은, Context로 전달 해야 함
+        val mockHeader = headers + mapOf(
+            HeaderKey.APP_KEY.value to MOCK_APP_KEY,
+            HeaderKey.APP_SECRET.value to MOCK_APP_SECRET,
+        )
+        val response = executeHttpRequest(info = info, headers = mockHeader, isMockApi = true)
         return response
     }
 

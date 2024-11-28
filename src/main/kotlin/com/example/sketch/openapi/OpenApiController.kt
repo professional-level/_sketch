@@ -1,5 +1,6 @@
 package com.example.sketch.openapi
 
+import ApiResponse
 import ProgramTradeVolume
 import VolumeRank
 import com.example.sketch.utils.OpenApiResponse
@@ -8,13 +9,16 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.ModelAttribute
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
+import output
 import programStockList
 import programStockOfDateTime
 import programStockVolume
 import stock
 import stockMap
+import stockOrderRsponse
 
 @RequestMapping("/open-api")
 @RestController
@@ -55,7 +59,8 @@ class OpenApiController(
          "일자별" 클릭 시 기능을 API로 개발한 사항으로,
          해당 화면을 참고하시면 기능을 이해하기 쉽습니다.
          * */
-        return service.getProgramTradeInfoPerIndividual(stockId, request.toFormat()).toGetProgramTradeInfoPerIndividual()
+        return service.getProgramTradeInfoPerIndividual(stockId, request.toFormat())
+            .toGetProgramTradeInfoPerIndividual()
     }
 
     @GetMapping("/program/individual/{stockId}/detail") // 일별 프로그램 거래대금 조회
@@ -68,7 +73,8 @@ class OpenApiController(
          한국투자 HTS(eFriend Plus) > [0465] 종목별 프로그램 매매추이 화면(혹은 한국투자 MTS > 국내 현재가 > 기타수급 > 프로그램) 의 기능을 API로 개발한 사항으로,
          해당 화면을 참고하시면 기능을 이해하기 쉽습니다.
          * */
-        return service.getProgramTradeInfoPerIndividualAtOneDay(stockId).toGetProgramTradeInfoPerIndividualAtOneDayResponse()
+        return service.getProgramTradeInfoPerIndividualAtOneDay(stockId)
+            .toGetProgramTradeInfoPerIndividualAtOneDayResponse()
     }
 
     @GetMapping("/quotations/volume-rank") // 거래량순위[v1_국내주식-047]
@@ -97,19 +103,45 @@ class OpenApiController(
         return service.getForeignerTradeTrend(stockId)
     }
 
-    @PostMapping("/temp/test")
-    suspend fun postStockOrder() {
-        service.postStockOrder(
-            request = StockOrderRequest(
-                PDNO = "005930",
-                ORD_QTY = "1",
-                ORD_UNPR = "56500",
-            ),
-        )
+    @PostMapping("/trading/order-cash")
+    suspend fun postStockOrder(
+        @RequestBody request: StockOrderRequest,
+    ) {
+        /**
+         국내주식주문(현금) API 입니다.
+         TTC0802U(현금매수) 사용하셔서 미수매수 가능합니다. 단, 거래하시는 계좌가 증거금40%계좌로 신청이 되어있어야 가능합니다.
+         신용매수는 별도의 API가 준비되어 있습니다.
+         ORD_QTY(주문수량), ORD_UNPR(주문단가) 등을 String으로 전달해야 함에 유의 부탁드립니다.
+         ORD_UNPR(주문단가)가 없는 주문은 상한가로 주문금액을 선정하고 이후 체결이되면 체결금액로 정산됩니다.
+         POST API의 경우 BODY값의 key값들을 대문자로 작성하셔야 합니다.
+         (EX. "CANO" : "12345678", "ACNT_PRDT_CD": "01",...)
+         종목코드 마스터파일 파이썬 정제코드는 한국투자증권 Github 참고 부탁드립니다.
+         **/
+        service.postStockOrder(request = request)
+    }
+
+    @GetMapping("/trading/inquire-daily-ccld")
+    suspend fun getExecutionOrders() {
+        service.getExecutionOrders()
     }
 }
 
 // TODO: 해당 to~로직을 다른 interface로 변경
+private fun OpenApiResponse.toPostStockOrderResponse(): ApiResponse.StockOrderRsponse {
+    val response = this.get(0)?.let {
+        stockOrderRsponse {
+            rtCd = it.get("rt_cd").asText()
+            msgCd = it.get("msg_cd").asText()
+            msg1 = it.get("msg_1").asText()
+            output = output {
+                kRXFWDGORDORGNO = it.get("KRX_FWDG_ORD_ORGNO").asText()
+                oDNO = it.get("ODNO").asText()
+                oRDTMD = it.get("ORD_TMD").asText()
+            }
+        }
+    } ?: stockOrderRsponse {}
+    return response
+}
 
 private fun OpenApiResponse.toGetProgramTradeInfoPerIndividualAtOneDayResponse(): ProgramTradeVolume.ProgramStockOfDateTime {
     val stock = this.get(0)?.let { // TODO: get()이 null일경우 처리

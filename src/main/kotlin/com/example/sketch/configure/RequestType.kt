@@ -44,6 +44,10 @@ enum class RequestType(
         requestURI = "/uapi/domestic-stock/v1/trading/order-cash", // 주식주문(현금) URI
         type = HttpMethod.POST,
     ),
+    GET_EXECUTION_ORDERS(
+        requestURI = "/uapi/domestic-stock/v1/trading/inquire-daily-ccld", // 주식일별주문체결조회[v1_국내주식-005]
+        type = HttpMethod.GET,
+    ),
     ;
 
     fun getRequestUri() = requestURI
@@ -136,7 +140,8 @@ enum class QueryParameter(
                     )
                 }
 
-                RequestType.POST_STOCK_ORDER -> TODO()
+                RequestType.POST_STOCK_ORDER -> emptyList()
+                RequestType.GET_EXECUTION_ORDERS -> emptyList()
             }.toResult(additionalInfo)
     }
 }
