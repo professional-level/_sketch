@@ -26,7 +26,7 @@ ORD_DVSN
 data class StockOrderRequest(
 //    val CANO: String, // 종합계좌번호 (8자리)
 //    val ACNT_PRDT_CD: String, // 계좌상품코드 (2자리)
-    val PDNO: String, // 종목코드 (6자리)
+    val PDNO: String, // 종목코드 (6자리) 삼성전자:005930
     val ORD_DVSN: String = "00", // 주문구분 (2자리 코드)
     val ORD_QTY: Long, // 주문수량 (String)
     val ORD_UNPR: Long, // 주문단가 (String)

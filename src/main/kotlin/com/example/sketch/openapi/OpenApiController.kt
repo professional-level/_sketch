@@ -5,6 +5,8 @@ import ProgramTradeVolume
 import VolumeRank
 import com.example.sketch.utils.OpenApiResponse
 import com.example.sketch.utils.StringExtension.toRequestableDateFormat
+import org.springframework.http.HttpStatus
+import org.springframework.http.server.reactive.ServerHttpResponse
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.ModelAttribute
 import org.springframework.web.bind.annotation.PathVariable
@@ -51,6 +53,7 @@ class OpenApiController(
     suspend fun getProgramTradeInfoPerIndividual(
         @PathVariable("stockId") stockId: String,
         @ModelAttribute request: GetProgramTradeInfoPerIndividualRequest,
+        response: ServerHttpResponse,
     ): ProgramTradeVolume.ProgramStockList { // TODO: 날짜를 동적으로 조회 가능 하도록 변경
         /**
          개요
@@ -60,12 +63,18 @@ class OpenApiController(
          해당 화면을 참고하시면 기능을 이해하기 쉽습니다.
          * */
         return service.getProgramTradeInfoPerIndividual(stockId, request.toFormat())
-            .toGetProgramTradeInfoPerIndividual()
+            .toGetProgramTradeInfoPerIndividual().apply {
+                response.statusCode = when (rtCd == "0") {
+                    true -> HttpStatus.OK
+                    false -> HttpStatus.INTERNAL_SERVER_ERROR
+                }
+            }
     }
 
     @GetMapping("/program/individual/{stockId}/detail") // 일별 프로그램 거래대금 조회
     suspend fun getProgramTradeInfoPerIndividualAtOneDay(
         @PathVariable("stockId") stockId: String,
+        response: ServerHttpResponse,
     ): ProgramTradeVolume.ProgramStockOfDateTime { // TODO: 시간을 동적으로 조회 가능 하도록 변경
         /**
          개요
@@ -74,7 +83,12 @@ class OpenApiController(
          해당 화면을 참고하시면 기능을 이해하기 쉽습니다.
          * */
         return service.getProgramTradeInfoPerIndividualAtOneDay(stockId)
-            .toGetProgramTradeInfoPerIndividualAtOneDayResponse()
+            .toGetProgramTradeInfoPerIndividualAtOneDayResponse().apply {
+                response.statusCode = when (rtCd == "0") {
+                    true -> HttpStatus.OK
+                    false -> HttpStatus.INTERNAL_SERVER_ERROR
+                }
+            }
     }
 
     @GetMapping("/quotations/volume-rank") // 거래량순위[v1_국내주식-047]
@@ -106,6 +120,7 @@ class OpenApiController(
     @PostMapping("/trading/order-cash")
     suspend fun postStockOrder(
         @RequestBody request: StockOrderRequest,
+        response: ServerHttpResponse,
     ) {
         /**
          국내주식주문(현금) API 입니다.
@@ -117,7 +132,12 @@ class OpenApiController(
          (EX. "CANO" : "12345678", "ACNT_PRDT_CD": "01",...)
          종목코드 마스터파일 파이썬 정제코드는 한국투자증권 Github 참고 부탁드립니다.
          **/
-        service.postStockOrder(request = request)
+        service.postStockOrder(request = request).toPostStockOrderResponse().apply {
+            response.statusCode = when (rtCd == "0") {
+                true -> HttpStatus.OK
+                false -> HttpStatus.INTERNAL_SERVER_ERROR
+            }
+        }
     }
 
     @GetMapping("/trading/inquire-daily-ccld")
@@ -160,8 +180,10 @@ private fun OpenApiResponse.toGetProgramTradeInfoPerIndividualAtOneDayResponse()
             wholSmtnNtbyTrPbmn = it.get("whol_smtn_ntby_tr_pbmn").asText()
             wholNtbyVolIcdc = it.get("whol_ntby_vol_icdc").asText()
             wholNtbyTrPbmnIcdc = it.get("whol_ntby_tr_pbmn_icdc").asText()
+            rtCd = it.get("rt_cd").asText()
         }
     } ?: programStockOfDateTime {}
+    HttpStatus.GONE
     return stock
 }
 
@@ -217,7 +239,10 @@ private fun OpenApiResponse.toGetProgramTradeInfoPerIndividual(): ProgramTradeVo
             wholNtbyTrPbmnIcdc2 = it.get("whol_ntby_tr_pbmn_icdc2").asText()
         }
     }
-    return programStockList { items.addAll(stocks) }
+    return programStockList {
+        items.addAll(stocks)
+        rtCd = this.rtCd
+    }
 }
 
 data class GetProgramTradeInfoPerIndividualRequest(
