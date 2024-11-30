@@ -27,6 +27,8 @@ dependencies {
     // protobuf
     implementation("com.google.protobuf:protobuf-kotlin:3.25.2")
     implementation("com.google.protobuf:protobuf-java:3.25.2")
+    // kotlin reflection
+    implementation("org.jetbrains.kotlin:kotlin-reflect")
 }
 protobuf {
     protoc {
