@@ -3,6 +3,15 @@ package com.example.sketch.openapi
 import ApiResponse
 import ProgramTradeVolume
 import VolumeRank
+import com.example.common.endpoint.Endpoint.GET_CURRENT_PRICE
+import com.example.common.endpoint.Endpoint.GET_CURRENT_PRICE_OF_INVESTMENT
+import com.example.common.endpoint.Endpoint.GET_EXECUTION_ORDERS
+import com.example.common.endpoint.Endpoint.GET_FOREIGNER_TRADE_TREND
+import com.example.common.endpoint.Endpoint.GET_PROGRAM_TRADE_INFO_PER_INDIVIDUAL
+import com.example.common.endpoint.Endpoint.GET_PROGRAM_TRADE_INFO_PER_INDIVIDUAL_AT_ONE_DAY
+import com.example.common.endpoint.Endpoint.GET_QUOTATIONS_OF_VOLUME_RANK
+import com.example.common.endpoint.Endpoint.POST_STOCK_ORDER
+import com.example.common.endpoint.Endpoint.REQUEST_TOKEN
 import com.example.sketch.utils.OpenApiResponse
 import com.example.sketch.utils.StringExtension.toRequestableDateFormat
 import org.springframework.http.HttpStatus
@@ -27,17 +36,17 @@ import stockOrderRsponse
 class OpenApiController(
     private val service: OpenApiService,
 ) {
-    @PostMapping("/token")
+    @PostMapping(REQUEST_TOKEN)
     suspend fun login(): TokenResponse { // TODO: java와의 호환성을 위해 Mono타입으로 변경 필요, suspend 제거
         return service.requestToken()
     }
 
-    @GetMapping("/current-price")
+    @GetMapping(GET_CURRENT_PRICE)
     suspend fun getCurrentPrice(): OpenApiResponse { // TODO: OpenApiResponse -> swagger response에 정확히 반영시킬 방법
         return service.getCurrentPrice()
     }
 
-    @GetMapping("/current-price/investment") // 주식현재가 투자자[v1_국내주식-012]
+    @GetMapping(GET_CURRENT_PRICE_OF_INVESTMENT) // 주식현재가 투자자[v1_국내주식-012]
     suspend fun getCurrentPriceOfInvestment(): OpenApiResponse {
         /**
          * 개요
@@ -49,7 +58,7 @@ class OpenApiController(
         return service.getCurrentPriceOfInvestment()
     }
 
-    @GetMapping("/program/individual/{stockId}") // 주식현재가 투자자[v1_국내주식-012]
+    @GetMapping(GET_PROGRAM_TRADE_INFO_PER_INDIVIDUAL) // 주식현재가 투자자[v1_국내주식-012]
     suspend fun getProgramTradeInfoPerIndividual(
         @PathVariable("stockId") stockId: String,
         @ModelAttribute request: GetProgramTradeInfoPerIndividualRequest,
@@ -71,7 +80,7 @@ class OpenApiController(
             }
     }
 
-    @GetMapping("/program/individual/{stockId}/detail") // 일별 프로그램 거래대금 조회
+    @GetMapping(GET_PROGRAM_TRADE_INFO_PER_INDIVIDUAL_AT_ONE_DAY) // 일별 프로그램 거래대금 조회
     suspend fun getProgramTradeInfoPerIndividualAtOneDay(
         @PathVariable("stockId") stockId: String,
         response: ServerHttpResponse,
@@ -91,7 +100,7 @@ class OpenApiController(
             }
     }
 
-    @GetMapping("/quotations/volume-rank") // 거래량순위[v1_국내주식-047]
+    @GetMapping(GET_QUOTATIONS_OF_VOLUME_RANK) // 거래량순위[v1_국내주식-047]
     suspend fun getQuotationsOfVolumeRank(): VolumeRank.StockMap {
         /**
          개요
@@ -105,7 +114,7 @@ class OpenApiController(
         return service.getQuotationsOfVolumeRank().toGetQuotationsOfVolumeRankResponse()
     }
 
-    @GetMapping("/quotations/foreigner-trade-trend/{stockId}") //  종목별 외국계 순매수추이
+    @GetMapping(GET_FOREIGNER_TRADE_TREND) //  종목별 외국계 순매수추이
     suspend fun getForeignerTradeTrend(
         @PathVariable("stockId") stockId: String,
     ): OpenApiResponse {
@@ -117,7 +126,7 @@ class OpenApiController(
         return service.getForeignerTradeTrend(stockId)
     }
 
-    @PostMapping("/trading/order-cash")
+    @PostMapping(POST_STOCK_ORDER)
     suspend fun postStockOrder(
         @RequestBody request: StockOrderRequest,
         response: ServerHttpResponse,
@@ -140,7 +149,7 @@ class OpenApiController(
         }
     }
 
-    @GetMapping("/trading/inquire-daily-ccld")
+    @GetMapping(GET_EXECUTION_ORDERS)
     suspend fun getExecutionOrders() {
         service.getExecutionOrders()
     }
