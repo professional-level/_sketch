@@ -4,6 +4,8 @@ import com.example.com.example.stockpurchaseservice.application.port.out.StockOr
 import com.example.com.example.stockpurchaseservice.domain.repository.StockOrderRepository
 import com.example.stockpurchaseservice.domain.Order
 import com.example.stockpurchaseservice.domain.OrderId
+import com.example.stockpurchaseservice.domain.PurchaseOrder
+import com.example.stockpurchaseservice.domain.SellingOrder
 import com.example.stockpurchaseservice.domain.StrategyType
 import org.springframework.stereotype.Component
 import java.time.ZonedDateTime
@@ -28,15 +30,25 @@ internal class StockOrderRepositoryImpl(
 }
 
 private fun Order.toDto(): OrderDto {
+    var sellingAt: ZonedDateTime? = null // TODO: order에서 sellingAt가 not null일 경우가 있는가
+    val sellingPrice = when (this) {
+        is SellingOrder -> {
+            this.sellingPrice.price
+        }
+
+        is PurchaseOrder -> {
+            null
+        }
+    }
     return OrderDto(
         id = this.id.value,
         stockId = this.stockId.value,
         requestedAt = this.requestedAt,
         strategyType = StrategyTypeDto.from(this.strategyType),
         purchasedAt = this.purchasedAt,
-        sellingAt = this.sellingAt,
-        purchasePrice = this.purchasePrice?.price,
-        sellingPrice = this.sellingPrice?.price,
+        sellingAt = sellingAt,
+        purchasePrice = this.purchasePrice.price,
+        sellingPrice = sellingPrice,
     )
 }
 

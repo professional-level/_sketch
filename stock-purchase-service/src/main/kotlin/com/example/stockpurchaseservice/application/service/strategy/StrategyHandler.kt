@@ -3,15 +3,16 @@ package com.example.stockpurchaseservice.application.service.strategy
 import com.example.com.example.stockpurchaseservice.domain.repository.StockOrderRepository
 import com.example.stockpurchaseservice.application.port.out.MarketServicePort
 import com.example.stockpurchaseservice.application.port.out.PurchaseOrderDto
+import com.example.stockpurchaseservice.application.port.out.SellingOrderDto
 import com.example.stockpurchaseservice.application.service.BuyingStockPurchaseCommand
 import com.example.stockpurchaseservice.application.service.BuyingStockPurchaseResult
 import com.example.stockpurchaseservice.application.service.PurchaseStatus
 import com.example.stockpurchaseservice.domain.FinalPriceBatingV1
-import com.example.stockpurchaseservice.domain.Order
 import com.example.stockpurchaseservice.domain.PurchaseErrorCode
 import com.example.stockpurchaseservice.domain.PurchaseFailedEvent
 import com.example.stockpurchaseservice.domain.PurchaseOrder
 import com.example.stockpurchaseservice.domain.PurchaseSuccessEvent
+import com.example.stockpurchaseservice.domain.SellingOrder
 import com.example.stockpurchaseservice.domain.Stock
 import org.springframework.stereotype.Component
 
@@ -37,7 +38,7 @@ internal class FinalPriceBatingV1Handler(
         )
 
         // 구매 주문 생성
-        val purchaseOrder = strategy.createPurchaseOrder()
+        val purchaseOrder = strategy.createPurchaseOrder().let(::checkNotNull) // TODO: check checkNotNull
         runCatching { marketService.buyStock(purchaseOrder.toDto()) }
             .onSuccess { purchaseOrder.success() }
             .onFailure { e ->
@@ -54,7 +55,7 @@ internal class FinalPriceBatingV1Handler(
         purchaseOrder.events.forEach { event ->
             // 이벤트 퍼블리싱 로직 추가
             when (event) {
-                is PurchaseSuccessEvent -> orderRepository.save(Order.from(purchaseOrder))
+                is PurchaseSuccessEvent -> orderRepository.save(purchaseOrder)
                 is PurchaseFailedEvent -> {}
                 else -> throw UndefinedException()
             }
@@ -75,6 +76,14 @@ internal fun PurchaseOrder.toDto(): PurchaseOrderDto {
         orderId = this.id.value,
         stockId = this.stockId.value,
         purchasePrice = this.purchasePrice.price,
+    )
+}
+
+internal fun SellingOrder.toDto(): SellingOrderDto {
+    return SellingOrderDto(
+        orderId = this.id.value,
+        stockId = this.stockId.value,
+        sellingPrice = this.sellingPrice.price,
     )
 }
 

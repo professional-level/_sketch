@@ -5,6 +5,7 @@ import com.example.common.ExternalApiAdapter
 import com.example.common.endpoint.Endpoint.POST_STOCK_ORDER
 import com.example.stockpurchaseservice.application.port.out.MarketServicePort
 import com.example.stockpurchaseservice.application.port.out.PurchaseOrderDto
+import com.example.stockpurchaseservice.application.port.out.SellingOrderDto
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.MediaType
@@ -15,10 +16,22 @@ import kotlin.math.round
 @ExternalApiAdapter // TODO: 어노테이션 체크
 internal class MarketServiceAdapter(
     private val buyStockHandler: BuyStockHandler,
+    private val sellStockHandler: SellStockHandler,
 ) : MarketServicePort {
     override fun buyStock(order: PurchaseOrderDto) {
         buyStockHandler.execute(order)
     }
+
+    override fun sellStock(order: SellingOrderDto) {
+        TODO("Not yet implemented")
+    }
+}
+
+@Component
+internal class SellStockHandler(
+    private val stockApiClient: WebClient,
+) {
+    fun execute(order: SellingOrderDto) {}
 }
 
 @Component

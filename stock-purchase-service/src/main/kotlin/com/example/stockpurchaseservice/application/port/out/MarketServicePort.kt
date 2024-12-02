@@ -4,10 +4,17 @@ import java.util.UUID
 
 interface MarketServicePort {
     fun buyStock(order: PurchaseOrderDto)
+    fun sellStock(order: SellingOrderDto)
 }
 
 data class PurchaseOrderDto(
     val orderId: UUID,
     val stockId: String,
     val purchasePrice: Double,
+)
+
+data class SellingOrderDto(
+    val orderId: UUID,
+    val stockId: String,
+    val sellingPrice: Double,
 )

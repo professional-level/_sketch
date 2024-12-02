@@ -9,9 +9,9 @@ import java.util.UUID
 // StockStrategy 인터페이스 구현
 abstract class StockStrategy : EventSupportedEntity {
     abstract fun createPurchaseOrder(): PurchaseOrder?
-    abstract fun createSellingOrder(): SellingOrder?
+    abstract fun createSellingOrder(orderId: OrderId): SellingOrder?
     abstract val purchasedAt: ZonedDateTime?
-    fun isPurchased() = (purchasedAt != null)
+    fun isPurchased() = purchasedAt.isNotNull()
 }
 
 class FinalPriceBatingV1 private constructor(
@@ -44,9 +44,8 @@ class FinalPriceBatingV1 private constructor(
     // 구매 주문 생성
     override fun createPurchaseOrder(): PurchaseOrder? {
         // Return null
-        if (purchasedAt.isNotNull()) {
-            return null
-        }
+        if (isPurchased()) return null
+
         // 익절, 손절 가격 계산
         val takeProfitPrice = calculateTakeProfitPrice(purchasePrice)
         val stopLossPrice = calculateStopLossPrice(purchasePrice)
@@ -55,8 +54,8 @@ class FinalPriceBatingV1 private constructor(
             stockId = stock.id,
             stockName = stock.name,
             purchasePrice = purchasePrice,
-            takeProfitPrice = takeProfitPrice,
-            stopLossPrice = stopLossPrice,
+//            takeProfitPrice = takeProfitPrice, // TODO: PurchaseOrder에 strategy관련 parameter 제거 한것.
+//            stopLossPrice = stopLossPrice,
             strategyType = StrategyType.FinalPriceBatingV1,
             requestedAt = requestedAt,
             purchasedAt = purchasedAt,
@@ -73,9 +72,22 @@ class FinalPriceBatingV1 private constructor(
         return purchaseOrder
     }
 
-    override fun createSellingOrder(): SellingOrder? {
-        if (!isPurchased()) throw IllegalStateException("purchasedAt is null")
-        TODO()
+    override fun createSellingOrder(orderId: OrderId): SellingOrder? {
+        if (!isPurchased()) return null
+        // 익절, 손절 가격 계산
+        val takeProfitPrice = calculateTakeProfitPrice(purchasePrice)
+        val stopLossPrice = calculateStopLossPrice(purchasePrice)
+
+        return SellingOrder(
+            id = orderId,
+            stockId = stock.id,
+            stockName = stock.name,
+            requestedAt = requestedAt,
+            strategyType = StrategyType.FinalPriceBatingV1,
+            purchasedAt = purchasedAt!!, // TODO: 위에서 !isPurchased()를 했는데 타입체크가 왜 안될까?
+            purchasePrice = purchasePrice,
+            sellingPrice = takeProfitPrice, // TODO: 지금은 익절 가격을 매핑하지만, 날짜라던가 특정 조건에 따라서는 손절 가격을 매핑해야 한다.
+        )
     }
 
     private fun calculateTakeProfitPrice(purchasePrice: Money): Money {
@@ -147,12 +159,14 @@ class FinalPriceBatingV1 private constructor(
 //        }
 //    }
 // }
+// TODO: 판매 금액의 spread 분산 전략 적용 필요. +- 1% 등등
 sealed class Order(
     open val id: OrderId,
     open val stockId: StockId,
     open val stockName: String,
     open val requestedAt: ZonedDateTime,
     open val strategyType: StrategyType,
+    open val purchasePrice: Money,
     open val purchasedAt: ZonedDateTime?,
 ) : EventSupportedEntity {
     abstract override val events: MutableList<DomainEvent>
@@ -181,8 +195,9 @@ class SellingOrder(
     override val requestedAt: ZonedDateTime,
     override val strategyType: StrategyType,
     override val purchasedAt: ZonedDateTime,
+    override val purchasePrice: Money,
     val sellingPrice: Money,
-) : Order(id, stockId, stockName, requestedAt, strategyType, purchasedAt) {
+) : Order(id, stockId, stockName, requestedAt, strategyType, purchasePrice, purchasedAt) {
     override val events: MutableList<DomainEvent> = mutableListOf()
 
     override fun complete() {
@@ -197,6 +212,7 @@ class SellingOrder(
             requestedAt: ZonedDateTime,
             strategyType: StrategyType,
             sellingPrice: Money,
+            purchasePrice: Money,
             purchasedAt: ZonedDateTime,
         ): SellingOrder {
             return SellingOrder(
@@ -206,6 +222,7 @@ class SellingOrder(
                 requestedAt = requestedAt,
                 strategyType = strategyType,
                 sellingPrice = sellingPrice,
+                purchasePrice = purchasePrice,
                 purchasedAt = purchasedAt,
             )
         }
@@ -262,11 +279,11 @@ class PurchaseOrder(
     override val stockName: String,
     override val requestedAt: ZonedDateTime,
     override val strategyType: StrategyType,
+    override val purchasePrice: Money,
     override val purchasedAt: ZonedDateTime?,
-    val purchasePrice: Money,
-    val takeProfitPrice: Money,
-    val stopLossPrice: Money,
-) : Order(id, stockId, stockName, requestedAt, strategyType, purchasedAt) {
+//    val takeProfitPrice: Money,
+//    val stopLossPrice: Money,
+) : Order(id, stockId, stockName, requestedAt, strategyType, purchasePrice, purchasedAt) {
     override val events: MutableList<DomainEvent> = mutableListOf()
     private var _isSuccess: Boolean = false
     val isSuccess get() = _isSuccess
