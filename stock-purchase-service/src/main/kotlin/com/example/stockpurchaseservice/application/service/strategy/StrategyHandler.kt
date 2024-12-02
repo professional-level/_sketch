@@ -76,6 +76,7 @@ internal fun PurchaseOrder.toDto(): PurchaseOrderDto {
         orderId = this.id.value,
         stockId = this.stockId.value,
         purchasePrice = this.purchasePrice.price,
+        quantity = this.quantity,
     )
 }
 
@@ -84,6 +85,7 @@ internal fun SellingOrder.toDto(): SellingOrderDto {
         orderId = this.id.value,
         stockId = this.stockId.value,
         sellingPrice = this.sellingPrice.price,
+        quantity = this.quantity,
     )
 }
 

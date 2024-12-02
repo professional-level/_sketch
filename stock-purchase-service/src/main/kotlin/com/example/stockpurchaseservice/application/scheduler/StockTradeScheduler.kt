@@ -26,7 +26,7 @@ internal class StockTradeScheduler(
     }
 
     @Scheduled(cron = "0 */1 * ? * MON-FRI") // TODO: 판매 전략에 따라 스케쥴 시간 변경필요
-    suspend fun finalPriceBatingStrategy1() {
+    suspend fun sellOrderByStrategies() {
         // TODO: 휴장일인지 체크하는 로직이 필요
         val dateTime = ZonedDateTime.now()
 
@@ -52,6 +52,7 @@ internal class StockTradeScheduler(
         println(sellingOrderList)
 
         /*db save 로직*/
+        /* 이미 팔렸을 경우 + @ transaction rollback 처리 필요*/
         sellingOrderList.forEach { order ->
             stockOrderRepository.save(order)
             marketService.sellStock(order.toDto())

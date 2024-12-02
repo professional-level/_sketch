@@ -13,4 +13,10 @@ internal class StockOrderAdapter(
     override suspend fun save(order: OrderDto) {
         stockOrderRepository.save(Order.from(order))
     }
+
+    override suspend fun findAllWithNotCompleted(): List<OrderDto> {
+        return stockOrderRepository.findAllWithNotCompleted().map { order ->
+            order.toDTO()
+        }
+    }
 }

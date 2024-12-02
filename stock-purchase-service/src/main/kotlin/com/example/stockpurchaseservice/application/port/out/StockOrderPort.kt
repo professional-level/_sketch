@@ -4,4 +4,5 @@ import com.example.com.example.stockpurchaseservice.application.repository.Order
 
 interface StockOrderPort {
     suspend fun save(order: OrderDto)
+    suspend fun findAllWithNotCompleted(): List<OrderDto>
 }

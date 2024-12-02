@@ -11,10 +11,12 @@ data class PurchaseOrderDto(
     val orderId: UUID,
     val stockId: String,
     val purchasePrice: Double,
+    val quantity: Int,
 )
 
 data class SellingOrderDto(
     val orderId: UUID,
     val stockId: String,
     val sellingPrice: Double,
+    val quantity: Int,
 )

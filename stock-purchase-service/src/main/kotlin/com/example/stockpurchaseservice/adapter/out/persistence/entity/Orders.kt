@@ -20,6 +20,8 @@ internal class Order private constructor(
     @Column(nullable = false)
     val stockId: String,
     @Column(nullable = false)
+    val stockName: String,
+    @Column(nullable = false)
     val requestedAt: ZonedDateTime,
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -32,16 +34,20 @@ internal class Order private constructor(
     val purchasePrice: Double?,
     @Column
     val sellingPrice: Double?,
+    @Column(nullable = false)
+    val quantity: Int,
 ) {
     fun toDTO(): OrderDto = OrderDto(
         id = id,
         stockId = stockId,
+        stockName = stockName,
         requestedAt = requestedAt,
         strategyType = strategyType.toDto(),
         purchasedAt = purchasedAt,
         sellingAt = sellingAt,
         purchasePrice = purchasePrice,
         sellingPrice = sellingPrice,
+        quantity = quantity,
     )
 
     companion object {
@@ -49,12 +55,14 @@ internal class Order private constructor(
             return Order(
                 id = dto.id,
                 stockId = dto.stockId,
+                stockName = dto.stockName,
                 requestedAt = dto.requestedAt,
                 strategyType = StrategyType.fromDto(dto.strategyType),
                 purchasedAt = dto.purchasedAt,
                 sellingAt = dto.sellingAt,
                 purchasePrice = dto.purchasePrice,
                 sellingPrice = dto.sellingPrice,
+                quantity = dto.quantity,
             )
         }
     }

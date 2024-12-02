@@ -5,6 +5,7 @@ import com.example.common.domain.event.EventSupportedEntity
 import common.StringExtension.isNotNull
 import java.time.ZonedDateTime
 import java.util.UUID
+import kotlin.math.round
 
 // StockStrategy 인터페이스 구현
 abstract class StockStrategy : EventSupportedEntity {
@@ -12,6 +13,7 @@ abstract class StockStrategy : EventSupportedEntity {
     abstract fun createSellingOrder(orderId: OrderId): SellingOrder?
     abstract val purchasedAt: ZonedDateTime?
     fun isPurchased() = purchasedAt.isNotNull()
+    abstract fun calculateQuantity(): Int
 }
 
 class FinalPriceBatingV1 private constructor(
@@ -59,6 +61,7 @@ class FinalPriceBatingV1 private constructor(
             strategyType = StrategyType.FinalPriceBatingV1,
             requestedAt = requestedAt,
             purchasedAt = purchasedAt,
+            quantity = calculateQuantity(),
         )
 
         // 이벤트 추가
@@ -87,7 +90,12 @@ class FinalPriceBatingV1 private constructor(
             purchasedAt = purchasedAt!!, // TODO: 위에서 !isPurchased()를 했는데 타입체크가 왜 안될까?
             purchasePrice = purchasePrice,
             sellingPrice = takeProfitPrice, // TODO: 지금은 익절 가격을 매핑하지만, 날짜라던가 특정 조건에 따라서는 손절 가격을 매핑해야 한다.
+            quantity = calculateQuantity(),
         )
+    }
+
+    override fun calculateQuantity(): Int {
+        return round(DEFAULT_BUY_TOTAL_AMOUNT / purchasePrice.price).toInt()
     }
 
     private fun calculateTakeProfitPrice(purchasePrice: Money): Money {
@@ -103,6 +111,9 @@ class FinalPriceBatingV1 private constructor(
         private const val ALLOWED_PRICE_GAP_PERCENTAGE = 2.5 // 허용 가격 격차 퍼센트
         private const val TAKE_PROFIT_MARGIN = 0.03
         private const val STOP_LOSS_MARGIN = 0.03
+
+        // 전략에 따른 구매 금액
+        private const val DEFAULT_BUY_TOTAL_AMOUNT: Long = 1_000_000
 
         // 객체 생성용 팩토리 메서드
         fun of(
@@ -168,6 +179,7 @@ sealed class Order(
     open val strategyType: StrategyType,
     open val purchasePrice: Money,
     open val purchasedAt: ZonedDateTime?,
+    open val quantity: Int,
 ) : EventSupportedEntity {
     abstract override val events: MutableList<DomainEvent>
     abstract override fun complete()
@@ -196,8 +208,9 @@ class SellingOrder(
     override val strategyType: StrategyType,
     override val purchasedAt: ZonedDateTime,
     override val purchasePrice: Money,
+    override val quantity: Int,
     val sellingPrice: Money,
-) : Order(id, stockId, stockName, requestedAt, strategyType, purchasePrice, purchasedAt) {
+) : Order(id, stockId, stockName, requestedAt, strategyType, purchasePrice, purchasedAt, quantity) {
     override val events: MutableList<DomainEvent> = mutableListOf()
 
     override fun complete() {
@@ -214,6 +227,7 @@ class SellingOrder(
             sellingPrice: Money,
             purchasePrice: Money,
             purchasedAt: ZonedDateTime,
+            quantity: Int,
         ): SellingOrder {
             return SellingOrder(
                 id = id,
@@ -224,6 +238,31 @@ class SellingOrder(
                 sellingPrice = sellingPrice,
                 purchasePrice = purchasePrice,
                 purchasedAt = purchasedAt,
+                quantity = quantity,
+            )
+        }
+
+        fun from(
+            id: OrderId,
+            stockId: StockId,
+            stockName: String,
+            requestedAt: ZonedDateTime,
+            strategyType: StrategyType,
+            sellingPrice: Money,
+            purchasePrice: Money,
+            purchasedAt: ZonedDateTime,
+            quantity: Int,
+        ): SellingOrder {
+            return SellingOrder(
+                id = id,
+                stockId = stockId,
+                stockName = stockName,
+                requestedAt = requestedAt,
+                strategyType = strategyType,
+                sellingPrice = sellingPrice,
+                purchasePrice = purchasePrice,
+                purchasedAt = purchasedAt,
+                quantity = quantity,
             )
         }
     }
@@ -281,9 +320,10 @@ class PurchaseOrder(
     override val strategyType: StrategyType,
     override val purchasePrice: Money,
     override val purchasedAt: ZonedDateTime?,
+    override val quantity: Int,
 //    val takeProfitPrice: Money,
 //    val stopLossPrice: Money,
-) : Order(id, stockId, stockName, requestedAt, strategyType, purchasePrice, purchasedAt) {
+) : Order(id, stockId, stockName, requestedAt, strategyType, purchasePrice, purchasedAt, quantity) {
     override val events: MutableList<DomainEvent> = mutableListOf()
     private var _isSuccess: Boolean = false
     val isSuccess get() = _isSuccess

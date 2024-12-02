@@ -23,7 +23,7 @@ internal class MarketServiceAdapter(
     }
 
     override fun sellStock(order: SellingOrderDto) {
-        TODO("Not yet implemented")
+        sellStockHandler.execute(order)
     }
 }
 
@@ -31,7 +31,9 @@ internal class MarketServiceAdapter(
 internal class SellStockHandler(
     private val stockApiClient: WebClient,
 ) {
-    fun execute(order: SellingOrderDto) {}
+    fun execute(order: SellingOrderDto) {
+
+    }
 }
 
 @Component
@@ -40,7 +42,7 @@ internal class BuyStockHandler(
 ) {
     fun execute(order: PurchaseOrderDto) {
         val uri = POST_STOCK_ORDER
-        val quantity = order.calculateBuyingStockAmount()
+        val quantity = order.quantity
 
         val body = mapOf(
             "PDNO" to order.stockId,
@@ -82,8 +84,3 @@ data class StockOrderRequest(
 )
 
 // TODO: properties 혹은 다른 옵션으로 관리 필요
-const val DEFAULT_BUY_TOTAL_AMOUNT: Long = 1_000_000
-
-fun PurchaseOrderDto.calculateBuyingStockAmount(): Long {
-    return round(DEFAULT_BUY_TOTAL_AMOUNT / this.purchasePrice).toLong()
-}

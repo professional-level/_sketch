@@ -16,7 +16,7 @@ abstract class AbstractReactiveRepository<T, ID> : ReactiveRepository<T, ID> {
     @Inject
     lateinit var sessionFactory: Mutiny.SessionFactory
 
-    private val entityType: Class<T> by lazy {
+    protected val entityType: Class<T> by lazy {
         (javaClass.genericSuperclass as ParameterizedType).actualTypeArguments[0] as Class<T>
     }
 
