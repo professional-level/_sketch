@@ -1,5 +1,6 @@
 package com.example.stockpurchaseservice.adapter.out
 
+import ApiResponse
 import com.example.common.ExternalApiAdapter
 import com.example.common.endpoint.Endpoint.POST_STOCK_ORDER
 import com.example.stockpurchaseservice.application.port.out.MarketServicePort
@@ -7,7 +8,6 @@ import com.example.stockpurchaseservice.application.port.out.PurchaseOrderDto
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.MediaType
-import org.springframework.http.ResponseEntity
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
 import kotlin.math.round
@@ -41,10 +41,12 @@ internal class BuyStockHandler(
             .accept(MediaType.APPLICATION_PROTOBUF)
             .bodyValue(body)
             .retrieve()
-            .toEntity(ResponseEntity::class.java) // TODO: map to ProtoType Entity
+            .toEntity(ApiResponse.StockOrder::class.java)
             .block()
-        // TODO: 유효성 체크
-        response?.body?.body
+        // 유효성 체크
+        if (response?.body?.rtCd != "0") {
+            throw RuntimeException("request failed") // TODO: exception mapping 필요
+        }
     }
 }
 

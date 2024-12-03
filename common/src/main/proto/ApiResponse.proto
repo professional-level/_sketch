@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 // ApiResponse는 응답 구조를 나타냅니다.
-message StockOrderRsponse {
+message StockOrder {
   string rt_cd = 1;       // 반환 코드
   string msg_cd = 2;      // 메시지 코드
   string msg1 = 3;        // 메시지 내용
