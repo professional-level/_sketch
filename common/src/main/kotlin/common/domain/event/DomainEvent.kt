@@ -11,6 +11,11 @@ abstract class DomainEvent {
 interface EventSupportedEntity {
     val events: MutableList<DomainEvent>
     fun complete()
+    fun register(domainEvent: DomainEvent){
+        events.add(domainEvent)
+        project(domainEvent)
+    }
+    fun project(domainEvent: DomainEvent)
 }
 
 // 공통 인터페이스

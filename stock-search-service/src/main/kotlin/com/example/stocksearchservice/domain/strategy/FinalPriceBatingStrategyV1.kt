@@ -75,4 +75,8 @@ class FinalPriceBatingStrategyV1 private constructor(
             ),
         )
     }
+
+    override fun project(domainEvent: DomainEvent) {
+        TODO("Not yet implemented")
+    }
 }

@@ -5,6 +5,7 @@ import com.example.com.example.stockpurchaseservice.domain.repository.StockOrder
 import com.example.stockpurchaseservice.domain.Money
 import com.example.stockpurchaseservice.domain.Order
 import com.example.stockpurchaseservice.domain.OrderId
+import com.example.stockpurchaseservice.domain.OrderState
 import com.example.stockpurchaseservice.domain.PurchaseOrder
 import com.example.stockpurchaseservice.domain.SellingOrder
 import com.example.stockpurchaseservice.domain.StockId
@@ -56,6 +57,7 @@ private fun Order.toDto(): OrderDto {
         purchasePrice = this.purchasePrice.price,
         sellingPrice = sellingPrice,
         quantity = this.quantity,
+        orderState = OrderStateDto.from(this.orderState),
     )
 }
 
@@ -70,6 +72,7 @@ data class OrderDto(
     val purchasePrice: Double?,
     val sellingPrice: Double?,
     val quantity: Int,
+    val orderState: OrderStateDto,
 ) {
     fun toOrder(): SellingOrder {
         return SellingOrder.from(
@@ -82,6 +85,7 @@ data class OrderDto(
             purchasePrice = purchasePrice?.let { Money(purchasePrice) } ?: Money.undefined(), // maping 확인 필요
             purchasedAt = purchasedAt ?: ZonedDateTime.now(), // maping 확인 필요
             quantity = quantity,
+            orderState = orderState.toDomain()
         )
     }
 }
@@ -103,6 +107,40 @@ enum class StrategyTypeDto {
             return when (type) {
                 StrategyType.Undefined -> TODO()
                 StrategyType.FinalPriceBatingV1 -> FINAL_PRICE_BATING_V1
+            }
+        }
+    }
+}
+
+enum class OrderStateDto {
+    PURCHASE_WAITING,  // 주문이 들어가기 전
+    PURCHASE_IN_PROCESS, // 주문이 들어간 상태
+    PURCHASE_COMPLETED, // 체결이 된 상태
+    SELLING_WAITING,  // 주문이 들어가기 전
+    SELLING_IN_PROCESS, // 주문이 들어간 상태
+    SELLING_COMPLETED, // 체결이 된 상태
+    ;
+
+    fun toDomain(): OrderState {
+        return when (this) {
+            OrderStateDto.PURCHASE_WAITING -> OrderState.PURCHASE_WAITING
+            OrderStateDto.PURCHASE_IN_PROCESS -> OrderState.PURCHASE_IN_PROCESS
+            OrderStateDto.PURCHASE_COMPLETED -> OrderState.PURCHASE_COMPLETED
+            OrderStateDto.SELLING_WAITING -> OrderState.SELLING_WAITING
+            OrderStateDto.SELLING_IN_PROCESS -> OrderState.SELLING_IN_PROCESS
+            OrderStateDto.SELLING_COMPLETED -> OrderState.SELLING_COMPLETED
+        }
+    }
+
+    companion object {
+        fun from(orderState: OrderState): OrderStateDto {
+            return when (orderState) {
+                OrderState.PURCHASE_WAITING -> OrderStateDto.PURCHASE_WAITING
+                OrderState.PURCHASE_IN_PROCESS -> OrderStateDto.PURCHASE_IN_PROCESS
+                OrderState.PURCHASE_COMPLETED -> OrderStateDto.PURCHASE_COMPLETED
+                OrderState.SELLING_WAITING -> OrderStateDto.SELLING_WAITING
+                OrderState.SELLING_IN_PROCESS -> OrderStateDto.SELLING_IN_PROCESS
+                OrderState.SELLING_COMPLETED -> OrderStateDto.SELLING_COMPLETED
             }
         }
     }

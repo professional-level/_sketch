@@ -62,6 +62,7 @@ class FinalPriceBatingV1 private constructor(
             requestedAt = requestedAt,
             purchasedAt = purchasedAt,
             quantity = calculateQuantity(),
+            orderState = TODO(),
         )
 
         // 이벤트 추가
@@ -91,6 +92,7 @@ class FinalPriceBatingV1 private constructor(
             purchasePrice = purchasePrice,
             sellingPrice = takeProfitPrice, // TODO: 지금은 익절 가격을 매핑하지만, 날짜라던가 특정 조건에 따라서는 손절 가격을 매핑해야 한다.
             quantity = calculateQuantity(),
+            orderState = TODO(),
         )
     }
 
@@ -134,6 +136,10 @@ class FinalPriceBatingV1 private constructor(
     // 이벤트 완료 처리
     override fun complete() {
         // 필요한 경우 추가 로직 수행
+    }
+
+    override fun project(domainEvent: DomainEvent) {
+        TODO("Not yet implemented")
     }
 }
 
@@ -180,6 +186,7 @@ sealed class Order(
     open val purchasePrice: Money,
     open val purchasedAt: ZonedDateTime?,
     open val quantity: Int,
+    open val orderState: OrderState,
 ) : EventSupportedEntity {
     abstract override val events: MutableList<DomainEvent>
     abstract override fun complete()
@@ -209,12 +216,17 @@ class SellingOrder(
     override val purchasedAt: ZonedDateTime,
     override val purchasePrice: Money,
     override val quantity: Int,
+    override val orderState: OrderState,
     val sellingPrice: Money,
-) : Order(id, stockId, stockName, requestedAt, strategyType, purchasePrice, purchasedAt, quantity) {
+) : Order(id, stockId, stockName, requestedAt, strategyType, purchasePrice, purchasedAt, quantity, orderState) {
     override val events: MutableList<DomainEvent> = mutableListOf()
 
     override fun complete() {
         // 필요한 완료 로직 구현
+    }
+
+    override fun project(domainEvent: DomainEvent) {
+        TODO("Not yet implemented")
     }
 
     companion object {
@@ -228,6 +240,7 @@ class SellingOrder(
             purchasePrice: Money,
             purchasedAt: ZonedDateTime,
             quantity: Int,
+            orderState: OrderState,
         ): SellingOrder {
             return SellingOrder(
                 id = id,
@@ -239,6 +252,7 @@ class SellingOrder(
                 purchasePrice = purchasePrice,
                 purchasedAt = purchasedAt,
                 quantity = quantity,
+                orderState = orderState,
             )
         }
 
@@ -252,6 +266,7 @@ class SellingOrder(
             purchasePrice: Money,
             purchasedAt: ZonedDateTime,
             quantity: Int,
+            orderState: OrderState,
         ): SellingOrder {
             return SellingOrder(
                 id = id,
@@ -263,9 +278,19 @@ class SellingOrder(
                 purchasePrice = purchasePrice,
                 purchasedAt = purchasedAt,
                 quantity = quantity,
+                orderState = orderState,
             )
         }
     }
+}
+
+enum class OrderState {
+    PURCHASE_WAITING,  // 주문이 들어가기 전
+    PURCHASE_IN_PROCESS, // 주문이 들어간 상태
+    PURCHASE_COMPLETED, // 체결이 된 상태
+    SELLING_WAITING,  // 주문이 들어가기 전
+    SELLING_IN_PROCESS, // 주문이 들어간 상태
+    SELLING_COMPLETED, // 체결이 된 상태
 }
 
 data class SellingSuccessEvent(
@@ -312,7 +337,7 @@ enum class SellingErrorCode {
 //        TODO("Not yet implemented")
 //    }
 // }
-class PurchaseOrder(
+data class PurchaseOrder(
     override val id: OrderId = OrderId.generate(),
     override val stockId: StockId,
     override val stockName: String,
@@ -321,25 +346,33 @@ class PurchaseOrder(
     override val purchasePrice: Money,
     override val purchasedAt: ZonedDateTime?,
     override val quantity: Int,
+    override val orderState: OrderState,
 //    val takeProfitPrice: Money,
 //    val stopLossPrice: Money,
-) : Order(id, stockId, stockName, requestedAt, strategyType, purchasePrice, purchasedAt, quantity) {
+) : Order(id, stockId, stockName, requestedAt, strategyType, purchasePrice, purchasedAt, quantity, orderState) {
     override val events: MutableList<DomainEvent> = mutableListOf()
     private var _isSuccess: Boolean = false
     val isSuccess get() = _isSuccess
 
     fun success() {
         _isSuccess = true
-        events.add(PurchaseSuccessEvent(orderId = this.id))
+        register(PurchaseSuccessEvent(orderId = this.id))
     }
 
     fun failed(message: String?, purchaseErrorCode: PurchaseErrorCode = PurchaseErrorCode.UNDEFINED) {
         _isSuccess = false
-        events.add(PurchaseFailedEvent(message = message ?: "", errorCode = purchaseErrorCode))
+        register(PurchaseFailedEvent(message = message ?: "", errorCode = purchaseErrorCode))
     }
 
     override fun complete() {
         // 필요한 완료 로직 구현
+    }
+
+    override fun project(domainEvent: DomainEvent) {
+        when(domainEvent) {
+            is PurchaseSuccessEvent -> this.copy(orderState = OrderState.PURCHASE_IN_PROCESS)
+            is PurchaseFailedEvent ->  this.copy(orderState = OrderState.PURCHASE_WAITING)
+        }
     }
 }
 

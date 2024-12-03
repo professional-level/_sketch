@@ -90,8 +90,8 @@ internal class StockSearchScheduler(
          * */
 
         /*db save 로직*/
-//        finalPriceBatingStrategyV1Repository.saveAll(programVolumeAdaptedList)
-        finalPriceBatingStrategyV1Repository.saveAll(makeMockProgramVolumeAdaptedList())
+        finalPriceBatingStrategyV1Repository.saveAll(programVolumeAdaptedList)
+//        finalPriceBatingStrategyV1Repository.saveAll(makeMockProgramVolumeAdaptedList())
         // debuging code
 //        programVolumeAdaptedList.forEach finalPriceBatingStrategyV1Repository.save(it) }
 //        FinalPriceBatingStrategyV1.default().let { finalPriceBatingStrategyV1Repository.save(it) }

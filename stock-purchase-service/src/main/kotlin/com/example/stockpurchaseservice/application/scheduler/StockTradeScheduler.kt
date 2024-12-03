@@ -67,20 +67,3 @@ internal class StockTradeScheduler(
         TODO()
     }
 }
-
-// private fun makeMockProgramVolumeAdaptedList(): List<FinalPriceBatingStrategyV1> {
-//    return listOf(
-//        FinalPriceBatingStrategyV1(
-//            stock = Stock.of(
-//                stockId = StockId.of("elementum"),
-//                stockName = StockName.of("dapibus"),
-//                stockPrice = StockPrice.of(3945),
-//                stockDerivative = StockDerivative.of(value = 2.3),
-//                stockVolume = StockVolume.of(value = 3917),
-//                stockTotalVolume = StockTotalVolume.of(value = 6371),
-//            ),
-//            rank = 1,
-//            foreignerStockVolume = FinalPriceBatingStrategyV1.ForeignerStockVolume(value = 4058),
-//        ),
-//    )
-// }
