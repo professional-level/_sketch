@@ -20,7 +20,6 @@ message ProgramStockVolume{
 
 message ProgramStockList {
   repeated ProgramStockVolume items = 1;
-  string rt_cd = 2;
 }
 
 
@@ -39,5 +38,4 @@ message ProgramStockOfDateTime{
   string whol_smtn_ntby_tr_pbmn = 12;
   string whol_ntby_vol_icdc = 13;
   string whol_ntby_tr_pbmn_icdc = 14;
-  string rt_cd = 15;
 }

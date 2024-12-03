@@ -22,6 +22,7 @@ message ProgramStockList {
   repeated ProgramStockVolume items = 1;
 }
 
+
 message ProgramStockOfDateTime{
   string bsop_hour = 1;
   string stck_prpr = 2;
