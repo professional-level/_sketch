@@ -41,9 +41,6 @@ class FinalPriceBatingStrategyV1 private constructor(
 
     fun isValidProgramForeignerTradeVolume(): Boolean {
         // TODO: 비율에 대한 조정 필요
-        // stockTotalVolume / 100000000
-        // foreignerStockVolume.value / 1000000
-        // stockTotalVolume / 100, foreignerStockVolume.value
         return foreignerStockVolume.value >= ((stock.stockTotalVolume.value / 100) * 0.3).toLong()
     }
 
@@ -66,8 +63,7 @@ class FinalPriceBatingStrategyV1 private constructor(
         fun validOf(stock: Stock): FinalPriceBatingStrategyV1? = validListOf(listOf(stock)).firstOrNull()
     }
 
-    override val events: MutableList<DomainEvent>
-        get() = mutableListOf()
+    override val events: MutableList<DomainEvent> = mutableListOf()
 
     override fun complete() {
         events.add(
