@@ -29,7 +29,7 @@ import programStockOfDateTime
 import programStockVolume
 import stock
 import stockMap
-import stockOrderRsponse
+import stockOrder
 
 @RequestMapping("/open-api")
 @RestController
@@ -72,12 +72,7 @@ class OpenApiController(
          해당 화면을 참고하시면 기능을 이해하기 쉽습니다.
          * */
         return service.getProgramTradeInfoPerIndividual(stockId, request.toFormat())
-            .toGetProgramTradeInfoPerIndividual().apply {
-                response.statusCode = when (rtCd == "0") {
-                    true -> HttpStatus.OK
-                    false -> HttpStatus.INTERNAL_SERVER_ERROR
-                }
-            }
+            .toGetProgramTradeInfoPerIndividual()
     }
 
     @GetMapping(GET_PROGRAM_TRADE_INFO_PER_INDIVIDUAL_AT_ONE_DAY) // 일별 프로그램 거래대금 조회
@@ -92,12 +87,13 @@ class OpenApiController(
          해당 화면을 참고하시면 기능을 이해하기 쉽습니다.
          * */
         return service.getProgramTradeInfoPerIndividualAtOneDay(stockId)
-            .toGetProgramTradeInfoPerIndividualAtOneDayResponse().apply {
-                response.statusCode = when (rtCd == "0") {
-                    true -> HttpStatus.OK
-                    false -> HttpStatus.INTERNAL_SERVER_ERROR
-                }
-            }
+            .toGetProgramTradeInfoPerIndividualAtOneDayResponse()
+//            .apply {
+//                response.statusCode = when (rtCd == "0") {
+//                    true -> HttpStatus.OK
+//                    false -> HttpStatus.INTERNAL_SERVER_ERROR
+//                }
+//            }
     }
 
     @GetMapping(GET_QUOTATIONS_OF_VOLUME_RANK) // 거래량순위[v1_국내주식-047]
@@ -156,9 +152,9 @@ class OpenApiController(
 }
 
 // TODO: 해당 to~로직을 다른 interface로 변경
-private fun OpenApiResponse.toPostStockOrderResponse(): ApiResponse.StockOrderRsponse {
+private fun OpenApiResponse.toPostStockOrderResponse(): ApiResponse.StockOrder {
     val response = this.get(0)?.let {
-        stockOrderRsponse {
+        stockOrder {
             rtCd = it.get("rt_cd").asText()
             msgCd = it.get("msg_cd").asText()
             msg1 = it.get("msg_1").asText()
@@ -168,7 +164,7 @@ private fun OpenApiResponse.toPostStockOrderResponse(): ApiResponse.StockOrderRs
                 oRDTMD = it.get("ORD_TMD").asText()
             }
         }
-    } ?: stockOrderRsponse {}
+    } ?: stockOrder {}
     return response
 }
 
@@ -189,10 +185,9 @@ private fun OpenApiResponse.toGetProgramTradeInfoPerIndividualAtOneDayResponse()
             wholSmtnNtbyTrPbmn = it.get("whol_smtn_ntby_tr_pbmn").asText()
             wholNtbyVolIcdc = it.get("whol_ntby_vol_icdc").asText()
             wholNtbyTrPbmnIcdc = it.get("whol_ntby_tr_pbmn_icdc").asText()
-            rtCd = it.get("rt_cd").asText()
+//            rtCd = it.get("rt_cd").asText()
         }
     } ?: programStockOfDateTime {}
-    HttpStatus.GONE
     return stock
 }
 
@@ -250,7 +245,6 @@ private fun OpenApiResponse.toGetProgramTradeInfoPerIndividual(): ProgramTradeVo
     }
     return programStockList {
         items.addAll(stocks)
-        rtCd = this.rtCd
     }
 }
 

@@ -90,7 +90,7 @@ class OpenApiService(
         // 변화 과정을 위해 일부로 inline 하지 않음
         val token = applicationContext.getBean(OpenApiService::class.java).requestToken().token
         /** TODO: Point 프록시 객체가 아닌 실제 메서드를 직접 호출하면 AOP가 적용되지 않아 캐싱이 동작하지 않는 문제
-        self-invocation을 피하기 위해, ApplicationContext 프록시 객체를 가져와서, 메서드 호출. 고도화 필요*/
+         self-invocation을 피하기 위해, ApplicationContext 프록시 객체를 가져와서, 메서드 호출. 고도화 필요*/
         require(token.isNotBlank()) // TODO: token validation 필요
 
         val info: RequestType = RequestType.GET_CURRENT_PRICE
@@ -194,6 +194,11 @@ class OpenApiService(
             ),
         )
         val response = executeHttpRequest(info, headers, queryParameters)
+
+        if (response.getReturnCode()?.asText() != "0") {
+            throw UnexpectApiResponseException()
+        }
+
         val output = response.getOutput() // mksc_shrn_iscd -> 종목 코드
         return output // TODO: map을 return 하게 되면 최종 반환타입이 OpenApiResponse를 사용할 수 없게 되는것을 고민
     }
@@ -327,10 +332,12 @@ class OpenApiService(
     }
 
     private fun JsonNode.getOutput() = get(ResponseParameter.OUTPUT.value)
+    private fun JsonNode.getReturnCode() = get(ResponseParameter.RETURN_CODE.value)
 }
 
 enum class ResponseParameter(val value: String) {
     OUTPUT("output"),
+    RETURN_CODE("rt_cd"),
 }
 
 object BodyParameter {
@@ -341,3 +348,5 @@ object BodyParameter {
     const val ORD_QTY = "ORD_QTY"
     const val ORD_UNPR = "ORD_UNPR"
 }
+
+internal class UnexpectApiResponseException : RuntimeException()
