@@ -1,6 +1,13 @@
 package com.example.stocksearchservice.application.scheduler
 
+import com.example.stocksearchservice.domain.Stock
+import com.example.stocksearchservice.domain.StockDerivative
+import com.example.stocksearchservice.domain.StockId
 import com.example.stocksearchservice.domain.StockLog
+import com.example.stocksearchservice.domain.StockName
+import com.example.stocksearchservice.domain.StockPrice
+import com.example.stocksearchservice.domain.StockTotalVolume
+import com.example.stocksearchservice.domain.StockVolume
 import com.example.stocksearchservice.domain.repository.FinalPriceBatingStrategyV1Repository
 import com.example.stocksearchservice.domain.repository.StockInformationRepository
 import com.example.stocksearchservice.domain.strategy.FinalPriceBatingStrategyV1
@@ -67,14 +74,14 @@ internal class StockSearchScheduler(
         // TODO: 2개의 repository를 동시에 호출 하는 성능 중심 vs filter를 걸어 호출 하는 객체 list를 작게 하는 전략 고민
 
         println(programVolumeAdaptedList)
-
         /*
          * 거래량이 3거래일중 최대치
          * 거래량이 5거래일중 최고치중 70% 이상(당일 제외)
          * */
 
         /*db save 로직*/
-        finalPriceBatingStrategyV1Repository.saveAll(programVolumeAdaptedList)
+//        finalPriceBatingStrategyV1Repository.saveAll(programVolumeAdaptedList)
+        finalPriceBatingStrategyV1Repository.saveAll(makeMockProgramVolumeAdaptedList())
         // debuging code
 //        programVolumeAdaptedList.forEach finalPriceBatingStrategyV1Repository.save(it) }
 //        FinalPriceBatingStrategyV1.default().let { finalPriceBatingStrategyV1Repository.save(it) }
@@ -82,6 +89,22 @@ internal class StockSearchScheduler(
 
         /*매수를 위한 microservice로 데이터 이관 로직*/
         /* event publish를 통해 해결*/
-
     }
+}
+
+private fun makeMockProgramVolumeAdaptedList(): List<FinalPriceBatingStrategyV1> {
+    return listOf(
+        FinalPriceBatingStrategyV1(
+            stock = Stock.of(
+                stockId = StockId.of("elementum"),
+                stockName = StockName.of("dapibus"),
+                stockPrice = StockPrice.of(3945),
+                stockDerivative = StockDerivative.of(value = 2.3),
+                stockVolume = StockVolume.of(value = 3917),
+                stockTotalVolume = StockTotalVolume.of(value = 6371),
+            ),
+            rank = 1,
+            foreignerStockVolume = FinalPriceBatingStrategyV1.ForeignerStockVolume(value = 4058),
+        ),
+    )
 }
