@@ -1,6 +1,9 @@
 package com.example.com.example.stockpurchaseservice.application.scheduler
 
+import com.example.com.example.stockpurchaseservice.domain.ExecutedStock
+import com.example.com.example.stockpurchaseservice.domain.ExecutionType
 import com.example.com.example.stockpurchaseservice.domain.repository.StockOrderRepository
+import com.example.common.application.event.ApplicationEvent
 import com.example.stockpurchaseservice.application.port.out.MarketServicePort
 import com.example.stockpurchaseservice.application.service.strategy.toDto
 import com.example.stockpurchaseservice.domain.FinalPriceBatingV1
@@ -10,6 +13,7 @@ import org.springframework.retry.annotation.Recover
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import java.time.ZonedDateTime
+import java.util.UUID
 
 @Component
 internal class StockTradeScheduler(
@@ -66,4 +70,48 @@ internal class StockTradeScheduler(
         // 예: 알림 전송, 로그 기록, 대체 로직 실행 등
         TODO()
     }
+
+
+    @Scheduled(cron = "0 */1 * ? * MON-FRI") // TODO: 판매 전략에 따라 스케쥴 시간 변경필요
+    suspend fun executionCheck() {
+//        val orders = stockOrderRepository.findAllNotCompleted()
+//        val purchaseOrder = orders.map { it as PurchaseOrder }
+//        val sellingOrder = orders.map { it as SellingOrder }
+        val executedStockList: List<ExecutedStock> = marketService.findExecutionListAtOneDay()
+        val (selled, purchased) = executedStockList.partition { it.type == ExecutionType.Selling }
+        selled.forEach {
+            applicationEventPublisher.pulishEvent(
+                SellingExecutionCreatedApplicationEvent(
+                    stockId = it.stock.id.value,
+                    quantity = it.quantity,
+                    id = UUID.randomUUID(),
+                    occurredAt = ZonedDateTime.now(),
+                )
+            )
+        }
+        purchased.forEach {
+            applicationEventPublisher.pulishEvent(
+                PurchaseExecutionCreatedApplicationEvent(
+                    stockId = it.stock.id.value,
+                    quantity = it.quantity,
+                    id = UUID.randomUUID(),
+                    occurredAt = ZonedDateTime.now(),
+                )
+            )
+        }
+    }
 }
+
+class SellingExecutionCreatedApplicationEvent(
+    val stockId: String,
+    val quantity: Int,
+    override val id: UUID,
+    override val occurredAt: ZonedDateTime,
+) : ApplicationEvent
+
+class PurchaseExecutionCreatedApplicationEvent(
+    val stockId: String,
+    val quantity: Int,
+    override val id: UUID,
+    override val occurredAt: ZonedDateTime,
+) : ApplicationEvent
