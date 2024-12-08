@@ -19,8 +19,7 @@ internal class ExternalEventListenerAdapter(
     fun createdStrategies(message: ByteArray) {
         // 구현
         println(message) // TODO: 테스트 후 제거
-        val tempMessage: ByteArray = byteArrayOf()
-        val event = Event.StrategySavedEvent.parseFrom(tempMessage)
+        val event = Event.StrategySavedEvent.parseFrom(message)
         buyingStockPurchaseUseCase.execute(event.toCommand())
     }
 }
