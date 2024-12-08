@@ -15,6 +15,7 @@ import com.example.common.endpoint.Endpoint.REQUEST_TOKEN
 import com.example.sketch.utils.OpenApiResponse
 import com.example.sketch.utils.StringExtension.toRequestableDateFormat
 import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
 import org.springframework.http.server.reactive.ServerHttpResponse
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.ModelAttribute
@@ -146,8 +147,10 @@ class OpenApiController(
     }
 
     @GetMapping(GET_EXECUTION_ORDERS)
-    suspend fun getExecutionOrders() {
-        service.getExecutionOrders()
+    suspend fun getExecutionOrders(
+        @ModelAttribute request: GetDailyExecutionOrdersRequest,
+    ): ResponseEntity<OpenApiResponse> {
+        return ResponseEntity.ok(service.getExecutionOrders(request))
     }
 }
 

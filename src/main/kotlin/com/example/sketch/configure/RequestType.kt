@@ -79,6 +79,22 @@ enum class QueryParameter(
     FID_INPUT_PRICE_1(emptyQueryParam), // 입력 가격1, 가격~, 전체검색 공란
     FID_INPUT_PRICE_2(emptyQueryParam), // 입력 가격 2 ~가격, 전체검색 공란
     FID_VOL_CNT(emptyQueryParam), // 거래량~
+
+    // TODO: CANO~ CTX_AREA_NK100 까지는 임의로 추가한 것. 필요없는 것 제거 필요
+    CANO(emptyQueryParam),
+    ACNT_PRDT_CD(emptyQueryParam),
+    INQR_STRT_DT(emptyQueryParam),
+    INQR_END_DT(emptyQueryParam),
+    SLL_BUY_DVSN_CD(emptyQueryParam),
+    INQR_DVSN(emptyQueryParam),
+    PDNO(emptyQueryParam),
+    CCLD_DVSN(emptyQueryParam),
+    ORD_GNO_BRNO(emptyQueryParam),
+    ODNO(emptyQueryParam),
+    INQR_DVSN_3(emptyQueryParam),
+    INQR_DVSN_1(emptyQueryParam),
+    CTX_AREA_FK100(emptyQueryParam),
+    CTX_AREA_NK100(emptyQueryParam),
     ;
 
     companion object {
@@ -141,7 +157,13 @@ enum class QueryParameter(
                 }
 
                 RequestType.POST_STOCK_ORDER -> emptyList()
-                RequestType.GET_EXECUTION_ORDERS -> emptyList()
+                // TODO: 필요없는 파라미터 제거 필요.
+                RequestType.GET_EXECUTION_ORDERS -> listOf(
+                    CANO, ACNT_PRDT_CD, INQR_STRT_DT, INQR_END_DT,
+                    SLL_BUY_DVSN_CD, INQR_DVSN, PDNO, CCLD_DVSN,
+                    ORD_GNO_BRNO, ODNO, INQR_DVSN_3, INQR_DVSN_1,
+                    CTX_AREA_FK100, CTX_AREA_NK100,
+                )
             }.toResult(additionalInfo)
     }
 }

@@ -101,7 +101,10 @@ internal class StockSearchScheduler(
         /* event publish를 통해 해결*/
 //        throw RuntimeException("일부로 throw")
     }
+    @Scheduled(cron = "0 */1 * ? * MON-FRI")
+    suspend fun temp() {
 
+    }
     @Recover
     suspend fun recover(e: Exception) {
         // 최대 재시도 횟수를 초과했을 때 수행할 동작

@@ -6,6 +6,7 @@ import com.example.sketch.configure.Property.Companion.APP_SECRET
 import com.example.sketch.configure.Property.Companion.MOCK_APP_KEY
 import com.example.sketch.configure.Property.Companion.MOCK_APP_SECRET
 import com.example.sketch.configure.QueryParameter
+import com.example.sketch.configure.QueryParameter.CANO
 import com.example.sketch.configure.QueryParameter.FID_INPUT_DATE_1
 import com.example.sketch.configure.QueryParameter.FID_INPUT_ISCD
 import com.example.sketch.configure.RequestType
@@ -255,21 +256,50 @@ class OpenApiService(
         return response
     }
 
-    suspend fun getExecutionOrders(): OpenApiResponse {
+    suspend fun getExecutionOrders(request: GetDailyExecutionOrdersRequest): OpenApiResponse {
         val token = getToken(isMock = true)
         val info: RequestType = RequestType.GET_EXECUTION_ORDERS
 
         val trId = "VTTC8001R" // 모의투자 3개월 이내, TODO: 상황별 mapping 필요
         var headers = build(token = token, trId = trId)
-            .addHeader(HeaderBuilder.HeaderKey.CUSTOMER_TYPE, "P") // 개인 고객 타입
-//            .addHashKey(request)
+            .addHeader(HeaderBuilder.HeaderKey.CUSTOMER_TYPE, "P")
             .build()
         // TODO: mock 인지 아닌지 ThreadLocal 혹은, Context로 전달 해야 함
         val mockHeader = headers + mapOf(
             HeaderKey.APP_KEY.value to MOCK_APP_KEY,
             HeaderKey.APP_SECRET.value to MOCK_APP_SECRET,
         )
-        val response = executeHttpRequest(info = info, headers = mockHeader, isMockApi = true)
+        // query parameter build
+        val cano = when (request.isMock) {
+            true -> Property.MOCK_ACCOUNT
+            false -> Property.MOCK_ACCOUNT // TODO: 추후 실전계좌 매핑
+        }
+        val acntPrdtCd = when (request.isMock) {
+            true -> Property.MOCK_ACCOUNT_TAIL // TODO: 추후 실전계좌 매핑
+            false -> Property.MOCK_ACCOUNT_TAIL
+        }
+        val queryParameters =
+            QueryParameter.forType(
+                info,
+                mapOf(
+                    CANO to cano,
+                    QueryParameter.ACNT_PRDT_CD to acntPrdtCd,
+                    QueryParameter.INQR_STRT_DT to request.inqrStrtDt,
+                    QueryParameter.INQR_END_DT to request.inqrEndDt,
+                    QueryParameter.SLL_BUY_DVSN_CD to request.sllBuyDvsnCd,
+                    QueryParameter.INQR_DVSN to request.inqrDvsn,
+                    QueryParameter.PDNO to request.pdno,
+                    QueryParameter.CCLD_DVSN to request.ccldDvsn,
+                    QueryParameter.ORD_GNO_BRNO to request.ordGnoBrno,
+                    QueryParameter.ODNO to request.odno,
+                    QueryParameter.INQR_DVSN_3 to request.inqrDvsn3,
+                    QueryParameter.INQR_DVSN_1 to request.inqrDvsn1,
+                    QueryParameter.CTX_AREA_FK100 to request.ctxAreaFk100,
+                    QueryParameter.CTX_AREA_NK100 to request.ctxAreaNk100,
+                ),
+            )
+
+        val response = executeHttpRequest(info = info, headers = mockHeader, queryParameters = queryParameters, isMockApi = true)
         return response
     }
 
