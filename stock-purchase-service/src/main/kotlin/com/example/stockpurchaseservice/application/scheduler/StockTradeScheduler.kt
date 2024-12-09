@@ -9,18 +9,22 @@ import com.example.stockpurchaseservice.application.service.strategy.toDto
 import com.example.stockpurchaseservice.domain.FinalPriceBatingV1
 import com.example.stockpurchaseservice.domain.Stock
 import com.example.stockpurchaseservice.domain.StrategyType
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.retry.annotation.Recover
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import java.time.ZonedDateTime
 import java.util.UUID
+import java.util.concurrent.ConcurrentLinkedQueue
 
 @Component
 internal class StockTradeScheduler(
     private val stockOrderRepository: StockOrderRepository,
 //    private val stockInformationRepository: StockInformationRepository, // TODO: common? 아니면 독립적으로 ?
     private val marketService: MarketServicePort,
+    private val applicationEventPublisher: ApplicationEventPublisher,
 ) {
+    private val executionQueue: ConcurrentLinkedQueue<ExecutedStock> = ConcurrentLinkedQueue()
     // example of cron = "초 분 시간-시간 ? * 요일-요일"
     //    @Scheduled(cron = "15 */2 9-18 ? * MON-FRI ")
     @Scheduled(cron = "15 */1 * ? * MON-FRI ")
@@ -79,26 +83,22 @@ internal class StockTradeScheduler(
 //        val sellingOrder = orders.map { it as SellingOrder }
         val executedStockList: List<ExecutedStock> = marketService.findExecutionListAtOneDay()
         val (selled, purchased) = executedStockList.partition { it.type == ExecutionType.Selling }
-        selled.forEach {
-            applicationEventPublisher.pulishEvent(
-                SellingExecutionCreatedApplicationEvent(
-                    stockId = it.stock.id.value,
-                    quantity = it.quantity,
-                    id = UUID.randomUUID(),
-                    occurredAt = ZonedDateTime.now(),
-                )
-            )
+        // TODO: 추후 event publish 형태로 변경 필요;;
+        // TODO: 지금 전제가 같은 종목이 다른 전략에 의해 발굴 되지 않는다는 전제가 있으므로, 추후 해결 필요
+        selled.forEach { item ->
+            val order = stockOrderRepository.findByStockIdAndQuantity(item.stock.id, item.quantity)?.let{
+                it.orderState
+            }
+            order?.let{stockOrderRepository.save(it)}
         }
-        purchased.forEach {
-            applicationEventPublisher.pulishEvent(
-                PurchaseExecutionCreatedApplicationEvent(
-                    stockId = it.stock.id.value,
-                    quantity = it.quantity,
-                    id = UUID.randomUUID(),
-                    occurredAt = ZonedDateTime.now(),
-                )
-            )
+        purchased.forEach { item ->
+
         }
+    }
+
+    @Scheduled(cron = "0 30 8 ? * MON-FRI") // TODO: 판매 전략에 따라 스케쥴 시간 변경필요
+    fun initializeExecutionQueue(){
+        // executionQueue를 빈 값으로 초기화
     }
 }
 

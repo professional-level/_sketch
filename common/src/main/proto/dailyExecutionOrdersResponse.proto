@@ -1,0 +1,56 @@
+syntax = "proto3";
+import "google/protobuf/timestamp.proto";
+
+message DailyExecutionOrdersOutput1 {
+  string ord_dt = 1;
+  string ord_gno_brno = 2;
+  string odno = 3;
+  string orgn_odno = 4;
+  string ord_dvsn_name = 5;
+  string sll_buy_dvsn_cd = 6;
+  string sll_buy_dvsn_cd_name = 7;
+  string pdno = 8;
+  string prdt_name = 9;
+  string ord_qty = 10;
+  string ord_unpr = 11;
+  string ord_tmd = 12;
+  string tot_ccld_qty = 13;
+  string avg_prvs = 14;
+  string cncl_yn = 15;
+  string tot_ccld_amt = 16;
+  string loan_dt = 17;
+  string ordr_empno = 18;
+  string ord_dvsn_cd = 19;
+  string cncl_cfrm_qty = 20;
+  string rmn_qty = 21;
+  string rjct_qty = 22;
+  string ccld_cndt_name = 23;
+  string inqr_ip_addr = 24;
+  string cpbc_ordp_ord_rcit_dvsn_cd = 25;
+  string cpbc_ordp_infm_mthd_dvsn_cd = 26;
+  string infm_tmd = 27;
+  string ctac_tlno = 28;
+  string prdt_type_cd = 29;
+  string excg_dvsn_cd = 30;
+  string cpbc_ordp_mtrl_dvsn_cd = 31;
+  string ord_orgno = 32;
+  string rsvn_ord_end_dt = 33;
+}
+
+message DailyExecutionOrdersOutput2 {
+  string tot_ord_qty = 1;
+  string tot_ccld_qty = 2;
+  string tot_ccld_amt = 3;
+  string prsm_tlex_smtl = 4;
+  string pchs_avg_pric = 5;
+}
+
+message DailyExecutionOrdersResponse {
+  string ctx_area_fk100 = 1;
+  string ctx_area_nk100 = 2;
+  repeated DailyExecutionOrdersOutput1 output1 = 3;
+  DailyExecutionOrdersOutput2 output2 = 4;
+  string rt_cd = 5;
+  string msg_cd = 6;
+  string msg1 = 7;
+}

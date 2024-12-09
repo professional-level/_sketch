@@ -1,6 +1,7 @@
 package com.example.sketch.openapi
 
 import ApiResponse
+import DailyExecutionOrdersResponseOuterClass.DailyExecutionOrdersResponse
 import ProgramTradeVolume
 import VolumeRank
 import com.example.common.endpoint.Endpoint.GET_CURRENT_PRICE
@@ -14,8 +15,10 @@ import com.example.common.endpoint.Endpoint.POST_STOCK_ORDER
 import com.example.common.endpoint.Endpoint.REQUEST_TOKEN
 import com.example.sketch.utils.OpenApiResponse
 import com.example.sketch.utils.StringExtension.toRequestableDateFormat
+import dailyExecutionOrdersOutput1
+import dailyExecutionOrdersOutput2
+import dailyExecutionOrdersResponse
 import org.springframework.http.HttpStatus
-import org.springframework.http.ResponseEntity
 import org.springframework.http.server.reactive.ServerHttpResponse
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.ModelAttribute
@@ -149,8 +152,8 @@ class OpenApiController(
     @GetMapping(GET_EXECUTION_ORDERS)
     suspend fun getExecutionOrders(
         @ModelAttribute request: GetDailyExecutionOrdersRequest,
-    ): ResponseEntity<OpenApiResponse> {
-        return ResponseEntity.ok(service.getExecutionOrders(request))
+    ): DailyExecutionOrdersResponse {
+        return service.getExecutionOrders(request).toDailyExecutionOrdersResponse()
     }
 }
 
@@ -248,6 +251,66 @@ private fun OpenApiResponse.toGetProgramTradeInfoPerIndividual(): ProgramTradeVo
     }
     return programStockList {
         items.addAll(stocks)
+    }
+}
+private fun OpenApiResponse.toDailyExecutionOrdersResponse(): DailyExecutionOrdersResponse {
+    return dailyExecutionOrdersResponse {
+        // top-level 필드들 가져오기
+        ctxAreaFk100 = this@toDailyExecutionOrdersResponse.get("ctx_area_fk100").asText()
+        ctxAreaNk100 = this@toDailyExecutionOrdersResponse.get("ctx_area_nk100").asText()
+        rtCd = this@toDailyExecutionOrdersResponse.get("rt_cd").asText()
+        msgCd = this@toDailyExecutionOrdersResponse.get("msg_cd").asText()
+        msg1 = this@toDailyExecutionOrdersResponse.get("msg1").asText()
+
+        // output1 배열 처리
+        val output1Array = this@toDailyExecutionOrdersResponse.get("output1")
+        output1Array.forEach { item ->
+                dailyExecutionOrdersOutput1 {
+                    ordDt = item.get("ord_dt").asText()
+                    ordGnoBrno = item.get("ord_gno_brno").asText()
+                    odno = item.get("odno").asText()
+                    orgnOdno = item.get("orgn_odno").asText()
+                    ordDvsnName = item.get("ord_dvsn_name").asText()
+                    sllBuyDvsnCd = item.get("sll_buy_dvsn_cd").asText()
+                    sllBuyDvsnCdName = item.get("sll_buy_dvsn_cd_name").asText()
+                    pdno = item.get("pdno").asText()
+                    prdtName = item.get("prdt_name").asText()
+                    ordQty = item.get("ord_qty").asText()
+                    ordUnpr = item.get("ord_unpr").asText()
+                    ordTmd = item.get("ord_tmd").asText()
+                    totCcldQty = item.get("tot_ccld_qty").asText()
+                    avgPrvs = item.get("avg_prvs").asText()
+                    cnclYn = item.get("cncl_yn").asText()
+                    totCcldAmt = item.get("tot_ccld_amt").asText()
+                    loanDt = item.get("loan_dt").asText()
+                    ordrEmpno = item.get("ordr_empno").asText()
+                    ordDvsnCd = item.get("ord_dvsn_cd").asText()
+                    cnclCfrmQty = item.get("cncl_cfrm_qty").asText()
+                    rmnQty = item.get("rmn_qty").asText()
+                    rjctQty = item.get("rjct_qty").asText()
+                    ccldCndtName = item.get("ccld_cndt_name").asText()
+                    inqrIpAddr = item.get("inqr_ip_addr").asText()
+                    cpbcOrdpOrdRcitDvsnCd = item.get("cpbc_ordp_ord_rcit_dvsn_cd").asText()
+                    cpbcOrdpInfmMthdDvsnCd = item.get("cpbc_ordp_infm_mthd_dvsn_cd").asText()
+                    infmTmd = item.get("infm_tmd").asText()
+                    ctacTlno = item.get("ctac_tlno").asText()
+                    prdtTypeCd = item.get("prdt_type_cd").asText()
+                    excgDvsnCd = item.get("excg_dvsn_cd").asText()
+                    cpbcOrdpMtrlDvsnCd = item.get("cpbc_ordp_mtrl_dvsn_cd").asText()
+                    ordOrgno = item.get("ord_orgno").asText()
+                    rsvnOrdEndDt = item.get("rsvn_ord_end_dt").asText()
+                }
+        }
+
+        // output2 객체 처리
+        val output2Object = this@toDailyExecutionOrdersResponse.get("output2")
+        output2 = dailyExecutionOrdersOutput2 {
+            totOrdQty = output2Object.get("tot_ord_qty").asText()
+            totCcldQty = output2Object.get("tot_ccld_qty").asText()
+            totCcldAmt = output2Object.get("tot_ccld_amt").asText()
+            prsmTlexSmtl = output2Object.get("prsm_tlex_smtl").asText()
+            pchsAvgPric = output2Object.get("pchs_avg_pric").asText()
+        }
     }
 }
 
