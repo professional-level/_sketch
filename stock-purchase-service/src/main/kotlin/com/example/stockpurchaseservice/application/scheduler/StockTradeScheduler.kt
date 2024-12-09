@@ -1,27 +1,13 @@
-package com.example.stocksearchservice.application.scheduler
+package com.example.com.example.stockpurchaseservice.application.scheduler
 
-import com.example.stocksearchservice.domain.Stock
-import com.example.stocksearchservice.domain.StockDerivative
-import com.example.stocksearchservice.domain.StockId
-import com.example.stocksearchservice.domain.StockLog
-import com.example.stocksearchservice.domain.StockName
-import com.example.stocksearchservice.domain.StockPrice
-import com.example.stocksearchservice.domain.StockTotalVolume
-import com.example.stocksearchservice.domain.StockVolume
-import com.example.stocksearchservice.domain.repository.FinalPriceBatingStrategyV1Repository
-import com.example.stocksearchservice.domain.repository.StockInformationRepository
-import com.example.stocksearchservice.domain.strategy.FinalPriceBatingStrategyV1
-import org.springframework.retry.annotation.Backoff
 import org.springframework.retry.annotation.Recover
-import org.springframework.retry.annotation.Retryable
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import java.time.ZonedDateTime
 
 @Component
-internal class StockSearchScheduler(
-    private val stockInformationRepository: StockInformationRepository,
-    private val finalPriceBatingStrategyV1Repository: FinalPriceBatingStrategyV1Repository,
+internal class StockTradeScheduler(
+    // TODO: repository 추가
 ) {
     // example of cron = "초 분 시간-시간 ? * 요일-요일"
     //    @Scheduled(cron = "15 */2 9-18 ? * MON-FRI ")
@@ -31,23 +17,6 @@ internal class StockSearchScheduler(
         println("[${Thread.currentThread()}]:$time")
     }
 
-    @Scheduled(cron = "15 */1 * ? * MON-FRI ")
-//    @Scheduled(cron = "15 */2 9-18 ? * MON-FRI ")
-    suspend fun findTop10VolumeStocks() {
-        val stockList = stockInformationRepository.findTop10VolumeStocks()
-        println(stockList)
-        val stockLogList = StockLog.from(stockList) // TODO: 비동기에 맞춰서 로직 변경 해야 함
-        stockInformationRepository.saveTop10VolumeStocks(stockLogList) // TODO: save 하는 로직을 event로 떨궈도 될듯?
-    }
-
-    // TODO: 해당 알고리즘을 관리하는것을 어떻게 해야 할지 고민이 필요.
-//    @Scheduled(cron = "0 50 15 ? * MON-FRI")
-    // TODO: retry 동작 안함
-    @Retryable( // TODO: 실패를 고려해 임의로 retryable 처리.
-        value = [Exception::class],
-        maxAttempts = 5,
-        backoff = Backoff(delay = 1000)
-    )
     @Scheduled(cron = "0 */1 * ? * MON-FRI")
     suspend fun finalPriceBatingStrategy1() {
         // TODO: 휴장일인지 체크하는 로직이 필요
@@ -111,19 +80,19 @@ internal class StockSearchScheduler(
     }
 }
 
-private fun makeMockProgramVolumeAdaptedList(): List<FinalPriceBatingStrategyV1> {
-    return listOf(
-        FinalPriceBatingStrategyV1(
-            stock = Stock.of(
-                stockId = StockId.of("elementum"),
-                stockName = StockName.of("dapibus"),
-                stockPrice = StockPrice.of(3945),
-                stockDerivative = StockDerivative.of(value = 2.3),
-                stockVolume = StockVolume.of(value = 3917),
-                stockTotalVolume = StockTotalVolume.of(value = 6371),
-            ),
-            rank = 1,
-            foreignerStockVolume = FinalPriceBatingStrategyV1.ForeignerStockVolume(value = 4058),
-        ),
-    )
-}
+//private fun makeMockProgramVolumeAdaptedList(): List<FinalPriceBatingStrategyV1> {
+//    return listOf(
+//        FinalPriceBatingStrategyV1(
+//            stock = Stock.of(
+//                stockId = StockId.of("elementum"),
+//                stockName = StockName.of("dapibus"),
+//                stockPrice = StockPrice.of(3945),
+//                stockDerivative = StockDerivative.of(value = 2.3),
+//                stockVolume = StockVolume.of(value = 3917),
+//                stockTotalVolume = StockTotalVolume.of(value = 6371),
+//            ),
+//            rank = 1,
+//            foreignerStockVolume = FinalPriceBatingStrategyV1.ForeignerStockVolume(value = 4058),
+//        ),
+//    )
+//}
