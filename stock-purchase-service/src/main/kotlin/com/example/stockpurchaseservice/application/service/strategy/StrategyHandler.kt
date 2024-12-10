@@ -1,11 +1,13 @@
 package com.example.stockpurchaseservice.application.service.strategy
 
+import com.example.com.example.stockpurchaseservice.domain.repository.StockOrderRepository
 import com.example.stockpurchaseservice.application.port.out.MarketServicePort
 import com.example.stockpurchaseservice.application.port.out.PurchaseOrderDto
 import com.example.stockpurchaseservice.application.service.BuyingStockPurchaseCommand
 import com.example.stockpurchaseservice.application.service.BuyingStockPurchaseResult
 import com.example.stockpurchaseservice.application.service.PurchaseStatus
 import com.example.stockpurchaseservice.domain.FinalPriceBatingV1
+import com.example.stockpurchaseservice.domain.Order
 import com.example.stockpurchaseservice.domain.PurchaseErrorCode
 import com.example.stockpurchaseservice.domain.PurchaseOrder
 import com.example.stockpurchaseservice.domain.Stock
@@ -15,6 +17,7 @@ import org.springframework.stereotype.Component
 @Component
 internal class FinalPriceBatingV1Handler(
     private val marketService: MarketServicePort,
+    private val orderRepository: StockOrderRepository,
 ) : StockPurchaseHandler<BuyingStockPurchaseCommand.OfFinalPriceBatingV1> {
 
     override fun handle(command: BuyingStockPurchaseCommand.OfFinalPriceBatingV1): BuyingStockPurchaseResult {
@@ -50,6 +53,7 @@ internal class FinalPriceBatingV1Handler(
             // 이벤트 퍼블리싱 로직 추가
         }
 
+        orderRepository.save(Order.from(purchaseOrder))
         return BuyingStockPurchaseResult(
             orderId = purchaseOrder.id,
             status = when (purchaseOrder.isSuccess) {

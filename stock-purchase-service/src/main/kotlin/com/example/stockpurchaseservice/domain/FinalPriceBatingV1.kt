@@ -118,14 +118,24 @@ class FinalPriceBatingV1 private constructor(
     val sellingPrice: Money?,
 ){
   companion object{
-      fun from(purchaseOrder: PurchaseOrder): Order { TODO()}
+      fun from(purchaseOrder: PurchaseOrder): Order {
+          return Order(
+              id = purchaseOrder.id,
+              stockId = purchaseOrder.stockId,
+              requestedAt = purchaseOrder.requestedAt,
+              purchasePrice = purchaseOrder.purchasePrice,
+              strategyType = purchaseOrder.strategyType,
+              purchasedAt =  purchaseOrder.events.find{ it is PurchaseSuccessEvent}?.occurredAt,
+              sellingAt = null,
+              sellingPrice = null,
+          )
+      }
       fun from(sellingOrder: SellingOrder): Order { TODO()}
   }
 }
 // 판매 주문 엔티티
     class SellingOrder : EventSupportedEntity {
-    override val events: MutableList<DomainEvent>
-        get() = TODO("Not yet implemented")
+    override val events: MutableList<DomainEvent> = mutableListOf()
 
     override fun complete() {
         TODO("Not yet implemented")
@@ -185,7 +195,7 @@ data class PurchaseFailedEvent(
     val errorCode: PurchaseErrorCode,
 ) : DomainEvent()
 
-enum class PurchaseErrorCode {
+enum class PurchaseErrorCode { // TODO: error enum class의 공통분모를 상속하도록 수정 필요
     UNDEFINED
 }
 
