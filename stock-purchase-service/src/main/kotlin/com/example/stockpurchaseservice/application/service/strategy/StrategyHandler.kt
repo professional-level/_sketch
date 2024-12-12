@@ -9,7 +9,9 @@ import com.example.stockpurchaseservice.application.service.PurchaseStatus
 import com.example.stockpurchaseservice.domain.FinalPriceBatingV1
 import com.example.stockpurchaseservice.domain.Order
 import com.example.stockpurchaseservice.domain.PurchaseErrorCode
+import com.example.stockpurchaseservice.domain.PurchaseFailedEvent
 import com.example.stockpurchaseservice.domain.PurchaseOrder
+import com.example.stockpurchaseservice.domain.PurchaseSuccessEvent
 import com.example.stockpurchaseservice.domain.Stock
 import org.springframework.stereotype.Component
 
@@ -31,7 +33,7 @@ internal class FinalPriceBatingV1Handler(
         val strategy = FinalPriceBatingV1.of(
             stock = stock,
             requestedAt = requestedAt,
-            purchasePrice = purchasePrice
+            purchasePrice = purchasePrice,
         )
 
         // 구매 주문 생성
@@ -51,9 +53,13 @@ internal class FinalPriceBatingV1Handler(
         }
         purchaseOrder.events.forEach { event ->
             // 이벤트 퍼블리싱 로직 추가
+            when (event) {
+                is PurchaseSuccessEvent -> orderRepository.save(Order.from(purchaseOrder))
+                is PurchaseFailedEvent -> {}
+                else -> throw UndefinedException()
+            }
         }
 
-        orderRepository.save(Order.from(purchaseOrder))
         return BuyingStockPurchaseResult(
             orderId = purchaseOrder.id,
             status = when (purchaseOrder.isSuccess) {
@@ -68,6 +74,9 @@ internal fun PurchaseOrder.toDto(): PurchaseOrderDto {
     return PurchaseOrderDto(
         orderId = this.id.value,
         stockId = this.stockId.value,
-        purchasePrice = this.purchasePrice.price
+        purchasePrice = this.purchasePrice.price,
     )
 }
+
+// TODO: exception 고도화 및 패키지 위치 확인
+class UndefinedException : RuntimeException()

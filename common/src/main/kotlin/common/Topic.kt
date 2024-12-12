@@ -1,7 +1,5 @@
 package common
 
-import common.MessageTopic.values
-
 
 // TODO: Topic과 MessageTopic이 나눠지는 현상 수정
 object Topic {
@@ -9,6 +7,7 @@ object Topic {
     const val TOPIC2 = "topic2"
     const val STRATEGY_SAVED = "strategy-saved"
     const val INVALID_EVENT = "invalid-event"
+    const val PURCHASE_SUCCESS = "purchase-success"
 }
 
 enum class MessageTopic(val topicName: String) {
@@ -16,6 +15,7 @@ enum class MessageTopic(val topicName: String) {
     TOPIC2(Topic.TOPIC2),
     STRATEGY_SAVED(Topic.STRATEGY_SAVED),
     INVALID_EVENT(Topic.INVALID_EVENT),
+    PURCHASE_SUCCESS(Topic.PURCHASE_SUCCESS),
     ;
 
     companion object {

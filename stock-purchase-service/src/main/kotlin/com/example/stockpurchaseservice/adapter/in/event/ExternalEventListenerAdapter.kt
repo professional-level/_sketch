@@ -17,6 +17,7 @@ internal class ExternalEventListenerAdapter(
 ) {
     @KafkaListener(topics = [STRATEGY_SAVED], groupId = PURCHASE_SERVICE) // TODO: topic enum으로 관리하며 common으로 이동 필요
     fun createdStrategies(message: ByteArray) {
+        // TODO: event store 개념으로 event를 consume을 정상적으로 했다는 의미의 application event를 발행?!
         // 구현
         val event = Event.StrategySavedEvent.parseFrom(message)
         buyingStockPurchaseUseCase.execute(event.toCommand())

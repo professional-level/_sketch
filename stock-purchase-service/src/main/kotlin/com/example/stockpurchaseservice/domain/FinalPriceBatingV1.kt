@@ -28,7 +28,7 @@ class FinalPriceBatingV1 private constructor(
         하나의 틱이 얼마인지 계산하여 몇 틱을 분산화 할 것 인지에 대한 로직이 필요
         3. 매수의 총 비용이 얼마인지를 반환하는 것이 필요하다.
         전략마다, 매수하는 금액도 다를 것이고, 총 매수 가능한 금액을 계산하는것도 필요하다.
-    */
+     */
 
     // 이벤트 목록 관리
     override val events: MutableList<DomainEvent> = mutableListOf()
@@ -107,7 +107,7 @@ class FinalPriceBatingV1 private constructor(
     }
 }
 
- class Order private constructor(
+class Order private constructor(
     val id: OrderId,
     val stockId: StockId,
     val requestedAt: ZonedDateTime,
@@ -116,25 +116,29 @@ class FinalPriceBatingV1 private constructor(
     val sellingAt: ZonedDateTime?,
     val purchasePrice: Money?,
     val sellingPrice: Money?,
-){
-  companion object{
-      fun from(purchaseOrder: PurchaseOrder): Order {
-          return Order(
-              id = purchaseOrder.id,
-              stockId = purchaseOrder.stockId,
-              requestedAt = purchaseOrder.requestedAt,
-              purchasePrice = purchaseOrder.purchasePrice,
-              strategyType = purchaseOrder.strategyType,
-              purchasedAt =  purchaseOrder.events.find{ it is PurchaseSuccessEvent}?.occurredAt,
-              sellingAt = null,
-              sellingPrice = null,
-          )
-      }
-      fun from(sellingOrder: SellingOrder): Order { TODO()}
-  }
+) {
+    companion object {
+        fun from(purchaseOrder: PurchaseOrder): Order {
+            return Order(
+                id = purchaseOrder.id,
+                stockId = purchaseOrder.stockId,
+                requestedAt = purchaseOrder.requestedAt,
+                purchasePrice = purchaseOrder.purchasePrice,
+                strategyType = purchaseOrder.strategyType,
+                purchasedAt = purchaseOrder.events.find { it is PurchaseSuccessEvent }?.occurredAt,
+                sellingAt = null,
+                sellingPrice = null,
+            )
+        }
+
+        fun from(sellingOrder: SellingOrder): Order {
+            TODO()
+        }
+    }
 }
+
 // 판매 주문 엔티티
-    class SellingOrder : EventSupportedEntity {
+class SellingOrder : EventSupportedEntity {
     override val events: MutableList<DomainEvent> = mutableListOf()
 
     override fun complete() {
@@ -153,7 +157,7 @@ data class SellingFailedEvent(
 ) : DomainEvent()
 
 enum class SellingErrorCode {
-    UNDEFINED
+    UNDEFINED,
 }
 
 // 구매 주문 엔티티
@@ -177,26 +181,26 @@ data class PurchaseOrder(
 
     fun failed(message: String?, purchaseErrorCode: PurchaseErrorCode = PurchaseErrorCode.UNDEFINED) {
         _isSuccess = false
-        events.add(PurchaseFailedEvent(orderId = this.id, message = message ?: "", errorCode = purchaseErrorCode))
+        events.add(PurchaseFailedEvent( message = message ?: "", errorCode = purchaseErrorCode))
     }
 
     override fun complete() {
         TODO("Not yet implemented")
     }
 }
-
+// TODO: stockId, type을 넘기는 것 보다는,,, traceId, spanId의 개념을 구현하는게 더 좋을 것 같다.
+// 동기코드에선 ThreadLocal을 구현하면 되는데.. 비동기 webflux& 코루틴에서는 어떻게 구현해야 할지...
 data class PurchaseSuccessEvent(
     val orderId: OrderId,
 ) : DomainEvent()
 
 data class PurchaseFailedEvent(
-    val orderId: OrderId,
     val message: String,
     val errorCode: PurchaseErrorCode,
 ) : DomainEvent()
 
 enum class PurchaseErrorCode { // TODO: error enum class의 공통분모를 상속하도록 수정 필요
-    UNDEFINED
+    UNDEFINED,
 }
 
 data class StrategyExecutedEvent(
