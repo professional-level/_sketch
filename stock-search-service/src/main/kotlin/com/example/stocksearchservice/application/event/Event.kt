@@ -15,6 +15,7 @@ data class StrategyCreatedApplicationEvent(
     override val occurredAt: ZonedDateTime,
 ) : ApplicationEvent
 
+// TODO: common module로 이동 해야 할 듯
 enum class StrategyTypeDto {
     FINAL_PRICE_BATING_V1,
     // 다른 타입 추가 가능

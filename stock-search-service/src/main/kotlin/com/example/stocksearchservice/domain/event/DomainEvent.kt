@@ -14,6 +14,7 @@ data class StrategyCreatedEvent(
     val type: StrategyType,
 ) : DomainEvent()
 
+// TODO: common module의 Domain으로 이동해야 할 것 같다.
 enum class StrategyType {
     FinalPriceBatingV1,
 }
