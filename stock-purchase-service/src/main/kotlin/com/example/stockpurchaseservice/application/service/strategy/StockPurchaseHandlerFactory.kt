@@ -6,7 +6,7 @@ import com.example.stockpurchaseservice.application.service.StrategyType
 import org.springframework.stereotype.Component
 
 interface StockPurchaseHandler<T : BuyingStockPurchaseCommand> {
-    fun handle(command: T): BuyingStockPurchaseResult
+    suspend fun handle(command: T): BuyingStockPurchaseResult
 }
 
 @Component

@@ -7,13 +7,12 @@ import com.example.stockpurchaseservice.domain.OrderId
 import org.springframework.stereotype.Service
 import java.time.ZonedDateTime
 
-
 @Service
 class BuyingStockPurchaseService(
     private val handlerFactory: StockPurchaseHandlerFactory,
 ) : BuyingStockPurchaseUseCase {
 
-    override fun execute(request: BuyingStockPurchaseCommand): BuyingStockPurchaseResult {
+    override suspend fun execute(request: BuyingStockPurchaseCommand): BuyingStockPurchaseResult {
         val handler = handlerFactory.getHandler<BuyingStockPurchaseCommand>(request.type)
         return handler.handle(request)
     }

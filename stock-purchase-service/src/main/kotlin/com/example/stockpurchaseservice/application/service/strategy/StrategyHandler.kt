@@ -22,7 +22,7 @@ internal class FinalPriceBatingV1Handler(
     private val orderRepository: StockOrderRepository,
 ) : StockPurchaseHandler<BuyingStockPurchaseCommand.OfFinalPriceBatingV1> {
 
-    override fun handle(command: BuyingStockPurchaseCommand.OfFinalPriceBatingV1): BuyingStockPurchaseResult {
+    override suspend fun handle(command: BuyingStockPurchaseCommand.OfFinalPriceBatingV1): BuyingStockPurchaseResult {
         val stockId = command.stockId
         val stockName = command.stockName
         val requestedAt = command.requestAt

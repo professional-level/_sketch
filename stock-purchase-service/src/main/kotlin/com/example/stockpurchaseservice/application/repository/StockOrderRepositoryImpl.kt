@@ -5,9 +5,11 @@ import com.example.com.example.stockpurchaseservice.domain.repository.StockOrder
 import com.example.stockpurchaseservice.domain.Order
 import com.example.stockpurchaseservice.domain.OrderId
 import com.example.stockpurchaseservice.domain.StrategyType
+import org.springframework.stereotype.Component
 import java.time.ZonedDateTime
 import java.util.UUID
 
+@Component
 internal class StockOrderRepositoryImpl(
     private val stockOrderPort: StockOrderPort, // TODO: 이름 체크
 ) : StockOrderRepository {
@@ -16,8 +18,12 @@ internal class StockOrderRepositoryImpl(
     }
 
     // TODO: save 구현은 왜 DomainRepo에 없을까? 구현필요
-    override fun save(order: Order) {
+    override suspend fun save(order: Order) {
         stockOrderPort.save(order.toDto())
+    }
+
+    override suspend fun findAllNotCompleted(): List<Order> {
+        TODO("Not yet implemented")
     }
 }
 
