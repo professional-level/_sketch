@@ -48,6 +48,7 @@ class FinalPriceBatingV1 private constructor(
 
         val purchaseOrder = PurchaseOrder(
             stockId = stock.id,
+            stockName = stock.name,
             purchasePrice = purchasePrice,
             takeProfitPrice = takeProfitPrice,
             stopLossPrice = stopLossPrice,
@@ -110,6 +111,7 @@ class FinalPriceBatingV1 private constructor(
 class Order private constructor(
     val id: OrderId,
     val stockId: StockId,
+    val stockName: String,
     val requestedAt: ZonedDateTime,
     val strategyType: StrategyType,
     val purchasedAt: ZonedDateTime?,
@@ -122,6 +124,7 @@ class Order private constructor(
             return Order(
                 id = purchaseOrder.id,
                 stockId = purchaseOrder.stockId,
+                stockName = purchaseOrder.stockName,
                 requestedAt = purchaseOrder.requestedAt,
                 purchasePrice = purchaseOrder.purchasePrice,
                 strategyType = purchaseOrder.strategyType,
@@ -163,6 +166,7 @@ enum class SellingErrorCode {
 // 구매 주문 엔티티
 data class PurchaseOrder(
     val stockId: StockId,
+    val stockName: String, // TODO: String 말고 Vo로?
     val purchasePrice: Money,
     val takeProfitPrice: Money,
     val stopLossPrice: Money,
@@ -181,13 +185,14 @@ data class PurchaseOrder(
 
     fun failed(message: String?, purchaseErrorCode: PurchaseErrorCode = PurchaseErrorCode.UNDEFINED) {
         _isSuccess = false
-        events.add(PurchaseFailedEvent( message = message ?: "", errorCode = purchaseErrorCode))
+        events.add(PurchaseFailedEvent(message = message ?: "", errorCode = purchaseErrorCode))
     }
 
     override fun complete() {
         TODO("Not yet implemented")
     }
 }
+
 // TODO: stockId, type을 넘기는 것 보다는,,, traceId, spanId의 개념을 구현하는게 더 좋을 것 같다.
 // 동기코드에선 ThreadLocal을 구현하면 되는데.. 비동기 webflux& 코루틴에서는 어떻게 구현해야 할지...
 data class PurchaseSuccessEvent(
