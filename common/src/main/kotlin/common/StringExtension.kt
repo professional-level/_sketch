@@ -18,4 +18,13 @@ object StringExtension {
     fun defaultCurrentTime(): String {
         return ZonedDateTime.now().toDefaultDateStringFormat()
     }
+
+    /* Null check of ZonedDateTime*/
+    fun ZonedDateTime?.isNotNull(): Boolean {
+        return (this != null)
+    }
+
+    fun ZonedDateTime?.isNull(): Boolean {
+        return (this == null)
+    }
 }
