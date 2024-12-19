@@ -2,6 +2,7 @@ package com.example.com.example.stockpurchaseservice.application.repository
 
 import com.example.com.example.stockpurchaseservice.application.port.out.StockOrderPort
 import com.example.com.example.stockpurchaseservice.domain.repository.StockOrderRepository
+import com.example.stockpurchaseservice.application.service.ExternalOrderId
 import com.example.stockpurchaseservice.domain.Money
 import com.example.stockpurchaseservice.domain.Order
 import com.example.stockpurchaseservice.domain.OrderId
@@ -27,10 +28,26 @@ internal class StockOrderRepositoryImpl(
         stockOrderPort.save(order.toDto())
     }
 
+    // TODO: transaction 처리 필요
+    override suspend fun save(
+        order: Order,
+        externalOrderId: ExternalOrderId,
+    ) {
+        stockOrderPort.save(order.toDto())
+        stockOrderPort.saveExternalOrderId(order.id.value, externalOrderId.value)
+    }
+
     override suspend fun findAllNotCompleted(): List<Order> {
         return stockOrderPort.findAllWithNotCompleted().map { orderDto ->
             orderDto.toOrder()
         }
+    }
+
+    override suspend fun findByStockIdAndQuantity(
+        stockId: StockId,
+        quantity: Int,
+    ): Order? {
+        TODO("Not yet implemented")
     }
 }
 

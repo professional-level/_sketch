@@ -1,6 +1,7 @@
 package com.example.stockpurchaseservice.adapter.out
 
 import ApiResponse
+import com.example.com.example.stockpurchaseservice.domain.ExecutedStock
 import com.example.common.ExternalApiAdapter
 import com.example.common.endpoint.Endpoint.POST_STOCK_ORDER
 import com.example.stockpurchaseservice.application.port.out.MarketServicePort
@@ -11,12 +12,12 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.http.MediaType
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
-import kotlin.math.round
 
 @ExternalApiAdapter // TODO: 어노테이션 체크
 internal class MarketServiceAdapter(
     private val buyStockHandler: BuyStockHandler,
     private val sellStockHandler: SellStockHandler,
+    private val getExecutedStockListHandler: GetExecutedStockListHandler,
 ) : MarketServicePort {
     override fun buyStock(order: PurchaseOrderDto) {
         buyStockHandler.execute(order)
@@ -24,6 +25,11 @@ internal class MarketServiceAdapter(
 
     override fun sellStock(order: SellingOrderDto) {
         sellStockHandler.execute(order)
+    }
+
+    override fun findExecutionListAtOneDay(): List<ExecutedStock> {
+        // TODO: 주문번호라던가 그런것들을 가지고 domain 로직에 매핑 할 방법이 필요하다.
+        TODO("Not yet implemented")
     }
 }
 
@@ -33,6 +39,7 @@ internal class SellStockHandler(
 ) {
     fun execute(order: SellingOrderDto) {
 
+        return TODO()
     }
 }
 
@@ -40,7 +47,7 @@ internal class SellStockHandler(
 internal class BuyStockHandler(
     private val stockApiClient: WebClient,
 ) {
-    fun execute(order: PurchaseOrderDto) {
+    fun execute(order: PurchaseOrderDto): String {
         val uri = POST_STOCK_ORDER
         val quantity = order.quantity
 
@@ -62,6 +69,17 @@ internal class BuyStockHandler(
         if (response?.body?.rtCd != "0") {
             throw RuntimeException("request failed") // TODO: exception mapping 필요
         }
+        // TODO: 체결주문번호 반환 필요
+        return TODO()
+    }
+}
+
+@Component
+internal class GetExecutedStockListHandler(
+    private val stockApiClient: WebClient,
+) {
+    fun execute() {
+        val uri = ""
     }
 }
 

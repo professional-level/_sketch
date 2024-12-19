@@ -37,7 +37,7 @@ internal class Orders private constructor(
     val sellingPrice: Double?,
     @Column(nullable = false)
     val quantity: Int,
-    val orderState :OrderState
+    val orderState: OrderState,
 ) {
     fun toDTO(): OrderDto = OrderDto(
         id = id,

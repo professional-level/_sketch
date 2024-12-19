@@ -1,5 +1,6 @@
 package com.example.stockpurchaseservice.domain
 
+import com.example.com.example.stockpurchaseservice.adapter.out.persistence.entity.OrderState
 import com.example.common.domain.event.DomainEvent
 import com.example.common.domain.event.EventSupportedEntity
 import common.StringExtension.isNotNull
@@ -190,6 +191,7 @@ sealed class Order(
 ) : EventSupportedEntity {
     abstract override val events: MutableList<DomainEvent>
     abstract override fun complete()
+    abstract fun changeOrderState(orderState: OrderState)
 }
 
 // 판매 주문 엔티티
@@ -207,7 +209,8 @@ sealed class Order(
 //        }
 //    }
 // }
-class SellingOrder(
+// TODO: data class로 바꿔도 되는지 확인
+data class SellingOrder(
     override val id: OrderId,
     override val stockId: StockId,
     override val stockName: String,
@@ -225,8 +228,31 @@ class SellingOrder(
         // 필요한 완료 로직 구현
     }
 
+    override fun changeOrderState(orderState: OrderState) {
+        // TODO: 추후 state 변경에 따라 event 발행 필요
+        when (orderState) {
+            OrderState.PURCHASE_WAITING -> {}
+            OrderState.PURCHASE_IN_PROCESS -> {}
+            OrderState.PURCHASE_COMPLETED -> {}
+            OrderState.SELLING_WAITING -> {}
+            OrderState.SELLING_IN_PROCESS -> {}
+            OrderState.SELLING_COMPLETED -> {}
+        }
+        if (this.orderState != orderState)
+            register(
+                ChangeOrderStateEvent(
+                    orderId = this.id,
+                    orderState = orderState,
+                ),
+            )
+    }
+
     override fun project(domainEvent: DomainEvent) {
-        TODO("Not yet implemented")
+       when(domainEvent){
+              is SellingSuccessEvent -> {}
+              is SellingFailedEvent -> {}
+              is ChangeOrderStateEvent -> this.copy(orderState = domainEvent.orderState)
+       }
     }
 
     companion object {
@@ -303,6 +329,11 @@ data class SellingFailedEvent(
     val errorCode: SellingErrorCode,
 ) : DomainEvent()
 
+data class ChangeOrderStateEvent(
+    val orderId: OrderId,
+    val orderState: OrderState,
+) : DomainEvent()
+
 enum class SellingErrorCode {
     UNDEFINED,
 }
@@ -368,10 +399,30 @@ data class PurchaseOrder(
         // 필요한 완료 로직 구현
     }
 
+    override fun changeOrderState(orderState: OrderState) {
+        // TODO: 추후 state 변경에 따라 event 발행 필요
+        when (orderState) {
+            OrderState.PURCHASE_WAITING -> {}
+            OrderState.PURCHASE_IN_PROCESS -> {}
+            OrderState.PURCHASE_COMPLETED -> {}
+            OrderState.SELLING_WAITING -> {}
+            OrderState.SELLING_IN_PROCESS -> {}
+            OrderState.SELLING_COMPLETED -> {}
+        }
+        if (this.orderState != orderState)
+            register(
+                ChangeOrderStateEvent(
+                    orderId = this.id,
+                    orderState = orderState,
+                ),
+            )
+    }
+
     override fun project(domainEvent: DomainEvent) {
-        when(domainEvent) {
-            is PurchaseSuccessEvent -> this.copy(orderState = OrderState.PURCHASE_IN_PROCESS)
-            is PurchaseFailedEvent ->  this.copy(orderState = OrderState.PURCHASE_WAITING)
+        when (domainEvent) {
+            is PurchaseSuccessEvent -> this.copy(orderState = OrderState.PURCHASE_IN_PROCESS) // TODO: val이기 때문에 copy만으로는 반환값을 이용하지 않는 한 변경이 없다.
+            is PurchaseFailedEvent -> this.copy(orderState = OrderState.PURCHASE_WAITING)
+            is ChangeOrderStateEvent -> this.copy(orderState = domainEvent.orderState)
         }
     }
 }
