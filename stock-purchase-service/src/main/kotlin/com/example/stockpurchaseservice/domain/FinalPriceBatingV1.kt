@@ -2,12 +2,13 @@ package com.example.stockpurchaseservice.domain
 
 import com.example.common.domain.event.DomainEvent
 import com.example.common.domain.event.EventSupportedEntity
+import common.StringExtension.isNotNull
 import java.time.ZonedDateTime
 import java.util.UUID
 
 // StockStrategy 인터페이스 구현
 abstract class StockStrategy : EventSupportedEntity {
-    abstract fun createPurchaseOrder(): PurchaseOrder
+    abstract fun createPurchaseOrder(): PurchaseOrder?
     abstract fun createSellingOrder(): SellingOrder?
     abstract val purchasedAt: ZonedDateTime?
     fun isPurchased() = (purchasedAt != null)
@@ -41,7 +42,11 @@ class FinalPriceBatingV1 private constructor(
 //    }
 
     // 구매 주문 생성
-    override fun createPurchaseOrder(): PurchaseOrder {
+    override fun createPurchaseOrder(): PurchaseOrder? {
+        // Return null
+        if (purchasedAt.isNotNull()) {
+            return null
+        }
         // 익절, 손절 가격 계산
         val takeProfitPrice = calculateTakeProfitPrice(purchasePrice)
         val stopLossPrice = calculateStopLossPrice(purchasePrice)
@@ -54,6 +59,7 @@ class FinalPriceBatingV1 private constructor(
             stopLossPrice = stopLossPrice,
             strategyType = StrategyType.FinalPriceBatingV1,
             requestedAt = requestedAt,
+            purchasedAt = purchasedAt,
         )
 
         // 이벤트 추가
@@ -108,44 +114,101 @@ class FinalPriceBatingV1 private constructor(
     }
 }
 
-class Order private constructor(
-    val id: OrderId,
-    val stockId: StockId,
-    val stockName: String,
-    val requestedAt: ZonedDateTime,
-    val strategyType: StrategyType,
-    val purchasedAt: ZonedDateTime?,
-    val sellingAt: ZonedDateTime?,
-    val purchasePrice: Money?,
-    val sellingPrice: Money?,
-) {
-    companion object {
-        fun from(purchaseOrder: PurchaseOrder): Order {
-            return Order(
-                id = purchaseOrder.id,
-                stockId = purchaseOrder.stockId,
-                stockName = purchaseOrder.stockName,
-                requestedAt = purchaseOrder.requestedAt,
-                purchasePrice = purchaseOrder.purchasePrice,
-                strategyType = purchaseOrder.strategyType,
-                purchasedAt = purchaseOrder.events.find { it is PurchaseSuccessEvent }?.occurredAt,
-                sellingAt = null,
-                sellingPrice = null,
-            )
-        }
-
-        fun from(sellingOrder: SellingOrder): Order {
-            TODO()
-        }
-    }
+// }
+//
+// class Order private constructor(
+//    val id: OrderId,
+//    val stockId: StockId,
+//    val stockName: String,
+//    val requestedAt: ZonedDateTime,
+//    val strategyType: StrategyType,
+//    val purchasedAt: ZonedDateTime?,
+//    val sellingAt: ZonedDateTime?,
+//    val purchasePrice: Money?,
+//    val sellingPrice: Money?,
+// ) {
+//    companion object {
+//        fun from(purchaseOrder: PurchaseOrder): Order {
+//            return Order(
+//                id = purchaseOrder.id,
+//                stockId = purchaseOrder.stockId,
+//                stockName = purchaseOrder.stockName,
+//                requestedAt = purchaseOrder.requestedAt,
+//                purchasePrice = purchaseOrder.purchasePrice,
+//                strategyType = purchaseOrder.strategyType,
+//                purchasedAt = purchaseOrder.events.find { it is PurchaseSuccessEvent }?.occurredAt,
+//                sellingAt = null,
+//                sellingPrice = null,
+//            )
+//        }
+//
+//        fun from(sellingOrder: SellingOrder): Order {
+//            TODO()
+//        }
+//    }
+// }
+sealed class Order(
+    open val id: OrderId,
+    open val stockId: StockId,
+    open val stockName: String,
+    open val requestedAt: ZonedDateTime,
+    open val strategyType: StrategyType,
+    open val purchasedAt: ZonedDateTime?,
+) : EventSupportedEntity {
+    abstract override val events: MutableList<DomainEvent>
+    abstract override fun complete()
 }
 
 // 판매 주문 엔티티
-class SellingOrder : EventSupportedEntity {
+// class SellingOrder : Order() {
+//    override val events: MutableList<DomainEvent> = mutableListOf()
+//
+//    override fun complete() {
+//        TODO("Not yet implemented")
+//    }
+//    companion object{
+//        fun create(): SellingOrder{
+//            return SellingOrder(
+//
+//            )
+//        }
+//    }
+// }
+class SellingOrder(
+    override val id: OrderId,
+    override val stockId: StockId,
+    override val stockName: String,
+    override val requestedAt: ZonedDateTime,
+    override val strategyType: StrategyType,
+    override val purchasedAt: ZonedDateTime,
+    val sellingPrice: Money,
+) : Order(id, stockId, stockName, requestedAt, strategyType, purchasedAt) {
     override val events: MutableList<DomainEvent> = mutableListOf()
 
     override fun complete() {
-        TODO("Not yet implemented")
+        // 필요한 완료 로직 구현
+    }
+
+    companion object {
+        fun create(
+            id: OrderId,
+            stockId: StockId,
+            stockName: String,
+            requestedAt: ZonedDateTime,
+            strategyType: StrategyType,
+            sellingPrice: Money,
+            purchasedAt: ZonedDateTime,
+        ): SellingOrder {
+            return SellingOrder(
+                id = id,
+                stockId = stockId,
+                stockName = stockName,
+                requestedAt = requestedAt,
+                strategyType = strategyType,
+                sellingPrice = sellingPrice,
+                purchasedAt = purchasedAt,
+            )
+        }
     }
 }
 
@@ -163,21 +226,51 @@ enum class SellingErrorCode {
     UNDEFINED,
 }
 
-// 구매 주문 엔티티
-data class PurchaseOrder(
-    val stockId: StockId,
-    val stockName: String, // TODO: String 말고 Vo로?
+//
+// // 구매 주문 엔티티
+// data class PurchaseOrder(
+//    val stockId: StockId,
+//    val stockName: String, // TODO: String 말고 Vo로?
+//    val purchasePrice: Money,
+//    val takeProfitPrice: Money,
+//    val stopLossPrice: Money,
+//    val strategyType: StrategyType,
+//    val requestedAt: ZonedDateTime,
+//    val id: OrderId = OrderId.generate(),
+// ) : EventSupportedEntity {
+//    override val events: MutableList<DomainEvent> = mutableListOf()
+//
+//    private var _isSuccess: Boolean = false
+//    val isSuccess get() = _isSuccess
+//    fun success() {
+//        _isSuccess = true
+//        events.add(PurchaseSuccessEvent(orderId = this.id))
+//    }
+//
+//    fun failed(message: String?, purchaseErrorCode: PurchaseErrorCode = PurchaseErrorCode.UNDEFINED) {
+//        _isSuccess = false
+//        events.add(PurchaseFailedEvent(message = message ?: "", errorCode = purchaseErrorCode))
+//    }
+//
+//    override fun complete() {
+//        TODO("Not yet implemented")
+//    }
+// }
+class PurchaseOrder(
+    override val id: OrderId = OrderId.generate(),
+    override val stockId: StockId,
+    override val stockName: String,
+    override val requestedAt: ZonedDateTime,
+    override val strategyType: StrategyType,
+    override val purchasedAt: ZonedDateTime?,
     val purchasePrice: Money,
     val takeProfitPrice: Money,
     val stopLossPrice: Money,
-    val strategyType: StrategyType,
-    val requestedAt: ZonedDateTime,
-    val id: OrderId = OrderId.generate(),
-) : EventSupportedEntity {
+) : Order(id, stockId, stockName, requestedAt, strategyType, purchasedAt) {
     override val events: MutableList<DomainEvent> = mutableListOf()
-
     private var _isSuccess: Boolean = false
     val isSuccess get() = _isSuccess
+
     fun success() {
         _isSuccess = true
         events.add(PurchaseSuccessEvent(orderId = this.id))
@@ -189,7 +282,7 @@ data class PurchaseOrder(
     }
 
     override fun complete() {
-        TODO("Not yet implemented")
+        // 필요한 완료 로직 구현
     }
 }
 
@@ -241,4 +334,12 @@ value class Money(val price: Double) {
     operator fun times(factor: Double): Money = Money(price * factor)
     operator fun minus(other: Money): Money = Money(price - other.price)
     operator fun plus(other: Money): Money = Money(price + other.price)
+
+    init {
+        require(price >= 0.0)
+    }
+
+    companion object {
+        fun undefined(): Money = Money(0.0)
+    }
 }
