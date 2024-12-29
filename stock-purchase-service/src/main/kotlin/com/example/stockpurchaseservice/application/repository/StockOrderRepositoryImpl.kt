@@ -66,7 +66,6 @@ private fun Order.toDto(): OrderDto {
             null
         }
     }
-
     return OrderDto(
         id = this.id.value,
         stockId = this.stockId.value,

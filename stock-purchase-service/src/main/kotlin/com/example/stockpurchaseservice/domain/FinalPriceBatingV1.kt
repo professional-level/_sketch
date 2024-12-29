@@ -1,6 +1,5 @@
 package com.example.stockpurchaseservice.domain
 
-import com.example.com.example.stockpurchaseservice.adapter.out.persistence.entity.OrderState
 import com.example.common.domain.event.DomainEvent
 import com.example.common.domain.event.EventSupportedEntity
 import common.StringExtension.isNotNull
