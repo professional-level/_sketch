@@ -102,17 +102,18 @@ internal class StockTradeScheduler(
         purchased.forEach { item ->
             // TODO:findByExternalOrderId를 사용해도 좋지만 purchase에서 OrderId의 정보를 가지고 있게 하는것이 좋을 거 같기도 하다.
             val order = stockOrderRepository.findByExternalOrderId(item.externalOrderId)?.let { order ->
-                sellOrderByStrategy(order)
+                makeSellOrderByStrategy(order)
             }
             order?.let {
                 // TODO: sell 할때 수량을 item에서 받아와야 . domain logic의 quantity는 totalQuantity로 변경을 하던 변경에 상관 없도록 수정 필요.
                 marketService.sellStock(it.toDto(quantity = item.quantity)) // 구매한 수량만큼 바로 매도
                 // TODO: event 처리는 어디서?
+                // TODO: 매수 된 양을 이벤트로 던져 KafkaStream에서 합산해야 함
             }
         }
     }
 
-    private suspend fun sellOrderByStrategy(order: Order): SellingOrder? {
+    private suspend fun makeSellOrderByStrategy(order: Order): SellingOrder? {
         return when (order.strategyType) {
             StrategyType.Undefined -> throw RuntimeException(
                 "Undefined strategy type ${order.strategyType}",
