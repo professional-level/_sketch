@@ -38,7 +38,6 @@ internal class SellStockHandler(
     private val stockApiClient: WebClient,
 ) {
     fun execute(order: SellingOrderDto) {
-
         return TODO()
     }
 }

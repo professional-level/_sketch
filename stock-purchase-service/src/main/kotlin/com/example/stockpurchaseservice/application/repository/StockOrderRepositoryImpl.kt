@@ -49,6 +49,10 @@ internal class StockOrderRepositoryImpl(
     ): Order? {
         TODO("Not yet implemented")
     }
+
+    override suspend fun findByExternalOrderId(externalOrderId: ExternalOrderId): Order? {
+        return stockOrderPort.findByExternalOrderId(externalOrderId.value)?.toOrder()
+    }
 }
 
 private fun Order.toDto(): OrderDto {
@@ -102,7 +106,7 @@ data class OrderDto(
             purchasePrice = purchasePrice?.let { Money(purchasePrice) } ?: Money.undefined(), // maping 확인 필요
             purchasedAt = purchasedAt ?: ZonedDateTime.now(), // maping 확인 필요
             quantity = quantity,
-            orderState = orderState.toDomain()
+            orderState = orderState.toDomain(),
         )
     }
 }
@@ -130,10 +134,10 @@ enum class StrategyTypeDto {
 }
 
 enum class OrderStateDto {
-    PURCHASE_WAITING,  // 주문이 들어가기 전
+    PURCHASE_WAITING, // 주문이 들어가기 전
     PURCHASE_IN_PROCESS, // 주문이 들어간 상태
     PURCHASE_COMPLETED, // 체결이 된 상태
-    SELLING_WAITING,  // 주문이 들어가기 전
+    SELLING_WAITING, // 주문이 들어가기 전
     SELLING_IN_PROCESS, // 주문이 들어간 상태
     SELLING_COMPLETED, // 체결이 된 상태
     ;

@@ -6,6 +6,7 @@ import com.example.com.example.stockpurchaseservice.adapter.out.persistence.repo
 import com.example.com.example.stockpurchaseservice.application.port.out.StockOrderPort
 import com.example.com.example.stockpurchaseservice.application.repository.OrderDto
 import com.example.common.PersistenceAdapter
+import io.smallrye.mutiny.coroutines.awaitSuspending
 import java.util.UUID
 
 @PersistenceAdapter
@@ -25,5 +26,10 @@ internal class StockOrderAdapter(
 
     override suspend fun saveExternalOrderId(internalOrderId: UUID, externalOrderId: String) {
         orderIdMappingRepository.save(internalOrderId, externalOrderId)
+    }
+
+    override suspend fun findByExternalOrderId(value: String): OrderDto? {
+        val orderId = orderIdMappingRepository.findOrderIdByExternalOrderId(value)
+        return stockOrderRepository.findById(orderId).awaitSuspending()?.toDTO()
     }
 }

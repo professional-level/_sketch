@@ -41,6 +41,7 @@ internal class OrderIdMappingRepository : AbstractReactiveRepository<OrderIdMapp
             ).setParameter("internalOrderId", internalOrderId).resultList // TODO: resultList를 바로 flatmap하는 방법 필요
         }.awaitSuspending().map { it.externalOrderId }
     }
+
     suspend fun save(internalOrderId: UUID, externalOrderId: String) {
         sessionFactory.withSession { session ->
             session.persist(OrderIdMapping(externalOrderId, internalOrderId))

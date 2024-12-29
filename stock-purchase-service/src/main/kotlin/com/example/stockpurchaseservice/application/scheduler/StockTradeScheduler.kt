@@ -7,6 +7,8 @@ import com.example.common.application.event.ApplicationEvent
 import com.example.stockpurchaseservice.application.port.out.MarketServicePort
 import com.example.stockpurchaseservice.application.service.strategy.toDto
 import com.example.stockpurchaseservice.domain.FinalPriceBatingV1
+import com.example.stockpurchaseservice.domain.Order
+import com.example.stockpurchaseservice.domain.SellingOrder
 import com.example.stockpurchaseservice.domain.Stock
 import com.example.stockpurchaseservice.domain.StrategyType
 import org.springframework.context.ApplicationEventPublisher
@@ -24,6 +26,7 @@ internal class StockTradeScheduler(
     private val applicationEventPublisher: ApplicationEventPublisher,
 ) {
     // 체결에 대한 변경을 감지. 하루마다 초기화. 추후 redis로 변경 필요
+    // 서비스의 이상 정지 시, 데이터의 비정합성을 복구할 방법을 찾아야 함 리실리언스 적용 필요
     private val executionQueue: MutableSet<ExecutedStock> = java.util.concurrent.ConcurrentHashMap.newKeySet()
 //        ConcurrentLinkedQueue()
 
@@ -69,13 +72,13 @@ internal class StockTradeScheduler(
         TODO()
     }
 
-
     @Scheduled(cron = "0 */1 * ? * MON-FRI") // TODO: 판매 전략에 따라 스케쥴 시간 변경필요
     suspend fun executionCheck() {
         val executedStockList: List<ExecutedStock> = marketService.findExecutionListAtOneDay()
         // dirty check를 통해, 변경이 없으면 바로 return 처리
         val refinedExecutedStockList = executedStockList.filter { execution ->
             executionQueue.add(execution) // dirty check를 통해, 큐의 변경이 된 경우에만 list로 정제한다.
+            // Tip. set의 add() 메서드의 반환값은 boolean이다
         }
         if (refinedExecutedStockList.isEmpty()) return
 
@@ -90,7 +93,7 @@ internal class StockTradeScheduler(
 //            val tempOrder = stockOrderRepository.findByOrder(order)
 //            val order = stockOrderRepository.findByStockIdAndQuantity(item.stock.id, item.quantity)?.apply {
 //                // TODO: OrderState를 Completed로 변경하는 로직은 여기가 아닌, 모든 execution이 처리된 이벤트를 조합해서 변경(KafkaStream)
-////                changeOrderState(OrderState.SELLING_COMPLETED) // TODO: order은 sealed class인데, cast 하지 않고 이렇게 처리 가능한지 확인 필요
+// //                changeOrderState(OrderState.SELLING_COMPLETED) // TODO: order은 sealed class인데, cast 하지 않고 이렇게 처리 가능한지 확인 필요
 //            }
 //            order?.let { stockOrderRepository.save(it) }
 //            // TODO: 정상적인 상황에서는 order가 존재 해야 한다. 없을 경우 예외 혹은 이벤트 or 로그 처리 필요
@@ -99,25 +102,31 @@ internal class StockTradeScheduler(
         purchased.forEach { item ->
             // TODO:findByExternalOrderId를 사용해도 좋지만 purchase에서 OrderId의 정보를 가지고 있게 하는것이 좋을 거 같기도 하다.
             val order = stockOrderRepository.findByExternalOrderId(item.externalOrderId)?.let { order ->
-                when (order.strategyType) {
-                    StrategyType.Undefined -> throw RuntimeException("Undefined strategy type ${order.strategyType}") // TODO: exception mapping
-                    StrategyType.FinalPriceBatingV1 -> {
-                        val strategy = FinalPriceBatingV1.of(
-                            stock = Stock(id = order.stockId, name = order.stockName),
-                            requestedAt = order.requestedAt,
-                            purchasePrice = order.purchasePrice,
-                            purchasedAt = order.purchasedAt,
-                        )
-                        val sellingOrder = strategy.createSellingOrder(order.id)
-                        if (sellingOrder == null) println("selling order unexpected error") // TODO: 로깅 필요
-                        sellingOrder
-                    }
-                }
+                sellOrderByStrategy(order)
             }
             order?.let {
                 // TODO: sell 할때 수량을 item에서 받아와야 . domain logic의 quantity는 totalQuantity로 변경을 하던 변경에 상관 없도록 수정 필요.
                 marketService.sellStock(it.toDto(quantity = item.quantity)) // 구매한 수량만큼 바로 매도
                 // TODO: event 처리는 어디서?
+            }
+        }
+    }
+
+    private suspend fun sellOrderByStrategy(order: Order): SellingOrder? {
+        return when (order.strategyType) {
+            StrategyType.Undefined -> throw RuntimeException(
+                "Undefined strategy type ${order.strategyType}",
+            ) // TODO: exception mapping
+            StrategyType.FinalPriceBatingV1 -> {
+                val strategy = FinalPriceBatingV1.of(
+                    stock = Stock(id = order.stockId, name = order.stockName),
+                    requestedAt = order.requestedAt,
+                    purchasePrice = order.purchasePrice,
+                    purchasedAt = order.purchasedAt,
+                )
+                val sellingOrder = strategy.createSellingOrder(order.id)
+                if (sellingOrder == null) println("selling order unexpected error") // TODO: 로깅 필요
+                sellingOrder
             }
         }
     }
