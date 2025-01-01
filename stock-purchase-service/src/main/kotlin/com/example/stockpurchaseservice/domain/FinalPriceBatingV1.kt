@@ -14,6 +14,9 @@ abstract class StockStrategy : EventSupportedEntity {
     abstract val purchasedAt: ZonedDateTime?
     fun isPurchased() = purchasedAt.isNotNull()
     abstract fun calculateQuantity(): Int
+    // 실패시 매도에 대한 파라미터
+    abstract val dueDateTime: ZonedDateTime?
+    abstract fun isOverdue() : Boolean?
 }
 
 class FinalPriceBatingV1 private constructor(
@@ -82,6 +85,12 @@ class FinalPriceBatingV1 private constructor(
         val takeProfitPrice = calculateTakeProfitPrice(purchasePrice)
         val stopLossPrice = calculateStopLossPrice(purchasePrice)
 
+        val sellingPrice = when(!isOverdue()){
+            true -> takeProfitPrice
+            false -> stopLossPrice
+        } // TODO: 원래는 isOverdue()에 따라서 profit or loss만 계산하면 되지만, 가독성 및 흐름을 위해 둘 다 계산
+        // TODO: 추후 사용하지 않는다면 성능 개선을 위해, 사용하는 값만 계산하도록 수정 필요
+
         return SellingOrder(
             id = orderId,
             stockId = stock.id,
@@ -90,7 +99,7 @@ class FinalPriceBatingV1 private constructor(
             strategyType = StrategyType.FinalPriceBatingV1,
             purchasedAt = purchasedAt!!, // TODO: 위에서 !isPurchased()를 했는데 타입체크가 왜 안될까?
             purchasePrice = purchasePrice,
-            sellingPrice = takeProfitPrice, // TODO: 지금은 익절 가격을 매핑하지만, 날짜라던가 특정 조건에 따라서는 손절 가격을 매핑해야 한다.
+            sellingPrice = sellingPrice, // TODO: 지금은 익절 가격을 매핑하지만, 날짜라던가 특정 조건에 따라서는 손절 가격을 매핑해야 한다.
             quantity = calculateQuantity(),
             orderState = TODO(),
         )
@@ -98,6 +107,13 @@ class FinalPriceBatingV1 private constructor(
 
     override fun calculateQuantity(): Int {
         return round(DEFAULT_BUY_TOTAL_AMOUNT / purchasePrice.price).toInt()
+    }
+
+    override val dueDateTime: ZonedDateTime?
+        get() = purchasedAt?.plusDays(2)
+
+    override fun isOverdue(): Boolean {
+        return ZonedDateTime.now().isBefore(dueDateTime)
     }
 
     private fun calculateTakeProfitPrice(purchasePrice: Money): Money {
