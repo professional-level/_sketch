@@ -27,6 +27,17 @@ dependencies {
     implementation("io.vertx:vertx-core")
     implementation("io.vertx:vertx-jdbc-client:4.5.7")
     
+    // Hibernate and JPA
+    implementation("org.hibernate.reactive:hibernate-reactive-core:2.3.0.Final")
+    implementation("jakarta.persistence:jakarta.persistence-api:3.1.0")
+    implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+    
+    // HikariCP for connection pooling
+    implementation("com.zaxxer:HikariCP:5.0.1")
+    
+    // H2 Database
+    runtimeOnly("com.h2database:h2:2.2.224")
+    
     // Reactive
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:1.9.0")
@@ -46,4 +57,8 @@ dependencies {
     // Test
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("io.projectreactor:reactor-test")
+}
+
+kotlin {
+    jvmToolchain(17)
 }

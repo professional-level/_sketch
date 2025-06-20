@@ -1,4 +1,4 @@
-package common.domain.stock
+package com.example.common.domain.stock
 
 import java.time.ZonedDateTime
 

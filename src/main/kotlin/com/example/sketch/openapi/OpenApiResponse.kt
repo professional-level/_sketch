@@ -1,6 +1,6 @@
 package com.example.sketch.openapi
 
-import common.StringExtension.toDefaultDateStringFormat
+import com.example.common.StringExtension.toDefaultDateStringFormat
 import java.time.ZoneId
 import java.time.ZonedDateTime
 

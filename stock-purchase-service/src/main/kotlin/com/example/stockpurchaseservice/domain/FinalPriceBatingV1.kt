@@ -2,7 +2,7 @@ package com.example.stockpurchaseservice.domain
 
 import com.example.common.domain.event.DomainEvent
 import com.example.common.domain.event.EventSupportedEntity
-import common.StringExtension.isNotNull
+import com.example.common.StringExtension.isNotNull
 import java.time.ZonedDateTime
 import java.util.UUID
 import kotlin.math.round

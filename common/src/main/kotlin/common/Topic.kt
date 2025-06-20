@@ -1,4 +1,4 @@
-package common
+package com.example.common
 
 
 // TODO: Topic과 MessageTopic이 나눠지는 현상 수정

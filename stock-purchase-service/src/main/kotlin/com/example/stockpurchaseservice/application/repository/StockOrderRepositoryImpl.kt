@@ -1,7 +1,7 @@
-package com.example.com.example.stockpurchaseservice.application.repository
+package com.example.stockpurchaseservice.application.repository
 
-import com.example.com.example.stockpurchaseservice.application.port.out.StockOrderPort
-import com.example.com.example.stockpurchaseservice.domain.repository.StockOrderRepository
+import com.example.stockpurchaseservice.application.port.out.StockOrderPort
+import com.example.stockpurchaseservice.domain.repository.StockOrderRepository
 import com.example.stockpurchaseservice.application.service.ExternalOrderId
 import com.example.stockpurchaseservice.domain.Money
 import com.example.stockpurchaseservice.domain.Order

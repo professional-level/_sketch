@@ -2,7 +2,7 @@ package com.example.stocksearchservice.application.port.out.message
 
 import com.example.common.application.event.ApplicationEvent
 import com.example.common.application.event.EventMessage
-import common.MessageTopic
+import com.example.common.MessageTopic
 
 interface MessageServicePort {
     suspend fun publish(topic: MessageTopic, message: String)

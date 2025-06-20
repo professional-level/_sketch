@@ -1,4 +1,4 @@
-package common.infrastructure.database
+package com.example.common.infrastructure.database
 
 import com.zaxxer.hikari.HikariDataSource
 import jakarta.persistence.spi.PersistenceUnitInfo

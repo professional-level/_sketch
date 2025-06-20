@@ -1,11 +1,11 @@
-package com.example.com.example.stockpurchaseservice.application.event
+package com.example.stockpurchaseservice.application.event
 
 import com.example.common.application.event.ApplicationEvent
 import com.example.common.application.event.EventMapper
 import com.example.common.application.event.EventMessage
 import com.example.common.domain.event.DomainEvent
 import com.example.stockpurchaseservice.domain.PurchaseSuccessEvent
-import common.MessageTopic
+import com.example.common.MessageTopic
 import org.springframework.stereotype.Component
 import kotlin.reflect.KClass
 

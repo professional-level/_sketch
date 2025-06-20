@@ -6,9 +6,9 @@ import com.example.stockpurchaseservice.application.port.`in`.BuyingStockPurchas
 import com.example.stockpurchaseservice.application.service.BuyingStockPurchaseCommand
 import com.example.stockpurchaseservice.application.service.StockId
 import com.example.stockpurchaseservice.application.service.StrategyType
-import common.ConsumerGroupId.PURCHASE_SERVICE
-import common.Topic.STRATEGY_SAVED
-import common.proto.ProtoUtils.toZonedDateTime
+import com.example.common.ConsumerGroupId.PURCHASE_SERVICE
+import com.example.common.Topic.STRATEGY_SAVED
+import com.example.common.proto.ProtoUtils.toZonedDateTime
 import org.springframework.kafka.annotation.KafkaListener
 
 @ExternalApiAdapter // TODO: 정확한 annotation 매칭

@@ -1,7 +1,13 @@
 package com.example.common
 
 interface DomainRepository<TEntity, TId> {
-//    fun findAll(): List<TEntity>
-    fun findById(id: TId): TEntity?
-//    fun save(entity: TEntity)
+    suspend fun findAll(): List<TEntity>
+    suspend fun findById(id: TId): TEntity?
+    suspend fun save(entity: TEntity): TEntity
+    suspend fun saveAll(entities: List<TEntity>): List<TEntity>
+    suspend fun existsById(id: TId): Boolean
+    suspend fun deleteById(id: TId)
+    suspend fun delete(entity: TEntity)
+    suspend fun deleteAll()
+    suspend fun count(): Long
 }

@@ -3,7 +3,7 @@ package com.example.stockpurchaseservice
 import com.tngtech.archunit.core.domain.JavaClasses
 import com.tngtech.archunit.core.importer.ClassFileImporter
 import com.tngtech.archunit.junit.AnalyzeClasses
-import common.archunit.ArchitectureTest
+import com.example.common.archunit.ArchitectureTest
 import org.junit.jupiter.api.TestInstance
 
 /**

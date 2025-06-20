@@ -1,9 +1,9 @@
 package com.example.stocksearchservice.adapter.out.api.handler
 
-import common.Command
-import common.Handler
-import common.HandlerContext
-import common.Query
+import com.example.common.Command
+import com.example.common.Handler
+import com.example.common.HandlerContext
+import com.example.common.Query
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.reactive.function.client.WebClient
 

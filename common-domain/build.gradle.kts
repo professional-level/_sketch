@@ -26,6 +26,10 @@ dependencies {
     testImplementation("io.kotest:kotest-assertions-core:5.6.2")
 }
 
+kotlin {
+    jvmToolchain(17)
+}
+
 tasks.test {
     useJUnitPlatform()
 }

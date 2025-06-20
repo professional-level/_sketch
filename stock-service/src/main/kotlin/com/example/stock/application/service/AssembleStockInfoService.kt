@@ -3,7 +3,7 @@ package com.example.stock.application.service
 import com.example.stock.application.port.`in`.AssembleStockInfoCommand
 import com.example.stock.application.port.`in`.AssembleStockInfoUseCase
 import com.example.stock.application.port.out.AssembleStockInfoPort
-import common.UseCaseImpl
+import com.example.common.UseCaseImpl
 import com.example.stock.domain.Stock
 import com.example.stock.domain.repository.StockRepository
 

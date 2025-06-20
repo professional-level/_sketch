@@ -9,7 +9,7 @@ import com.example.stocksearchservice.adapter.out.api.handler.GetProgramVolumeIn
 import com.example.stocksearchservice.application.port.out.StockInformationPort
 import com.example.stocksearchservice.application.port.out.dto.SimpleStockDTO
 import com.example.stocksearchservice.application.port.out.dto.StockProgramVolume
-import common.UnitQuery
+import com.example.common.UnitQuery
 
 @ExternalApiAdapter
 internal class StockInformationAdapter(

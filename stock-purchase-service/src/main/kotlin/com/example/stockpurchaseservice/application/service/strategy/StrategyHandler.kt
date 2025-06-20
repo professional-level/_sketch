@@ -1,6 +1,6 @@
 package com.example.stockpurchaseservice.application.service.strategy
 
-import com.example.com.example.stockpurchaseservice.domain.repository.StockOrderRepository
+import com.example.stockpurchaseservice.domain.repository.StockOrderRepository
 import com.example.stockpurchaseservice.application.port.out.MarketServicePort
 import com.example.stockpurchaseservice.application.port.out.PurchaseOrderDto
 import com.example.stockpurchaseservice.application.port.out.SellingOrderDto

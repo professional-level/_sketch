@@ -12,8 +12,8 @@ import com.example.stocksearchservice.domain.StockLog
 import com.example.stocksearchservice.domain.StockPrice
 import com.example.stocksearchservice.domain.StockVolume
 import com.example.stocksearchservice.domain.repository.StockInformationRepository
-import common.StringExtension
-import common.StringExtension.defaultCurrentTime
+import com.example.common.StringExtension
+import com.example.common.StringExtension.defaultCurrentTime
 import org.springframework.stereotype.Component
 
 @Component

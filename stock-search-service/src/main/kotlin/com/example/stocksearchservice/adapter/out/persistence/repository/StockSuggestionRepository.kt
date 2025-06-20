@@ -1,7 +1,7 @@
 //package com.example.stocksearchservice.adapter.out.persistence.repository
 //
 //import com.example.stocksearchservice.adapter.out.persistence.entity.StockVolumeRank
-//import common.AbstractReactiveRepository
+//import com.example.common.AbstractReactiveRepository
 //import jakarta.enterprise.context.ApplicationScoped
 //import org.springframework.stereotype.Repository
 //

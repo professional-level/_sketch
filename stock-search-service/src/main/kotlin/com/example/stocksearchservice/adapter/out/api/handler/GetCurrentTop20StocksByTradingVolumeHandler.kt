@@ -2,7 +2,7 @@ package com.example.stocksearchservice.adapter.out.api.handler
 
 import VolumeRank
 import com.example.stocksearchservice.application.port.out.dto.SimpleStockDTO
-import common.UnitQuery
+import com.example.common.UnitQuery
 import org.springframework.http.MediaType
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient

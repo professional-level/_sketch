@@ -1,6 +1,6 @@
-package common.infrastructure.repository
+package com.example.common.infrastructure.repository
 
-import common.DomainRepository
+import com.example.common.DomainRepository
 import org.springframework.data.repository.NoRepositoryBean
 import org.springframework.data.repository.Repository
 

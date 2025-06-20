@@ -2,7 +2,7 @@ package com.example.com.example.stockpurchaseservice.adapter.out.persistence.rep
 
 import com.example.com.example.stockpurchaseservice.adapter.out.persistence.entity.OrderIdMapping
 import com.example.com.example.stockpurchaseservice.adapter.out.persistence.entity.Orders
-import common.AbstractReactiveRepository
+import com.example.common.AbstractReactiveRepository
 import io.smallrye.mutiny.coroutines.awaitSuspending
 import jakarta.enterprise.context.ApplicationScoped
 import org.springframework.stereotype.Repository

@@ -6,10 +6,10 @@ import com.example.common.application.event.EventMessage
 import com.example.stocksearchservice.application.event.StrategyCreatedApplicationEvent
 import com.example.stocksearchservice.application.event.StrategyTypeDto
 import com.example.stocksearchservice.application.port.out.message.MessageServicePort
-import common.MessageTopic
-import common.Topic.TOPIC1
-import common.proto.ProtoUtils.getMeta
-import common.proto.ProtoUtils.toProtobufTimestamp
+import com.example.common.MessageTopic
+import com.example.common.Topic.TOPIC1
+import com.example.common.proto.ProtoUtils.getMeta
+import com.example.common.proto.ProtoUtils.toProtobufTimestamp
 import kotlinx.coroutines.future.await
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.kafka.core.ConsumerFactory

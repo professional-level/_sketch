@@ -1,4 +1,4 @@
-package common.infrastructure.messaging
+package com.example.common.infrastructure.messaging
 
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.producer.ProducerConfig

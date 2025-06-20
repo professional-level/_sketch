@@ -1,6 +1,6 @@
 package com.example.common.application.event
 
-import common.MessageTopic
+import com.example.common.MessageTopic
 import kotlin.reflect.KClass
 
 abstract class EventMapper<D : Any, A> {

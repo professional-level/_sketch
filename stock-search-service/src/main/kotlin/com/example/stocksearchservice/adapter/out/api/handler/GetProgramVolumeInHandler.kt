@@ -2,8 +2,8 @@ package com.example.stocksearchservice.adapter.out.api.handler
 
 import ProgramTradeVolume
 import com.example.stocksearchservice.application.port.out.dto.StockProgramVolume
-import common.Query
-import common.StringExtension
+import com.example.common.Query
+import com.example.common.StringExtension
 import org.springframework.http.MediaType
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient

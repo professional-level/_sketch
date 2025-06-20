@@ -5,7 +5,7 @@ import com.example.common.application.event.EventMapper
 import com.example.common.application.event.EventMessage
 import com.example.common.domain.event.DomainEvent
 import com.example.stocksearchservice.domain.event.StrategyCreatedEvent
-import common.MessageTopic
+import com.example.common.MessageTopic
 import org.springframework.stereotype.Component
 import kotlin.reflect.KClass
 

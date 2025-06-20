@@ -1,8 +1,8 @@
 package com.example.stockpurchaseservice.application.service
 
-import com.example.com.example.stockpurchaseservice.domain.ExecutedStock
-import com.example.com.example.stockpurchaseservice.domain.ExecutionType
-import com.example.com.example.stockpurchaseservice.domain.repository.StockOrderRepository
+import com.example.stockpurchaseservice.domain.ExecutedStock
+import com.example.stockpurchaseservice.domain.ExecutionType
+import com.example.stockpurchaseservice.domain.repository.StockOrderRepository
 import com.example.common.UseCaseImpl
 import com.example.common.application.event.ApplicationEvent
 import com.example.stockpurchaseservice.application.port.`in`.StockTradeScheduleUseCase

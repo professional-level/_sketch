@@ -1,4 +1,4 @@
-package common
+package com.example.common
 
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter

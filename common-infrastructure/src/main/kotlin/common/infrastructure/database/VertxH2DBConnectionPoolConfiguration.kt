@@ -1,4 +1,4 @@
-package common.infrastructure.database
+package com.example.common.infrastructure.database
 
 import io.vertx.core.Vertx
 import io.vertx.jdbcclient.JDBCConnectOptions

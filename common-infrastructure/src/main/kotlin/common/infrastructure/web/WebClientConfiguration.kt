@@ -1,4 +1,4 @@
-package common.infrastructure.web
+package com.example.common.infrastructure.web
 
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.context.annotation.Bean
