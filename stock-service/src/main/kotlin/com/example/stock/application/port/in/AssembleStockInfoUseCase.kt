@@ -1,6 +1,6 @@
 package com.example.stock.application.port.`in`
 
-import com.example.stock.common.UseCase
+import common.UseCase
 import com.example.stock.domain.Stock
 
 @UseCase

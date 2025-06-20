@@ -4,7 +4,7 @@ import com.example.stock.application.port.`in`.AssembleStockInfoCommand
 import com.example.stock.application.port.`in`.AssembleStockInfoCommandResult
 import com.example.stock.application.port.`in`.AssembleStockInfoCommandResult.Companion.toCommandResult
 import com.example.stock.application.port.`in`.AssembleStockInfoUseCase
-import com.example.stock.common.WebAdapter
+import common.WebAdapter
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
