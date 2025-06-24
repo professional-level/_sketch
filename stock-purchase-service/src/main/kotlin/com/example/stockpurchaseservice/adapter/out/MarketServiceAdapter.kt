@@ -1,7 +1,7 @@
 package com.example.stockpurchaseservice.adapter.out
 
 import ApiResponse
-import com.example.com.example.stockpurchaseservice.domain.ExecutedStock
+import com.example.stockpurchaseservice.domain.ExecutedStock
 import com.example.common.ExternalApiAdapter
 import com.example.common.endpoint.Endpoint.POST_STOCK_ORDER
 import com.example.stockpurchaseservice.application.port.out.MarketServicePort

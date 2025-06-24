@@ -1,4 +1,4 @@
-package com.example.entity
+package com.example.grpcproficiency.entity
 
 import example.Protobuff
 import kotlin.random.Random

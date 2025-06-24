@@ -1,6 +1,6 @@
 package com.example.stockpurchaseservice.application.port.out
 
-import com.example.com.example.stockpurchaseservice.domain.ExecutedStock
+import com.example.stockpurchaseservice.domain.ExecutedStock
 import java.util.UUID
 
 interface MarketServicePort {

@@ -1,8 +1,8 @@
-package com.example.controller
+package com.example.grpcproficiency.controller
 
-import com.example.entity.TestEntity
-import com.example.service.TestProtobufService
-import com.example.service.TestService
+import com.example.grpcproficiency.entity.TestEntity
+import com.example.grpcproficiency.service.TestProtobufService
+import com.example.grpcproficiency.service.TestService
 import com.google.protobuf.MessageLite
 import kotlinx.coroutines.runBlocking
 import org.springframework.web.bind.annotation.GetMapping

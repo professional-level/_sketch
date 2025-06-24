@@ -1,6 +1,6 @@
-package com.example.com.example.stockpurchaseservice.application.event
+package com.example.stockpurchaseservice.application.event
 
-import com.example.com.example.stockpurchaseservice.domain.repository.StockOrderRepository
+import com.example.stockpurchaseservice.domain.repository.StockOrderRepository
 import com.example.common.domain.event.DomainEvent
 import com.example.stockpurchaseservice.domain.SellingSuccessEvent
 

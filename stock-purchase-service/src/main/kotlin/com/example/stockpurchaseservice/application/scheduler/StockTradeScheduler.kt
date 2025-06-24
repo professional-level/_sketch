@@ -1,8 +1,8 @@
-package com.example.com.example.stockpurchaseservice.application.scheduler
+package com.example.stockpurchaseservice.application.scheduler
 
-import com.example.com.example.stockpurchaseservice.domain.ExecutedStock
-import com.example.com.example.stockpurchaseservice.domain.ExecutionType
-import com.example.com.example.stockpurchaseservice.domain.repository.StockOrderRepository
+import com.example.stockpurchaseservice.domain.ExecutedStock
+import com.example.stockpurchaseservice.domain.ExecutionType
+import com.example.stockpurchaseservice.domain.repository.StockOrderRepository
 import com.example.common.application.event.ApplicationEvent
 import com.example.stockpurchaseservice.application.port.out.MarketServicePort
 import com.example.stockpurchaseservice.application.service.strategy.toDto

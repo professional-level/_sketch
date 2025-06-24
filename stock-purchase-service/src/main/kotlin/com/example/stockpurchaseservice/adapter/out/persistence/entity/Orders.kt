@@ -1,8 +1,8 @@
-package com.example.com.example.stockpurchaseservice.adapter.out.persistence.entity
+package com.example.stockpurchaseservice.adapter.out.persistence.entity
 
-import com.example.com.example.stockpurchaseservice.application.repository.OrderDto
-import com.example.com.example.stockpurchaseservice.application.repository.OrderStateDto
-import com.example.com.example.stockpurchaseservice.application.repository.StrategyTypeDto
+import com.example.stockpurchaseservice.application.repository.OrderDto
+import com.example.stockpurchaseservice.application.repository.OrderStateDto
+import com.example.stockpurchaseservice.application.repository.StrategyTypeDto
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType

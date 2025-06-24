@@ -1,7 +1,7 @@
-package com.example.com.example.stockpurchaseservice.adapter.out.persistence.repository
+package com.example.stockpurchaseservice.adapter.out.persistence.repository
 
-import com.example.com.example.stockpurchaseservice.adapter.out.persistence.entity.OrderIdMapping
-import com.example.com.example.stockpurchaseservice.adapter.out.persistence.entity.Orders
+import com.example.stockpurchaseservice.adapter.out.persistence.entity.OrderIdMapping
+import com.example.stockpurchaseservice.adapter.out.persistence.entity.Orders
 import common.AbstractReactiveRepository
 import io.smallrye.mutiny.coroutines.awaitSuspending
 import jakarta.enterprise.context.ApplicationScoped

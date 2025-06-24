@@ -1,8 +1,8 @@
-package com.example.repository
+package com.example.grpcproficiency.repository
 
-import com.example.entity.TestEntity
-import com.example.entity.TestEntity.Companion.generateDummyData
-import com.example.entity.TestEntity.Companion.protoToKotlin
+import com.example.grpcproficiency.entity.TestEntity
+import com.example.grpcproficiency.entity.TestEntity.Companion.generateDummyData
+import com.example.grpcproficiency.entity.TestEntity.Companion.protoToKotlin
 import example.Protobuff
 import org.springframework.stereotype.Component
 import java.util.concurrent.ConcurrentHashMap

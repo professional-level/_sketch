@@ -1,4 +1,4 @@
-package com.example.com.example.stockpurchaseservice.application.event
+package com.example.stockpurchaseservice.application.event
 
 import com.example.common.application.event.ApplicationEvent
 import com.example.common.application.event.EventMapper

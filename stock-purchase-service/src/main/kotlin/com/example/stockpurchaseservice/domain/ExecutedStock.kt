@@ -1,4 +1,4 @@
-package com.example.com.example.stockpurchaseservice.domain
+package com.example.stockpurchaseservice.domain
 
 import com.example.stockpurchaseservice.application.service.ExternalOrderId
 import com.example.stockpurchaseservice.domain.Stock

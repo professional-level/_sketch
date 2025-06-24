@@ -1,4 +1,4 @@
-package com.example.com.example.stockpurchaseservice.adapter.out.persistence.entity
+package com.example.stockpurchaseservice.adapter.out.persistence.entity
 
 import jakarta.persistence.Column
 import jakarta.persistence.Entity

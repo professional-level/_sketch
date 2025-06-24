@@ -1,4 +1,4 @@
-package com.example
+package com.example.grpcproficiencyclient
 
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication

@@ -1,10 +1,10 @@
-package com.example.com.example.stockpurchaseservice.adapter.out
+package com.example.stockpurchaseservice.adapter.out
 
-import com.example.com.example.stockpurchaseservice.adapter.out.persistence.entity.Orders
-import com.example.com.example.stockpurchaseservice.adapter.out.persistence.repository.OrderIdMappingRepository
-import com.example.com.example.stockpurchaseservice.adapter.out.persistence.repository.StockOrderRepository
-import com.example.com.example.stockpurchaseservice.application.port.out.StockOrderPort
-import com.example.com.example.stockpurchaseservice.application.repository.OrderDto
+import com.example.stockpurchaseservice.adapter.out.persistence.entity.Orders
+import com.example.stockpurchaseservice.adapter.out.persistence.repository.OrderIdMappingRepository
+import com.example.stockpurchaseservice.adapter.out.persistence.repository.StockOrderRepository
+import com.example.stockpurchaseservice.application.port.out.StockOrderPort
+import com.example.stockpurchaseservice.application.repository.OrderDto
 import com.example.common.PersistenceAdapter
 import io.smallrye.mutiny.coroutines.awaitSuspending
 import java.util.UUID

@@ -1,8 +1,8 @@
-package com.example.service
+package com.example.grpcproficiency.service
 
-import com.example.entity.TestEntity
-import com.example.repository.TestProtobufRepository
-import com.example.repository.TestRepository
+import com.example.grpcproficiency.entity.TestEntity
+import com.example.grpcproficiency.repository.TestProtobufRepository
+import com.example.grpcproficiency.repository.TestRepository
 import example.Protobuff
 import org.springframework.stereotype.Service
 

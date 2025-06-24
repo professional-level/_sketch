@@ -1,6 +1,6 @@
-package com.example.com.example.stockpurchaseservice.application.port.out
+package com.example.stockpurchaseservice.application.port.out
 
-import com.example.com.example.stockpurchaseservice.application.repository.OrderDto
+import com.example.stockpurchaseservice.application.repository.OrderDto
 import java.util.UUID
 
 interface StockOrderPort {
