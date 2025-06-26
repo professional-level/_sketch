@@ -1,5 +1,6 @@
 package com.example.stocksearchservice.application.repository
 
+import com.example.common.AopEnabled
 import com.example.common.domain.event.EventPublishingRepository
 import com.example.stocksearchservice.application.port.out.StockStrategyPort
 import com.example.stocksearchservice.application.port.out.dto.StockStrategyDTO
@@ -10,6 +11,7 @@ import org.springframework.context.annotation.Lazy
 import org.springframework.stereotype.Component
 import java.time.ZonedDateTime
 
+@AopEnabled("com.example.stocksearchservice.application.event.CompleteEntityAspect") // TODO: aop가 걸려있을때 해당 annotation을 강제 할 수 있는 방법 강구
 @EventPublishingRepository
 @Component
 class FinalPriceBatingStrategyV1RepositoryImpl(

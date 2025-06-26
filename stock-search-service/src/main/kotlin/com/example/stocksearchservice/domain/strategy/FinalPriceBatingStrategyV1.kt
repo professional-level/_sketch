@@ -66,6 +66,7 @@ class FinalPriceBatingStrategyV1 private constructor(
     override val events: MutableList<DomainEvent> = mutableListOf()
 
     override fun complete() {
+        // TODO: complete()를 AOP에서 수행하는데, 그렇게 하지말고 StrategyCreatedEvent의 경우에는 생성시점에 쌓이도록 하는게 좋겠다.
         events.add(
             StrategyCreatedEvent(
                 stockId = this.stock.stockId.value,
