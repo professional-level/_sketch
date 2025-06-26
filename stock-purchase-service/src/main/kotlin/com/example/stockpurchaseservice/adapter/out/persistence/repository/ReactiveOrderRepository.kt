@@ -19,6 +19,15 @@ internal class StockOrderRepository : AbstractReactiveRepository<Orders, UUID>()
             ).resultList
         }.awaitSuspending()
     }
+
+    suspend fun findAllWithPurchaseWaiting(): List<Orders> {
+        return sessionFactory.withSession { session ->
+            session.createQuery(
+                "FROM Orders o WHERE o.orderState = 'PURCHASE_WAITING'",
+                Orders::class.java,
+            ).resultList
+        }.awaitSuspending()
+    }
 }
 
 @ApplicationScoped

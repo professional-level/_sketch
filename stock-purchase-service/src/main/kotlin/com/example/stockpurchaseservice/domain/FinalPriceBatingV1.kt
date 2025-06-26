@@ -65,7 +65,7 @@ class FinalPriceBatingV1 private constructor(
             requestedAt = requestedAt,
             purchasedAt = purchasedAt,
             quantity = calculateQuantity(),
-            orderState = TODO(),
+            orderState = OrderState.PURCHASE_WAITING,
         )
 
         // 이벤트 추가

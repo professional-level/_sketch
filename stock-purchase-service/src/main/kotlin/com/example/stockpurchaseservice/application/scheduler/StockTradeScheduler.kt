@@ -1,16 +1,17 @@
 package com.example.stockpurchaseservice.application.scheduler
 
-import com.example.stockpurchaseservice.domain.ExecutedStock
-import com.example.stockpurchaseservice.domain.ExecutionType
-import com.example.stockpurchaseservice.domain.repository.StockOrderRepository
 import com.example.common.application.event.ApplicationEvent
 import com.example.stockpurchaseservice.application.port.out.MarketServicePort
 import com.example.stockpurchaseservice.application.service.strategy.toDto
+import com.example.stockpurchaseservice.domain.ExecutedStock
+import com.example.stockpurchaseservice.domain.ExecutionType
 import com.example.stockpurchaseservice.domain.FinalPriceBatingV1
 import com.example.stockpurchaseservice.domain.Order
+import com.example.stockpurchaseservice.domain.PurchaseOrder
 import com.example.stockpurchaseservice.domain.SellingOrder
 import com.example.stockpurchaseservice.domain.Stock
 import com.example.stockpurchaseservice.domain.StrategyType
+import com.example.stockpurchaseservice.domain.repository.StockOrderRepository
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.retry.annotation.Recover
 import org.springframework.scheduling.annotation.Scheduled
@@ -137,6 +138,34 @@ internal class StockTradeScheduler(
         // TODO: 초기화 하기 전에 데이터 정리 및 이벤트 발행 필요
         // executionQueue를 빈 값으로 초기화
         executionQueue.clear()
+    }
+
+    @Scheduled(cron = "0 */1 * ? * MON-FRI")
+    suspend fun simulateStockPurchase() {
+        val waitingOrders = stockOrderRepository.findAllWithPurchaseWaiting()
+
+        waitingOrders.forEach { order ->
+            // 가상으로 현재가를 가져온다. 실제로는 외부 API 등을 통해 가져와야 함.
+            val currentPrice = getMockCurrentPrice(order.stockId)
+
+            if (order.purchasePrice.price >= currentPrice) {
+                // 매수 성공: 주문 상태 변경 및 저장
+                val completedOrder = (order as PurchaseOrder).copy(
+                    orderState = com.example.stockpurchaseservice.domain.OrderState.PURCHASE_COMPLETED,
+                    purchasedAt = ZonedDateTime.now()
+                )
+                stockOrderRepository.save(completedOrder)
+
+                // 매수 성공 이벤트 발행 (옵션)
+                // applicationEventPublisher.publishEvent(PurchaseSuccessEvent(...))
+            }
+        }
+    }
+
+    private fun getMockCurrentPrice(stockId: com.example.stockpurchaseservice.domain.StockId): Double {
+        // 실제로는 이 부분에서 외부 API 호출 등을 통해 현재가를 가져와야 합니다.
+        // 여기서는 테스트를 위해 무작위 값을 반환합니다.
+        return (1000..2000).random().toDouble()
     }
 }
 

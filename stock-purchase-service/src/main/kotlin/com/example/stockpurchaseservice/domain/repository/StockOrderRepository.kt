@@ -10,6 +10,7 @@ interface StockOrderRepository : DomainRepository<Order, OrderId> {
     suspend fun save(order: Order)
     suspend fun save(order: Order, externalOrderId: ExternalOrderId)
     suspend fun findAllNotCompleted(): List<Order>
+    suspend fun findAllWithPurchaseWaiting(): List<Order>
     suspend fun findByStockIdAndQuantity(stockId: StockId, quantity:Int): Order?
     suspend fun findByExternalOrderId(externalOrderId: ExternalOrderId): Order? // TODO: 구현
 }

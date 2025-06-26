@@ -24,6 +24,12 @@ internal class StockOrderAdapter(
         }
     }
 
+    override suspend fun findAllWithPurchaseWaiting(): List<OrderDto> {
+        return stockOrderRepository.findAllWithPurchaseWaiting().map { order ->
+            order.toDTO()
+        }
+    }
+
     override suspend fun saveExternalOrderId(internalOrderId: UUID, externalOrderId: String) {
         orderIdMappingRepository.save(internalOrderId, externalOrderId)
     }

@@ -6,6 +6,7 @@ import java.util.UUID
 interface StockOrderPort {
     suspend fun save(order: OrderDto)
     suspend fun findAllWithNotCompleted(): List<OrderDto>
+    suspend fun findAllWithPurchaseWaiting(): List<OrderDto>
     suspend fun saveExternalOrderId(internalOrderId: UUID, externalOrderId: String)
     suspend fun findByExternalOrderId(value: String): OrderDto?
 }
