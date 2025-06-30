@@ -54,13 +54,8 @@ class FinalPriceBatingStrategyV1 private constructor(
 
     companion object {
         fun default() = FinalPriceBatingStrategyV1(Stock.default(), 0) // Debug용 함수
-        private fun of(stock: Stock, rank: Int): FinalPriceBatingStrategyV1 = FinalPriceBatingStrategyV1(stock, rank)
-        fun validListOf(stocks: List<Stock>): List<FinalPriceBatingStrategyV1> {
-            return stocks.mapIndexed { rank, stock -> of(stock, rank + 1) }.filter { it.isValidCurrentValue() }
-        }
-
-        // TODO: 단건 validation의 경우에는 순위에 대한 보장이 필요하다
-        fun validOf(stock: Stock): FinalPriceBatingStrategyV1? = validListOf(listOf(stock)).firstOrNull()
+        
+        fun of(stock: Stock, rank: Int): FinalPriceBatingStrategyV1 = FinalPriceBatingStrategyV1(stock, rank)
     }
 
     override val events: MutableList<DomainEvent> = mutableListOf()

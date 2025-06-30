@@ -10,6 +10,7 @@ import com.example.stocksearchservice.domain.StockTotalVolume
 import com.example.stocksearchservice.domain.StockVolume
 import com.example.stocksearchservice.domain.repository.FinalPriceBatingStrategyV1Repository
 import com.example.stocksearchservice.domain.repository.StockInformationRepository
+import com.example.stocksearchservice.domain.service.FinalPriceBatingStockAnalyzer
 import com.example.stocksearchservice.domain.strategy.FinalPriceBatingStrategyV1
 import org.springframework.retry.annotation.Backoff
 import org.springframework.retry.annotation.Recover
@@ -22,6 +23,7 @@ import java.time.ZonedDateTime
 internal class StockSearchScheduler(
     private val stockInformationRepository: StockInformationRepository,
     private val finalPriceBatingStrategyV1Repository: FinalPriceBatingStrategyV1Repository,
+    private val stockAnalyzer: FinalPriceBatingStockAnalyzer,
 ) {
     // example of cron = "초 분 시간-시간 ? * 요일-요일"
     //    @Scheduled(cron = "15 */2 9-18 ? * MON-FRI ")
@@ -61,9 +63,7 @@ internal class StockSearchScheduler(
          * */
 
         /* stock list를 FinalPrice~ 객체로 초기화 할때, validation을 체크하는 로직이 필요 할 것 같다. fun create 반환 타입 nullable*/
-        val validStocks = FinalPriceBatingStrategyV1.validListOf(
-            top10VolumeStockList,
-        ) // TODO: 이 단계에서 FinalPriceBatingStrategyV1에 rank를 넣는 것 빼야할지도
+        val validStocks = stockAnalyzer.analyzeStocks(top10VolumeStockList)
         /*
          * 프로그램 순매수가 시가총액의 3% ?
          * 프로그램 순매수의 5거래일중 최대
