@@ -20,4 +20,4 @@ interface StockInformationRepository {
     // save
     // TODO: StockVolume을 두개로 기관, 외국인으로 나눠야한다
     suspend fun saveTop10VolumeStocks(stockLogs: List<StockLog>)
-}
+} // TODO: DomainRepository를 상속하는 형태로 구축 필요

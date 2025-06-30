@@ -4,7 +4,7 @@ import com.example.stocksearchservice.domain.Stock
 import com.example.stocksearchservice.domain.strategy.FinalPriceBatingStrategyV1
 import org.springframework.stereotype.Component
 
-@Component
+@Component // 굳이 component일 필요가 있나 ?
 class FinalPriceBatingStockAnalyzer {
     
     fun analyzeStocks(stocks: List<Stock>): List<FinalPriceBatingStrategyV1> {
