@@ -16,7 +16,7 @@ import java.time.ZonedDateTime
 @Component
 class FinalPriceBatingStrategyV1RepositoryImpl(
     private val stockStrategyPort: StockStrategyPort,
-    @Lazy private val proxy: FinalPriceBatingStrategyV1RepositoryImpl, // TODO: 개선 방안 모색 필요, 안티 패턴이라는 의견이 있었음
+    @Lazy private val proxy: FinalPriceBatingStrategyV1Repository, // TODO: 개선 방안 모색 필요, 안티 패턴이라는 의견이 있었음
 ) : FinalPriceBatingStrategyV1Repository {
     override suspend fun save(entity: FinalPriceBatingStrategyV1, date: ZonedDateTime) {
         val stockId = entity.stock.stockId.value
