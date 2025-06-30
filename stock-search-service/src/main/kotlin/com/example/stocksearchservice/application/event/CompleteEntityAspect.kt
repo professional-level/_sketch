@@ -2,7 +2,9 @@ package com.example.stocksearchservice.application.event
 
 import com.example.common.domain.event.EventSupportedEntity
 import org.aspectj.lang.JoinPoint
+import org.aspectj.lang.ProceedingJoinPoint
 import org.aspectj.lang.annotation.AfterReturning
+import org.aspectj.lang.annotation.Around
 import org.aspectj.lang.annotation.Aspect
 import org.aspectj.lang.annotation.Before
 import org.springframework.stereotype.Component
@@ -77,33 +79,35 @@ class CompleteEntityAspect(
 //        }
 //    }
 
-    //
-    // TODO: 추후 reactive 적용
-//    @Around("@within(com.example.stocksearchservice.domain.event.EventPublishingRepository) && execution(* save(..))")
-//    fun aroundSave(joinPoint: ProceedingJoinPoint): Any? {
-//        val result = joinPoint.proceed()
-//
-//        when (result) {
-//            is Mono<*> -> {
-//                (result as Mono<EventSupportedEntity>).doOnSuccess { entity ->
-//                    if (entity.events.isNotEmpty()) {
-//                        logger.info("Dispatching events for entity: ${entity.id}")
-//                        domainEventDispatcher.dispatch(entity.events)
-//                        entity.events.clear()
-//                    }
-//                }
-//            }
-//            is EventSupportedEntity -> {
-//                if (result.events.isNotEmpty()) {
-//                    logger.info("Dispatching events for entity: ${result.id}")
-//                    domainEventDispatcher.dispatch(result.events)
-//                    result.events.clear()
-//                }
-//            }
-//            else -> logger.warn("Unexpected return type from save method: ${result?.javaClass}")
-//        }
-//
-//        return result
-//    }
+    // saveAll용 AOP - Reactive 배치 처리 + 개별 이벤트 발행
+    @Around("@within(com.example.common.domain.event.EventPublishingRepository) && execution(* saveAll(..))")
+    suspend fun aroundSaveAll(joinPoint: ProceedingJoinPoint): Any? {
+        val entities = joinPoint.args[0] as? List<*> ?: return joinPoint.proceed()
+        
+        // 1. 각 엔티티의 성공 이벤트 생성
+        entities.filterIsInstance<EventSupportedEntity>()
+            .forEach { it.complete() }
+        
+        return runCatching {
+            // 2. 실제 저장 로직 실행
+            joinPoint.proceed()
+        }.onSuccess { result ->
+            // 3. 저장 성공 시에만 이벤트 개별 발행 (비동기)
+            entities.filterIsInstance<EventSupportedEntity>()
+                .filter { it.events.isNotEmpty() }
+                .forEach { entity ->
+                    domainEventDispatcher.dispatchAsync(entity.events)
+                    entity.events.clear()
+                }
+        }.onFailure { exception ->
+            // TODO: 저장 실패 시 실패 이벤트 발행 기능 추가 필요
+            // 예: StrategySaveFailedEvent(entities.map{it.id}, exception.message, timestamp)
+            // domainEventDispatcher.dispatchAsync(failureEvents)
+            
+            // 성공 이벤트 제거 (저장 실패했으므로)
+            entities.filterIsInstance<EventSupportedEntity>()
+                .forEach { it.events.clear() }
+        }.getOrThrow() // 실패 시 예외 재발생
+    }
 }
 

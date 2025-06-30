@@ -25,6 +25,16 @@ class DomainEventDispatcher(
             }
         }
     }
+    
+    fun dispatchAsync(events: List<DomainEvent>) {
+        // Fire-and-forget 방식으로 비동기 이벤트 발행
+        coroutineScope.launch {
+            events.forEach { event ->
+                val eventMessage = eventMapper.map(event)
+                messageServicePort.publish(eventMessage)
+            }
+        }
+    }
 }
 
 private fun StrategyCreatedEvent.toMessage() {

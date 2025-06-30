@@ -15,4 +15,12 @@ class StockStrategyAdapter(
         stockSuggestionRepository.save(entity)
         // save가 실패하면?
     }
+    
+    override suspend fun saveAll(dtos: List<StockStrategyDTO>) {
+        val entities = dtos.map { dto -> StockSuggestion.of(dto) }
+        entities.forEach { entity ->
+            stockSuggestionRepository.save(entity)
+        }
+        // TODO: 향후 진정한 배치 저장으로 개선 (bulk insert)
+    }
 }

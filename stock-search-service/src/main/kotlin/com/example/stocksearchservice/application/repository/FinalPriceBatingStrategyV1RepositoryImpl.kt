@@ -7,16 +7,14 @@ import com.example.stocksearchservice.application.port.out.dto.StockStrategyDTO
 import com.example.stocksearchservice.application.port.out.dto.StrategyType
 import com.example.stocksearchservice.domain.repository.FinalPriceBatingStrategyV1Repository
 import com.example.stocksearchservice.domain.strategy.FinalPriceBatingStrategyV1
-import org.springframework.context.annotation.Lazy
 import org.springframework.stereotype.Component
 import java.time.ZonedDateTime
 
-@AopEnabled("com.example.stocksearchservice.application.event.CompleteEntityAspect") // TODO: aop가 걸려있을때 해당 annotation을 강제 할 수 있는 방법 강구
+@AopEnabled("com.example.stocksearchservice.application.event.CompleteEntityAspect")
 @EventPublishingRepository
 @Component
 class FinalPriceBatingStrategyV1RepositoryImpl(
     private val stockStrategyPort: StockStrategyPort,
-    @Lazy private val proxy: FinalPriceBatingStrategyV1Repository, // TODO: 개선 방안 모색 필요, 안티 패턴이라는 의견이 있었음
 ) : FinalPriceBatingStrategyV1Repository {
     override suspend fun save(entity: FinalPriceBatingStrategyV1, date: ZonedDateTime) {
         val stockId = entity.stock.stockId.value
@@ -25,8 +23,14 @@ class FinalPriceBatingStrategyV1RepositoryImpl(
         stockStrategyPort.save(dto)
     }
 
-    // TODO: 같은 class(Component)의 save()를 호출할때 aop를 고려하도록 수정 필요
     override suspend fun saveAll(entities: List<FinalPriceBatingStrategyV1>, date: ZonedDateTime) {
-        entities.forEach { proxy.save(it, date) }
+        val dtos = entities.map { entity ->
+            StockStrategyDTO(
+                stockId = entity.stock.stockId.value,
+                type = StrategyType.FinalPriceBatingV1,
+                date = date
+            )
+        }
+        stockStrategyPort.saveAll(dtos)
     }
 }
