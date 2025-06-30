@@ -10,7 +10,6 @@ interface MessageServicePort {
     suspend fun publish(eventMessage: EventMessage<ApplicationEvent>)
 }
 
-
 // TODO: 추후 common module로 이동 필요
 //internal interface Message
 // internal interface Event
@@ -18,7 +17,3 @@ interface MessageServicePort {
 //internal abstract class ApiHandlerMessage : Message {
 //    lateinit var event: ApiEvent
 //}
-
-//
-//
-//
