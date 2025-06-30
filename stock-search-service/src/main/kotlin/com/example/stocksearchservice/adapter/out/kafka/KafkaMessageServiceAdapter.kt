@@ -1,6 +1,7 @@
 package com.example.stocksearchservice.adapter.out.kafka
 
 import Event
+import com.example.common.ExternalApiAdapter
 import com.example.common.application.event.ApplicationEvent
 import com.example.common.application.event.EventMessage
 import com.example.stocksearchservice.application.event.StrategyCreatedApplicationEvent
@@ -14,10 +15,9 @@ import kotlinx.coroutines.future.await
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.kafka.core.ConsumerFactory
 import org.springframework.kafka.core.KafkaTemplate
-import org.springframework.stereotype.Service
 
 
-@Service
+@ExternalApiAdapter
 internal class KafkaMessageServiceAdapter(
     private val kafkaStringTypeTemplate: KafkaTemplate<String, String>,
     private val kafkaProtoTypeTemplate: KafkaTemplate<String, ByteArray>,
