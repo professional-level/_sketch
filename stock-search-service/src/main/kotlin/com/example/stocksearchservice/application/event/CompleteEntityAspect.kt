@@ -96,13 +96,13 @@ class CompleteEntityAspect(
             entities.filterIsInstance<EventSupportedEntity>()
                 .filter { it.events.isNotEmpty() }
                 .forEach { entity ->
-                    domainEventDispatcher.dispatchAsync(entity.events)
+                    domainEventDispatcher.dispatch(entity.events)
                     entity.events.clear()
                 }
         }.onFailure { exception ->
             // TODO: 저장 실패 시 실패 이벤트 발행 기능 추가 필요
             // 예: StrategySaveFailedEvent(entities.map{it.id}, exception.message, timestamp)
-            // domainEventDispatcher.dispatchAsync(failureEvents)
+            // domainEventDispatcher.dispatch(failureEvents)
             
             // 성공 이벤트 제거 (저장 실패했으므로)
             entities.filterIsInstance<EventSupportedEntity>()
