@@ -13,7 +13,6 @@ import com.example.stocksearchservice.domain.repository.StockInformationReposito
 import com.example.stocksearchservice.domain.service.FinalPriceBatingStockAnalyzer
 import com.example.stocksearchservice.domain.strategy.FinalPriceBatingStrategyV1
 import org.springframework.retry.annotation.Backoff
-import org.springframework.retry.annotation.Recover
 import org.springframework.retry.annotation.Retryable
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
@@ -101,19 +100,9 @@ internal class StockSearchScheduler(
         /* event publish를 통해 해결*/
 //        throw RuntimeException("일부로 throw")
     }
-    @Scheduled(cron = "0 */1 * ? * MON-FRI")
-    suspend fun temp() {
-
-    }
-    @Recover
-    suspend fun recover(e: Exception) {
-        // 최대 재시도 횟수를 초과했을 때 수행할 동작
-        println("재시도 횟수를 초과했습니다: ${e.message}")
-        // 예: 알림 전송, 로그 기록, 대체 로직 실행 등
-        TODO()
-    }
 }
 
+// TODO: 추후 테스트 mock으로 이동
 private fun makeMockProgramVolumeAdaptedList(): List<FinalPriceBatingStrategyV1> {
     return listOf(
         FinalPriceBatingStrategyV1(
