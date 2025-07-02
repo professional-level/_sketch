@@ -9,6 +9,7 @@ import org.aspectj.lang.annotation.Aspect
 import org.aspectj.lang.annotation.Before
 import org.springframework.stereotype.Component
 
+// TODO: annotation mapping 형태로 수정하자. @EventPublishingRepository 등
 @Aspect
 @Component
 class CompleteEntityAspect(
@@ -49,13 +50,13 @@ class CompleteEntityAspect(
 
     // saveAll용 AOP - Reactive 배치 처리 + 개별 이벤트 발행
     @Around("@within(com.example.common.domain.event.EventPublishingRepository) && execution(* saveAll(..))")
-     fun aroundSaveAll(joinPoint: ProceedingJoinPoint): Any? {
+    fun aroundSaveAll(joinPoint: ProceedingJoinPoint): Any? {
         val entities = joinPoint.args[0] as? List<*> ?: return joinPoint.proceed()
-        
+
         // 1. 각 엔티티의 성공 이벤트 생성
         entities.filterIsInstance<EventSupportedEntity>()
             .forEach { it.complete() }
-        
+
         return runCatching {
             // 2. 실제 저장 로직 실행
             joinPoint.proceed()
@@ -71,7 +72,7 @@ class CompleteEntityAspect(
             // TODO: 저장 실패 시 실패 이벤트 발행 기능 추가 필요
             // 예: StrategySaveFailedEvent(entities.map{it.id}, exception.message, timestamp)
             // domainEventDispatcher.dispatch(failureEvents)
-            
+
             // 성공 이벤트 제거 (저장 실패했으므로)
             entities.filterIsInstance<EventSupportedEntity>()
                 .forEach { it.events.clear() }
