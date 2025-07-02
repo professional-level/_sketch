@@ -25,19 +25,6 @@ class CompleteEntityAspect(
         }
     }
 
-//    // TODO: 현재 적용이 되지 않으니 확인 필요, 또한 실질적으로 필요없는 상태 saveAll()이 save()를 호출하므로
-// //    @Before("execution(* com.example.stocksearchservice.application.repository.*.saveAll(..))")
-//    @Before("@within(com.example.stocksearchservice.domain.event.EventPublishingRepository) && execution(* saveAll(..))")
-//    fun beforeSaveAll(joinPoint: JoinPoint) {
-//        val entities = joinPoint.args[0]
-//        if (entities is Iterable<*>) {
-//            entities.forEach { entity ->
-//                if (entity is EventSupportedEntity) {
-//                    entity.complete()
-//                }
-//            }
-//        }
-//    }
 
     // AfterReturning advice to dispatch events after single entity save
     @AfterReturning(
@@ -59,29 +46,10 @@ class CompleteEntityAspect(
         }
     }
 
-//    // AfterReturning advice to dispatch events after saveAll
-//    @AfterReturning(
-//        pointcut = "execution(* com.example.stocksearchservice.application.repository.*.saveAll(..))",
-//        returning = "result",
-//    )
-//    suspend fun afterSaveAll(joinPoint: JoinPoint, result: Any?) {
-//        if (result is Iterable<*>) {
-//            val allEvents = mutableListOf<com.example.stocksearchservice.domain.event.DomainEvent>()
-//            result.forEach { entity ->
-//                if (entity is EventSupportedEntity) {
-//                    allEvents.addAll(entity.events)
-//                    entity.events.clear()
-//                }
-//            }
-//            if (allEvents.isNotEmpty()) {
-//                domainEventDispatcher.dispatch(allEvents)
-//            }
-//        }
-//    }
 
     // saveAll용 AOP - Reactive 배치 처리 + 개별 이벤트 발행
     @Around("@within(com.example.common.domain.event.EventPublishingRepository) && execution(* saveAll(..))")
-    suspend fun aroundSaveAll(joinPoint: ProceedingJoinPoint): Any? {
+     fun aroundSaveAll(joinPoint: ProceedingJoinPoint): Any? {
         val entities = joinPoint.args[0] as? List<*> ?: return joinPoint.proceed()
         
         // 1. 각 엔티티의 성공 이벤트 생성
@@ -109,5 +77,41 @@ class CompleteEntityAspect(
                 .forEach { it.events.clear() }
         }.getOrThrow() // 실패 시 예외 재발생
     }
+
+
+//    // TODO: 현재 적용이 되지 않으니 확인 필요, 또한 실질적으로 필요없는 상태 saveAll()이 save()를 호출하므로
+// //    @Before("execution(* com.example.stocksearchservice.application.repository.*.saveAll(..))")
+//    @Before("@within(com.example.stocksearchservice.domain.event.EventPublishingRepository) && execution(* saveAll(..))")
+//    fun beforeSaveAll(joinPoint: JoinPoint) {
+//        val entities = joinPoint.args[0]
+//        if (entities is Iterable<*>) {
+//            entities.forEach { entity ->
+//                if (entity is EventSupportedEntity) {
+//                    entity.complete()
+//                }
+//            }
+//        }
+//    }
+
+
+//    // AfterReturning advice to dispatch events after saveAll
+//    @AfterReturning(
+//        pointcut = "execution(* com.example.stocksearchservice.application.repository.*.saveAll(..))",
+//        returning = "result",
+//    )
+//    suspend fun afterSaveAll(joinPoint: JoinPoint, result: Any?) {
+//        if (result is Iterable<*>) {
+//            val allEvents = mutableListOf<com.example.stocksearchservice.domain.event.DomainEvent>()
+//            result.forEach { entity ->
+//                if (entity is EventSupportedEntity) {
+//                    allEvents.addAll(entity.events)
+//                    entity.events.clear()
+//                }
+//            }
+//            if (allEvents.isNotEmpty()) {
+//                domainEventDispatcher.dispatch(allEvents)
+//            }
+//        }
+//    }
 }
 
