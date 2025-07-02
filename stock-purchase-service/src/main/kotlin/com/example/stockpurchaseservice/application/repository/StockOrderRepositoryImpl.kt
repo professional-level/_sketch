@@ -1,7 +1,6 @@
 package com.example.stockpurchaseservice.application.repository
 
 import com.example.stockpurchaseservice.application.port.out.StockOrderPort
-import com.example.stockpurchaseservice.domain.repository.StockOrderRepository
 import com.example.stockpurchaseservice.application.service.ExternalOrderId
 import com.example.stockpurchaseservice.domain.Money
 import com.example.stockpurchaseservice.domain.Order
@@ -11,6 +10,7 @@ import com.example.stockpurchaseservice.domain.PurchaseOrder
 import com.example.stockpurchaseservice.domain.SellingOrder
 import com.example.stockpurchaseservice.domain.StockId
 import com.example.stockpurchaseservice.domain.StrategyType
+import com.example.stockpurchaseservice.domain.repository.StockOrderRepository
 import org.springframework.stereotype.Component
 import java.time.ZonedDateTime
 import java.util.UUID
@@ -41,6 +41,10 @@ internal class StockOrderRepositoryImpl(
         return stockOrderPort.findAllWithNotCompleted().map { orderDto ->
             orderDto.toOrder()
         }
+    }
+
+    override suspend fun findAllWithPurchaseWaiting(): List<Order> {
+        TODO("Not yet implemented")
     }
 
     override suspend fun findByStockIdAndQuantity(
