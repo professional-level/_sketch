@@ -1,10 +1,12 @@
 package com.example.stocksearchservice.domain.repository
 
+import com.example.common.domain.event.EventPublishingRepository
 import com.example.common.domain.event.SupportedEventEntityRepository
 import com.example.stocksearchservice.domain.strategy.FinalPriceBatingStrategyV1
 import com.example.stocksearchservice.domain.strategy.StockStrategy
 import java.time.ZonedDateTime
 
+@EventPublishingRepository
 interface FinalPriceBatingStrategyV1Repository : StockStrategyRepository<FinalPriceBatingStrategyV1>
 
 // TODO: 공통 인터페이스 위치 이동 필요

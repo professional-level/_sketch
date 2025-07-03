@@ -11,7 +11,6 @@ import org.springframework.stereotype.Component
 import java.time.ZonedDateTime
 
 @AopEnabled("com.example.stocksearchservice.application.event.CompleteEntityAspect")
-@EventPublishingRepository
 @Component
 class FinalPriceBatingStrategyV1RepositoryImpl(
     private val stockStrategyPort: StockStrategyPort,

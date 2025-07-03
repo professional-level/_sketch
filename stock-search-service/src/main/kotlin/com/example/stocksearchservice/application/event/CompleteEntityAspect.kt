@@ -18,7 +18,7 @@ class CompleteEntityAspect(
     // Event 발행의 순서가.. save 이후에 하는것이 맞을까?
     // after에 건다면, save과정에서 에러 발생 시, AOP관련 로직이 동작하는가? 동작하지 않도록 하려면?
 //    @Before("execution(* com.example.stocksearchservice.application.repository.*.save(..))") // 표현식 점검
-    @Before("@within(com.example.common.domain.event.EventPublishingRepository) && execution(* save(..))")
+    @Before("@target(com.example.common.domain.event.EventPublishingRepository) && execution(* save(..))")
     fun beforeSave(joinPoint: JoinPoint) {
         val entity = joinPoint.args[0]
         if (entity is EventSupportedEntity) {
@@ -29,7 +29,7 @@ class CompleteEntityAspect(
 
     // AfterReturning advice to dispatch events after single entity save
     @AfterReturning(
-        pointcut = "@within(com.example.common.domain.event.EventPublishingRepository) && execution(* save(..))",
+        pointcut = "@target(com.example.common.domain.event.EventPublishingRepository) && execution(* save(..))",
         returning = "result",
     )
     fun afterSave(joinPoint: JoinPoint, result: Any?) {
@@ -49,7 +49,7 @@ class CompleteEntityAspect(
 
 
     // saveAll용 AOP - Reactive 배치 처리 + 개별 이벤트 발행
-    @Around("@within(com.example.common.domain.event.EventPublishingRepository) && execution(* saveAll(..))")
+    @Around("@target(com.example.common.domain.event.EventPublishingRepository) && execution(* saveAll(..))")
     fun aroundSaveAll(joinPoint: ProceedingJoinPoint): Any? {
         val entities = joinPoint.args[0] as? List<*> ?: return joinPoint.proceed()
 
