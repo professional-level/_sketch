@@ -5,7 +5,8 @@
       "Bash(mv:*)",
       "Bash(./gradlew build:*)",
       "Bash(./gradlew compileKotlin:*)",
-      "Bash(./gradlew:*)"
+      "Bash(./gradlew:*)",
+      "WebFetch(domain:docs.anthropic.com)"
     ],
     "deny": []
   }
