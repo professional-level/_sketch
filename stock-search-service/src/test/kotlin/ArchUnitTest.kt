@@ -33,7 +33,7 @@ class ArchUnitTest {
     fun `domain should not access adapters, application`() {
         val rule = noClasses()
             .that().resideInAnyPackage("..domain..")
-            .should().accessClassesThat().resideInAnyPackage("..application..", "..service..")
+            .should().accessClassesThat().resideInAnyPackage("..application..", "..adapter..")
 
         rule.check(importedClasses)
     }
