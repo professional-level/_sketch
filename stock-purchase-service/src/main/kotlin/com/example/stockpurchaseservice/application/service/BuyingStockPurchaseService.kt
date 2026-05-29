@@ -74,6 +74,3 @@ enum class PurchaseStatus {
     FAILED,
     COMPLETED,
 }
-
-@JvmInline
-value class ExternalOrderId(val value: String)
