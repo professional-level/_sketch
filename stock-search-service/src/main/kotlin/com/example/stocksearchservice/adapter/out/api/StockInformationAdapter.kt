@@ -28,11 +28,11 @@ internal class StockInformationAdapter(
     }
 
     override fun getStockVolumeDuring7days(id: String): List<SimpleStockDTO> {
-        TODO("Not yet implemented")
+        unsupportedMarketData("seven day stock volume")
     }
 
     override fun getHighestPriceAtCurrentDay(id: String): SimpleStockDTO {
-        TODO("Not yet implemented")
+        unsupportedMarketData("current day highest price")
     }
 
     override fun getCurrentProgramPureBuyingVolume(id: String, date: String): Long {
@@ -40,18 +40,22 @@ internal class StockInformationAdapter(
     }
 
     override fun getCurrentPrice(id: String): SimpleStockDTO {
-        TODO("Not yet implemented")
+        unsupportedMarketData("current price")
     }
 
     override fun getInstitutionAndForeignerFlowsOfDay(id: String, date: String): SimpleStockDTO {
-        TODO("Not yet implemented")
+        unsupportedMarketData("institution and foreigner flows")
     }
 
     override fun getInstitutionFlowsOfDay(id: String, date: String): SimpleStockDTO {
-        TODO("Not yet implemented")
+        unsupportedMarketData("institution flows")
     }
 
     override fun getForeignerFlowsOfDay(id: String, date: String): SimpleStockDTO {
-        TODO("Not yet implemented")
+        unsupportedMarketData("foreigner flows")
+    }
+
+    private fun unsupportedMarketData(name: String): Nothing {
+        throw UnsupportedOperationException("Market data endpoint is not wired yet: $name")
     }
 }

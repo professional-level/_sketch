@@ -18,7 +18,6 @@ class ArchUnitTest {
         val rule = noClasses()
             .that().resideInAnyPackage("..adapter..")
             .should().accessClassesThat().resideInAnyPackage("..domain..")
-            .allowEmptyShould(true)
         rule.check(importedClasses)
     }
 
@@ -27,7 +26,6 @@ class ArchUnitTest {
         val rule = noClasses()
             .that().resideInAnyPackage("..application..")
             .should().accessClassesThat().resideInAnyPackage("..adapter..")
-            .allowEmptyShould(true)
         rule.check(importedClasses)
     }
 
@@ -35,8 +33,33 @@ class ArchUnitTest {
     fun `domain should not access adapters, application`() {
         val rule = noClasses()
             .that().resideInAnyPackage("..domain..")
-            .should().accessClassesThat().resideInAnyPackage("..application..", "..service..")
-            .allowEmptyShould(true)
+            .should().accessClassesThat().resideInAnyPackage("..application..", "..adapter..")
+        rule.check(importedClasses)
+    }
+
+    @Test
+    fun `domain should not depend on framework classes`() {
+        val rule = noClasses()
+            .that().resideInAnyPackage("..domain..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                "org.springframework..",
+                "org.apache.kafka..",
+                "jakarta.persistence..",
+                "reactor..",
+            )
+        rule.check(importedClasses)
+    }
+
+    @Test
+    fun `schedulers should call use cases only`() {
+        val rule = noClasses()
+            .that().resideInAnyPackage("..application.scheduler..")
+            .should().accessClassesThat().resideInAnyPackage(
+                "..domain..",
+                "..adapter..",
+                "..application.service..",
+                "..application.repository..",
+            )
         rule.check(importedClasses)
     }
 

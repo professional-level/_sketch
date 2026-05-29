@@ -19,7 +19,7 @@ internal class GetCurrentTop20StocksByTradingVolumeHandler(
             .accept(MediaType.APPLICATION_PROTOBUF)
             .retrieve()
             .toEntity(VolumeRank.StockMap::class.java)
-            .block() // TODO: webclient의 block()은 스레드 block을 유도하는지 확인 필요
+            .awaitExternalApi()
 
         return response?.body?.itemsMap?.map {
             val stockPrice = it.value.stckPrpr.toInt()

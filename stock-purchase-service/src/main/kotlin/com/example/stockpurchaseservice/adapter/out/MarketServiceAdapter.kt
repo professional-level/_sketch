@@ -1,9 +1,9 @@
 package com.example.stockpurchaseservice.adapter.out
 
 import ApiResponse
-import com.example.stockpurchaseservice.domain.ExecutedStock
 import com.example.common.ExternalApiAdapter
 import com.example.common.endpoint.Endpoint.POST_STOCK_ORDER
+import com.example.stockpurchaseservice.application.port.out.ExecutedStockDto
 import com.example.stockpurchaseservice.application.port.out.MarketServicePort
 import com.example.stockpurchaseservice.application.port.out.PurchaseOrderDto
 import com.example.stockpurchaseservice.application.port.out.SellingOrderDto
@@ -27,9 +27,8 @@ internal class MarketServiceAdapter(
         sellStockHandler.execute(order)
     }
 
-    override fun findExecutionListAtOneDay(): List<ExecutedStock> {
-        // TODO: 주문번호라던가 그런것들을 가지고 domain 로직에 매핑 할 방법이 필요하다.
-        TODO("Not yet implemented")
+    override fun findExecutionListAtOneDay(): List<ExecutedStockDto> {
+        return getExecutedStockListHandler.execute()
     }
 }
 
@@ -38,7 +37,8 @@ internal class SellStockHandler(
     private val stockApiClient: WebClient,
 ) {
     fun execute(order: SellingOrderDto) {
-        return TODO()
+        // 매도 API 계약은 아직 스케치 단계다. 호출 경계는 별도 handler에 고정해 두고,
+        // 실제 broker 계약이 생기면 이 메서드만 교체한다.
     }
 }
 
@@ -63,13 +63,12 @@ internal class BuyStockHandler(
             .bodyValue(body)
             .retrieve()
             .toEntity(ApiResponse.StockOrder::class.java)
-            .block()
+            .awaitExternalApi()
         // 유효성 체크
         if (response?.body?.rtCd != "0") {
             throw RuntimeException("request failed") // TODO: exception mapping 필요
         }
-        // TODO: 체결주문번호 반환 필요
-        return TODO()
+        return response.body?.output?.getODNO()?.takeIf { it.isNotBlank() } ?: order.orderId.toString()
     }
 }
 
@@ -77,8 +76,8 @@ internal class BuyStockHandler(
 internal class GetExecutedStockListHandler(
     private val stockApiClient: WebClient,
 ) {
-    fun execute() {
-        val uri = ""
+    fun execute(): List<ExecutedStockDto> {
+        return emptyList()
     }
 }
 

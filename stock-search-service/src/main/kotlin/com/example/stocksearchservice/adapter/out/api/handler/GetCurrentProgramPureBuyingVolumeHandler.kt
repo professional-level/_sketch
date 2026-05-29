@@ -18,7 +18,7 @@ internal class GetCurrentProgramPureBuyingVolumeHandler(
             .accept(MediaType.APPLICATION_PROTOBUF)
             .retrieve()
             .toEntity(ProgramTradeVolume.ProgramStockOfDateTime::class.java)
-            .block()
+            .awaitExternalApi()
         val volume = response?.body?.wholSmtnNtbyTrPbmn ?: throw RuntimeException("Error getting stock data")
         return volume.toLong()
     }

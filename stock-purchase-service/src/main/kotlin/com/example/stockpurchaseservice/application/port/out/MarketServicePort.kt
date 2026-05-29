@@ -1,12 +1,12 @@
 package com.example.stockpurchaseservice.application.port.out
 
-import com.example.stockpurchaseservice.domain.ExecutedStock
+import java.time.ZonedDateTime
 import java.util.UUID
 
 interface MarketServicePort {
     fun buyStock(order: PurchaseOrderDto)
     fun sellStock(order: SellingOrderDto)
-    fun findExecutionListAtOneDay() : List<ExecutedStock>
+    fun findExecutionListAtOneDay(): List<ExecutedStockDto>
 }
 
 data class PurchaseOrderDto(
@@ -21,4 +21,14 @@ data class SellingOrderDto(
     val stockId: String,
     val sellingPrice: Double,
     val quantity: Int,
+)
+
+data class ExecutedStockDto(
+    val stockId: String,
+    val stockName: String,
+    val createdAt: ZonedDateTime,
+    val quantity: Int,
+    val type: ExecutionTypeDto,
+    val externalOrderId: String,
+    val externalExecutionId: String,
 )

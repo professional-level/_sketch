@@ -20,7 +20,7 @@ internal class StockOrderRepositoryImpl(
     private val stockOrderPort: StockOrderPort, // TODO: 이름 체크
 ) : StockOrderRepository {
     override fun findById(id: OrderId): Order? {
-        TODO("Not yet implemented")
+        return null
     }
 
     // TODO: save 구현은 왜 DomainRepo에 없을까? 구현필요
@@ -37,6 +37,10 @@ internal class StockOrderRepositoryImpl(
         stockOrderPort.saveExternalOrderId(order.id.value, externalOrderId.value)
     }
 
+    override suspend fun existsByStrategyId(strategyId: String): Boolean {
+        return stockOrderPort.existsByStrategyId(strategyId)
+    }
+
     override suspend fun findAllNotCompleted(): List<Order> {
         return stockOrderPort.findAllWithNotCompleted().map { orderDto ->
             orderDto.toOrder()
@@ -44,14 +48,16 @@ internal class StockOrderRepositoryImpl(
     }
 
     override suspend fun findAllWithPurchaseWaiting(): List<Order> {
-        TODO("Not yet implemented")
+        return stockOrderPort.findAllWithPurchaseWaiting().map { orderDto ->
+            orderDto.toOrder()
+        }
     }
 
     override suspend fun findByStockIdAndQuantity(
         stockId: StockId,
         quantity: Int,
     ): Order? {
-        TODO("Not yet implemented")
+        return stockOrderPort.findByStockIdAndQuantity(stockId.value, quantity)?.toOrder()
     }
 
     override suspend fun findByExternalOrderId(externalOrderId: ExternalOrderId): Order? {
@@ -72,6 +78,7 @@ private fun Order.toDto(): OrderDto {
     }
     return OrderDto(
         id = this.id.value,
+        strategyId = this.strategyId,
         stockId = this.stockId.value,
         stockName = this.stockName,
         requestedAt = this.requestedAt,
@@ -87,6 +94,7 @@ private fun Order.toDto(): OrderDto {
 
 data class OrderDto(
     val id: UUID,
+    val strategyId: String?,
     val stockId: String,
     val stockName: String,
     val requestedAt: ZonedDateTime,
@@ -98,19 +106,39 @@ data class OrderDto(
     val quantity: Int,
     val orderState: OrderStateDto,
 ) {
-    fun toOrder(): SellingOrder {
-        return SellingOrder.from(
-            id = OrderId(id),
-            stockId = StockId(stockId),
-            stockName = stockName,
-            requestedAt = requestedAt,
-            strategyType = strategyType.toDomain(),
-            sellingPrice = sellingPrice?.let { Money(sellingPrice) } ?: Money.undefined(),
-            purchasePrice = purchasePrice?.let { Money(purchasePrice) } ?: Money.undefined(), // maping 확인 필요
-            purchasedAt = purchasedAt ?: ZonedDateTime.now(), // maping 확인 필요
-            quantity = quantity,
-            orderState = orderState.toDomain(),
-        )
+    fun toOrder(): Order {
+        val domainOrderState = orderState.toDomain()
+        val domainStrategyType = strategyType.toDomain()
+        val domainPurchasePrice = purchasePrice?.let { Money(it) } ?: Money.undefined()
+
+        return if (sellingPrice != null || domainOrderState.name.startsWith("SELLING")) {
+            SellingOrder.from(
+                id = OrderId(id),
+                strategyId = strategyId,
+                stockId = StockId(stockId),
+                stockName = stockName,
+                requestedAt = requestedAt,
+                strategyType = domainStrategyType,
+                sellingPrice = sellingPrice?.let { Money(it) } ?: Money.undefined(),
+                purchasePrice = domainPurchasePrice,
+                purchasedAt = purchasedAt ?: requestedAt,
+                quantity = quantity,
+                orderState = domainOrderState,
+            )
+        } else {
+            PurchaseOrder(
+                id = OrderId(id),
+                strategyId = strategyId,
+                stockId = StockId(stockId),
+                stockName = stockName,
+                requestedAt = requestedAt,
+                strategyType = domainStrategyType,
+                purchasePrice = domainPurchasePrice,
+                purchasedAt = purchasedAt,
+                quantity = quantity,
+                orderState = domainOrderState,
+            )
+        }
     }
 }
 
@@ -129,7 +157,7 @@ enum class StrategyTypeDto {
     companion object {
         fun from(type: StrategyType): StrategyTypeDto {
             return when (type) {
-                StrategyType.Undefined -> TODO()
+                StrategyType.Undefined -> throw IllegalArgumentException("Undefined strategy type cannot be persisted")
                 StrategyType.FinalPriceBatingV1 -> FINAL_PRICE_BATING_V1
             }
         }
@@ -140,6 +168,8 @@ enum class OrderStateDto {
     PURCHASE_WAITING, // 주문이 들어가기 전
     PURCHASE_IN_PROCESS, // 주문이 들어간 상태
     PURCHASE_COMPLETED, // 체결이 된 상태
+    SUBMIT_FAILED,
+    SUBMISSION_UNKNOWN,
     SELLING_WAITING, // 주문이 들어가기 전
     SELLING_IN_PROCESS, // 주문이 들어간 상태
     SELLING_COMPLETED, // 체결이 된 상태
@@ -150,6 +180,8 @@ enum class OrderStateDto {
             OrderStateDto.PURCHASE_WAITING -> OrderState.PURCHASE_WAITING
             OrderStateDto.PURCHASE_IN_PROCESS -> OrderState.PURCHASE_IN_PROCESS
             OrderStateDto.PURCHASE_COMPLETED -> OrderState.PURCHASE_COMPLETED
+            OrderStateDto.SUBMIT_FAILED -> OrderState.SUBMIT_FAILED
+            OrderStateDto.SUBMISSION_UNKNOWN -> OrderState.SUBMISSION_UNKNOWN
             OrderStateDto.SELLING_WAITING -> OrderState.SELLING_WAITING
             OrderStateDto.SELLING_IN_PROCESS -> OrderState.SELLING_IN_PROCESS
             OrderStateDto.SELLING_COMPLETED -> OrderState.SELLING_COMPLETED
@@ -162,6 +194,8 @@ enum class OrderStateDto {
                 OrderState.PURCHASE_WAITING -> OrderStateDto.PURCHASE_WAITING
                 OrderState.PURCHASE_IN_PROCESS -> OrderStateDto.PURCHASE_IN_PROCESS
                 OrderState.PURCHASE_COMPLETED -> OrderStateDto.PURCHASE_COMPLETED
+                OrderState.SUBMIT_FAILED -> OrderStateDto.SUBMIT_FAILED
+                OrderState.SUBMISSION_UNKNOWN -> OrderStateDto.SUBMISSION_UNKNOWN
                 OrderState.SELLING_WAITING -> OrderStateDto.SELLING_WAITING
                 OrderState.SELLING_IN_PROCESS -> OrderStateDto.SELLING_IN_PROCESS
                 OrderState.SELLING_COMPLETED -> OrderStateDto.SELLING_COMPLETED

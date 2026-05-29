@@ -9,6 +9,7 @@ import com.example.stockpurchaseservice.domain.StockId
 interface StockOrderRepository : DomainRepository<Order, OrderId> {
     suspend fun save(order: Order)
     suspend fun save(order: Order, externalOrderId: ExternalOrderId)
+    suspend fun existsByStrategyId(strategyId: String): Boolean
     suspend fun findAllNotCompleted(): List<Order>
     suspend fun findAllWithPurchaseWaiting(): List<Order>
     suspend fun findByStockIdAndQuantity(stockId: StockId, quantity: Int): Order?

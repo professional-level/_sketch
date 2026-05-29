@@ -23,6 +23,7 @@ class FinalPriceBatingV1 private constructor(
     val stock: Stock,
     val requestedAt: ZonedDateTime,
     val purchasePrice: Money,
+    val strategyId: String,
     override val purchasedAt: ZonedDateTime?,
 ) : StockStrategy() {
     /* TODO:
@@ -51,11 +52,8 @@ class FinalPriceBatingV1 private constructor(
         // Return null
         if (isPurchased()) return null
 
-        // 익절, 손절 가격 계산
-        val takeProfitPrice = calculateTakeProfitPrice(purchasePrice)
-        val stopLossPrice = calculateStopLossPrice(purchasePrice)
-
         val purchaseOrder = PurchaseOrder(
+            strategyId = strategyId,
             stockId = stock.id,
             stockName = stock.name,
             purchasePrice = purchasePrice,
@@ -93,6 +91,7 @@ class FinalPriceBatingV1 private constructor(
 
         return SellingOrder(
             id = orderId,
+            strategyId = strategyId,
             stockId = stock.id,
             stockName = stock.name,
             requestedAt = requestedAt,
@@ -101,7 +100,7 @@ class FinalPriceBatingV1 private constructor(
             purchasePrice = purchasePrice,
             sellingPrice = sellingPrice, // TODO: 지금은 익절 가격을 매핑하지만, 날짜라던가 특정 조건에 따라서는 손절 가격을 매핑해야 한다.
             quantity = calculateQuantity(),
-            orderState = TODO(),
+            orderState = OrderState.SELLING_WAITING,
         )
     }
 
@@ -138,12 +137,14 @@ class FinalPriceBatingV1 private constructor(
             stock: Stock,
             requestedAt: ZonedDateTime,
             purchasePrice: Money,
+            strategyId: String = "${StrategyType.FinalPriceBatingV1}:${stock.id.value}",
             purchasedAt: ZonedDateTime? = null,
         ): FinalPriceBatingV1 {
             return FinalPriceBatingV1(
                 stock = stock,
                 requestedAt = requestedAt,
                 purchasePrice = purchasePrice,
+                strategyId = strategyId,
                 purchasedAt = purchasedAt,
             )
         }
@@ -154,47 +155,13 @@ class FinalPriceBatingV1 private constructor(
         // 필요한 경우 추가 로직 수행
     }
 
-    override fun project(domainEvent: DomainEvent) {
-        TODO("Not yet implemented")
-    }
+    override fun project(domainEvent: DomainEvent) = Unit
 }
 
-// }
-//
-// class Order private constructor(
-//    val id: OrderId,
-//    val stockId: StockId,
-//    val stockName: String,
-//    val requestedAt: ZonedDateTime,
-//    val strategyType: StrategyType,
-//    val purchasedAt: ZonedDateTime?,
-//    val sellingAt: ZonedDateTime?,
-//    val purchasePrice: Money?,
-//    val sellingPrice: Money?,
-// ) {
-//    companion object {
-//        fun from(purchaseOrder: PurchaseOrder): Order {
-//            return Order(
-//                id = purchaseOrder.id,
-//                stockId = purchaseOrder.stockId,
-//                stockName = purchaseOrder.stockName,
-//                requestedAt = purchaseOrder.requestedAt,
-//                purchasePrice = purchaseOrder.purchasePrice,
-//                strategyType = purchaseOrder.strategyType,
-//                purchasedAt = purchaseOrder.events.find { it is PurchaseSuccessEvent }?.occurredAt,
-//                sellingAt = null,
-//                sellingPrice = null,
-//            )
-//        }
-//
-//        fun from(sellingOrder: SellingOrder): Order {
-//            TODO()
-//        }
-//    }
-// }
 // TODO: 판매 금액의 spread 분산 전략 적용 필요. +- 1% 등등
 sealed class Order(
     open val id: OrderId,
+    open val strategyId: String?,
     open val stockId: StockId,
     open val stockName: String,
     open val requestedAt: ZonedDateTime,
@@ -202,31 +169,17 @@ sealed class Order(
     open val purchasePrice: Money,
     open val purchasedAt: ZonedDateTime?,
     open val quantity: Int,
-    open val orderState: OrderState,
+    open var orderState: OrderState,
 ) : EventSupportedEntity {
     abstract override val events: MutableList<DomainEvent>
     abstract override fun complete()
     abstract fun changeOrderState(orderState: OrderState)
 }
 
-// 판매 주문 엔티티
-// class SellingOrder : Order() {
-//    override val events: MutableList<DomainEvent> = mutableListOf()
-//
-//    override fun complete() {
-//        TODO("Not yet implemented")
-//    }
-//    companion object{
-//        fun create(): SellingOrder{
-//            return SellingOrder(
-//
-//            )
-//        }
-//    }
-// }
 // TODO: data class로 바꿔도 되는지 확인
 data class SellingOrder(
     override val id: OrderId,
+    override val strategyId: String?,
     override val stockId: StockId,
     override val stockName: String,
     override val requestedAt: ZonedDateTime,
@@ -234,9 +187,9 @@ data class SellingOrder(
     override val purchasedAt: ZonedDateTime,
     override val purchasePrice: Money,
     override val quantity: Int,
-    override val orderState: OrderState,
+    override var orderState: OrderState,
     val sellingPrice: Money,
-) : Order(id, stockId, stockName, requestedAt, strategyType, purchasePrice, purchasedAt, quantity, orderState) {
+) : Order(id, strategyId, stockId, stockName, requestedAt, strategyType, purchasePrice, purchasedAt, quantity, orderState) {
     override val events: MutableList<DomainEvent> = mutableListOf()
 
     override fun complete() {
@@ -244,35 +197,31 @@ data class SellingOrder(
     }
 
     override fun changeOrderState(orderState: OrderState) {
-        // TODO: 추후 state 변경에 따라 event 발행 필요
-        when (orderState) {
-            OrderState.PURCHASE_WAITING -> {}
-            OrderState.PURCHASE_IN_PROCESS -> {}
-            OrderState.PURCHASE_COMPLETED -> {}
-            OrderState.SELLING_WAITING -> {}
-            OrderState.SELLING_IN_PROCESS -> {}
-            OrderState.SELLING_COMPLETED -> {}
+        require(this.orderState.canTransitionTo(orderState)) {
+            "Invalid order state transition: ${this.orderState} -> $orderState"
         }
-        if (this.orderState != orderState)
+        if (this.orderState != orderState) {
             register(
                 ChangeOrderStateEvent(
                     orderId = this.id,
                     orderState = orderState,
                 ),
             )
+        }
     }
 
     override fun project(domainEvent: DomainEvent) {
-       when(domainEvent){
-              is SellingSuccessEvent -> {}
-              is SellingFailedEvent -> {}
-              is ChangeOrderStateEvent -> this.copy(orderState = domainEvent.orderState)
-       }
+        when (domainEvent) {
+            is SellingSuccessEvent -> orderState = OrderState.SELLING_COMPLETED
+            is SellingFailedEvent -> orderState = OrderState.SELLING_WAITING
+            is ChangeOrderStateEvent -> orderState = domainEvent.orderState
+        }
     }
 
     companion object {
         fun create(
             id: OrderId,
+            strategyId: String?,
             stockId: StockId,
             stockName: String,
             requestedAt: ZonedDateTime,
@@ -285,6 +234,7 @@ data class SellingOrder(
         ): SellingOrder {
             return SellingOrder(
                 id = id,
+                strategyId = strategyId,
                 stockId = stockId,
                 stockName = stockName,
                 requestedAt = requestedAt,
@@ -299,6 +249,7 @@ data class SellingOrder(
 
         fun from(
             id: OrderId,
+            strategyId: String?,
             stockId: StockId,
             stockName: String,
             requestedAt: ZonedDateTime,
@@ -311,6 +262,7 @@ data class SellingOrder(
         ): SellingOrder {
             return SellingOrder(
                 id = id,
+                strategyId = strategyId,
                 stockId = stockId,
                 stockName = stockName,
                 requestedAt = requestedAt,
@@ -329,9 +281,31 @@ enum class OrderState {
     PURCHASE_WAITING,  // 주문이 들어가기 전
     PURCHASE_IN_PROCESS, // 주문이 들어간 상태
     PURCHASE_COMPLETED, // 체결이 된 상태
+    SUBMIT_FAILED,
+    SUBMISSION_UNKNOWN,
     SELLING_WAITING,  // 주문이 들어가기 전
     SELLING_IN_PROCESS, // 주문이 들어간 상태
     SELLING_COMPLETED, // 체결이 된 상태
+    ;
+
+    fun canTransitionTo(next: OrderState): Boolean {
+        if (this == next) return true
+        return when (this) {
+            PURCHASE_WAITING -> next == PURCHASE_IN_PROCESS || next == PURCHASE_COMPLETED ||
+                next == SUBMIT_FAILED || next == SUBMISSION_UNKNOWN
+            PURCHASE_IN_PROCESS -> next == PURCHASE_COMPLETED || next == PURCHASE_WAITING ||
+                next == SUBMIT_FAILED || next == SUBMISSION_UNKNOWN
+            PURCHASE_COMPLETED -> next == SELLING_WAITING
+            SUBMIT_FAILED -> next == PURCHASE_WAITING || next == SELLING_WAITING
+            SUBMISSION_UNKNOWN -> next == PURCHASE_IN_PROCESS || next == PURCHASE_COMPLETED ||
+                next == SELLING_IN_PROCESS || next == SELLING_COMPLETED || next == SUBMIT_FAILED
+            SELLING_WAITING -> next == SELLING_IN_PROCESS || next == SELLING_COMPLETED ||
+                next == SUBMIT_FAILED || next == SUBMISSION_UNKNOWN
+            SELLING_IN_PROCESS -> next == SELLING_COMPLETED || next == SELLING_WAITING ||
+                next == SUBMIT_FAILED || next == SUBMISSION_UNKNOWN
+            SELLING_COMPLETED -> false
+        }
+    }
 }
 
 data class SellingSuccessEvent(
@@ -353,38 +327,9 @@ enum class SellingErrorCode {
     UNDEFINED,
 }
 
-//
-// // 구매 주문 엔티티
-// data class PurchaseOrder(
-//    val stockId: StockId,
-//    val stockName: String, // TODO: String 말고 Vo로?
-//    val purchasePrice: Money,
-//    val takeProfitPrice: Money,
-//    val stopLossPrice: Money,
-//    val strategyType: StrategyType,
-//    val requestedAt: ZonedDateTime,
-//    val id: OrderId = OrderId.generate(),
-// ) : EventSupportedEntity {
-//    override val events: MutableList<DomainEvent> = mutableListOf()
-//
-//    private var _isSuccess: Boolean = false
-//    val isSuccess get() = _isSuccess
-//    fun success() {
-//        _isSuccess = true
-//        events.add(PurchaseSuccessEvent(orderId = this.id))
-//    }
-//
-//    fun failed(message: String?, purchaseErrorCode: PurchaseErrorCode = PurchaseErrorCode.UNDEFINED) {
-//        _isSuccess = false
-//        events.add(PurchaseFailedEvent(message = message ?: "", errorCode = purchaseErrorCode))
-//    }
-//
-//    override fun complete() {
-//        TODO("Not yet implemented")
-//    }
-// }
 data class PurchaseOrder(
     override val id: OrderId = OrderId.generate(),
+    override val strategyId: String?,
     override val stockId: StockId,
     override val stockName: String,
     override val requestedAt: ZonedDateTime,
@@ -392,10 +337,10 @@ data class PurchaseOrder(
     override val purchasePrice: Money,
     override val purchasedAt: ZonedDateTime?,
     override val quantity: Int,
-    override val orderState: OrderState,
+    override var orderState: OrderState,
 //    val takeProfitPrice: Money,
 //    val stopLossPrice: Money,
-) : Order(id, stockId, stockName, requestedAt, strategyType, purchasePrice, purchasedAt, quantity, orderState) {
+) : Order(id, strategyId, stockId, stockName, requestedAt, strategyType, purchasePrice, purchasedAt, quantity, orderState) {
     override val events: MutableList<DomainEvent> = mutableListOf()
     private var _isSuccess: Boolean = false
     val isSuccess get() = _isSuccess
@@ -415,29 +360,24 @@ data class PurchaseOrder(
     }
 
     override fun changeOrderState(orderState: OrderState) {
-        // TODO: 추후 state 변경에 따라 event 발행 필요
-        when (orderState) {
-            OrderState.PURCHASE_WAITING -> {}
-            OrderState.PURCHASE_IN_PROCESS -> {}
-            OrderState.PURCHASE_COMPLETED -> {}
-            OrderState.SELLING_WAITING -> {}
-            OrderState.SELLING_IN_PROCESS -> {}
-            OrderState.SELLING_COMPLETED -> {}
+        require(this.orderState.canTransitionTo(orderState)) {
+            "Invalid order state transition: ${this.orderState} -> $orderState"
         }
-        if (this.orderState != orderState)
+        if (this.orderState != orderState) {
             register(
                 ChangeOrderStateEvent(
                     orderId = this.id,
                     orderState = orderState,
                 ),
             )
+        }
     }
 
     override fun project(domainEvent: DomainEvent) {
         when (domainEvent) {
-            is PurchaseSuccessEvent -> this.copy(orderState = OrderState.PURCHASE_IN_PROCESS) // TODO: val이기 때문에 copy만으로는 반환값을 이용하지 않는 한 변경이 없다.
-            is PurchaseFailedEvent -> this.copy(orderState = OrderState.PURCHASE_WAITING)
-            is ChangeOrderStateEvent -> this.copy(orderState = domainEvent.orderState)
+            is PurchaseSuccessEvent -> orderState = OrderState.PURCHASE_COMPLETED
+            is PurchaseFailedEvent -> orderState = OrderState.PURCHASE_WAITING
+            is ChangeOrderStateEvent -> orderState = domainEvent.orderState
         }
     }
 }

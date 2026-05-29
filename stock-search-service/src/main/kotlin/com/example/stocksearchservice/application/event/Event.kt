@@ -11,6 +11,12 @@ data class StrategyCreatedApplicationEvent(
     val stockName: String,
     val type: StrategyTypeDto,
     val savedAt: ZonedDateTime,
+    val strategyId: String,
+    val strategyVersion: String,
+    val decisionPrice: Double,
+    val targetBuyPrice: Double,
+    val budget: Double,
+    val quantityPolicy: String,
     override val id: UUID,
     override val occurredAt: ZonedDateTime,
 ) : ApplicationEvent

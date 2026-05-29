@@ -10,6 +10,8 @@ import common.ConsumerGroupId.PURCHASE_SERVICE
 import common.Topic.STRATEGY_SAVED
 import common.proto.ProtoUtils.toZonedDateTime
 import org.springframework.kafka.annotation.KafkaListener
+import java.nio.charset.StandardCharsets
+import java.util.UUID
 
 @ExternalApiAdapter // TODO: 정확한 annotation 매칭
 internal class ExternalEventListenerAdapter(
@@ -36,15 +38,34 @@ fun Event.StrategyType.convert(): StrategyType {
 fun Event.StrategySavedEvent.toCommand(): BuyingStockPurchaseCommand {
     val event = this
     val strategyType = event.type.convert()
+    val eventId = event.eventId.toUuidOrDeterministic {
+        "${event.stockId}:${event.type.name}:${event.savedAt.seconds}:${event.savedAt.nanos}"
+    }
+    val strategyId = event.strategyId.ifBlank { "${strategyType}:${event.stockId}" }
+    val idempotencyKey = event.idempotencyKey.ifBlank { eventId.toString() }
+    val strategyVersion = event.strategyVersion.ifBlank { "v1" }
+    val targetBuyPrice = event.targetBuyPrice.takeIf { it > 0.0 } ?: event.decisionPrice
     return when (strategyType) {
         StrategyType.FinalPriceBatingV1 -> BuyingStockPurchaseCommand.OfFinalPriceBatingV1(
             stockId = StockId(event.stockId),
             stockName = event.stockName,
             requestAt = event.savedAt.toZonedDateTime(),
             type = strategyType,
-            purchasePrice = 0.0, // TODO: 실제 구매 가격으로 변경 필요
+            purchasePrice = targetBuyPrice,
+            eventId = eventId,
+            strategyId = strategyId,
+            idempotencyKey = idempotencyKey,
+            strategyVersion = strategyVersion,
+            budget = event.budget,
+            quantityPolicy = event.quantityPolicy,
         )
 
         else -> throw IllegalArgumentException("지원하지 않는 전략 타입입니다: $strategyType")
     }
+}
+
+private fun String.toUuidOrDeterministic(seed: () -> String): UUID {
+    return takeIf { it.isNotBlank() }
+        ?.let(UUID::fromString)
+        ?: UUID.nameUUIDFromBytes(seed().toByteArray(StandardCharsets.UTF_8))
 }

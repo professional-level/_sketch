@@ -27,11 +27,16 @@ internal class FinalPriceBatingV1Handler(
         val purchasePrice = command.targetPurchasePrice
         val stock = Stock(id = stockId.toDomain(), name = stockName)
 
+        if (orderRepository.existsByStrategyId(command.strategyId)) {
+            return BuyingStockPurchaseResult(orderId = null, status = PurchaseStatus.SKIPPED_DUPLICATE)
+        }
+
         // 도메인 객체 생성
         val strategy = FinalPriceBatingV1.of(
             stock = stock,
             requestedAt = requestedAt,
             purchasePrice = purchasePrice,
+            strategyId = command.strategyId,
         )
 
         // 구매 주문 생성 및 저장
@@ -47,12 +52,6 @@ internal class FinalPriceBatingV1Handler(
 //                    purchaseErrorCode = PurchaseErrorCode.UNDEFINED,
 //                )
 //            }
-        // 이벤트 처리
-        strategy.events.forEach { event ->
-            // 이벤트 퍼블리싱 로직 추가
-
-        }
-
 //        purchaseOrder.events.forEach { event ->
 //            // 이벤트 퍼블리싱 로직 추가
 //            when (event) {
