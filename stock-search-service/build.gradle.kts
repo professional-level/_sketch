@@ -83,6 +83,8 @@ dependencies {
     implementation("org.springframework.kafka:spring-kafka")
     // aop 추가
     implementation("org.springframework.boot:spring-boot-starter-aop")
+    // temporal
+    implementation("io.temporal:temporal-sdk:1.35.0")
 }
 
 protobuf {
