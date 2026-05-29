@@ -39,6 +39,32 @@ class ArchUnitTest {
     }
 
     @Test
+    fun `domain should not depend on framework classes`() {
+        val rule = noClasses()
+            .that().resideInAnyPackage("..domain..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                "org.springframework..",
+                "org.apache.kafka..",
+                "jakarta.persistence..",
+                "reactor..",
+            )
+        rule.check(importedClasses)
+    }
+
+    @Test
+    fun `schedulers should call use cases only`() {
+        val rule = noClasses()
+            .that().resideInAnyPackage("..application.scheduler..")
+            .should().accessClassesThat().resideInAnyPackage(
+                "..domain..",
+                "..adapter..",
+                "..application.service..",
+                "..application.repository..",
+            )
+        rule.check(importedClasses)
+    }
+
+    @Test
     fun `controllers should be annotated with WebAdapter`() {
         val rule = classes()
             .that().resideInAPackage("..adapter..in..web..")

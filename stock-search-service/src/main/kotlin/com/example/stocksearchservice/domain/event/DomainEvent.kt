@@ -12,6 +12,12 @@ data class StrategyCreatedEvent(
     val stockName: String,
     val savedAt: ZonedDateTime,
     val type: StrategyType,
+    val strategyId: String,
+    val strategyVersion: String,
+    val decisionPrice: Double,
+    val targetBuyPrice: Double,
+    val budget: Double,
+    val quantityPolicy: String,
 ) : DomainEvent()
 
 // TODO: common module의 Domain으로 이동해야 할 것 같다.

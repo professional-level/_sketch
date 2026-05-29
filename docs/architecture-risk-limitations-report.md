@@ -29,41 +29,59 @@
      -> FinalPriceBatingStrategyV1 생성
      -> 전략 저장
      -> StrategyCreatedEvent 생성
-     -> strategy-saved Kafka 발행
+     -> outbox_event 저장
+     -> OutboxKafkaPublisher가 strategy-saved Kafka 발행
   -> stock-purchase-service
      -> strategy-saved Kafka 소비
+     -> processed_event 멱등 확인
      -> BuyingStockPurchaseCommand 변환
      -> 전략 타입별 handler 실행
      -> PurchaseOrder 생성 및 저장
-     -> 스케줄러가 체결/매도 처리
+     -> use case가 체결 reconciliation과 매도 주문 처리
 ```
 
 주요 코드 위치:
 
 - `stock-search-service/src/main/kotlin/com/example/stocksearchservice/application/scheduler/StockSearchScheduler.kt`
 - `stock-search-service/src/main/kotlin/com/example/stocksearchservice/domain/strategy/FinalPriceBatingStrategyV1.kt`
-- `stock-search-service/src/main/kotlin/com/example/stocksearchservice/application/event/CompleteEntityAspect.kt`
-- `stock-search-service/src/main/kotlin/com/example/stocksearchservice/application/event/DomainEventDispatcher.kt`
+- `stock-search-service/src/main/kotlin/com/example/stocksearchservice/adapter/out/persistence/OutboxEventAdapter.kt`
+- `stock-search-service/src/main/kotlin/com/example/stocksearchservice/adapter/out/kafka/OutboxKafkaPublisher.kt`
 - `stock-search-service/src/main/kotlin/com/example/stocksearchservice/adapter/out/kafka/KafkaMessageServiceAdapter.kt`
 - `stock-purchase-service/src/main/kotlin/com/example/stockpurchaseservice/adapter/in/event/ExternalEventListenerAdapter.kt`
 - `stock-purchase-service/src/main/kotlin/com/example/stockpurchaseservice/application/service/BuyingStockPurchaseService.kt`
 - `stock-purchase-service/src/main/kotlin/com/example/stockpurchaseservice/application/service/strategy/StrategyHandler.kt`
 - `stock-purchase-service/src/main/kotlin/com/example/stockpurchaseservice/application/scheduler/StockTradeScheduler.kt`
+- `stock-purchase-service/src/main/kotlin/com/example/stockpurchaseservice/application/service/StockTradeOrchestrationServices.kt`
 
 ## 3. 주요 위험 목록
 
-| 번호 | 위험 | 심각도 | 영향 |
+| 번호 | 위험 | 심각도 | 조치 상태 |
 | --- | --- | --- | --- |
-| R1 | DB 저장과 Kafka 발행의 일관성 부재 | 매우 높음 | 저장된 전략이 주문으로 이어지지 않거나, 중복 주문이 발생할 수 있음 |
-| R2 | 이벤트 계약 부족 | 매우 높음 | 구매 서비스가 의미 있는 주문을 만들 수 없음 |
-| R3 | 주문 상태 머신 미완성 | 매우 높음 | 부분 체결, 실패, 재시도, 매도 전환을 안전하게 처리하기 어려움 |
-| R4 | Kafka 소비 idempotency 부재 | 매우 높음 | 동일 이벤트 재처리 시 중복 주문 가능 |
-| R5 | 스케줄러에 비즈니스 오케스트레이션 집중 | 높음 | 테스트, 재실행, 장애 복구, 수동 보정이 어려움 |
-| R6 | AOP 기반 도메인 이벤트 생성 | 높음 | 이벤트 발생 시점과 비즈니스 의미가 불명확함 |
-| R7 | coroutine/reactive와 blocking 코드 혼재 | 높음 | 부하 상황에서 스레드 고갈 또는 지연 전파 가능 |
-| R8 | 서비스 경계 불명확 | 중간~높음 | 검색, 전략, 주문, 체결 책임이 뒤섞임 |
-| R9 | 공통 모듈 결합도 증가 위험 | 중간 | 서비스 간 독립 배포와 진화가 어려워짐 |
-| R10 | 운영 관측성 부족 | 중간 | 장애 원인 추적, 재처리, 감사가 어려움 |
+| R1 | DB 저장과 Kafka 발행의 일관성 부재 | 매우 높음 | `outbox_event`, `OutboxEventPort`, `OutboxKafkaPublisher` 추가 |
+| R2 | 이벤트 계약 부족 | 매우 높음 | `StrategySavedEvent`에 event/strategy/idempotency/가격/예산/버전 필드 추가 |
+| R3 | 주문 상태 머신 미완성 | 매우 높음 | `OrderState.canTransitionTo()`와 상태 전이 테스트 추가 |
+| R4 | Kafka 소비 idempotency 부재 | 매우 높음 | `processed_event` 저장소와 `strategy_id` 중복 주문 방어 추가 |
+| R5 | 스케줄러에 비즈니스 오케스트레이션 집중 | 높음 | scheduler는 use case 호출만 수행하도록 이동 |
+| R6 | AOP 기반 도메인 이벤트 생성 | 높음 | `CompleteEntityAspect`, `DomainEventDispatcher`, `EventPublishingRepository` 제거 |
+| R7 | coroutine/reactive와 blocking 코드 혼재 | 높음 | WebClient blocking 호출을 timeout + bounded elastic helper로 격리 |
+| R8 | 서비스 경계 불명확 | 중간~높음 | `docs/adr/0001-trading-service-boundaries.md`로 현재 bounded context 고정 |
+| R9 | 공통 모듈 결합도 증가 위험 | 중간 | 중복 root proto 제거, integration contract 소유권을 `common/src/main/proto`로 정리 |
+| R10 | 외부 API 호출과 주문 저장의 saga 경계 부재 | 중간~높음 | `SUBMISSION_UNKNOWN` 상태와 sell submission 보정 경로 추가 |
+| R11 | 체결 처리 모델 부족 | 중간~높음 | `execution_fill` 영속 dedupe 모델과 `ExecutionFillPort` 추가 |
+| R12 | ArchUnit 보호력 부족 | 중간 | domain framework 의존 금지, scheduler use case 경계 규칙 추가 |
+| R13 | 문서화와 코드 주석 품질 문제 | 중간 | ADR 추가, 주요 런타임 `TODO()` 제거, 보고서 상태 현행화 |
+
+## 3.1 적용 결과 요약
+
+이번 수정은 "완전한 운영 시스템"이 아니라, 보고서에서 지적한 위험을 스케치 코드 수준에서 한 단계 낮추는 것을 목표로 했다.
+
+- 발행 측은 전략 저장 후 즉시 Kafka에 쏘지 않고 outbox에 저장한 뒤 publisher가 재시도 가능한 방식으로 발행한다.
+- 소비 측은 `processed_event`와 `strategy_id` 기준 방어로 같은 메시지 또는 같은 전략이 중복 주문으로 이어지지 않게 했다.
+- 주문 상태 전이는 enum 값 변경이 아니라 `canTransitionTo()`와 `changeOrderState()`를 통과하도록 바꿨다.
+- 체결 dedupe는 in-memory queue가 아니라 `externalExecutionId` 기준 `execution_fill` 저장소로 옮겼다.
+- scheduler는 trigger 역할만 남기고 discovery, sell order, reconciliation, simulation 흐름은 use case로 이동했다.
+- AOP 이벤트 발행은 제거했고, 도메인 이벤트는 명시적으로 outbox로 변환된다.
+- WebClient 동기 호출은 남아 있으나 어댑터 경계의 timeout/bounded-elastic helper로 격리했다. 장기적으로는 port 전체를 `suspend`로 통일하는 것이 다음 단계다.
 
 ## 4. 상세 분석
 
@@ -71,7 +89,7 @@
 
 현재 `stock-search-service`는 전략을 저장한 뒤 도메인 이벤트를 Kafka로 발행하려는 구조다. 문제는 저장과 발행이 하나의 신뢰성 경계 안에 있지 않다는 점이다.
 
-현재 구조의 특징:
+수정 전 구조의 특징:
 
 - `FinalPriceBatingStrategyV1RepositoryImpl.saveAll()`이 전략 DTO를 persistence port에 저장한다.
 - `CompleteEntityAspect`가 저장 전후로 `EventSupportedEntity.complete()`와 `DomainEventDispatcher.dispatch()`를 호출한다.
@@ -149,7 +167,7 @@ meta
 - 중복 처리 키
 - 전략 버전
 
-현재 구매 서비스의 `ExternalEventListenerAdapter.toCommand()`는 `purchasePrice = 0.0`으로 `BuyingStockPurchaseCommand.OfFinalPriceBatingV1`을 만든다. 이 값은 도메인적으로 의미 있는 주문 가격이 아니며, 실제 주문 생성의 근거가 이벤트에 없다는 신호다.
+수정 전 구매 서비스의 `ExternalEventListenerAdapter.toCommand()`는 `purchasePrice = 0.0`으로 `BuyingStockPurchaseCommand.OfFinalPriceBatingV1`을 만들었다. 이 값은 도메인적으로 의미 있는 주문 가격이 아니며, 실제 주문 생성의 근거가 이벤트에 없다는 신호였다.
 
 이벤트 이름도 모호하다. `StrategySavedEvent`는 "전략이 저장되었다"는 사실 이벤트에 가깝다. 하지만 구매 서비스는 이 이벤트를 "주문을 생성하라"는 명령처럼 소비한다. 사실 이벤트와 명령이 섞이면 서비스 간 결합이 커지고 재처리 의미가 흐려진다.
 
@@ -191,7 +209,7 @@ idempotency_key
 
 `stock-purchase-service`의 주문 도메인은 `PurchaseOrder`, `SellingOrder`, `OrderState`를 갖고 있다. 그러나 상태 전이가 아직 안전하게 모델링되지 않았다.
 
-현재 위험 지점:
+수정 전 위험 지점:
 
 - `OrderState`는 enum이지만 유효 전이를 강제하지 않는다.
 - `changeOrderState()`가 있지만 실제 상태 변경이 보장되지 않는다.
@@ -287,7 +305,7 @@ ProcessStrategySavedUseCase
 - 전략 저장
 - 이벤트 발행 흐름 유발
 
-`StockTradeScheduler`도 다음을 수행한다.
+수정 전 `StockTradeScheduler`도 다음을 수행했다.
 
 - 미완료 주문 조회
 - 전략별 매도 주문 생성
@@ -326,7 +344,7 @@ SimulatePurchaseFillUseCase
 
 ### R6. AOP 기반 도메인 이벤트 생성의 의미가 불명확함
 
-현재 `CompleteEntityAspect`는 repository save/saveAll 주변에서 entity의 `complete()`를 호출하고 이벤트를 발행한다.
+수정 전 `CompleteEntityAspect`는 repository save/saveAll 주변에서 entity의 `complete()`를 호출하고 이벤트를 발행했다.
 
 이 구조의 문제:
 
@@ -358,7 +376,7 @@ AOP는 도메인 이벤트 생성보다 트랜잭션 로깅, 메트릭, auditing
 
 ### R7. coroutine/reactive와 blocking 코드 혼재
 
-프로젝트는 Kotlin suspend, WebFlux, reactive repository를 쓰려는 방향이다. 그러나 외부 API handler에는 WebClient `.block()` 호출이 존재한다.
+프로젝트는 Kotlin suspend, WebFlux, reactive repository를 쓰려는 방향이다. 수정 전 외부 API handler에는 WebClient `.block()` 호출이 직접 존재했다.
 
 위험:
 
@@ -472,7 +490,7 @@ OrderRequested
 
 ### R11. 체결 처리 모델이 부족함
 
-현재 `StockTradeScheduler.executionCheck()`는 하루 체결 목록을 조회하고 in-memory `executionQueue`로 중복을 거르려 한다. 이 방식은 프로세스 재시작에 취약하다.
+수정 전 `StockTradeScheduler.executionCheck()`는 하루 체결 목록을 조회하고 in-memory `executionQueue`로 중복을 거르려 했다. 이 방식은 프로세스 재시작에 취약하다.
 
 위험:
 
@@ -644,6 +662,8 @@ stock-purchase-service
 
 목표: 이벤트 의미와 주문 생성 입력을 명확히 한다.
 
+적용 상태: 완료. `StrategySavedEvent` 확장, 구매 서비스 command 매핑, deterministic fallback을 반영했다.
+
 작업:
 
 - `StrategySavedEvent`의 의미를 재정의한다.
@@ -659,6 +679,8 @@ stock-purchase-service
 ### Phase 2. Outbox와 idempotency 도입
 
 목표: 이벤트 누락과 중복 주문을 막는다.
+
+적용 상태: 완료. 발행 측 outbox와 소비 측 processed-event 저장소, `strategy_id` 중복 방어를 추가했다.
 
 작업:
 
@@ -677,6 +699,8 @@ stock-purchase-service
 
 목표: 주문/체결/매도 전이를 도메인에서 강제한다.
 
+적용 상태: 1차 완료. `OrderState.canTransitionTo()`, 상태 전이 테스트, `execution_fill` dedupe 저장소를 추가했다.
+
 작업:
 
 - `OrderState`를 실제 거래 lifecycle 기준으로 재정의한다.
@@ -693,6 +717,8 @@ stock-purchase-service
 
 목표: 트리거와 비즈니스 흐름을 분리한다.
 
+적용 상태: 완료. 검색/주문 scheduler는 use case 호출만 하도록 정리했다.
+
 작업:
 
 - `StockSearchScheduler.finalPriceBatingStrategy1()` 내용을 application service로 이동한다.
@@ -707,6 +733,8 @@ stock-purchase-service
 ### Phase 5. 외부 API resilience 정리
 
 목표: timeout, retry, unknown state를 제어한다.
+
+적용 상태: 1차 완료. WebClient 호출 격리, `SUBMISSION_UNKNOWN` 상태, reconciliation 진입점을 추가했다.
 
 작업:
 

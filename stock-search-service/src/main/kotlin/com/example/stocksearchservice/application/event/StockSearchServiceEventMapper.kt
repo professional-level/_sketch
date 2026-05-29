@@ -32,6 +32,12 @@ class StockSearchServiceEventMapper : EventMapper<DomainEvent, ApplicationEvent>
             stockName = event.stockName,
             type = StrategyTypeDto.from(event.type),
             savedAt = event.savedAt,
+            strategyId = event.strategyId,
+            strategyVersion = event.strategyVersion,
+            decisionPrice = event.decisionPrice,
+            targetBuyPrice = event.targetBuyPrice,
+            budget = event.budget,
+            quantityPolicy = event.quantityPolicy,
             id = event.id,
             occurredAt = event.occurredAt,
         )

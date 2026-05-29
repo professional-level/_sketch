@@ -14,8 +14,16 @@ internal class StockOrderAdapter(
     private val stockOrderRepository: StockOrderRepository,
     private val orderIdMappingRepository: OrderIdMappingRepository,
 ) : StockOrderPort {
+    override suspend fun findById(id: UUID): OrderDto? {
+        return stockOrderRepository.findById(id).awaitSuspending()?.toDTO()
+    }
+
     override suspend fun save(order: OrderDto) {
         stockOrderRepository.save(Orders.from(order))
+    }
+
+    override suspend fun existsByStrategyId(strategyId: String): Boolean {
+        return stockOrderRepository.existsByStrategyId(strategyId)
     }
 
     override suspend fun findAllWithNotCompleted(): List<OrderDto> {
@@ -30,12 +38,16 @@ internal class StockOrderAdapter(
         }
     }
 
+    override suspend fun findByStockIdAndQuantity(stockId: String, quantity: Int): OrderDto? {
+        return stockOrderRepository.findByStockIdAndQuantity(stockId, quantity)?.toDTO()
+    }
+
     override suspend fun saveExternalOrderId(internalOrderId: UUID, externalOrderId: String) {
         orderIdMappingRepository.save(internalOrderId, externalOrderId)
     }
 
     override suspend fun findByExternalOrderId(value: String): OrderDto? {
-        val orderId = orderIdMappingRepository.findOrderIdByExternalOrderId(value)
+        val orderId = orderIdMappingRepository.findOrderIdByExternalOrderId(value) ?: return null
         return stockOrderRepository.findById(orderId).awaitSuspending()?.toDTO()
     }
 }

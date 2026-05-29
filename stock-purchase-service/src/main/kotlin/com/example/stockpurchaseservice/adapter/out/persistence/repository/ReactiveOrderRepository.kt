@@ -11,6 +11,15 @@ import java.util.UUID
 @ApplicationScoped
 @Repository
 internal class StockOrderRepository : AbstractReactiveRepository<Orders, UUID>() {
+    suspend fun existsByStrategyId(strategyId: String): Boolean {
+        return sessionFactory.withSession { session ->
+            session.createQuery(
+                "SELECT COUNT(o) FROM Orders o WHERE o.strategyId = :strategyId",
+                java.lang.Long::class.java,
+            ).setParameter("strategyId", strategyId).singleResult
+        }.awaitSuspending() > 0
+    }
+
     suspend fun findAllWithNotCompleted(): List<Orders> {
         return sessionFactory.withSession { session ->
             session.createQuery(
@@ -28,18 +37,30 @@ internal class StockOrderRepository : AbstractReactiveRepository<Orders, UUID>()
             ).resultList
         }.awaitSuspending()
     }
+
+    suspend fun findByStockIdAndQuantity(stockId: String, quantity: Int): Orders? {
+        return sessionFactory.withSession { session ->
+            session.createQuery(
+                "FROM Orders o WHERE o.stockId = :stockId AND o.quantity = :quantity ORDER BY o.requestedAt DESC",
+                Orders::class.java,
+            ).setParameter("stockId", stockId)
+                .setParameter("quantity", quantity)
+                .setMaxResults(1)
+                .resultList
+        }.awaitSuspending().firstOrNull()
+    }
 }
 
 @ApplicationScoped
 @Repository
 internal class OrderIdMappingRepository : AbstractReactiveRepository<OrderIdMapping, UUID>() {
-    suspend fun findOrderIdByExternalOrderId(externalOrderId: String): UUID {
+    suspend fun findOrderIdByExternalOrderId(externalOrderId: String): UUID? {
         return sessionFactory.withSession { session ->
             session.createQuery(
                 "FROM OrderIdMapping o WHERE o.externalOrderId = :externalOrderId",
                 OrderIdMapping::class.java,
-            ).setParameter("externalOrderId", externalOrderId).singleResult
-        }.awaitSuspending().internalOrderId
+            ).setParameter("externalOrderId", externalOrderId).resultList
+        }.awaitSuspending().firstOrNull()?.internalOrderId
     }
 
     suspend fun findExternalOrderIdsByOrderId(internalOrderId: UUID): List<String> { // TODO: UUID를 바로 setParameter에 바인딩이 되나?

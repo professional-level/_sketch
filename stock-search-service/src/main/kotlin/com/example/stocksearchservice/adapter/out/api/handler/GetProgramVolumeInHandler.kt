@@ -20,7 +20,7 @@ internal class GetProgramVolumeInHandler(
             .accept(MediaType.APPLICATION_PROTOBUF)
             .retrieve()
             .toEntity(ProgramTradeVolume.ProgramStockList::class.java)
-            .block()
+            .awaitExternalApi()
         return response?.body?.itemsList?.map {
             val stockPrice = it.stckClpr.toInt()
             StockProgramVolume(

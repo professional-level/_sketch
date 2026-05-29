@@ -68,8 +68,3 @@ class StockInformationRepositoryImpl(
         stockLogPort.saveStockVolumeRankInfo(stockLogs.map { StockVolumeRankDTO.fromStockLog(it) })
     }
 }
-
-// 현재의 시간이 종가 이후의 시간임을 validating하는 로직이 필요하다.
-private fun timeValidator() {
-    TODO("Not yet implemented")
-}
