@@ -1,10 +1,10 @@
 package com.example.stocksearchservice.application.repository
 
-import com.example.stocksearchservice.application.event.StockSearchServiceEventMapper
+import com.example.common.domain.event.EventSupportedEntity
+import com.example.stocksearchservice.application.event.DomainEventDispatcher
 import com.example.stocksearchservice.application.port.out.StockStrategyPort
 import com.example.stocksearchservice.application.port.out.dto.StockStrategyDTO
 import com.example.stocksearchservice.application.port.out.dto.StrategyType
-import com.example.stocksearchservice.application.port.out.message.OutboxEventPort
 import com.example.stocksearchservice.domain.repository.FinalPriceBatingStrategyV1Repository
 import com.example.stocksearchservice.domain.strategy.FinalPriceBatingStrategyV1
 import org.springframework.stereotype.Component
@@ -13,8 +13,7 @@ import java.time.ZonedDateTime
 @Component
 class FinalPriceBatingStrategyV1RepositoryImpl(
     private val stockStrategyPort: StockStrategyPort,
-    private val outboxEventPort: OutboxEventPort,
-    private val eventMapper: StockSearchServiceEventMapper,
+    private val domainEventDispatcher: DomainEventDispatcher,
 ) : FinalPriceBatingStrategyV1Repository {
     override suspend fun save(entity: FinalPriceBatingStrategyV1, date: ZonedDateTime) {
         val stockId = entity.stock.stockId.value
@@ -22,8 +21,7 @@ class FinalPriceBatingStrategyV1RepositoryImpl(
         val dto = StockStrategyDTO(stockId = stockId, type = type, date = date)
         stockStrategyPort.save(dto)
         entity.complete()
-        outboxEventPort.saveAll(entity.events.map(eventMapper::map))
-        entity.events.clear()
+        domainEventDispatcher.dispatchAndClear(entity)
     }
 
     override suspend fun saveAll(entities: List<FinalPriceBatingStrategyV1>, date: ZonedDateTime) {
@@ -36,7 +34,16 @@ class FinalPriceBatingStrategyV1RepositoryImpl(
         }
         stockStrategyPort.saveAll(dtos)
         entities.forEach { it.complete() }
-        outboxEventPort.saveAll(entities.flatMap { it.events }.map(eventMapper::map))
+        domainEventDispatcher.dispatchAndClear(entities)
+    }
+
+    private suspend fun DomainEventDispatcher.dispatchAndClear(entity: EventSupportedEntity) {
+        dispatchAndClear(listOf(entity))
+    }
+
+    private suspend fun DomainEventDispatcher.dispatchAndClear(entities: List<EventSupportedEntity>) {
+        val events = entities.flatMap { it.events.toList() }
+        dispatch(events)
         entities.forEach { it.events.clear() }
     }
 }

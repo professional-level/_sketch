@@ -62,7 +62,7 @@
 | R3 | 주문 상태 머신 미완성 | 매우 높음 | `OrderState.canTransitionTo()`와 상태 전이 테스트 추가 |
 | R4 | Kafka 소비 idempotency 부재 | 매우 높음 | `processed_event` 저장소와 `strategy_id` 중복 주문 방어 추가 |
 | R5 | 스케줄러에 비즈니스 오케스트레이션 집중 | 높음 | scheduler는 use case 호출만 수행하도록 이동 |
-| R6 | AOP 기반 도메인 이벤트 생성 | 높음 | `CompleteEntityAspect`, `DomainEventDispatcher`, `EventPublishingRepository` 제거 |
+| R6 | AOP 기반 도메인 이벤트 생성 | 높음 | AOP 직접 발행은 제거하고 `DomainEventDispatcher`를 outbox 저장 경계로 복원 |
 | R7 | coroutine/reactive와 blocking 코드 혼재 | 높음 | WebClient blocking 호출을 timeout + bounded elastic helper로 격리 |
 | R8 | 서비스 경계 불명확 | 중간~높음 | `docs/adr/0001-trading-service-boundaries.md`로 현재 bounded context 고정 |
 | R9 | 공통 모듈 결합도 증가 위험 | 중간 | 중복 root proto 제거, integration contract 소유권을 `common/src/main/proto`로 정리 |
@@ -80,7 +80,7 @@
 - 주문 상태 전이는 enum 값 변경이 아니라 `canTransitionTo()`와 `changeOrderState()`를 통과하도록 바꿨다.
 - 체결 dedupe는 in-memory queue가 아니라 `externalExecutionId` 기준 `execution_fill` 저장소로 옮겼다.
 - scheduler는 trigger 역할만 남기고 discovery, sell order, reconciliation, simulation 흐름은 use case로 이동했다.
-- AOP 이벤트 발행은 제거했고, 도메인 이벤트는 명시적으로 outbox로 변환된다.
+- AOP 이벤트 발행은 제거했고, `DomainEventDispatcher`는 도메인 이벤트를 outbox로 넘기는 application 경계로 복원했다.
 - WebClient 동기 호출은 남아 있으나 어댑터 경계의 timeout/bounded-elastic helper로 격리했다. 장기적으로는 port 전체를 `suspend`로 통일하는 것이 다음 단계다.
 
 ## 4. 상세 분석
