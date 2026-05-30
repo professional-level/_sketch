@@ -7,8 +7,14 @@ data class InfiniteBuyConfig(
 ) {
     init {
         require(splits > 1) { "splits must be greater than 1" }
-        require(firstBuyMultiplier > 0.0) { "firstBuyMultiplier must be positive" }
+        require(firstBuyMultiplier > 1.0) { "firstBuyMultiplier must be greater than 1" }
     }
+
+    val reverseSellDivisor: Double
+        get() = splits / 2.0
+
+    val reverseSellFactor: Double
+        get() = 1.0 - 2.0 / splits
 
     companion object {
         const val DEFAULT_FIRST_BUY_MULTIPLIER: Double = 1.12

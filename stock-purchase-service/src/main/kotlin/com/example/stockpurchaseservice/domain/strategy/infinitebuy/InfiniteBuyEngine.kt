@@ -45,14 +45,24 @@ object InfiniteBuyEngine {
 
         val working = WorkingState.from(state)
 
-        fills.filter { it.side == TradeSide.SELL }.forEach { fill ->
+        val sellFills = fills.filter { it.side == TradeSide.SELL }
+        val buyFills = fills.filter { it.side == TradeSide.BUY }
+
+        sellFills.forEach { fill ->
             require(fill.tag in sellTags) { "${fill.tag} is not a sell tag" }
-            applySell(working, fill)
         }
 
-        fills.filter { it.side == TradeSide.BUY }.forEach { fill ->
+        buyFills.forEach { fill ->
             require(fill.tag in buyTags) { "${fill.tag} is not a buy tag" }
-            applyBuy(working, fill)
+        }
+
+        if (working.mode == TradeMode.REVERSE) {
+            sellFills.forEach { fill -> applyReverseSell(config, working, fill) }
+            buyFills.forEach { fill -> applyReverseBuy(config, working, fill) }
+        } else {
+            working.t = normalTAfterSells(working.t, working.shares, sellFills)
+            sellFills.forEach { fill -> applySell(working, fill) }
+            buyFills.forEach { fill -> applyNormalBuy(working, fill) }
         }
 
         if (working.shares == 0L) {
@@ -128,12 +138,13 @@ object InfiniteBuyEngine {
         }
 
         val starPrice = starPrice(config, state)
+        val starBuyPrice = starPrice - 0.01
         val oneBuyBudget = oneBuyBudget(config, state)
         val buyOrders = if (state.t < config.splits / 2.0) {
             listOfNotNull(
                 buyOrder(
                     type = TradeOrderType.LOC,
-                    price = starPrice,
+                    price = starBuyPrice,
                     budget = oneBuyBudget / 2,
                     tag = OrderTag.STAR_HALF_BUY,
                 ),
@@ -148,7 +159,7 @@ object InfiniteBuyEngine {
             listOfNotNull(
                 buyOrder(
                     type = TradeOrderType.LOC,
-                    price = starPrice,
+                    price = starBuyPrice,
                     budget = oneBuyBudget,
                     tag = OrderTag.STAR_FULL_BUY,
                 ),
@@ -199,6 +210,7 @@ object InfiniteBuyEngine {
         }
 
         val reverseStarPrice = reverseStarPrice(market)
+        val reverseBuyPrice = reverseStarPrice - 0.01
         return listOfNotNull(
             sellOrder(
                 type = TradeOrderType.LOC,
@@ -208,7 +220,7 @@ object InfiniteBuyEngine {
             ),
             buyOrder(
                 type = TradeOrderType.LOC,
-                price = reverseStarPrice,
+                price = reverseBuyPrice,
                 budget = state.cash * REVERSE_BUY_CASH_RATIO,
                 tag = OrderTag.REVERSE_BUY,
             ),
@@ -260,8 +272,54 @@ object InfiniteBuyEngine {
     }
 
     private fun reverseSellQuantity(config: InfiniteBuyConfig, shares: Long): Long {
-        val reverseSellDivisor = config.splits / 2.0
-        return floor(shares / reverseSellDivisor).toLong()
+        return floor(shares / config.reverseSellDivisor).toLong()
+    }
+
+    private fun normalTAfterSells(
+        t: Double,
+        startingShares: Long,
+        sellFills: List<ExecutedFill>,
+    ): Double {
+        if (sellFills.isEmpty()) return t
+
+        val soldShares = sellFills.sumOf { it.quantity }
+        if (soldShares >= startingShares) return 0.0
+
+        val targetSellFilled = sellFills.any { it.tag == OrderTag.TARGET_SELL }
+        val quarterSellFilled = sellFills.any { it.tag == OrderTag.QUARTER_SELL }
+
+        return cleanZero(
+            when {
+                targetSellFilled -> t * 0.25
+                quarterSellFilled -> t * 0.75
+                else -> t
+            },
+        )
+    }
+
+    private fun applyReverseSell(
+        config: InfiniteBuyConfig,
+        state: WorkingState,
+        fill: ExecutedFill,
+    ) {
+        if (fill.tag == OrderTag.REVERSE_MOC_SELL || fill.tag == OrderTag.REVERSE_LOC_SELL) {
+            state.t = cleanZero(state.t * config.reverseSellFactor)
+        }
+        applySell(state, fill)
+    }
+
+    private fun applyNormalBuy(state: WorkingState, fill: ExecutedFill) {
+        applyBuy(state, fill)
+        state.t = cleanZero(state.t + normalBuyTIncrement(fill.tag))
+    }
+
+    private fun applyReverseBuy(
+        config: InfiniteBuyConfig,
+        state: WorkingState,
+        fill: ExecutedFill,
+    ) {
+        state.t = cleanZero(state.t + (config.splits - state.t) * REVERSE_BUY_CASH_RATIO)
+        applyBuy(state, fill)
     }
 
     private fun applySell(state: WorkingState, fill: ExecutedFill) {
@@ -269,18 +327,9 @@ object InfiniteBuyEngine {
             "sell quantity ${fill.quantity} exceeds held shares ${state.shares}"
         }
 
-        val beforeShares = state.shares
-        val remainingShares = beforeShares - fill.quantity
-        val remainingRatio = if (beforeShares == 0L) {
-            0.0
-        } else {
-            remainingShares.toDouble() / beforeShares
-        }
-
         state.cash = cleanZero(state.cash + fill.price * fill.quantity)
         state.realizedPnl = cleanZero(state.realizedPnl + (fill.price - state.avgPrice) * fill.quantity)
-        state.t = cleanZero(state.t * remainingRatio)
-        state.shares = remainingShares
+        state.shares -= fill.quantity
 
         if (state.shares == 0L) {
             state.avgPrice = 0.0
@@ -301,14 +350,12 @@ object InfiniteBuyEngine {
         state.cash = cleanZero(state.cash - cost)
         state.avgPrice = cleanZero((previousPositionValue + cost) / nextShares)
         state.shares = nextShares
-        state.t = cleanZero(state.t + buyTIncrement(fill.tag))
     }
 
-    private fun buyTIncrement(tag: OrderTag): Double {
+    private fun normalBuyTIncrement(tag: OrderTag): Double {
         return when (tag) {
             OrderTag.FIRST_BUY,
-            OrderTag.STAR_FULL_BUY,
-            OrderTag.REVERSE_BUY -> 1.0
+            OrderTag.STAR_FULL_BUY -> 1.0
 
             OrderTag.STAR_HALF_BUY,
             OrderTag.AVG_HALF_BUY -> 0.5
@@ -316,7 +363,8 @@ object InfiniteBuyEngine {
             OrderTag.QUARTER_SELL,
             OrderTag.TARGET_SELL,
             OrderTag.REVERSE_MOC_SELL,
-            OrderTag.REVERSE_LOC_SELL -> 0.0
+            OrderTag.REVERSE_LOC_SELL,
+            OrderTag.REVERSE_BUY -> 0.0
         }
     }
 

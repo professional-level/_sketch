@@ -131,6 +131,34 @@ class InfiniteBuyEngineStateTransitionTest {
     }
 
     @Test
+    fun `target sell followed by half buy keeps quarter T and adds buy increment`() {
+        val config = InfiniteBuyConfig(symbol = SymbolProfile.TQQQ, splits = 20)
+        val state = InfiniteBuyState(
+            t = 4.0,
+            cash = 1_000.0,
+            shares = 100,
+            avgPrice = 100.0,
+        )
+
+        val next = InfiniteBuyEngine.applyFills(
+            config = config,
+            state = state,
+            fills = listOf(
+                ExecutedFill(TradeSide.SELL, 115.0, 75, OrderTag.TARGET_SELL),
+                ExecutedFill(TradeSide.BUY, 90.0, 10, OrderTag.STAR_HALF_BUY),
+            ),
+            closePrice = 100.0,
+        )
+
+        assertEquals(TradeMode.NORMAL, next.mode)
+        assertDouble(1.5, next.t)
+        assertDouble(8_725.0, next.cash)
+        assertEquals(35, next.shares)
+        assertDouble(97.1428571429, next.avgPrice)
+        assertDouble(1_125.0, next.realizedPnl)
+    }
+
+    @Test
     fun `normal mode enters reverse when T exceeds the last split`() {
         val config = InfiniteBuyConfig(symbol = SymbolProfile.TQQQ, splits = 20)
         val state = InfiniteBuyState(
@@ -176,7 +204,7 @@ class InfiniteBuyEngineStateTransitionTest {
         )
 
         assertEquals(TradeMode.REVERSE, next.mode)
-        assertDouble(19.0, next.t)
+        assertDouble(18.5, next.t)
         assertDouble(10_850.0, next.cash)
         assertEquals(190, next.shares)
         assertDouble(98.6842105263, next.avgPrice)

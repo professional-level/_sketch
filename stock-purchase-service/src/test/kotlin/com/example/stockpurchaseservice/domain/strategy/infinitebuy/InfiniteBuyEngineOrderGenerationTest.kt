@@ -2,9 +2,21 @@ package com.example.stockpurchaseservice.domain.strategy.infinitebuy
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 
 class InfiniteBuyEngineOrderGenerationTest {
+    @Test
+    fun `rejects first buy multiplier at or below one`() {
+        assertFailsWith<IllegalArgumentException> {
+            InfiniteBuyConfig(
+                symbol = SymbolProfile.TQQQ,
+                splits = 20,
+                firstBuyMultiplier = 1.0,
+            )
+        }
+    }
+
     @Test
     fun `calculates star percentage for supported symbols and splits`() {
         val cases = listOf(
@@ -67,7 +79,7 @@ class InfiniteBuyEngineOrderGenerationTest {
         val orders = InfiniteBuyEngine.generateOrders(config, state, market)
 
         assertEquals(4, orders.size)
-        assertOrder(orders[0], TradeSide.BUY, TradeOrderType.LOC, 109.0, 9, OrderTag.STAR_HALF_BUY)
+        assertOrder(orders[0], TradeSide.BUY, TradeOrderType.LOC, 108.99, 9, OrderTag.STAR_HALF_BUY)
         assertOrder(orders[1], TradeSide.BUY, TradeOrderType.LOC, 100.0, 10, OrderTag.AVG_HALF_BUY)
         assertOrder(orders[2], TradeSide.SELL, TradeOrderType.LOC, 109.0, 25, OrderTag.QUARTER_SELL)
         assertOrder(orders[3], TradeSide.SELL, TradeOrderType.LIMIT, 115.0, 75, OrderTag.TARGET_SELL)
@@ -87,7 +99,7 @@ class InfiniteBuyEngineOrderGenerationTest {
         val orders = InfiniteBuyEngine.generateOrders(config, state, market)
 
         assertEquals(3, orders.size)
-        assertOrder(orders[0], TradeSide.BUY, TradeOrderType.LOC, 97.0, 20, OrderTag.STAR_FULL_BUY)
+        assertOrder(orders[0], TradeSide.BUY, TradeOrderType.LOC, 96.99, 20, OrderTag.STAR_FULL_BUY)
         assertOrder(orders[1], TradeSide.SELL, TradeOrderType.LOC, 97.0, 25, OrderTag.QUARTER_SELL)
         assertOrder(orders[2], TradeSide.SELL, TradeOrderType.LIMIT, 115.0, 75, OrderTag.TARGET_SELL)
     }
@@ -146,7 +158,7 @@ class InfiniteBuyEngineOrderGenerationTest {
 
         assertEquals(2, orders.size)
         assertOrder(orders[0], TradeSide.SELL, TradeOrderType.LOC, 82.0, 18, OrderTag.REVERSE_LOC_SELL)
-        assertOrder(orders[1], TradeSide.BUY, TradeOrderType.LOC, 82.0, 30, OrderTag.REVERSE_BUY)
+        assertOrder(orders[1], TradeSide.BUY, TradeOrderType.LOC, 81.99, 30, OrderTag.REVERSE_BUY)
     }
 
     private fun assertDouble(expected: Double, actual: Double) {
