@@ -6,12 +6,14 @@ import com.example.stocksearchservice.application.port.out.message.OutboxEventDt
 import com.example.stocksearchservice.application.port.out.message.OutboxEventPort
 import com.example.stocksearchservice.domain.event.StrategyCreatedEvent
 import com.example.stocksearchservice.domain.event.StrategyType
+import com.example.stocksearchservice.domain.strategy.FinalPriceBatingStrategyV1
 import common.MessageTopic
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 import java.time.ZonedDateTime
 import java.util.UUID
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class DomainEventDispatcherTest {
 
@@ -42,6 +44,22 @@ class DomainEventDispatcherTest {
 
         assertEquals(1, outbox.savedMessages.size)
         assertEquals(MessageTopic.STRATEGY_SAVED, outbox.savedMessages.single().messageTopic)
+    }
+
+    @Test
+    fun `completeAndDispatch completes entity then clears events after outbox save`() = runBlocking {
+        val outbox = RecordingOutboxEventPort()
+        val dispatcher = DomainEventDispatcher(
+            eventMapper = StockSearchServiceEventMapper(),
+            outboxEventPort = outbox,
+        )
+        val strategy = FinalPriceBatingStrategyV1.default()
+
+        dispatcher.completeAndDispatch(strategy)
+
+        assertEquals(1, outbox.savedMessages.size)
+        assertEquals(MessageTopic.STRATEGY_SAVED, outbox.savedMessages.single().messageTopic)
+        assertTrue(strategy.events.isEmpty())
     }
 
     private class RecordingOutboxEventPort : OutboxEventPort {

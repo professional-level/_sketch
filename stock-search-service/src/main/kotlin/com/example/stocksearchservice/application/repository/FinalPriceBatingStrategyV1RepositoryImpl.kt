@@ -1,6 +1,5 @@
 package com.example.stocksearchservice.application.repository
 
-import com.example.common.domain.event.EventSupportedEntity
 import com.example.stocksearchservice.application.event.DomainEventDispatcher
 import com.example.stocksearchservice.application.port.out.StockStrategyPort
 import com.example.stocksearchservice.application.port.out.dto.StockStrategyDTO
@@ -20,8 +19,7 @@ class FinalPriceBatingStrategyV1RepositoryImpl(
         val type = StrategyType.FinalPriceBatingV1
         val dto = StockStrategyDTO(stockId = stockId, type = type, date = date)
         stockStrategyPort.save(dto)
-        entity.complete()
-        domainEventDispatcher.dispatchAndClear(entity)
+        domainEventDispatcher.completeAndDispatch(entity)
     }
 
     override suspend fun saveAll(entities: List<FinalPriceBatingStrategyV1>, date: ZonedDateTime) {
@@ -33,17 +31,6 @@ class FinalPriceBatingStrategyV1RepositoryImpl(
             )
         }
         stockStrategyPort.saveAll(dtos)
-        entities.forEach { it.complete() }
-        domainEventDispatcher.dispatchAndClear(entities)
-    }
-
-    private suspend fun DomainEventDispatcher.dispatchAndClear(entity: EventSupportedEntity) {
-        dispatchAndClear(listOf(entity))
-    }
-
-    private suspend fun DomainEventDispatcher.dispatchAndClear(entities: List<EventSupportedEntity>) {
-        val events = entities.flatMap { it.events.toList() }
-        dispatch(events)
-        entities.forEach { it.events.clear() }
+        domainEventDispatcher.completeAndDispatch(entities)
     }
 }
