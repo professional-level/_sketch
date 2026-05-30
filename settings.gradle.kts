@@ -11,3 +11,4 @@ include("grpc-proficiency:grpc-temp")
 findProject(":grpc-proficiency:grpc-temp")?.name = "grpc-temp"
 include("stock-purchase-service")
 include("stock-purchase-service")
+include("strategy-execution-service")

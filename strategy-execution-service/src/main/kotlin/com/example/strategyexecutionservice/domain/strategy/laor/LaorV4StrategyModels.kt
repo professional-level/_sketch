@@ -1,7 +1,7 @@
-package com.example.stockpurchaseservice.domain.strategy.infinitebuy
+package com.example.strategyexecutionservice.domain.strategy.laor
 
-data class InfiniteBuyConfig(
-    val symbol: SymbolProfile,
+data class LaorV4StrategyConfig(
+    val symbol: LaorV4StrategySymbol,
     val splits: Int,
     val firstBuyMultiplier: Double = DEFAULT_FIRST_BUY_MULTIPLIER,
 ) {
@@ -21,8 +21,8 @@ data class InfiniteBuyConfig(
     }
 }
 
-data class InfiniteBuyState(
-    val mode: TradeMode = TradeMode.NORMAL,
+data class LaorV4StrategyState(
+    val mode: LaorV4StrategyMode = LaorV4StrategyMode.NORMAL,
     val t: Double = 0.0,
     val cash: Double,
     val shares: Long = 0,
@@ -40,7 +40,7 @@ data class InfiniteBuyState(
     }
 }
 
-data class InfiniteBuyMarket(
+data class LaorV4StrategyMarket(
     val previousClose: Double,
     val recentClosePrices: List<Double> = emptyList(),
 ) {
@@ -50,16 +50,16 @@ data class InfiniteBuyMarket(
     }
 }
 
-data class PlannedOrder(
-    val side: TradeSide,
-    val type: TradeOrderType,
+data class LaorV4StrategyOrder(
+    val side: LaorV4StrategySide,
+    val type: LaorV4StrategyOrderType,
     val price: Double?,
     val quantity: Long,
-    val tag: OrderTag,
+    val tag: LaorV4StrategyOrderTag,
 ) {
     init {
         require(quantity > 0) { "quantity must be positive" }
-        if (type == TradeOrderType.MOC) {
+        if (type == LaorV4StrategyOrderType.MOC) {
             require(price == null || price > 0.0) { "MOC price must be null or positive" }
         } else {
             require(price != null && price > 0.0) { "$type price must be positive" }
@@ -67,11 +67,11 @@ data class PlannedOrder(
     }
 }
 
-data class ExecutedFill(
-    val side: TradeSide,
+data class LaorV4StrategyFill(
+    val side: LaorV4StrategySide,
     val price: Double,
     val quantity: Long,
-    val tag: OrderTag,
+    val tag: LaorV4StrategyOrderTag,
 ) {
     init {
         require(price > 0.0) { "price must be positive" }
@@ -79,31 +79,31 @@ data class ExecutedFill(
     }
 }
 
-enum class TradeMode {
+enum class LaorV4StrategyMode {
     NORMAL,
     REVERSE,
 }
 
-enum class TradeSide {
+enum class LaorV4StrategySide {
     BUY,
     SELL,
 }
 
-enum class TradeOrderType {
+enum class LaorV4StrategyOrderType {
     LOC,
     MOC,
     LIMIT,
 }
 
-enum class SymbolProfile(
+enum class LaorV4StrategySymbol(
     val ticker: String,
-    val gridPercent: Double,
+    val targetPercent: Double,
 ) {
     TQQQ("TQQQ", 15.0),
     SOXL("SOXL", 20.0),
 }
 
-enum class OrderTag {
+enum class LaorV4StrategyOrderTag {
     FIRST_BUY,
     STAR_HALF_BUY,
     AVG_HALF_BUY,

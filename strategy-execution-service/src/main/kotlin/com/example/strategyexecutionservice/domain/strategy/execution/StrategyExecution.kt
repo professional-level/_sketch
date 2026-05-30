@@ -1,4 +1,4 @@
-package com.example.stockpurchaseservice.domain.strategy.execution
+package com.example.strategyexecutionservice.domain.strategy.execution
 
 @JvmInline
 value class StrategyExecutionId(val value: String) {
@@ -17,8 +17,8 @@ interface TradingStrategyExecution {
 }
 
 enum class StrategyExecutionType {
-    FINAL_PRICE_BATING_V1,
-    INFINITE_BUY_V4,
+    FINAL_PRICE_BATING_V1_STRATEGY,
+    LAOR_V4_STRATEGY,
 }
 
 enum class StrategyExecutionStatus {

@@ -1,34 +1,34 @@
-package com.example.stockpurchaseservice.domain.strategy.infinitebuy
+package com.example.strategyexecutionservice.domain.strategy.laor
 
 import kotlin.math.abs
 import kotlin.math.floor
 
-object InfiniteBuyEngine {
+object LaorV4StrategyEngine {
     private const val EPSILON = 0.0000001
     private const val QUARTER_SELL_RATIO = 0.25
     private const val REVERSE_BUY_CASH_RATIO = 0.25
 
     private val buyTags = setOf(
-        OrderTag.FIRST_BUY,
-        OrderTag.STAR_HALF_BUY,
-        OrderTag.AVG_HALF_BUY,
-        OrderTag.STAR_FULL_BUY,
-        OrderTag.REVERSE_BUY,
+        LaorV4StrategyOrderTag.FIRST_BUY,
+        LaorV4StrategyOrderTag.STAR_HALF_BUY,
+        LaorV4StrategyOrderTag.AVG_HALF_BUY,
+        LaorV4StrategyOrderTag.STAR_FULL_BUY,
+        LaorV4StrategyOrderTag.REVERSE_BUY,
     )
 
     private val sellTags = setOf(
-        OrderTag.QUARTER_SELL,
-        OrderTag.TARGET_SELL,
-        OrderTag.REVERSE_MOC_SELL,
-        OrderTag.REVERSE_LOC_SELL,
+        LaorV4StrategyOrderTag.QUARTER_SELL,
+        LaorV4StrategyOrderTag.TARGET_SELL,
+        LaorV4StrategyOrderTag.REVERSE_MOC_SELL,
+        LaorV4StrategyOrderTag.REVERSE_LOC_SELL,
     )
 
     fun generateOrders(
-        config: InfiniteBuyConfig,
-        state: InfiniteBuyState,
-        market: InfiniteBuyMarket,
-    ): List<PlannedOrder> {
-        return if (state.mode == TradeMode.REVERSE || shouldEnterReverse(config, state.t)) {
+        config: LaorV4StrategyConfig,
+        state: LaorV4StrategyState,
+        market: LaorV4StrategyMarket,
+    ): List<LaorV4StrategyOrder> {
+        return if (state.mode == LaorV4StrategyMode.REVERSE || shouldEnterReverse(config, state.t)) {
             generateReverseOrders(config, state, market)
         } else {
             generateNormalOrders(config, state, market)
@@ -36,17 +36,16 @@ object InfiniteBuyEngine {
     }
 
     fun applyFills(
-        config: InfiniteBuyConfig,
-        state: InfiniteBuyState,
-        fills: List<ExecutedFill>,
+        config: LaorV4StrategyConfig,
+        state: LaorV4StrategyState,
+        fills: List<LaorV4StrategyFill>,
         closePrice: Double,
-    ): InfiniteBuyState {
+    ): LaorV4StrategyState {
         require(closePrice > 0.0) { "closePrice must be positive" }
 
         val working = WorkingState.from(state)
-
-        val sellFills = fills.filter { it.side == TradeSide.SELL }
-        val buyFills = fills.filter { it.side == TradeSide.BUY }
+        val sellFills = fills.filter { it.side == LaorV4StrategySide.SELL }
+        val buyFills = fills.filter { it.side == LaorV4StrategySide.BUY }
 
         sellFills.forEach { fill ->
             require(fill.tag in sellTags) { "${fill.tag} is not a sell tag" }
@@ -56,7 +55,7 @@ object InfiniteBuyEngine {
             require(fill.tag in buyTags) { "${fill.tag} is not a buy tag" }
         }
 
-        if (working.mode == TradeMode.REVERSE) {
+        if (working.mode == LaorV4StrategyMode.REVERSE) {
             sellFills.forEach { fill -> applyReverseSell(config, working, fill) }
             buyFills.forEach { fill -> applyReverseBuy(config, working, fill) }
         } else {
@@ -67,44 +66,44 @@ object InfiniteBuyEngine {
 
         if (working.shares == 0L) {
             return working.toState(
-                mode = TradeMode.NORMAL,
+                mode = LaorV4StrategyMode.NORMAL,
                 t = 0.0,
                 avgPrice = 0.0,
                 reverseDays = 0,
             )
         }
 
-        if (working.mode == TradeMode.REVERSE) {
+        if (working.mode == LaorV4StrategyMode.REVERSE) {
             val nextReverseDays = working.reverseDays + 1
             return if (shouldExitReverse(config, working.avgPrice, closePrice)) {
-                working.toState(mode = TradeMode.NORMAL, reverseDays = 0)
+                working.toState(mode = LaorV4StrategyMode.NORMAL, reverseDays = 0)
             } else {
                 working.toState(reverseDays = nextReverseDays)
             }
         }
 
         return if (shouldEnterReverse(config, working.t)) {
-            working.toState(mode = TradeMode.REVERSE, reverseDays = 0)
+            working.toState(mode = LaorV4StrategyMode.REVERSE, reverseDays = 0)
         } else {
             working.toState()
         }
     }
 
-    fun starPercentage(config: InfiniteBuyConfig, state: InfiniteBuyState): Double {
-        return config.symbol.gridPercent * (1 - (2 * state.t / config.splits))
+    fun starPercentage(config: LaorV4StrategyConfig, state: LaorV4StrategyState): Double {
+        return config.symbol.targetPercent * (1 - (2 * state.t / config.splits))
     }
 
-    fun starPrice(config: InfiniteBuyConfig, state: InfiniteBuyState): Double {
+    fun starPrice(config: LaorV4StrategyConfig, state: LaorV4StrategyState): Double {
         require(state.avgPrice > 0.0) { "avgPrice must be positive to calculate starPrice" }
         return state.avgPrice * (1 + starPercentage(config, state) / 100)
     }
 
-    fun targetPrice(config: InfiniteBuyConfig, state: InfiniteBuyState): Double {
+    fun targetPrice(config: LaorV4StrategyConfig, state: LaorV4StrategyState): Double {
         require(state.avgPrice > 0.0) { "avgPrice must be positive to calculate targetPrice" }
-        return state.avgPrice * (1 + config.symbol.gridPercent / 100)
+        return state.avgPrice * (1 + config.symbol.targetPercent / 100)
     }
 
-    fun oneBuyBudget(config: InfiniteBuyConfig, state: InfiniteBuyState): Double {
+    fun oneBuyBudget(config: LaorV4StrategyConfig, state: LaorV4StrategyState): Double {
         val remainingBuys = config.splits - state.t
         return if (remainingBuys <= 0.0) {
             0.0
@@ -113,7 +112,7 @@ object InfiniteBuyEngine {
         }
     }
 
-    fun reverseStarPrice(market: InfiniteBuyMarket): Double {
+    fun reverseStarPrice(market: LaorV4StrategyMarket): Double {
         require(market.recentClosePrices.size >= 5) {
             "at least 5 recentClosePrices are required for reverse star price"
         }
@@ -121,18 +120,18 @@ object InfiniteBuyEngine {
     }
 
     private fun generateNormalOrders(
-        config: InfiniteBuyConfig,
-        state: InfiniteBuyState,
-        market: InfiniteBuyMarket,
-    ): List<PlannedOrder> {
+        config: LaorV4StrategyConfig,
+        state: LaorV4StrategyState,
+        market: LaorV4StrategyMarket,
+    ): List<LaorV4StrategyOrder> {
         if (state.shares == 0L) {
             val firstBuyPrice = market.previousClose * config.firstBuyMultiplier
             return listOfNotNull(
                 buyOrder(
-                    type = TradeOrderType.LOC,
+                    type = LaorV4StrategyOrderType.LOC,
                     price = firstBuyPrice,
                     budget = state.cash / config.splits,
-                    tag = OrderTag.FIRST_BUY,
+                    tag = LaorV4StrategyOrderTag.FIRST_BUY,
                 ),
             )
         }
@@ -143,25 +142,25 @@ object InfiniteBuyEngine {
         val buyOrders = if (state.t < config.splits / 2.0) {
             listOfNotNull(
                 buyOrder(
-                    type = TradeOrderType.LOC,
+                    type = LaorV4StrategyOrderType.LOC,
                     price = starBuyPrice,
                     budget = oneBuyBudget / 2,
-                    tag = OrderTag.STAR_HALF_BUY,
+                    tag = LaorV4StrategyOrderTag.STAR_HALF_BUY,
                 ),
                 buyOrder(
-                    type = TradeOrderType.LOC,
+                    type = LaorV4StrategyOrderType.LOC,
                     price = state.avgPrice,
                     budget = oneBuyBudget / 2,
-                    tag = OrderTag.AVG_HALF_BUY,
+                    tag = LaorV4StrategyOrderTag.AVG_HALF_BUY,
                 ),
             )
         } else {
             listOfNotNull(
                 buyOrder(
-                    type = TradeOrderType.LOC,
+                    type = LaorV4StrategyOrderType.LOC,
                     price = starBuyPrice,
                     budget = oneBuyBudget,
-                    tag = OrderTag.STAR_FULL_BUY,
+                    tag = LaorV4StrategyOrderTag.STAR_FULL_BUY,
                 ),
             )
         }
@@ -170,41 +169,41 @@ object InfiniteBuyEngine {
     }
 
     private fun normalSellOrders(
-        config: InfiniteBuyConfig,
-        state: InfiniteBuyState,
+        config: LaorV4StrategyConfig,
+        state: LaorV4StrategyState,
         starPrice: Double,
-    ): List<PlannedOrder> {
+    ): List<LaorV4StrategyOrder> {
         val quarterSellQuantity = floor(state.shares * QUARTER_SELL_RATIO).toLong()
         val targetSellQuantity = state.shares - quarterSellQuantity
         return listOfNotNull(
             sellOrder(
-                type = TradeOrderType.LOC,
+                type = LaorV4StrategyOrderType.LOC,
                 price = starPrice,
                 quantity = quarterSellQuantity,
-                tag = OrderTag.QUARTER_SELL,
+                tag = LaorV4StrategyOrderTag.QUARTER_SELL,
             ),
             sellOrder(
-                type = TradeOrderType.LIMIT,
+                type = LaorV4StrategyOrderType.LIMIT,
                 price = targetPrice(config, state),
                 quantity = targetSellQuantity,
-                tag = OrderTag.TARGET_SELL,
+                tag = LaorV4StrategyOrderTag.TARGET_SELL,
             ),
         )
     }
 
     private fun generateReverseOrders(
-        config: InfiniteBuyConfig,
-        state: InfiniteBuyState,
-        market: InfiniteBuyMarket,
-    ): List<PlannedOrder> {
+        config: LaorV4StrategyConfig,
+        state: LaorV4StrategyState,
+        market: LaorV4StrategyMarket,
+    ): List<LaorV4StrategyOrder> {
         val sellQuantity = reverseSellQuantity(config, state.shares)
         if (state.reverseDays == 0) {
             return listOfNotNull(
                 sellOrder(
-                    type = TradeOrderType.MOC,
+                    type = LaorV4StrategyOrderType.MOC,
                     price = null,
                     quantity = sellQuantity,
-                    tag = OrderTag.REVERSE_MOC_SELL,
+                    tag = LaorV4StrategyOrderTag.REVERSE_MOC_SELL,
                 ),
             )
         }
@@ -213,30 +212,30 @@ object InfiniteBuyEngine {
         val reverseBuyPrice = reverseStarPrice - 0.01
         return listOfNotNull(
             sellOrder(
-                type = TradeOrderType.LOC,
+                type = LaorV4StrategyOrderType.LOC,
                 price = reverseStarPrice,
                 quantity = sellQuantity,
-                tag = OrderTag.REVERSE_LOC_SELL,
+                tag = LaorV4StrategyOrderTag.REVERSE_LOC_SELL,
             ),
             buyOrder(
-                type = TradeOrderType.LOC,
+                type = LaorV4StrategyOrderType.LOC,
                 price = reverseBuyPrice,
                 budget = state.cash * REVERSE_BUY_CASH_RATIO,
-                tag = OrderTag.REVERSE_BUY,
+                tag = LaorV4StrategyOrderTag.REVERSE_BUY,
             ),
         )
     }
 
     private fun buyOrder(
-        type: TradeOrderType,
+        type: LaorV4StrategyOrderType,
         price: Double,
         budget: Double,
-        tag: OrderTag,
-    ): PlannedOrder? {
+        tag: LaorV4StrategyOrderTag,
+    ): LaorV4StrategyOrder? {
         val quantity = quantityForBudget(budget, price)
         return if (quantity > 0) {
-            PlannedOrder(
-                side = TradeSide.BUY,
+            LaorV4StrategyOrder(
+                side = LaorV4StrategySide.BUY,
                 type = type,
                 price = price,
                 quantity = quantity,
@@ -248,14 +247,14 @@ object InfiniteBuyEngine {
     }
 
     private fun sellOrder(
-        type: TradeOrderType,
+        type: LaorV4StrategyOrderType,
         price: Double?,
         quantity: Long,
-        tag: OrderTag,
-    ): PlannedOrder? {
+        tag: LaorV4StrategyOrderTag,
+    ): LaorV4StrategyOrder? {
         return if (quantity > 0) {
-            PlannedOrder(
-                side = TradeSide.SELL,
+            LaorV4StrategyOrder(
+                side = LaorV4StrategySide.SELL,
                 type = type,
                 price = price,
                 quantity = quantity,
@@ -271,22 +270,22 @@ object InfiniteBuyEngine {
         return floor((budget + EPSILON) / price).toLong()
     }
 
-    private fun reverseSellQuantity(config: InfiniteBuyConfig, shares: Long): Long {
+    private fun reverseSellQuantity(config: LaorV4StrategyConfig, shares: Long): Long {
         return floor(shares / config.reverseSellDivisor).toLong()
     }
 
     private fun normalTAfterSells(
         t: Double,
         startingShares: Long,
-        sellFills: List<ExecutedFill>,
+        sellFills: List<LaorV4StrategyFill>,
     ): Double {
         if (sellFills.isEmpty()) return t
 
         val soldShares = sellFills.sumOf { it.quantity }
         if (soldShares >= startingShares) return 0.0
 
-        val targetSellFilled = sellFills.any { it.tag == OrderTag.TARGET_SELL }
-        val quarterSellFilled = sellFills.any { it.tag == OrderTag.QUARTER_SELL }
+        val targetSellFilled = sellFills.any { it.tag == LaorV4StrategyOrderTag.TARGET_SELL }
+        val quarterSellFilled = sellFills.any { it.tag == LaorV4StrategyOrderTag.QUARTER_SELL }
 
         return cleanZero(
             when {
@@ -298,31 +297,33 @@ object InfiniteBuyEngine {
     }
 
     private fun applyReverseSell(
-        config: InfiniteBuyConfig,
+        config: LaorV4StrategyConfig,
         state: WorkingState,
-        fill: ExecutedFill,
+        fill: LaorV4StrategyFill,
     ) {
-        if (fill.tag == OrderTag.REVERSE_MOC_SELL || fill.tag == OrderTag.REVERSE_LOC_SELL) {
+        if (fill.tag == LaorV4StrategyOrderTag.REVERSE_MOC_SELL ||
+            fill.tag == LaorV4StrategyOrderTag.REVERSE_LOC_SELL
+        ) {
             state.t = cleanZero(state.t * config.reverseSellFactor)
         }
         applySell(state, fill)
     }
 
-    private fun applyNormalBuy(state: WorkingState, fill: ExecutedFill) {
+    private fun applyNormalBuy(state: WorkingState, fill: LaorV4StrategyFill) {
         applyBuy(state, fill)
         state.t = cleanZero(state.t + normalBuyTIncrement(fill.tag))
     }
 
     private fun applyReverseBuy(
-        config: InfiniteBuyConfig,
+        config: LaorV4StrategyConfig,
         state: WorkingState,
-        fill: ExecutedFill,
+        fill: LaorV4StrategyFill,
     ) {
         state.t = cleanZero(state.t + (config.splits - state.t) * REVERSE_BUY_CASH_RATIO)
         applyBuy(state, fill)
     }
 
-    private fun applySell(state: WorkingState, fill: ExecutedFill) {
+    private fun applySell(state: WorkingState, fill: LaorV4StrategyFill) {
         require(fill.quantity <= state.shares) {
             "sell quantity ${fill.quantity} exceeds held shares ${state.shares}"
         }
@@ -334,12 +335,12 @@ object InfiniteBuyEngine {
         if (state.shares == 0L) {
             state.avgPrice = 0.0
             state.t = 0.0
-            state.mode = TradeMode.NORMAL
+            state.mode = LaorV4StrategyMode.NORMAL
             state.reverseDays = 0
         }
     }
 
-    private fun applyBuy(state: WorkingState, fill: ExecutedFill) {
+    private fun applyBuy(state: WorkingState, fill: LaorV4StrategyFill) {
         val cost = fill.price * fill.quantity
         require(cost <= state.cash + EPSILON) {
             "buy cost $cost exceeds cash ${state.cash}"
@@ -352,32 +353,32 @@ object InfiniteBuyEngine {
         state.shares = nextShares
     }
 
-    private fun normalBuyTIncrement(tag: OrderTag): Double {
+    private fun normalBuyTIncrement(tag: LaorV4StrategyOrderTag): Double {
         return when (tag) {
-            OrderTag.FIRST_BUY,
-            OrderTag.STAR_FULL_BUY -> 1.0
+            LaorV4StrategyOrderTag.FIRST_BUY,
+            LaorV4StrategyOrderTag.STAR_FULL_BUY -> 1.0
 
-            OrderTag.STAR_HALF_BUY,
-            OrderTag.AVG_HALF_BUY -> 0.5
+            LaorV4StrategyOrderTag.STAR_HALF_BUY,
+            LaorV4StrategyOrderTag.AVG_HALF_BUY -> 0.5
 
-            OrderTag.QUARTER_SELL,
-            OrderTag.TARGET_SELL,
-            OrderTag.REVERSE_MOC_SELL,
-            OrderTag.REVERSE_LOC_SELL,
-            OrderTag.REVERSE_BUY -> 0.0
+            LaorV4StrategyOrderTag.QUARTER_SELL,
+            LaorV4StrategyOrderTag.TARGET_SELL,
+            LaorV4StrategyOrderTag.REVERSE_MOC_SELL,
+            LaorV4StrategyOrderTag.REVERSE_LOC_SELL,
+            LaorV4StrategyOrderTag.REVERSE_BUY -> 0.0
         }
     }
 
-    private fun shouldEnterReverse(config: InfiniteBuyConfig, t: Double): Boolean {
+    private fun shouldEnterReverse(config: LaorV4StrategyConfig, t: Double): Boolean {
         return t > config.splits - 1
     }
 
     private fun shouldExitReverse(
-        config: InfiniteBuyConfig,
+        config: LaorV4StrategyConfig,
         avgPrice: Double,
         closePrice: Double,
     ): Boolean {
-        val reverseExitPrice = avgPrice * (1 - config.symbol.gridPercent / 100)
+        val reverseExitPrice = avgPrice * (1 - config.symbol.targetPercent / 100)
         return closePrice > reverseExitPrice
     }
 
@@ -386,7 +387,7 @@ object InfiniteBuyEngine {
     }
 
     private class WorkingState(
-        var mode: TradeMode,
+        var mode: LaorV4StrategyMode,
         var t: Double,
         var cash: Double,
         var shares: Long,
@@ -395,15 +396,15 @@ object InfiniteBuyEngine {
         var reverseDays: Int,
     ) {
         fun toState(
-            mode: TradeMode = this.mode,
+            mode: LaorV4StrategyMode = this.mode,
             t: Double = this.t,
             cash: Double = this.cash,
             shares: Long = this.shares,
             avgPrice: Double = this.avgPrice,
             realizedPnl: Double = this.realizedPnl,
             reverseDays: Int = this.reverseDays,
-        ): InfiniteBuyState {
-            return InfiniteBuyState(
+        ): LaorV4StrategyState {
+            return LaorV4StrategyState(
                 mode = mode,
                 t = t,
                 cash = cash,
@@ -415,7 +416,7 @@ object InfiniteBuyEngine {
         }
 
         companion object {
-            fun from(state: InfiniteBuyState): WorkingState {
+            fun from(state: LaorV4StrategyState): WorkingState {
                 return WorkingState(
                     mode = state.mode,
                     t = state.t,
