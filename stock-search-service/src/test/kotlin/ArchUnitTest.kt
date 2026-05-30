@@ -52,12 +52,15 @@ class ArchUnitTest {
     }
 
     @Test
-    fun `schedulers should call use cases only`() {
+    fun `scheduler adapters should call use cases only`() {
         val rule = noClasses()
-            .that().resideInAnyPackage("..application.scheduler..")
+            .that().resideInAnyPackage("..adapter..in..scheduler..")
             .should().accessClassesThat().resideInAnyPackage(
                 "..domain..",
-                "..adapter..",
+                "..adapter..out..",
+                "..adapter..in..event..",
+                "..adapter..in..temporal..",
+                "..adapter..in..web..",
                 "..application.service..",
                 "..application.repository..",
             )
