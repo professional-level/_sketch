@@ -57,6 +57,8 @@ class FinalPriceBatingStrategyV1 private constructor(
     override val events: MutableList<DomainEvent> = mutableListOf()
 
     override fun complete() {
+        if (events.any { it is StrategyCreatedEvent }) return
+
         events.add(
             StrategyCreatedEvent(
                 stockId = this.stock.stockId.value,
