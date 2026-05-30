@@ -6,7 +6,7 @@ import kotlin.math.floor
 object LaorV4StrategyEngine {
     private const val EPSILON = 0.0000001
     private const val QUARTER_SELL_RATIO = 0.25
-    private const val REVERSE_BUY_CASH_RATIO = 0.25
+    private const val REVERSE_BUY_AVAILABLE_CASH_RATIO = 0.25
 
     private val buyTags = setOf(
         LaorV4StrategyOrderTag.FIRST_BUY,
@@ -28,7 +28,7 @@ object LaorV4StrategyEngine {
         state: LaorV4StrategyState,
         market: LaorV4StrategyMarket,
     ): List<LaorV4StrategyOrder> {
-        return if (state.mode == LaorV4StrategyMode.REVERSE || shouldEnterReverse(config, state.t)) {
+        return if (state.mode == LaorV4StrategyMode.REVERSE || shouldEnterReverse(config, state.progressRound)) {
             generateReverseOrders(config, state, market)
         } else {
             generateNormalOrders(config, state, market)
@@ -59,60 +59,68 @@ object LaorV4StrategyEngine {
             sellFills.forEach { fill -> applyReverseSell(config, working, fill) }
             buyFills.forEach { fill -> applyReverseBuy(config, working, fill) }
         } else {
-            working.t = normalTAfterSells(working.t, working.shares, sellFills)
+            working.progressRound = normalProgressRoundAfterSells(
+                progressRound = working.progressRound,
+                startingHoldingQuantity = working.holdingQuantity,
+                sellFills = sellFills,
+            )
             sellFills.forEach { fill -> applySell(working, fill) }
             buyFills.forEach { fill -> applyNormalBuy(working, fill) }
         }
 
-        if (working.shares == 0L) {
+        if (working.holdingQuantity == 0L) {
             return working.toState(
                 mode = LaorV4StrategyMode.NORMAL,
-                t = 0.0,
-                avgPrice = 0.0,
-                reverseDays = 0,
+                progressRound = 0.0,
+                averagePurchasePrice = 0.0,
+                reverseModeElapsedDays = 0,
             )
         }
 
         if (working.mode == LaorV4StrategyMode.REVERSE) {
-            val nextReverseDays = working.reverseDays + 1
-            return if (shouldExitReverse(config, working.avgPrice, closePrice)) {
-                working.toState(mode = LaorV4StrategyMode.NORMAL, reverseDays = 0)
+            val nextReverseModeElapsedDays = working.reverseModeElapsedDays + 1
+            return if (shouldExitReverse(config, working.averagePurchasePrice, closePrice)) {
+                working.toState(mode = LaorV4StrategyMode.NORMAL, reverseModeElapsedDays = 0)
             } else {
-                working.toState(reverseDays = nextReverseDays)
+                working.toState(reverseModeElapsedDays = nextReverseModeElapsedDays)
             }
         }
 
-        return if (shouldEnterReverse(config, working.t)) {
-            working.toState(mode = LaorV4StrategyMode.REVERSE, reverseDays = 0)
+        return if (shouldEnterReverse(config, working.progressRound)) {
+            working.toState(mode = LaorV4StrategyMode.REVERSE, reverseModeElapsedDays = 0)
         } else {
             working.toState()
         }
     }
 
-    fun starPercentage(config: LaorV4StrategyConfig, state: LaorV4StrategyState): Double {
-        return config.symbol.targetPercent * (1 - (2 * state.t / config.splits))
+    fun normalModeStarProfitPercent(config: LaorV4StrategyConfig, state: LaorV4StrategyState): Double {
+        return config.symbol.targetProfitPercent * (1 - (2 * state.progressRound / config.totalSplitCount))
     }
 
-    fun starPrice(config: LaorV4StrategyConfig, state: LaorV4StrategyState): Double {
-        require(state.avgPrice > 0.0) { "avgPrice must be positive to calculate starPrice" }
-        return state.avgPrice * (1 + starPercentage(config, state) / 100)
+    fun normalModeStarPrice(config: LaorV4StrategyConfig, state: LaorV4StrategyState): Double {
+        require(state.averagePurchasePrice > 0.0) {
+            "averagePurchasePrice must be positive to calculate normalModeStarPrice"
+        }
+        return state.averagePurchasePrice * (1 + normalModeStarProfitPercent(config, state) / 100)
     }
 
-    fun targetPrice(config: LaorV4StrategyConfig, state: LaorV4StrategyState): Double {
-        require(state.avgPrice > 0.0) { "avgPrice must be positive to calculate targetPrice" }
-        return state.avgPrice * (1 + config.symbol.targetPercent / 100)
+    fun targetSellPrice(config: LaorV4StrategyConfig, state: LaorV4StrategyState): Double {
+        require(state.averagePurchasePrice > 0.0) {
+            "averagePurchasePrice must be positive to calculate targetSellPrice"
+        }
+        return state.averagePurchasePrice * (1 + config.symbol.targetProfitPercent / 100)
     }
 
-    fun oneBuyBudget(config: LaorV4StrategyConfig, state: LaorV4StrategyState): Double {
-        val remainingBuys = config.splits - state.t
-        return if (remainingBuys <= 0.0) {
+    fun singleBuyBudget(config: LaorV4StrategyConfig, state: LaorV4StrategyState): Double {
+        val remainingBuyRoundCount = config.totalSplitCount - state.progressRound
+        return if (remainingBuyRoundCount <= 0.0) {
             0.0
         } else {
-            state.cash / remainingBuys
+            state.availableCash / remainingBuyRoundCount
         }
     }
 
-    fun reverseStarPrice(market: LaorV4StrategyMarket): Double {
+    fun reverseModeStarPrice(market: LaorV4StrategyMarket): Double {
         require(market.recentClosePrices.size >= 5) {
             "at least 5 recentClosePrices are required for reverse star price"
         }
@@ -124,33 +132,33 @@ object LaorV4StrategyEngine {
         state: LaorV4StrategyState,
         market: LaorV4StrategyMarket,
     ): List<LaorV4StrategyOrder> {
-        if (state.shares == 0L) {
-            val firstBuyPrice = market.previousClose * config.firstBuyMultiplier
+        if (state.holdingQuantity == 0L) {
+            val firstBuyLimitPrice = market.previousClose * config.firstBuyLimitMultiplier
             return listOfNotNull(
                 buyOrder(
                     type = LaorV4StrategyOrderType.LOC,
-                    price = firstBuyPrice,
-                    budget = state.cash / config.splits,
+                    price = firstBuyLimitPrice,
+                    budget = state.availableCash / config.totalSplitCount,
                     tag = LaorV4StrategyOrderTag.FIRST_BUY,
                 ),
             )
         }
 
-        val starPrice = starPrice(config, state)
+        val starPrice = normalModeStarPrice(config, state)
         val starBuyPrice = starPrice - 0.01
-        val oneBuyBudget = oneBuyBudget(config, state)
-        val buyOrders = if (state.t < config.splits / 2.0) {
+        val singleBuyBudget = singleBuyBudget(config, state)
+        val buyOrders = if (state.progressRound < config.totalSplitCount / 2.0) {
             listOfNotNull(
                 buyOrder(
                     type = LaorV4StrategyOrderType.LOC,
                     price = starBuyPrice,
-                    budget = oneBuyBudget / 2,
+                    budget = singleBuyBudget / 2,
                     tag = LaorV4StrategyOrderTag.STAR_HALF_BUY,
                 ),
                 buyOrder(
                     type = LaorV4StrategyOrderType.LOC,
-                    price = state.avgPrice,
-                    budget = oneBuyBudget / 2,
+                    price = state.averagePurchasePrice,
+                    budget = singleBuyBudget / 2,
                     tag = LaorV4StrategyOrderTag.AVG_HALF_BUY,
                 ),
             )
@@ -159,7 +167,7 @@ object LaorV4StrategyEngine {
                 buyOrder(
                     type = LaorV4StrategyOrderType.LOC,
                     price = starBuyPrice,
-                    budget = oneBuyBudget,
+                    budget = singleBuyBudget,
                     tag = LaorV4StrategyOrderTag.STAR_FULL_BUY,
                 ),
             )
@@ -173,8 +181,8 @@ object LaorV4StrategyEngine {
         state: LaorV4StrategyState,
         starPrice: Double,
     ): List<LaorV4StrategyOrder> {
-        val quarterSellQuantity = floor(state.shares * QUARTER_SELL_RATIO).toLong()
-        val targetSellQuantity = state.shares - quarterSellQuantity
+        val quarterSellQuantity = floor(state.holdingQuantity * QUARTER_SELL_RATIO).toLong()
+        val targetSellQuantity = state.holdingQuantity - quarterSellQuantity
         return listOfNotNull(
             sellOrder(
                 type = LaorV4StrategyOrderType.LOC,
@@ -184,7 +192,7 @@ object LaorV4StrategyEngine {
             ),
             sellOrder(
                 type = LaorV4StrategyOrderType.LIMIT,
-                price = targetPrice(config, state),
+                price = targetSellPrice(config, state),
                 quantity = targetSellQuantity,
                 tag = LaorV4StrategyOrderTag.TARGET_SELL,
             ),
@@ -196,8 +204,8 @@ object LaorV4StrategyEngine {
         state: LaorV4StrategyState,
         market: LaorV4StrategyMarket,
     ): List<LaorV4StrategyOrder> {
-        val sellQuantity = reverseSellQuantity(config, state.shares)
-        if (state.reverseDays == 0) {
+        val sellQuantity = reverseSellQuantity(config, state.holdingQuantity)
+        if (state.reverseModeElapsedDays == 0) {
             return listOfNotNull(
                 sellOrder(
                     type = LaorV4StrategyOrderType.MOC,
@@ -208,19 +216,19 @@ object LaorV4StrategyEngine {
             )
         }
 
-        val reverseStarPrice = reverseStarPrice(market)
-        val reverseBuyPrice = reverseStarPrice - 0.01
+        val reverseModeStarPrice = reverseModeStarPrice(market)
+        val reverseBuyPrice = reverseModeStarPrice - 0.01
         return listOfNotNull(
             sellOrder(
                 type = LaorV4StrategyOrderType.LOC,
-                price = reverseStarPrice,
+                price = reverseModeStarPrice,
                 quantity = sellQuantity,
                 tag = LaorV4StrategyOrderTag.REVERSE_LOC_SELL,
             ),
             buyOrder(
                 type = LaorV4StrategyOrderType.LOC,
                 price = reverseBuyPrice,
-                budget = state.cash * REVERSE_BUY_CASH_RATIO,
+                budget = state.availableCash * REVERSE_BUY_AVAILABLE_CASH_RATIO,
                 tag = LaorV4StrategyOrderTag.REVERSE_BUY,
             ),
         )
@@ -270,28 +278,28 @@ object LaorV4StrategyEngine {
         return floor((budget + EPSILON) / price).toLong()
     }
 
-    private fun reverseSellQuantity(config: LaorV4StrategyConfig, shares: Long): Long {
-        return floor(shares / config.reverseSellDivisor).toLong()
+    private fun reverseSellQuantity(config: LaorV4StrategyConfig, holdingQuantity: Long): Long {
+        return floor(holdingQuantity / config.reverseSellDivisionCount).toLong()
     }
 
-    private fun normalTAfterSells(
-        t: Double,
-        startingShares: Long,
+    private fun normalProgressRoundAfterSells(
+        progressRound: Double,
+        startingHoldingQuantity: Long,
         sellFills: List<LaorV4StrategyFill>,
     ): Double {
-        if (sellFills.isEmpty()) return t
+        if (sellFills.isEmpty()) return progressRound
 
-        val soldShares = sellFills.sumOf { it.quantity }
-        if (soldShares >= startingShares) return 0.0
+        val soldQuantity = sellFills.sumOf { it.quantity }
+        if (soldQuantity >= startingHoldingQuantity) return 0.0
 
         val targetSellFilled = sellFills.any { it.tag == LaorV4StrategyOrderTag.TARGET_SELL }
         val quarterSellFilled = sellFills.any { it.tag == LaorV4StrategyOrderTag.QUARTER_SELL }
 
         return cleanZero(
             when {
-                targetSellFilled -> t * 0.25
-                quarterSellFilled -> t * 0.75
-                else -> t
+                targetSellFilled -> progressRound * 0.25
+                quarterSellFilled -> progressRound * 0.75
+                else -> progressRound
             },
         )
     }
@@ -304,14 +312,14 @@ object LaorV4StrategyEngine {
         if (fill.tag == LaorV4StrategyOrderTag.REVERSE_MOC_SELL ||
             fill.tag == LaorV4StrategyOrderTag.REVERSE_LOC_SELL
         ) {
-            state.t = cleanZero(state.t * config.reverseSellFactor)
+            state.progressRound = cleanZero(state.progressRound * config.reverseSellFactor)
         }
         applySell(state, fill)
     }
 
     private fun applyNormalBuy(state: WorkingState, fill: LaorV4StrategyFill) {
         applyBuy(state, fill)
-        state.t = cleanZero(state.t + normalBuyTIncrement(fill.tag))
+        state.progressRound = cleanZero(state.progressRound + normalBuyProgressRoundIncrement(fill.tag))
     }
 
     private fun applyReverseBuy(
@@ -319,41 +327,46 @@ object LaorV4StrategyEngine {
         state: WorkingState,
         fill: LaorV4StrategyFill,
     ) {
-        state.t = cleanZero(state.t + (config.splits - state.t) * REVERSE_BUY_CASH_RATIO)
+        state.progressRound = cleanZero(
+            state.progressRound +
+                (config.totalSplitCount - state.progressRound) * REVERSE_BUY_AVAILABLE_CASH_RATIO,
+        )
         applyBuy(state, fill)
     }
 
     private fun applySell(state: WorkingState, fill: LaorV4StrategyFill) {
-        require(fill.quantity <= state.shares) {
-            "sell quantity ${fill.quantity} exceeds held shares ${state.shares}"
+        require(fill.quantity <= state.holdingQuantity) {
+            "sell quantity ${fill.quantity} exceeds holdingQuantity ${state.holdingQuantity}"
         }
 
-        state.cash = cleanZero(state.cash + fill.price * fill.quantity)
-        state.realizedPnl = cleanZero(state.realizedPnl + (fill.price - state.avgPrice) * fill.quantity)
-        state.shares -= fill.quantity
+        state.availableCash = cleanZero(state.availableCash + fill.price * fill.quantity)
+        state.realizedProfitLoss = cleanZero(
+            state.realizedProfitLoss + (fill.price - state.averagePurchasePrice) * fill.quantity,
+        )
+        state.holdingQuantity -= fill.quantity
 
-        if (state.shares == 0L) {
-            state.avgPrice = 0.0
-            state.t = 0.0
+        if (state.holdingQuantity == 0L) {
+            state.averagePurchasePrice = 0.0
+            state.progressRound = 0.0
             state.mode = LaorV4StrategyMode.NORMAL
-            state.reverseDays = 0
+            state.reverseModeElapsedDays = 0
         }
     }
 
     private fun applyBuy(state: WorkingState, fill: LaorV4StrategyFill) {
         val cost = fill.price * fill.quantity
-        require(cost <= state.cash + EPSILON) {
-            "buy cost $cost exceeds cash ${state.cash}"
+        require(cost <= state.availableCash + EPSILON) {
+            "buy cost $cost exceeds availableCash ${state.availableCash}"
         }
 
-        val previousPositionValue = state.avgPrice * state.shares
-        val nextShares = state.shares + fill.quantity
-        state.cash = cleanZero(state.cash - cost)
-        state.avgPrice = cleanZero((previousPositionValue + cost) / nextShares)
-        state.shares = nextShares
+        val previousPositionValue = state.averagePurchasePrice * state.holdingQuantity
+        val nextHoldingQuantity = state.holdingQuantity + fill.quantity
+        state.availableCash = cleanZero(state.availableCash - cost)
+        state.averagePurchasePrice = cleanZero((previousPositionValue + cost) / nextHoldingQuantity)
+        state.holdingQuantity = nextHoldingQuantity
     }
 
-    private fun normalBuyTIncrement(tag: LaorV4StrategyOrderTag): Double {
+    private fun normalBuyProgressRoundIncrement(tag: LaorV4StrategyOrderTag): Double {
         return when (tag) {
             LaorV4StrategyOrderTag.FIRST_BUY,
             LaorV4StrategyOrderTag.STAR_FULL_BUY -> 1.0
@@ -369,16 +382,16 @@ object LaorV4StrategyEngine {
         }
     }
 
-    private fun shouldEnterReverse(config: LaorV4StrategyConfig, t: Double): Boolean {
-        return t > config.splits - 1
+    private fun shouldEnterReverse(config: LaorV4StrategyConfig, progressRound: Double): Boolean {
+        return progressRound > config.totalSplitCount - 1
     }
 
     private fun shouldExitReverse(
         config: LaorV4StrategyConfig,
-        avgPrice: Double,
+        averagePurchasePrice: Double,
         closePrice: Double,
     ): Boolean {
-        val reverseExitPrice = avgPrice * (1 - config.symbol.targetPercent / 100)
+        val reverseExitPrice = averagePurchasePrice * (1 - config.symbol.targetProfitPercent / 100)
         return closePrice > reverseExitPrice
     }
 
@@ -388,30 +401,30 @@ object LaorV4StrategyEngine {
 
     private class WorkingState(
         var mode: LaorV4StrategyMode,
-        var t: Double,
-        var cash: Double,
-        var shares: Long,
-        var avgPrice: Double,
-        var realizedPnl: Double,
-        var reverseDays: Int,
+        var progressRound: Double,
+        var availableCash: Double,
+        var holdingQuantity: Long,
+        var averagePurchasePrice: Double,
+        var realizedProfitLoss: Double,
+        var reverseModeElapsedDays: Int,
     ) {
         fun toState(
             mode: LaorV4StrategyMode = this.mode,
-            t: Double = this.t,
-            cash: Double = this.cash,
-            shares: Long = this.shares,
-            avgPrice: Double = this.avgPrice,
-            realizedPnl: Double = this.realizedPnl,
-            reverseDays: Int = this.reverseDays,
+            progressRound: Double = this.progressRound,
+            availableCash: Double = this.availableCash,
+            holdingQuantity: Long = this.holdingQuantity,
+            averagePurchasePrice: Double = this.averagePurchasePrice,
+            realizedProfitLoss: Double = this.realizedProfitLoss,
+            reverseModeElapsedDays: Int = this.reverseModeElapsedDays,
         ): LaorV4StrategyState {
             return LaorV4StrategyState(
                 mode = mode,
-                t = t,
-                cash = cash,
-                shares = shares,
-                avgPrice = avgPrice,
-                realizedPnl = realizedPnl,
-                reverseDays = reverseDays,
+                progressRound = progressRound,
+                availableCash = availableCash,
+                holdingQuantity = holdingQuantity,
+                averagePurchasePrice = averagePurchasePrice,
+                realizedProfitLoss = realizedProfitLoss,
+                reverseModeElapsedDays = reverseModeElapsedDays,
             )
         }
 
@@ -419,12 +432,12 @@ object LaorV4StrategyEngine {
             fun from(state: LaorV4StrategyState): WorkingState {
                 return WorkingState(
                     mode = state.mode,
-                    t = state.t,
-                    cash = state.cash,
-                    shares = state.shares,
-                    avgPrice = state.avgPrice,
-                    realizedPnl = state.realizedPnl,
-                    reverseDays = state.reverseDays,
+                    progressRound = state.progressRound,
+                    availableCash = state.availableCash,
+                    holdingQuantity = state.holdingQuantity,
+                    averagePurchasePrice = state.averagePurchasePrice,
+                    realizedProfitLoss = state.realizedProfitLoss,
+                    reverseModeElapsedDays = state.reverseModeElapsedDays,
                 )
             }
         }

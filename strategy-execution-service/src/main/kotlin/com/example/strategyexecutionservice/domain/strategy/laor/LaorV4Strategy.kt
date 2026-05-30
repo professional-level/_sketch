@@ -56,8 +56,8 @@ data class LaorV4Strategy(
     }
 
     private fun LaorV4StrategyState.forOrderGeneration(config: LaorV4StrategyConfig): LaorV4StrategyState {
-        return if (mode == LaorV4StrategyMode.NORMAL && t > config.splits - 1) {
-            copy(mode = LaorV4StrategyMode.REVERSE, reverseDays = 0)
+        return if (mode == LaorV4StrategyMode.NORMAL && progressRound > config.totalSplitCount - 1) {
+            copy(mode = LaorV4StrategyMode.REVERSE, reverseModeElapsedDays = 0)
         } else {
             this
         }

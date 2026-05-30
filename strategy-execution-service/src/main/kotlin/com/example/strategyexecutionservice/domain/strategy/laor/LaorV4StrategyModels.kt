@@ -2,41 +2,43 @@ package com.example.strategyexecutionservice.domain.strategy.laor
 
 data class LaorV4StrategyConfig(
     val symbol: LaorV4StrategySymbol,
-    val splits: Int,
-    val firstBuyMultiplier: Double = DEFAULT_FIRST_BUY_MULTIPLIER,
+    val totalSplitCount: Int,
+    val firstBuyLimitMultiplier: Double = DEFAULT_FIRST_BUY_LIMIT_MULTIPLIER,
 ) {
     init {
-        require(splits > 1) { "splits must be greater than 1" }
-        require(firstBuyMultiplier > 1.0) { "firstBuyMultiplier must be greater than 1" }
+        require(totalSplitCount > 1) { "totalSplitCount must be greater than 1" }
+        require(firstBuyLimitMultiplier > 1.0) { "firstBuyLimitMultiplier must be greater than 1" }
     }
 
-    val reverseSellDivisor: Double
-        get() = splits / 2.0
+    val reverseSellDivisionCount: Double
+        get() = totalSplitCount / 2.0
 
     val reverseSellFactor: Double
-        get() = 1.0 - 2.0 / splits
+        get() = 1.0 - 2.0 / totalSplitCount
 
     companion object {
-        const val DEFAULT_FIRST_BUY_MULTIPLIER: Double = 1.12
+        const val DEFAULT_FIRST_BUY_LIMIT_MULTIPLIER: Double = 1.12
     }
 }
 
 data class LaorV4StrategyState(
     val mode: LaorV4StrategyMode = LaorV4StrategyMode.NORMAL,
-    val t: Double = 0.0,
-    val cash: Double,
-    val shares: Long = 0,
-    val avgPrice: Double = 0.0,
-    val realizedPnl: Double = 0.0,
-    val reverseDays: Int = 0,
+    val progressRound: Double = 0.0,
+    val availableCash: Double,
+    val holdingQuantity: Long = 0,
+    val averagePurchasePrice: Double = 0.0,
+    val realizedProfitLoss: Double = 0.0,
+    val reverseModeElapsedDays: Int = 0,
 ) {
     init {
-        require(t >= 0.0) { "t must not be negative" }
-        require(cash >= 0.0) { "cash must not be negative" }
-        require(shares >= 0) { "shares must not be negative" }
-        require(avgPrice >= 0.0) { "avgPrice must not be negative" }
-        require(shares == 0L || avgPrice > 0.0) { "avgPrice must be positive when shares are held" }
-        require(reverseDays >= 0) { "reverseDays must not be negative" }
+        require(progressRound >= 0.0) { "progressRound must not be negative" }
+        require(availableCash >= 0.0) { "availableCash must not be negative" }
+        require(holdingQuantity >= 0) { "holdingQuantity must not be negative" }
+        require(averagePurchasePrice >= 0.0) { "averagePurchasePrice must not be negative" }
+        require(holdingQuantity == 0L || averagePurchasePrice > 0.0) {
+            "averagePurchasePrice must be positive when holdings exist"
+        }
+        require(reverseModeElapsedDays >= 0) { "reverseModeElapsedDays must not be negative" }
     }
 }
 
@@ -97,7 +99,7 @@ enum class LaorV4StrategyOrderType {
 
 enum class LaorV4StrategySymbol(
     val ticker: String,
-    val targetPercent: Double,
+    val targetProfitPercent: Double,
 ) {
     TQQQ("TQQQ", 15.0),
     SOXL("SOXL", 20.0),
