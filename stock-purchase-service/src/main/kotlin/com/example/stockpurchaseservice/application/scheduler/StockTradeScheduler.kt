@@ -12,6 +12,7 @@ internal class StockTradeScheduler(
     private val reconcileExecutionsUseCase: ReconcileExecutionsUseCase,
     private val simulateStockPurchaseUseCase: SimulateStockPurchaseUseCase,
 ) {
+    // TODO: Check market holidays/trading calendar before running trade jobs.
     @Scheduled(cron = "0 */1 * ? * MON-FRI") // TODO: 판매 전략에 따라 스케쥴 시간 변경필요
     suspend fun sellOrderByStrategies() {
         createSellOrdersByStrategyUseCase.execute()

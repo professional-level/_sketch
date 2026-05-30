@@ -14,6 +14,7 @@ internal class StrategyDiscoveryScheduler(
     private val requestStrategyDiscoveryRunUseCase: RequestStrategyDiscoveryRunUseCase,
 ) {
 
+    // TODO: Check market holidays/trading calendar before requesting discovery runs.
     @Retryable(
         value = [Exception::class],
         maxAttempts = 5,

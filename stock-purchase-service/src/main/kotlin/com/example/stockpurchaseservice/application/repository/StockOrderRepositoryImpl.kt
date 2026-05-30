@@ -109,6 +109,7 @@ data class OrderDto(
     fun toOrder(): Order {
         val domainOrderState = orderState.toDomain()
         val domainStrategyType = strategyType.toDomain()
+        // TODO: Revisit undefined price/date mapping once broker fill payload becomes authoritative.
         val domainPurchasePrice = purchasePrice?.let { Money(it) } ?: Money.undefined()
 
         return if (sellingPrice != null || domainOrderState.name.startsWith("SELLING")) {

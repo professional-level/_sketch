@@ -32,6 +32,7 @@ class CreateSellOrdersByStrategyService(
 ) : CreateSellOrdersByStrategyUseCase {
 
     override suspend fun execute() {
+        // TODO: Revisit strategy priority and same-symbol conflicts before enabling multiple active strategies.
         val sellingOrderList = stockOrderRepository.findAllNotCompleted().mapNotNull(::makeSellOrderByStrategy)
         sellingOrderList.forEach { order ->
             submitSellOrder(order)
@@ -58,6 +59,7 @@ class ReconcileExecutionsService(
 ) : ReconcileExecutionsUseCase {
 
     override suspend fun execute() {
+        // TODO: Add durable cursor/recovery handling; saveIfNew only deduplicates observed fills.
         val executedStockList: List<ExecutedStock> = marketService.findExecutionListAtOneDay().map { it.toDomain() }
         val refinedExecutedStockList = executedStockList.filter { execution ->
             executionFillPort.saveIfNew(ExecutionFillDto.from(ExecutionFill.from(execution)))
@@ -68,8 +70,10 @@ class ReconcileExecutionsService(
         selled.forEach {
             // Selling reconciliation is modeled here so the scheduler no longer owns the branch.
             // A later order-state redesign can apply external execution ids to the aggregate.
+            // TODO: Mark selling completion from aggregated fill events instead of assuming one fill closes the order.
         }
         purchased.forEach { item ->
+            // TODO: Unmatched broker executions should emit an event/log; normal fills should map to a known order.
             stockOrderRepository.findByExternalOrderId(item.externalOrderId)?.let { purchasedOrder ->
                 purchasedOrder.changeOrderState(OrderState.PURCHASE_COMPLETED)
                 stockOrderRepository.save(purchasedOrder)
@@ -77,6 +81,7 @@ class ReconcileExecutionsService(
                 makeSellOrderByStrategy(purchasedOrder)?.let { sellingOrder ->
                     stockOrderRepository.save(sellingOrder)
                     runCatching {
+                        // TODO: Publish submission lifecycle events once direct broker calls are split from orchestration.
                         marketService.sellStock(sellingOrder.toDto(quantity = item.quantity))
                         sellingOrder.changeOrderState(OrderState.SELLING_IN_PROCESS)
                     }.onFailure {

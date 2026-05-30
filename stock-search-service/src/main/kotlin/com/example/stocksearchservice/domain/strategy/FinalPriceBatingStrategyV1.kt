@@ -56,6 +56,7 @@ class FinalPriceBatingStrategyV1 private constructor(
 
     override val events: MutableList<DomainEvent> = mutableListOf()
 
+    // TODO: Consider registering StrategyCreatedEvent at construction time if creation itself is the event.
     override fun complete() {
         if (events.any { it is StrategyCreatedEvent }) return
 

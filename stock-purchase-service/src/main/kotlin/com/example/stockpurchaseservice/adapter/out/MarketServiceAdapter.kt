@@ -20,10 +20,12 @@ internal class MarketServiceAdapter(
     private val getExecutedStockListHandler: GetExecutedStockListHandler,
 ) : MarketServicePort {
     override fun buyStock(order: PurchaseOrderDto) {
+        // TODO: Return and persist broker order id instead of discarding it at the adapter boundary.
         buyStockHandler.execute(order)
     }
 
     override fun sellStock(order: SellingOrderDto) {
+        // TODO: Wire the real sell API response and broker order id once the broker contract is defined.
         sellStockHandler.execute(order)
     }
 
@@ -37,6 +39,7 @@ internal class SellStockHandler(
     private val stockApiClient: WebClient,
 ) {
     fun execute(order: SellingOrderDto) {
+        // TODO: Return broker order/execution identifiers so domain orders can be reconciled precisely.
         // 매도 API 계약은 아직 스케치 단계다. 호출 경계는 별도 handler에 고정해 두고,
         // 실제 broker 계약이 생기면 이 메서드만 교체한다.
     }

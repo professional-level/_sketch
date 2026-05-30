@@ -35,6 +35,7 @@ class DomainEventDispatcher(
         if (events.isEmpty()) return
 
         val messages: List<EventMessage<ApplicationEvent>> = events.map(eventMapper::map)
+        // TODO: Decide failure-event/retry handling for outbox persistence failures.
         outboxEventPort.saveAll(messages)
     }
 }

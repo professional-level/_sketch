@@ -14,6 +14,7 @@ class FinalPriceBatingStockAnalyzer {
     }
     
     private fun isValidStock(stock: Stock): Boolean {
+        // TODO: Verify these strategy thresholds and move them into named strategy configuration.
         return stock.stockDerivative.value >= 0 && 
                stock.stockVolume.value >= 30000
     }
