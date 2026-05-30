@@ -66,6 +66,7 @@ data class LaorV4Strategy(
     private fun LaorV4StrategyOrder.toOrderIntent(executionId: StrategyExecutionId): OrderIntent {
         return OrderIntent(
             executionId = executionId,
+            symbol = config.symbol.ticker,
             side = side.toOrderSide(),
             type = type.toOrderType(),
             price = price,

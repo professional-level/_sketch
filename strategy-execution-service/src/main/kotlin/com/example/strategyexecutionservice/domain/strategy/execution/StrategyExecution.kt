@@ -43,6 +43,7 @@ data class StrategyOrderPlan(
 
 data class OrderIntent(
     val executionId: StrategyExecutionId,
+    val symbol: String,
     val side: OrderSide,
     val type: OrderType,
     val price: Double?,
@@ -50,6 +51,7 @@ data class OrderIntent(
     val tag: String,
 ) {
     init {
+        require(symbol.isNotBlank()) { "symbol must not be blank" }
         require(quantity > 0) { "quantity must be positive" }
         require(tag.isNotBlank()) { "tag must not be blank" }
         if (type == OrderType.MOC) {

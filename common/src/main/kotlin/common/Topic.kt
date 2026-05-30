@@ -6,6 +6,7 @@ object Topic {
     const val TOPIC1 = "topic1"
     const val TOPIC2 = "topic2"
     const val STRATEGY_SAVED = "strategy-saved"
+    const val ORDER_INTENT_CREATED = "order-intent-created"
     const val INVALID_EVENT = "invalid-event"
     const val PURCHASE_SUCCESS = "purchase-success"
 }
@@ -14,6 +15,7 @@ enum class MessageTopic(val topicName: String) {
     TOPIC1(Topic.TOPIC1),
     TOPIC2(Topic.TOPIC2),
     STRATEGY_SAVED(Topic.STRATEGY_SAVED),
+    ORDER_INTENT_CREATED(Topic.ORDER_INTENT_CREATED),
     INVALID_EVENT(Topic.INVALID_EVENT),
     PURCHASE_SUCCESS(Topic.PURCHASE_SUCCESS),
     ;

@@ -24,7 +24,41 @@ message EventMeta{
   // 애플리케이션과 proto message를 동시에 아우를 수 있는 방법이 있을까
 }
 
+message OrderIntentCreatedEvent{
+  string event_id = 1;
+  string strategy_execution_id = 2;
+  StrategyExecutionType strategy_type = 3;
+  string symbol = 4;
+  OrderIntentSide side = 5;
+  OrderIntentOrderType order_type = 6;
+  double price = 7;
+  int64 quantity = 8;
+  string order_tag = 9;
+  string idempotency_key = 10;
+  google.protobuf.Timestamp created_at = 11;
+  EventMeta meta = 12;
+}
+
 enum StrategyType{
   UNDEFINED = 0;
   FINAL_PRICE_BATING_V1 = 1;
+}
+
+enum StrategyExecutionType{
+  STRATEGY_EXECUTION_TYPE_UNDEFINED = 0;
+  LAOR_V4_STRATEGY = 1;
+  FINAL_PRICE_BATING_V1_STRATEGY = 2;
+}
+
+enum OrderIntentSide{
+  ORDER_INTENT_SIDE_UNDEFINED = 0;
+  ORDER_INTENT_BUY = 1;
+  ORDER_INTENT_SELL = 2;
+}
+
+enum OrderIntentOrderType{
+  ORDER_INTENT_ORDER_TYPE_UNDEFINED = 0;
+  ORDER_INTENT_LOC = 1;
+  ORDER_INTENT_MOC = 2;
+  ORDER_INTENT_LIMIT = 3;
 }

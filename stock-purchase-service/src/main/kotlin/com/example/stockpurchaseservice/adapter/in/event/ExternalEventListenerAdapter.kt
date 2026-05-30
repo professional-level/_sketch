@@ -3,33 +3,43 @@ package com.example.stockpurchaseservice.adapter.`in`.event
 import Event
 import com.example.common.ExternalApiAdapter
 import com.example.stockpurchaseservice.application.port.`in`.BuyingStockPurchaseUseCase
+import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
+import com.example.stockpurchaseservice.application.port.`in`.OrderIntentType
+import com.example.stockpurchaseservice.application.port.`in`.SubmitOrderIntentCommand
+import com.example.stockpurchaseservice.application.port.`in`.SubmitOrderIntentUseCase
 import com.example.stockpurchaseservice.application.service.BuyingStockPurchaseCommand
 import com.example.stockpurchaseservice.application.service.StockId
 import com.example.stockpurchaseservice.application.service.StrategyType
 import common.ConsumerGroupId.PURCHASE_SERVICE
+import common.Topic.ORDER_INTENT_CREATED
 import common.Topic.STRATEGY_SAVED
 import common.proto.ProtoUtils.toZonedDateTime
-import org.springframework.kafka.annotation.KafkaListener
 import java.nio.charset.StandardCharsets
 import java.util.UUID
+import org.springframework.kafka.annotation.KafkaListener
 
-@ExternalApiAdapter // TODO: 정확한 annotation 매칭
+@ExternalApiAdapter // TODO: verify whether a dedicated inbound event adapter stereotype is needed.
 internal class ExternalEventListenerAdapter(
-    private val buyingStockPurchaseUseCase: BuyingStockPurchaseUseCase, // TODO: ServiceMapper class 필요
+    private val buyingStockPurchaseUseCase: BuyingStockPurchaseUseCase, // TODO: extract event-to-command mapper if this listener keeps growing.
+    private val submitOrderIntentUseCase: SubmitOrderIntentUseCase,
 ) {
-    @KafkaListener(topics = [STRATEGY_SAVED], groupId = PURCHASE_SERVICE) // TODO: topic enum으로 관리하며 common으로 이동 필요
+    @KafkaListener(topics = [STRATEGY_SAVED], groupId = PURCHASE_SERVICE)
     suspend fun createdStrategies(message: ByteArray) {
-        // TODO: event store 개념으로 event를 consume을 정상적으로 했다는 의미의 application event를 발행?!
-        // 구현
+        // TODO: publish or persist an application event that records successful event consumption.
         val event = Event.StrategySavedEvent.parseFrom(message)
         buyingStockPurchaseUseCase.execute(event.toCommand())
     }
+
+    @KafkaListener(topics = [ORDER_INTENT_CREATED], groupId = PURCHASE_SERVICE)
+    suspend fun orderIntents(message: ByteArray) {
+        val event = Event.OrderIntentCreatedEvent.parseFrom(message)
+        submitOrderIntentUseCase.execute(event.toCommand())
+    }
 }
 
-// 확장함수
 fun Event.StrategyType.convert(): StrategyType {
     return when (this) {
-        Event.StrategyType.UNDEFINED -> StrategyType.Undefined // TODO: UNRECOGNIZED 사용하도록 변경 필요
+        Event.StrategyType.UNDEFINED -> StrategyType.Undefined // TODO: decide explicit UNRECOGNIZED handling.
         Event.StrategyType.FINAL_PRICE_BATING_V1 -> StrategyType.FinalPriceBatingV1
         Event.StrategyType.UNRECOGNIZED -> StrategyType.Undefined
     }
@@ -60,7 +70,45 @@ fun Event.StrategySavedEvent.toCommand(): BuyingStockPurchaseCommand {
             quantityPolicy = event.quantityPolicy,
         )
 
-        else -> throw IllegalArgumentException("지원하지 않는 전략 타입입니다: $strategyType")
+        else -> throw IllegalArgumentException("unsupported strategy type: $strategyType")
+    }
+}
+
+fun Event.OrderIntentCreatedEvent.toCommand(): SubmitOrderIntentCommand {
+    val event = this
+    val eventId = event.eventId.toUuidOrDeterministic {
+        "${event.strategyExecutionId}:${event.orderTag}:${event.createdAt.seconds}:${event.createdAt.nanos}"
+    }
+    return SubmitOrderIntentCommand(
+        eventId = eventId,
+        idempotencyKey = event.idempotencyKey.ifBlank { eventId.toString() },
+        strategyExecutionId = event.strategyExecutionId,
+        symbol = event.symbol,
+        side = event.side.convert(),
+        orderType = event.orderType.convert(),
+        price = event.price.takeIf { it > 0.0 },
+        quantity = event.quantity,
+        orderTag = event.orderTag,
+        createdAt = event.createdAt.toZonedDateTime(),
+    )
+}
+
+private fun Event.OrderIntentSide.convert(): OrderIntentSide {
+    return when (this) {
+        Event.OrderIntentSide.ORDER_INTENT_BUY -> OrderIntentSide.BUY
+        Event.OrderIntentSide.ORDER_INTENT_SELL -> OrderIntentSide.SELL
+        Event.OrderIntentSide.ORDER_INTENT_SIDE_UNDEFINED,
+        Event.OrderIntentSide.UNRECOGNIZED -> throw IllegalArgumentException("unsupported order intent side: $this")
+    }
+}
+
+private fun Event.OrderIntentOrderType.convert(): OrderIntentType {
+    return when (this) {
+        Event.OrderIntentOrderType.ORDER_INTENT_LOC -> OrderIntentType.LOC
+        Event.OrderIntentOrderType.ORDER_INTENT_MOC -> OrderIntentType.MOC
+        Event.OrderIntentOrderType.ORDER_INTENT_LIMIT -> OrderIntentType.LIMIT
+        Event.OrderIntentOrderType.ORDER_INTENT_ORDER_TYPE_UNDEFINED,
+        Event.OrderIntentOrderType.UNRECOGNIZED -> throw IllegalArgumentException("unsupported order intent type: $this")
     }
 }
 

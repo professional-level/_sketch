@@ -69,6 +69,7 @@ adapter/out/kafka               # Kafka publishers
 - Kotlin style: 4-space indentation, PascalCase classes, lowerCamelCase functions/variables, UPPER_SNAKE_CASE constants.
 - Keep package names lowercase.
 - Prefer small, focused changes. Do not fix unrelated TODOs or unfinished sketch code unless the task requires it.
+- Do not remove TODOs or explanatory comments unless the underlying issue is actually resolved. If surrounding code changes, preserve unresolved comments by moving or rewording them so the remaining concern is still visible.
 - Prefer coroutine/reactive APIs in WebFlux paths; avoid introducing blocking calls in new code.
 - Keep protobuf definitions in `common/src/main/proto` or the owning module’s `src/main/proto`.
 - Put tests under `<module>/src/test/kotlin`; test file names should end with `Test.kt`.

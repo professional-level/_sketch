@@ -26,6 +26,7 @@ class LaorV4StrategyTest {
         assertEquals(1, plan.orders.size)
         with(plan.orders.single()) {
             assertEquals(StrategyExecutionId("laor-v4-strategy:TQQQ"), executionId)
+            assertEquals("TQQQ", symbol)
             assertEquals(OrderSide.BUY, side)
             assertEquals(OrderType.LOC, type)
             assertDouble(112.0, price ?: error("price is null"))
