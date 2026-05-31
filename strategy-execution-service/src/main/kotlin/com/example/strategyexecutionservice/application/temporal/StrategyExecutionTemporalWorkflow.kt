@@ -7,10 +7,16 @@ import io.temporal.workflow.WorkflowInterface
 import io.temporal.workflow.WorkflowMethod
 import java.time.Duration
 
+const val RUN_ACTIVE_STRATEGY_EXECUTIONS_WORKFLOW_TYPE = "RunActiveStrategyExecutions"
 const val RUN_LAOR_V4_STRATEGY_WORKFLOW_TYPE = "RunLaorV4Strategy"
 
 @WorkflowInterface
 interface StrategyExecutionTemporalWorkflow {
+    @WorkflowMethod(name = RUN_ACTIVE_STRATEGY_EXECUTIONS_WORKFLOW_TYPE)
+    fun runActiveStrategyExecutions(
+        input: RunActiveStrategyExecutionsWorkflowInput,
+    ): RunActiveStrategyExecutionsWorkflowResult
+
     @WorkflowMethod(name = RUN_LAOR_V4_STRATEGY_WORKFLOW_TYPE)
     fun runLaorV4Strategy(input: RunLaorV4StrategyWorkflowInput): RunLaorV4StrategyWorkflowResult
 }
@@ -29,6 +35,12 @@ class StrategyExecutionTemporalWorkflowImpl : StrategyExecutionTemporalWorkflow 
             )
             .build(),
     )
+
+    override fun runActiveStrategyExecutions(
+        input: RunActiveStrategyExecutionsWorkflowInput,
+    ): RunActiveStrategyExecutionsWorkflowResult {
+        return activities.runActiveStrategyExecutions(input)
+    }
 
     override fun runLaorV4Strategy(input: RunLaorV4StrategyWorkflowInput): RunLaorV4StrategyWorkflowResult {
         return activities.runLaorV4Strategy(input)

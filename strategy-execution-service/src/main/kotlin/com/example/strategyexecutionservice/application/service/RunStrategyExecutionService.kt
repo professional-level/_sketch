@@ -43,6 +43,7 @@ class RunStrategyExecutionService(
             executionId = command.executionId,
             executionRunId = command.executionRunId,
             createdOrderIntentCount = plan.orders.size,
+            plannedState = (plan.execution as? LaorV4Strategy)?.state?.toApplication(),
         )
     }
 
@@ -67,6 +68,18 @@ class RunStrategyExecutionService(
 
     private fun LaorV4State.toDomain(): LaorV4StrategyState {
         return LaorV4StrategyState(
+            mode = mode,
+            progressRound = progressRound,
+            availableCash = availableCash,
+            holdingQuantity = holdingQuantity,
+            averagePurchasePrice = averagePurchasePrice,
+            realizedProfitLoss = realizedProfitLoss,
+            reverseModeElapsedDays = reverseModeElapsedDays,
+        )
+    }
+
+    private fun LaorV4StrategyState.toApplication(): LaorV4State {
+        return LaorV4State(
             mode = mode,
             progressRound = progressRound,
             availableCash = availableCash,

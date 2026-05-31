@@ -1,9 +1,13 @@
 package com.example.strategyexecutionservice.adapter.`in`.temporal
 
+import com.example.strategyexecutionservice.application.port.`in`.RunActiveStrategyExecutionsCommand
+import com.example.strategyexecutionservice.application.port.`in`.RunActiveStrategyExecutionsResult
+import com.example.strategyexecutionservice.application.port.`in`.RunActiveStrategyExecutionsUseCase
 import com.example.strategyexecutionservice.application.port.`in`.RunStrategyExecutionCommand
 import com.example.strategyexecutionservice.application.port.`in`.RunStrategyExecutionResult
 import com.example.strategyexecutionservice.application.port.`in`.RunStrategyExecutionUseCase
 import com.example.strategyexecutionservice.application.temporal.LaorV4StrategyWorkflowState
+import com.example.strategyexecutionservice.application.temporal.RunActiveStrategyExecutionsWorkflowInput
 import com.example.strategyexecutionservice.application.temporal.RunLaorV4StrategyWorkflowInput
 import com.example.strategyexecutionservice.application.temporal.StrategyMarketWorkflowSnapshot
 import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategyMode
@@ -15,8 +19,9 @@ class StrategyExecutionTemporalActivitiesAdapterTest {
 
     @Test
     fun `runs laor strategy use case from temporal activity input`() {
+        val activeUseCase = FakeRunActiveStrategyExecutionsUseCase()
         val useCase = FakeRunStrategyExecutionUseCase()
-        val adapter = StrategyExecutionTemporalActivitiesAdapter(useCase)
+        val adapter = StrategyExecutionTemporalActivitiesAdapter(activeUseCase, useCase)
 
         val result = adapter.runLaorV4Strategy(
             RunLaorV4StrategyWorkflowInput(
@@ -60,6 +65,46 @@ class StrategyExecutionTemporalActivitiesAdapterTest {
         assertEquals(0, command.state.reverseModeElapsedDays)
         assertEquals(100.0, command.market.previousClose)
         assertEquals(listOf(99.0, 98.0, 97.0, 96.0, 95.0), command.market.recentClosePrices)
+    }
+
+    @Test
+    fun `runs active strategy executions use case from temporal activity input`() {
+        val activeUseCase = FakeRunActiveStrategyExecutionsUseCase()
+        val useCase = FakeRunStrategyExecutionUseCase()
+        val adapter = StrategyExecutionTemporalActivitiesAdapter(activeUseCase, useCase)
+
+        val result = adapter.runActiveStrategyExecutions(
+            RunActiveStrategyExecutionsWorkflowInput(
+                executionRunId = "2026-05-31",
+                requestedAt = "2026-05-31T09:00:00+09:00",
+            ),
+        )
+
+        assertEquals("2026-05-31", result.executionRunId)
+        assertEquals(2, result.activeStrategyCount)
+        assertEquals(2, result.executedStrategyCount)
+        assertEquals(4, result.createdOrderIntentCount)
+
+        with(activeUseCase.commands.single()) {
+            assertEquals("2026-05-31", executionRunId)
+            assertEquals("2026-05-31T09:00+09:00", requestedAt.toString())
+        }
+    }
+
+    private class FakeRunActiveStrategyExecutionsUseCase : RunActiveStrategyExecutionsUseCase {
+        val commands: MutableList<RunActiveStrategyExecutionsCommand> = mutableListOf()
+
+        override suspend fun execute(
+            command: RunActiveStrategyExecutionsCommand,
+        ): RunActiveStrategyExecutionsResult {
+            commands += command
+            return RunActiveStrategyExecutionsResult(
+                executionRunId = command.executionRunId,
+                activeStrategyCount = 2,
+                executedStrategyCount = 2,
+                createdOrderIntentCount = 4,
+            )
+        }
     }
 
     private class FakeRunStrategyExecutionUseCase : RunStrategyExecutionUseCase {

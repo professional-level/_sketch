@@ -43,4 +43,5 @@ data class RunStrategyExecutionResult(
     val executionId: String,
     val executionRunId: String,
     val createdOrderIntentCount: Int,
+    val plannedState: LaorV4State? = null,
 )

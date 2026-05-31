@@ -7,7 +7,24 @@ import io.temporal.activity.ActivityMethod
 interface StrategyExecutionTemporalActivities {
     @ActivityMethod
     fun runLaorV4Strategy(input: RunLaorV4StrategyWorkflowInput): RunLaorV4StrategyWorkflowResult
+
+    @ActivityMethod
+    fun runActiveStrategyExecutions(
+        input: RunActiveStrategyExecutionsWorkflowInput,
+    ): RunActiveStrategyExecutionsWorkflowResult
 }
+
+data class RunActiveStrategyExecutionsWorkflowInput(
+    val executionRunId: String = "",
+    val requestedAt: String = "",
+)
+
+data class RunActiveStrategyExecutionsWorkflowResult(
+    val executionRunId: String = "",
+    val activeStrategyCount: Int = 0,
+    val executedStrategyCount: Int = 0,
+    val createdOrderIntentCount: Int = 0,
+)
 
 data class RunLaorV4StrategyWorkflowInput(
     val executionId: String = "",
