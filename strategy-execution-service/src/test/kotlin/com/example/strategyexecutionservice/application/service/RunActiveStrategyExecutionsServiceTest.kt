@@ -85,6 +85,10 @@ class RunActiveStrategyExecutionsServiceTest {
     ) : StrategyExecutionStatePort {
         val saved: MutableList<LaorV4ExecutionState> = mutableListOf()
 
+        override suspend fun findLaorV4Strategy(executionId: String): LaorV4ExecutionState? {
+            return activeStates.firstOrNull { it.executionId == executionId }
+        }
+
         override suspend fun findActiveLaorV4Strategies(): List<LaorV4ExecutionState> {
             return activeStates
         }

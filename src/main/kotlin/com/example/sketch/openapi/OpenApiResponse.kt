@@ -23,3 +23,16 @@ data class GetDailyExecutionOrdersRequest(
     val ctxAreaFk100: String = "",
     val ctxAreaNk100: String = "",
 )
+
+data class OverseasDailyPriceResponse(
+    val symbol: String,
+    val exchange: String,
+    val previousClose: Double,
+    val recentClosePrices: List<Double>,
+    val candles: List<OverseasDailyPriceCandle>,
+)
+
+data class OverseasDailyPriceCandle(
+    val date: String,
+    val close: Double,
+)

@@ -6,6 +6,7 @@ import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategyS
 import java.time.ZonedDateTime
 
 interface StrategyExecutionStatePort {
+    suspend fun findLaorV4Strategy(executionId: String): LaorV4ExecutionState?
     suspend fun findActiveLaorV4Strategies(): List<LaorV4ExecutionState>
     suspend fun saveLaorV4Strategy(state: LaorV4ExecutionState)
 }

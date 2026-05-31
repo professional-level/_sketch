@@ -6,9 +6,14 @@ import com.example.sketch.configure.Property.Companion.APP_SECRET
 import com.example.sketch.configure.Property.Companion.MOCK_APP_KEY
 import com.example.sketch.configure.Property.Companion.MOCK_APP_SECRET
 import com.example.sketch.configure.QueryParameter
+import com.example.sketch.configure.QueryParameter.BYMD
 import com.example.sketch.configure.QueryParameter.CANO
+import com.example.sketch.configure.QueryParameter.EXCD
 import com.example.sketch.configure.QueryParameter.FID_INPUT_DATE_1
 import com.example.sketch.configure.QueryParameter.FID_INPUT_ISCD
+import com.example.sketch.configure.QueryParameter.GUBN
+import com.example.sketch.configure.QueryParameter.MODP
+import com.example.sketch.configure.QueryParameter.SYMB
 import com.example.sketch.configure.RequestType
 import com.example.sketch.configure.requestInfo
 import com.example.sketch.openapi.HeaderBuilder.Companion.addHeader
@@ -217,6 +222,52 @@ class OpenApiService(
             QueryParameter.forType(info, mapOf(FID_INPUT_ISCD to stockId /* 종목코드(ex) 005930(삼성전자))*/))
         val response = executeHttpRequest(info, headers, queryParameters)
         return response
+    }
+
+    suspend fun getOverseasDailyPrice(
+        symbol: String,
+        exchange: String,
+        count: Int,
+    ): OverseasDailyPriceResponse {
+        require(symbol.isNotBlank()) { "symbol must not be blank" }
+        require(exchange.isNotBlank()) { "exchange must not be blank" }
+        require(count > 0) { "count must be positive" }
+
+        val token = getToken()
+        val info = RequestType.GET_OVERSEAS_DAILY_PRICE
+        val headers = build(token = token, trId = "HHDFS76240000").build()
+        val queryParameters = QueryParameter.forType(
+            info,
+            mapOf(
+                EXCD to exchange.uppercase(),
+                SYMB to symbol.uppercase(),
+                GUBN to "0",
+                BYMD to "",
+                MODP to "1",
+            ),
+        )
+
+        val response = executeHttpRequest(info, headers, queryParameters)
+        val candles = response.path("output2")
+            .mapNotNull { node ->
+                node.path("clos").asText().toDoubleOrNull()?.let { close ->
+                    OverseasDailyPriceCandle(
+                        date = node.path("xymd").asText(),
+                        close = close,
+                    )
+                }
+            }
+        val previousClose = response.path("output1").path("nrec").asText().toDoubleOrNull()
+            ?: candles.firstOrNull()?.close
+            ?: throw IllegalStateException("overseas daily price response has no close prices")
+
+        return OverseasDailyPriceResponse(
+            symbol = symbol.uppercase(),
+            exchange = exchange.uppercase(),
+            previousClose = previousClose,
+            recentClosePrices = candles.take(count).map { it.close },
+            candles = candles.take(count),
+        )
     }
 
     suspend fun postStockOrder(request: StockOrderRequest): OpenApiResponse {

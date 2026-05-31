@@ -8,6 +8,7 @@ import com.example.common.endpoint.Endpoint.GET_CURRENT_PRICE
 import com.example.common.endpoint.Endpoint.GET_CURRENT_PRICE_OF_INVESTMENT
 import com.example.common.endpoint.Endpoint.GET_EXECUTION_ORDERS
 import com.example.common.endpoint.Endpoint.GET_FOREIGNER_TRADE_TREND
+import com.example.common.endpoint.Endpoint.GET_OVERSEAS_DAILY_PRICE
 import com.example.common.endpoint.Endpoint.GET_PROGRAM_TRADE_INFO_PER_INDIVIDUAL
 import com.example.common.endpoint.Endpoint.GET_PROGRAM_TRADE_INFO_PER_INDIVIDUAL_AT_ONE_DAY
 import com.example.common.endpoint.Endpoint.GET_QUOTATIONS_OF_VOLUME_RANK
@@ -26,6 +27,7 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import output
 import programStockList
@@ -124,6 +126,19 @@ class OpenApiController(
          한국투자 HTS(eFriend Plus) > [0433] 종목별 외국계 순매수추이 화면의 기능을 API로 개발한 사항으로, 해당 화면을 참고하시면 기능을 이해하기 쉽습니다.
          **/
         return service.getForeignerTradeTrend(stockId)
+    }
+
+    @GetMapping(GET_OVERSEAS_DAILY_PRICE)
+    suspend fun getOverseasDailyPrice(
+        @PathVariable("symbol") symbol: String,
+        @RequestParam(defaultValue = "NAS") exchange: String,
+        @RequestParam(defaultValue = "5") count: Int,
+    ): OverseasDailyPriceResponse {
+        return service.getOverseasDailyPrice(
+            symbol = symbol,
+            exchange = exchange,
+            count = count,
+        )
     }
 
     @PostMapping(POST_STOCK_ORDER)

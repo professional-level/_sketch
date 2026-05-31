@@ -9,6 +9,10 @@ import java.util.concurrent.ConcurrentHashMap
 internal class InMemoryStrategyExecutionStateAdapter : StrategyExecutionStatePort {
     private val laorV4States: MutableMap<String, LaorV4ExecutionState> = ConcurrentHashMap()
 
+    override suspend fun findLaorV4Strategy(executionId: String): LaorV4ExecutionState? {
+        return laorV4States[executionId]
+    }
+
     override suspend fun findActiveLaorV4Strategies(): List<LaorV4ExecutionState> {
         return laorV4States.values.toList()
     }

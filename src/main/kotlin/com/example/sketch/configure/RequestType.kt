@@ -40,6 +40,10 @@ enum class RequestType(
         requestURI = "/uapi/domestic-stock/v1/quotations/frgnmem-pchs-trend",
         type = HttpMethod.GET,
     ),
+    GET_OVERSEAS_DAILY_PRICE(
+        requestURI = "/uapi/overseas-price/v1/quotations/dailyprice",
+        type = HttpMethod.GET,
+    ),
     POST_STOCK_ORDER(
         requestURI = "/uapi/domestic-stock/v1/trading/order-cash", // 주식주문(현금) URI
         type = HttpMethod.POST,
@@ -95,6 +99,13 @@ enum class QueryParameter(
     INQR_DVSN_1(emptyQueryParam),
     CTX_AREA_FK100(emptyQueryParam),
     CTX_AREA_NK100(emptyQueryParam),
+
+    AUTH(""),
+    EXCD(emptyQueryParam),
+    SYMB(emptyQueryParam),
+    GUBN("0"),
+    BYMD(""),
+    MODP("1"),
     ;
 
     companion object {
@@ -154,6 +165,12 @@ enum class QueryParameter(
                         FID_INPUT_ISCD,
                         FID_INPUT_ISCD_2,
                     )
+                }
+
+                RequestType.GET_OVERSEAS_DAILY_PRICE -> {
+                    requireNotNull(additionalInfo[EXCD])
+                    requireNotNull(additionalInfo[SYMB])
+                    listOf(AUTH, EXCD, SYMB, GUBN, BYMD, MODP)
                 }
 
                 RequestType.POST_STOCK_ORDER -> emptyList()
