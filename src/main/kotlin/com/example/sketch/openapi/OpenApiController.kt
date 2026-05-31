@@ -12,6 +12,7 @@ import com.example.common.endpoint.Endpoint.GET_OVERSEAS_DAILY_PRICE
 import com.example.common.endpoint.Endpoint.GET_PROGRAM_TRADE_INFO_PER_INDIVIDUAL
 import com.example.common.endpoint.Endpoint.GET_PROGRAM_TRADE_INFO_PER_INDIVIDUAL_AT_ONE_DAY
 import com.example.common.endpoint.Endpoint.GET_QUOTATIONS_OF_VOLUME_RANK
+import com.example.common.endpoint.Endpoint.POST_OVERSEAS_STOCK_ORDER
 import com.example.common.endpoint.Endpoint.POST_STOCK_ORDER
 import com.example.common.endpoint.Endpoint.REQUEST_TOKEN
 import com.example.sketch.utils.OpenApiResponse
@@ -145,7 +146,7 @@ class OpenApiController(
     suspend fun postStockOrder(
         @RequestBody request: StockOrderRequest,
         response: ServerHttpResponse,
-    ) {
+    ): ApiResponse.StockOrder {
         /**
          국내주식주문(현금) API 입니다.
          TTC0802U(현금매수) 사용하셔서 미수매수 가능합니다. 단, 거래하시는 계좌가 증거금40%계좌로 신청이 되어있어야 가능합니다.
@@ -156,12 +157,25 @@ class OpenApiController(
          (EX. "CANO" : "12345678", "ACNT_PRDT_CD": "01",...)
          종목코드 마스터파일 파이썬 정제코드는 한국투자증권 Github 참고 부탁드립니다.
          **/
-        service.postStockOrder(request = request).toPostStockOrderResponse().apply {
+        return service.postStockOrder(request = request).toPostStockOrderResponse().apply {
             response.statusCode = when (rtCd == "0") {
                 true -> HttpStatus.OK
                 false -> HttpStatus.INTERNAL_SERVER_ERROR
             }
         }
+    }
+
+    @PostMapping(POST_OVERSEAS_STOCK_ORDER)
+    suspend fun postOverseasStockOrder(
+        @RequestBody request: OverseasStockOrderRequest,
+        response: ServerHttpResponse,
+    ): ApiResponse.StockOrder {
+        val result = service.postOverseasStockOrder(request).toPostStockOrderResponse()
+        response.statusCode = when (result.rtCd == "0") {
+            true -> HttpStatus.OK
+            false -> HttpStatus.INTERNAL_SERVER_ERROR
+        }
+        return result
     }
 
     @GetMapping(GET_EXECUTION_ORDERS)

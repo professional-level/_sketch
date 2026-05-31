@@ -9,6 +9,8 @@ import com.example.stockpurchaseservice.application.port.out.MarketServicePort
 import com.example.stockpurchaseservice.application.port.out.ProcessedEventPort
 import com.example.stockpurchaseservice.application.port.out.PurchaseOrderDto
 import com.example.stockpurchaseservice.application.port.out.SellingOrderDto
+import com.example.stockpurchaseservice.application.port.out.StockOrderMarket
+import com.example.stockpurchaseservice.application.port.out.StockOrderType
 import java.time.ZonedDateTime
 import java.util.UUID
 import kotlinx.coroutines.runBlocking
@@ -45,6 +47,35 @@ class SubmitOrderIntentServiceTest {
             assertEquals("TQQQ", stockId)
             assertEquals(112.0, purchasePrice)
             assertEquals(3, quantity)
+            assertEquals(StockOrderMarket.OVERSEAS_US, market)
+            assertEquals(StockOrderType.LOC, orderType)
+        }
+    }
+
+    @Test
+    fun `routes six digit symbols to domestic market`() = runBlocking {
+        val marketPort = FakeMarketServicePort()
+        val processedEventPort = FakeProcessedEventPort()
+        val service = SubmitOrderIntentService(marketPort, processedEventPort)
+
+        service.execute(
+            SubmitOrderIntentCommand(
+                eventId = UUID.randomUUID(),
+                idempotencyKey = "domestic-buy",
+                strategyExecutionId = "strategy:005930",
+                symbol = "005930",
+                side = OrderIntentSide.BUY,
+                orderType = OrderIntentType.LIMIT,
+                price = 70000.0,
+                quantity = 2,
+                orderTag = "BUY",
+                createdAt = ZonedDateTime.parse("2026-05-30T09:00:00+09:00"),
+            ),
+        )
+
+        with(marketPort.buyOrders.single()) {
+            assertEquals(StockOrderMarket.DOMESTIC, market)
+            assertEquals(StockOrderType.LIMIT, orderType)
         }
     }
 

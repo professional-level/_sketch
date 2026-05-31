@@ -10,5 +10,6 @@ object Endpoint {
     const val GET_FOREIGNER_TRADE_TREND ="/quotations/foreigner-trade-trend/{stockId}"
     const val GET_OVERSEAS_DAILY_PRICE = "/overseas/quotations/dailyprice/{symbol}"
     const val POST_STOCK_ORDER ="/trading/order-cash"
+    const val POST_OVERSEAS_STOCK_ORDER = "/overseas/trading/order"
     const val GET_EXECUTION_ORDERS ="/trading/inquire-daily-ccld"
 }

@@ -274,26 +274,15 @@ class OpenApiService(
         val token = getToken(isMock = request.isMock)
         val info: RequestType = RequestType.POST_STOCK_ORDER
 
-        val trId = getTrIdForOrder(request.ORD_DVSN)
+        val trId = getTrIdForOrder(request.ORD_DVSN, request.isMock)
 
-        var headers = build(token = token, trId = trId)
+        val headers = build(token = token, trId = trId)
             .addHeader(HeaderBuilder.HeaderKey.CUSTOMER_TYPE, "P") // 개인 고객 타입
 //            .addHashKey(request)
             .build()
-        // TODO: mock 인지 아닌지 ThreadLocal 혹은, Context로 전달 해야 함
-        val mockHeader = headers + mapOf(
-            HeaderKey.APP_KEY.value to MOCK_APP_KEY,
-            HeaderKey.APP_SECRET.value to MOCK_APP_SECRET,
-        )
+            .withMockCredentialIfNeeded(request.isMock)
 
-        val cano = when (request.isMock) {
-            true -> Property.MOCK_ACCOUNT
-            false -> Property.MOCK_ACCOUNT // TODO: 추후 실전계좌 매핑
-        }
-        val acntPrdtCd = when (request.isMock) {
-            true -> Property.MOCK_ACCOUNT_TAIL // TODO: 추후 실전계좌 매핑
-            false -> Property.MOCK_ACCOUNT_TAIL
-        }
+        val (cano, acntPrdtCd) = stockAccount(request.isMock)
         val body = mapOf(
             BodyParameter.CANO to cano,
             BodyParameter.ACNT_PRDT_CD to acntPrdtCd,
@@ -303,32 +292,49 @@ class OpenApiService(
             BodyParameter.ORD_UNPR to request.ORD_UNPR.toString(), // 주문단가
         )
 
-        val response = executeHttpRequest(info = info, headers = mockHeader, body = body, isMockApi = true)
+        val response = executeHttpRequest(info = info, headers = headers, body = body, isMockApi = request.isMock)
+        return response
+    }
+
+    suspend fun postOverseasStockOrder(request: OverseasStockOrderRequest): OpenApiResponse {
+        requireSupportedUsBuyOrder(request)
+        val token = getToken(isMock = request.isMock)
+        val info = RequestType.POST_OVERSEAS_STOCK_ORDER
+        val trId = getTrIdForUsOverseasBuyOrder(request.isMock)
+        val headers = build(token = token, trId = trId)
+            .addHeader(HeaderBuilder.HeaderKey.CUSTOMER_TYPE, "P")
+            .build()
+            .withMockCredentialIfNeeded(request.isMock)
+
+        val (cano, acntPrdtCd) = stockAccount(request.isMock)
+        val body = mapOf(
+            BodyParameter.CANO to cano,
+            BodyParameter.ACNT_PRDT_CD to acntPrdtCd,
+            BodyParameter.OVRS_EXCG_CD to request.OVRS_EXCG_CD.uppercase(),
+            BodyParameter.PDNO to request.PDNO.uppercase(),
+            BodyParameter.ORD_QTY to request.ORD_QTY.toString(),
+            BodyParameter.OVRS_ORD_UNPR to request.OVRS_ORD_UNPR,
+            BodyParameter.CTAC_TLNO to request.CTAC_TLNO,
+            BodyParameter.MGCO_APTM_ODNO to request.MGCO_APTM_ODNO,
+            BodyParameter.SLL_TYPE to "",
+            BodyParameter.ORD_SVR_DVSN_CD to request.ORD_SVR_DVSN_CD,
+            BodyParameter.ORD_DVSN to request.ORD_DVSN,
+        )
+
+        val response = executeHttpRequest(info = info, headers = headers, body = body, isMockApi = request.isMock)
         return response
     }
 
     suspend fun getExecutionOrders(request: GetDailyExecutionOrdersRequest): OpenApiResponse {
-        val token = getToken(isMock = true)
+        val token = getToken(isMock = request.isMock)
         val info: RequestType = RequestType.GET_EXECUTION_ORDERS
 
-        val trId = "VTTC8001R" // 모의투자 3개월 이내, TODO: 상황별 mapping 필요
-        var headers = build(token = token, trId = trId)
+        val trId = if (request.isMock) "VTTC8001R" else "TTTC8001R" // TODO: 상황별 mapping 필요
+        val headers = build(token = token, trId = trId)
             .addHeader(HeaderBuilder.HeaderKey.CUSTOMER_TYPE, "P")
             .build()
-        // TODO: mock 인지 아닌지 ThreadLocal 혹은, Context로 전달 해야 함
-        val mockHeader = headers + mapOf(
-            HeaderKey.APP_KEY.value to MOCK_APP_KEY,
-            HeaderKey.APP_SECRET.value to MOCK_APP_SECRET,
-        )
-        // query parameter build
-        val cano = when (request.isMock) {
-            true -> Property.MOCK_ACCOUNT
-            false -> Property.MOCK_ACCOUNT // TODO: 추후 실전계좌 매핑
-        }
-        val acntPrdtCd = when (request.isMock) {
-            true -> Property.MOCK_ACCOUNT_TAIL // TODO: 추후 실전계좌 매핑
-            false -> Property.MOCK_ACCOUNT_TAIL
-        }
+            .withMockCredentialIfNeeded(request.isMock)
+        val (cano, acntPrdtCd) = stockAccount(request.isMock)
         val queryParameters =
             QueryParameter.forType(
                 info,
@@ -350,18 +356,66 @@ class OpenApiService(
                 ),
             )
 
-        val response = executeHttpRequest(info = info, headers = mockHeader, queryParameters = queryParameters, isMockApi = true)
+        val response = executeHttpRequest(
+            info = info,
+            headers = headers,
+            queryParameters = queryParameters,
+            isMockApi = request.isMock,
+        )
         return response
     }
 
     // end
     // sub-method
-    private fun getTrIdForOrder(ordDvsn: String): String {
-        val isMock = true // TODO: 실제 환경에 맞게 변경 (true: 모의투자, false: 실전투자)
+    private fun getTrIdForOrder(
+        ordDvsn: String,
+        isMock: Boolean,
+    ): String {
         return when (ordDvsn) {
             "00", "02", "03", "13", "16" -> if (isMock) "VTTC0802U" else "TTTC0802U" // 매수
             "01", "07", "08", "14", "17" -> if (isMock) "VTTC0801U" else "TTTC0801U" // 매도
             else -> throw IllegalArgumentException("유효하지 않은 주문구분 코드입니다.")
+        }
+    }
+
+    private fun getTrIdForUsOverseasBuyOrder(isMock: Boolean): String {
+        return if (isMock) "VTTT1002U" else "TTTT1002U"
+    }
+
+    private fun requireSupportedUsBuyOrder(request: OverseasStockOrderRequest) {
+        val exchange = request.OVRS_EXCG_CD.uppercase()
+        require(exchange in setOf("NASD", "NYSE", "AMEX")) {
+            "only US overseas buy exchanges are supported: NASD, NYSE, AMEX"
+        }
+
+        val supportedOrderDivisions = when (request.isMock) {
+            true -> setOf("00")
+            false -> setOf("00", "32", "34")
+        }
+        require(request.ORD_DVSN in supportedOrderDivisions) {
+            "unsupported US overseas buy order division: ${request.ORD_DVSN}"
+        }
+    }
+
+    private fun Map<String, String>.withMockCredentialIfNeeded(isMock: Boolean): Map<String, String> {
+        return when (isMock) {
+            true -> this + mapOf(
+                HeaderKey.APP_KEY.value to MOCK_APP_KEY,
+                HeaderKey.APP_SECRET.value to MOCK_APP_SECRET,
+            )
+
+            false -> this
+        }
+    }
+
+    private fun stockAccount(isMock: Boolean): Pair<String, String> {
+        return when (isMock) {
+            true -> Property.MOCK_ACCOUNT to Property.MOCK_ACCOUNT_TAIL
+            false -> {
+                require(Property.ACCOUNT.isNotBlank()) { "account property is required for real stock order" }
+                require(Property.ACCOUNT_TAIL.isNotBlank()) { "account_tail property is required for real stock order" }
+                Property.ACCOUNT to Property.ACCOUNT_TAIL
+            }
         }
     }
 
@@ -428,6 +482,12 @@ object BodyParameter {
     const val ORD_DVSN = "ORD_DVSN"
     const val ORD_QTY = "ORD_QTY"
     const val ORD_UNPR = "ORD_UNPR"
+    const val OVRS_EXCG_CD = "OVRS_EXCG_CD"
+    const val OVRS_ORD_UNPR = "OVRS_ORD_UNPR"
+    const val CTAC_TLNO = "CTAC_TLNO"
+    const val MGCO_APTM_ODNO = "MGCO_APTM_ODNO"
+    const val SLL_TYPE = "SLL_TYPE"
+    const val ORD_SVR_DVSN_CD = "ORD_SVR_DVSN_CD"
 }
 
 internal class UnexpectApiResponseException : RuntimeException()

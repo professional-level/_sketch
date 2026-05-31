@@ -1,4 +1,4 @@
-package com.example.stockpurchaseservice.adapter.out
+package com.example.stockpurchaseservice.adapter.out.api
 
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers

@@ -19,6 +19,8 @@ class Property(
         MOCK_APP_SECRET = requireNotNull(env.getProperty("mock_app_secret"))
         MOCK_ACCOUNT = requireNotNull(env.getProperty("mock_account"))
         MOCK_ACCOUNT_TAIL = requireNotNull(env.getProperty("mock_account_tail"))
+        ACCOUNT = env.getProperty("account").orEmpty()
+        ACCOUNT_TAIL = env.getProperty("account_tail").orEmpty()
     }
 
     companion object {
@@ -32,5 +34,9 @@ class Property(
         lateinit var MOCK_APP_SECRET: String
         lateinit var MOCK_ACCOUNT: String
         lateinit var MOCK_ACCOUNT_TAIL: String
+
+        // 실전 주문 계좌. 로컬 secret에 없을 수 있으므로 실전 주문 호출 시점에 검증한다.
+        var ACCOUNT: String = ""
+        var ACCOUNT_TAIL: String = ""
     }
 }

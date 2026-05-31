@@ -3,6 +3,7 @@ package com.example.stockpurchaseservice.application.service
 import com.example.common.UseCaseImpl
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSubmissionStatus
+import com.example.stockpurchaseservice.application.port.`in`.OrderIntentType
 import com.example.stockpurchaseservice.application.port.`in`.SubmitOrderIntentCommand
 import com.example.stockpurchaseservice.application.port.`in`.SubmitOrderIntentResult
 import com.example.stockpurchaseservice.application.port.`in`.SubmitOrderIntentUseCase
@@ -10,6 +11,8 @@ import com.example.stockpurchaseservice.application.port.out.MarketServicePort
 import com.example.stockpurchaseservice.application.port.out.ProcessedEventPort
 import com.example.stockpurchaseservice.application.port.out.PurchaseOrderDto
 import com.example.stockpurchaseservice.application.port.out.SellingOrderDto
+import com.example.stockpurchaseservice.application.port.out.StockOrderMarket
+import com.example.stockpurchaseservice.application.port.out.StockOrderType
 import java.nio.charset.StandardCharsets
 import java.util.UUID
 
@@ -39,6 +42,8 @@ class SubmitOrderIntentService(
     private fun submit(command: SubmitOrderIntentCommand) {
         val orderId = UUID.nameUUIDFromBytes(command.idempotencyKey.toByteArray(StandardCharsets.UTF_8))
         val quantity = command.quantity.toInt()
+        val market = command.symbol.toStockOrderMarket()
+        val orderType = command.orderType.toStockOrderType()
         when (command.side) {
             OrderIntentSide.BUY -> marketService.buyStock(
                 PurchaseOrderDto(
@@ -46,6 +51,8 @@ class SubmitOrderIntentService(
                     stockId = command.symbol,
                     purchasePrice = checkNotNull(command.price),
                     quantity = quantity,
+                    market = market,
+                    orderType = orderType,
                 ),
             )
 
@@ -55,8 +62,25 @@ class SubmitOrderIntentService(
                     stockId = command.symbol,
                     sellingPrice = command.price ?: 0.0,
                     quantity = quantity,
+                    market = market,
+                    orderType = orderType,
                 ),
             )
+        }
+    }
+
+    private fun String.toStockOrderMarket(): StockOrderMarket {
+        return when {
+            length == 6 && all(Char::isDigit) -> StockOrderMarket.DOMESTIC
+            else -> StockOrderMarket.OVERSEAS_US
+        }
+    }
+
+    private fun OrderIntentType.toStockOrderType(): StockOrderType {
+        return when (this) {
+            OrderIntentType.LOC -> StockOrderType.LOC
+            OrderIntentType.MOC -> StockOrderType.MOC
+            OrderIntentType.LIMIT -> StockOrderType.LIMIT
         }
     }
 }

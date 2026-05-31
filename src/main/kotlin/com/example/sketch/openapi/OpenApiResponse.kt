@@ -36,3 +36,24 @@ data class OverseasDailyPriceCandle(
     val date: String,
     val close: Double,
 )
+
+data class OverseasStockOrderRequest(
+    val PDNO: String,
+    val OVRS_EXCG_CD: String = "NASD",
+    val ORD_QTY: Long,
+    val OVRS_ORD_UNPR: String,
+    val ORD_DVSN: String = "00",
+    val CTAC_TLNO: String = "",
+    val MGCO_APTM_ODNO: String = "",
+    val ORD_SVR_DVSN_CD: String = "0",
+    val isMock: Boolean = true,
+) {
+    init {
+        require(PDNO.isNotBlank()) { "PDNO must not be blank" }
+        require(OVRS_EXCG_CD.isNotBlank()) { "OVRS_EXCG_CD must not be blank" }
+        require(ORD_QTY > 0) { "ORD_QTY must be positive" }
+        require(OVRS_ORD_UNPR.isNotBlank()) { "OVRS_ORD_UNPR must not be blank" }
+        require(ORD_DVSN.isNotBlank()) { "ORD_DVSN must not be blank" }
+        require(ORD_SVR_DVSN_CD.isNotBlank()) { "ORD_SVR_DVSN_CD must not be blank" }
+    }
+}
