@@ -4,6 +4,9 @@ import com.example.strategyexecutionservice.application.port.`in`.ApplyOrderFill
 import com.example.strategyexecutionservice.application.port.`in`.ApplyOrderFillStatus
 import com.example.strategyexecutionservice.application.port.out.LaorV4ExecutionState
 import com.example.strategyexecutionservice.application.port.out.MarketDataPort
+import com.example.strategyexecutionservice.application.port.out.StrategyExecutionOrderEventPort
+import com.example.strategyexecutionservice.application.port.out.StrategyExecutionOrderEventRecord
+import com.example.strategyexecutionservice.application.port.out.StrategyExecutionOrderEventType
 import com.example.strategyexecutionservice.application.port.out.StrategyExecutionLifecycleStatus
 import com.example.strategyexecutionservice.application.port.out.StrategyExecutionStatePort
 import com.example.strategyexecutionservice.application.port.out.StrategyMarketDataSnapshot
@@ -33,7 +36,8 @@ class ApplyOrderFillServiceTest {
                 ),
             ),
         )
-        val service = ApplyOrderFillService(statePort, FakeMarketDataPort())
+        val orderEventPort = FakeStrategyExecutionOrderEventPort()
+        val service = ApplyOrderFillService(statePort, FakeMarketDataPort(), orderEventPort)
 
         val result = service.execute(
             ApplyOrderFillCommand(
@@ -50,6 +54,7 @@ class ApplyOrderFillServiceTest {
         )
 
         assertEquals(ApplyOrderFillStatus.APPLIED, result.status)
+        assertEquals(StrategyExecutionOrderEventType.FILLED, orderEventPort.saved.single().type)
         with(statePort.saved.single()) {
             assertEquals(StrategyExecutionLifecycleStatus.COMPLETED, status)
             assertEquals(1, cycleNo)
@@ -75,7 +80,7 @@ class ApplyOrderFillServiceTest {
                 ),
             ),
         )
-        val service = ApplyOrderFillService(statePort, FakeMarketDataPort())
+        val service = ApplyOrderFillService(statePort, FakeMarketDataPort(), FakeStrategyExecutionOrderEventPort())
 
         service.execute(
             ApplyOrderFillCommand(
@@ -95,6 +100,45 @@ class ApplyOrderFillServiceTest {
             assertEquals(StrategyExecutionLifecycleStatus.ACTIVE, status)
             assertEquals(3, cycleNo)
         }
+    }
+
+    @Test
+    fun `skips duplicate fill event without mutating strategy state`() = runBlocking {
+        val statePort = FakeStrategyExecutionStatePort(
+            initial = LaorV4ExecutionState(
+                executionId = "laor-v4:TQQQ",
+                symbol = LaorV4StrategySymbol.TQQQ,
+                totalSplitCount = 20,
+                state = LaorV4StrategyState(
+                    availableCash = 1000.0,
+                    holdingQuantity = 1,
+                    averagePurchasePrice = 100.0,
+                    progressRound = 1.0,
+                ),
+            ),
+        )
+        val service = ApplyOrderFillService(
+            statePort,
+            FakeMarketDataPort(),
+            FakeStrategyExecutionOrderEventPort(duplicateEventIds = setOf("fill-1")),
+        )
+
+        val result = service.execute(
+            ApplyOrderFillCommand(
+                eventId = "fill-1",
+                strategyExecutionId = "laor-v4:TQQQ",
+                orderIntentId = "intent-1",
+                brokerOrderId = "broker-1",
+                side = OrderSide.SELL,
+                filledPrice = 120.0,
+                filledQuantity = 1,
+                orderTag = "TARGET_SELL",
+                filledAt = ZonedDateTime.parse("2026-06-02T09:00:00+09:00"),
+            ),
+        )
+
+        assertEquals(ApplyOrderFillStatus.SKIPPED_DUPLICATE, result.status)
+        assertEquals(emptyList(), statePort.saved)
     }
 
     private class FakeStrategyExecutionStatePort(
@@ -126,6 +170,19 @@ class ApplyOrderFillServiceTest {
                 previousClose = 120.0,
                 recentClosePrices = listOf(120.0, 119.0, 118.0, 117.0, 116.0),
             )
+        }
+    }
+
+    private class FakeStrategyExecutionOrderEventPort(
+        private val duplicateEventIds: Set<String> = emptySet(),
+    ) : StrategyExecutionOrderEventPort {
+        val saved: MutableList<StrategyExecutionOrderEventRecord> = mutableListOf()
+
+        override suspend fun tryRecord(event: StrategyExecutionOrderEventRecord): Boolean {
+            if (event.eventId in duplicateEventIds) return false
+
+            saved += event
+            return true
         }
     }
 }

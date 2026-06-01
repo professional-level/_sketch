@@ -15,6 +15,7 @@ data class ApplyOrderFillCommand(
     val orderIntentId: String,
     val brokerOrderId: String,
     val side: OrderSide,
+    val fillKind: OrderFillKind = OrderFillKind.FILLED,
     val filledPrice: Double,
     val filledQuantity: Long,
     val orderTag: String,
@@ -31,6 +32,11 @@ data class ApplyOrderFillCommand(
     }
 }
 
+enum class OrderFillKind {
+    FILLED,
+    PARTIALLY_FILLED,
+}
+
 data class ApplyOrderFillResult(
     val strategyExecutionId: String,
     val status: ApplyOrderFillStatus,
@@ -38,6 +44,7 @@ data class ApplyOrderFillResult(
 
 enum class ApplyOrderFillStatus {
     APPLIED,
+    SKIPPED_DUPLICATE,
     STRATEGY_NOT_FOUND,
     IGNORED_COMPLETED,
 }

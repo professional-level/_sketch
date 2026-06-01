@@ -10,6 +10,7 @@ object Topic {
     const val ORDER_INTENT_CREATED = "order-intent-created"
     const val ORDER_SUBMITTED = "order-submitted"
     const val ORDER_FILLED = "order-filled"
+    const val ORDER_PARTIALLY_FILLED = "order-partially-filled"
     const val ORDER_REJECTED = "order-rejected"
     const val INVALID_EVENT = "invalid-event"
     const val PURCHASE_SUCCESS = "purchase-success"
@@ -23,6 +24,7 @@ enum class MessageTopic(val topicName: String) {
     ORDER_INTENT_CREATED(Topic.ORDER_INTENT_CREATED),
     ORDER_SUBMITTED(Topic.ORDER_SUBMITTED),
     ORDER_FILLED(Topic.ORDER_FILLED),
+    ORDER_PARTIALLY_FILLED(Topic.ORDER_PARTIALLY_FILLED),
     ORDER_REJECTED(Topic.ORDER_REJECTED),
     INVALID_EVENT(Topic.INVALID_EVENT),
     PURCHASE_SUCCESS(Topic.PURCHASE_SUCCESS),

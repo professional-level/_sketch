@@ -5,7 +5,11 @@ import com.example.strategyexecutionservice.application.port.`in`.ApplyOrderFill
 import com.example.strategyexecutionservice.application.port.`in`.ApplyOrderFillResult
 import com.example.strategyexecutionservice.application.port.`in`.ApplyOrderFillStatus
 import com.example.strategyexecutionservice.application.port.`in`.ApplyOrderFillUseCase
+import com.example.strategyexecutionservice.application.port.`in`.OrderFillKind
 import com.example.strategyexecutionservice.application.port.out.MarketDataPort
+import com.example.strategyexecutionservice.application.port.out.StrategyExecutionOrderEventPort
+import com.example.strategyexecutionservice.application.port.out.StrategyExecutionOrderEventRecord
+import com.example.strategyexecutionservice.application.port.out.StrategyExecutionOrderEventType
 import com.example.strategyexecutionservice.application.port.out.StrategyExecutionLifecycleStatus
 import com.example.strategyexecutionservice.application.port.out.StrategyExecutionStatePort
 import com.example.strategyexecutionservice.domain.strategy.execution.StrategyExecutionFill
@@ -17,11 +21,16 @@ import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategyC
 class ApplyOrderFillService(
     private val strategyExecutionStatePort: StrategyExecutionStatePort,
     private val marketDataPort: MarketDataPort,
+    private val orderEventPort: StrategyExecutionOrderEventPort,
 ) : ApplyOrderFillUseCase {
 
     override suspend fun execute(command: ApplyOrderFillCommand): ApplyOrderFillResult {
         val current = strategyExecutionStatePort.findLaorV4Strategy(command.strategyExecutionId)
             ?: return ApplyOrderFillResult(command.strategyExecutionId, ApplyOrderFillStatus.STRATEGY_NOT_FOUND)
+
+        if (!orderEventPort.tryRecord(command.toRecord())) {
+            return ApplyOrderFillResult(command.strategyExecutionId, ApplyOrderFillStatus.SKIPPED_DUPLICATE)
+        }
 
         if (current.status == StrategyExecutionLifecycleStatus.COMPLETED) {
             return ApplyOrderFillResult(command.strategyExecutionId, ApplyOrderFillStatus.IGNORED_COMPLETED)
@@ -66,5 +75,27 @@ class ApplyOrderFillService(
         )
 
         return ApplyOrderFillResult(command.strategyExecutionId, ApplyOrderFillStatus.APPLIED)
+    }
+}
+
+private fun ApplyOrderFillCommand.toRecord(): StrategyExecutionOrderEventRecord {
+    return StrategyExecutionOrderEventRecord(
+        eventId = eventId,
+        strategyExecutionId = strategyExecutionId,
+        orderIntentId = orderIntentId,
+        brokerOrderId = brokerOrderId,
+        type = fillKind.toEventType(),
+        side = side,
+        price = filledPrice,
+        quantity = filledQuantity,
+        orderTag = orderTag,
+        occurredAt = filledAt,
+    )
+}
+
+private fun OrderFillKind.toEventType(): StrategyExecutionOrderEventType {
+    return when (this) {
+        OrderFillKind.FILLED -> StrategyExecutionOrderEventType.FILLED
+        OrderFillKind.PARTIALLY_FILLED -> StrategyExecutionOrderEventType.PARTIALLY_FILLED
     }
 }

@@ -4,6 +4,9 @@ import Event
 import com.example.common.ExternalApiAdapter
 import com.example.strategyexecutionservice.application.port.`in`.ApplyOrderFillCommand
 import com.example.strategyexecutionservice.application.port.`in`.ApplyOrderFillUseCase
+import com.example.strategyexecutionservice.application.port.`in`.OrderFillKind
+import com.example.strategyexecutionservice.application.port.`in`.RecordOrderExecutionEventCommand
+import com.example.strategyexecutionservice.application.port.`in`.RecordOrderExecutionEventUseCase
 import com.example.strategyexecutionservice.application.port.`in`.StartStrategyExecutionCommand
 import com.example.strategyexecutionservice.application.port.`in`.StartStrategyExecutionUseCase
 import com.example.strategyexecutionservice.domain.strategy.execution.OrderSide
@@ -11,6 +14,9 @@ import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategyC
 import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategySymbol
 import common.ConsumerGroupId.STRATEGY_EXECUTION_SERVICE
 import common.Topic.ORDER_FILLED
+import common.Topic.ORDER_PARTIALLY_FILLED
+import common.Topic.ORDER_REJECTED
+import common.Topic.ORDER_SUBMITTED
 import common.Topic.STRATEGY_EXECUTION_START_REQUESTED
 import common.proto.ProtoUtils.toZonedDateTime
 import org.springframework.kafka.annotation.KafkaListener
@@ -19,6 +25,7 @@ import org.springframework.kafka.annotation.KafkaListener
 internal class StrategyExecutionEventListenerAdapter(
     private val startStrategyExecutionUseCase: StartStrategyExecutionUseCase,
     private val applyOrderFillUseCase: ApplyOrderFillUseCase,
+    private val recordOrderExecutionEventUseCase: RecordOrderExecutionEventUseCase,
 ) {
     @KafkaListener(topics = [STRATEGY_EXECUTION_START_REQUESTED], groupId = STRATEGY_EXECUTION_SERVICE)
     suspend fun strategyExecutionStartRequests(message: ByteArray) {
@@ -30,6 +37,24 @@ internal class StrategyExecutionEventListenerAdapter(
     suspend fun orderFills(message: ByteArray) {
         val event = Event.OrderFilled.parseFrom(message)
         applyOrderFillUseCase.execute(event.toCommand())
+    }
+
+    @KafkaListener(topics = [ORDER_PARTIALLY_FILLED], groupId = STRATEGY_EXECUTION_SERVICE)
+    suspend fun partialOrderFills(message: ByteArray) {
+        val event = Event.OrderPartiallyFilled.parseFrom(message)
+        applyOrderFillUseCase.execute(event.toCommand())
+    }
+
+    @KafkaListener(topics = [ORDER_SUBMITTED], groupId = STRATEGY_EXECUTION_SERVICE)
+    suspend fun orderSubmissions(message: ByteArray) {
+        val event = Event.OrderSubmitted.parseFrom(message)
+        recordOrderExecutionEventUseCase.execute(event.toCommand())
+    }
+
+    @KafkaListener(topics = [ORDER_REJECTED], groupId = STRATEGY_EXECUTION_SERVICE)
+    suspend fun orderRejections(message: ByteArray) {
+        val event = Event.OrderRejected.parseFrom(message)
+        recordOrderExecutionEventUseCase.execute(event.toCommand())
     }
 }
 
@@ -90,10 +115,47 @@ private fun Event.OrderFilled.toCommand(): ApplyOrderFillCommand {
         orderIntentId = orderIntentId,
         brokerOrderId = brokerOrderId,
         side = side.toDomain(),
+        fillKind = OrderFillKind.FILLED,
         filledPrice = filledPrice,
         filledQuantity = filledQuantity,
         orderTag = orderTag,
         filledAt = filledAt.toZonedDateTime(),
+    )
+}
+
+private fun Event.OrderPartiallyFilled.toCommand(): ApplyOrderFillCommand {
+    return ApplyOrderFillCommand(
+        eventId = eventId,
+        strategyExecutionId = strategyExecutionId,
+        orderIntentId = orderIntentId,
+        brokerOrderId = brokerOrderId,
+        side = side.toDomain(),
+        fillKind = OrderFillKind.PARTIALLY_FILLED,
+        filledPrice = filledPrice,
+        filledQuantity = filledQuantity,
+        orderTag = orderTag,
+        filledAt = filledAt.toZonedDateTime(),
+    )
+}
+
+private fun Event.OrderSubmitted.toCommand(): RecordOrderExecutionEventCommand.Submitted {
+    return RecordOrderExecutionEventCommand.Submitted(
+        eventId = eventId,
+        strategyExecutionId = strategyExecutionId,
+        orderIntentId = orderIntentId,
+        brokerOrderId = brokerOrderId,
+        submittedAt = submittedAt.toZonedDateTime(),
+    )
+}
+
+private fun Event.OrderRejected.toCommand(): RecordOrderExecutionEventCommand.Rejected {
+    return RecordOrderExecutionEventCommand.Rejected(
+        eventId = eventId,
+        strategyExecutionId = strategyExecutionId,
+        orderIntentId = orderIntentId,
+        brokerOrderId = brokerOrderId.ifBlank { null },
+        reason = reason,
+        rejectedAt = rejectedAt.toZonedDateTime(),
     )
 }
 
