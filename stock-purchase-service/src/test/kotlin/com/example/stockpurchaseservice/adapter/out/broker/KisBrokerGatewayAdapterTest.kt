@@ -1,10 +1,12 @@
 package com.example.stockpurchaseservice.adapter.out.broker
 
 import ApiResponse
+import DailyExecutionOrdersResponseOuterClass
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatus
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderSubmissionUnknownException
 import com.example.stockpurchaseservice.application.port.out.ExecutionQuantityModeDto
+import com.example.stockpurchaseservice.application.port.out.ExecutionTypeDto
 import com.example.stockpurchaseservice.application.port.out.StockOrderMarket
 import com.example.stockpurchaseservice.application.port.out.StockOrderType
 import org.springframework.core.io.buffer.DefaultDataBufferFactory
@@ -159,6 +161,127 @@ class KisBrokerGatewayAdapterTest {
         assertEquals("20260602", exchangeFunction.requests[0].queryValue("ordEndDt"))
         assertEquals("FK1", exchangeFunction.requests[1].queryValue("ctxAreaFk200"))
         assertEquals("NK1", exchangeFunction.requests[1].queryValue("ctxAreaNk200"))
+    }
+
+    @Test
+    fun `domestic order history sends broker order id when present`() {
+        val exchangeFunction = ResponseExchangeFunction(
+            responses = listOf(protobufResponse(domesticHistoryResponse())),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        adapter.findOrderHistory(
+            BrokerOrderHistoryQuery(
+                market = StockOrderMarket.DOMESTIC,
+                symbol = "",
+                externalOrderId = "domestic-order-1",
+                from = ZonedDateTime.parse("2026-06-02T09:00:00+09:00"),
+                to = ZonedDateTime.parse("2026-06-02T09:00:00+09:00"),
+                isMock = false,
+            ),
+        )
+
+        assertEquals("domestic-order-1", exchangeFunction.requests.single().queryValue("odno"))
+        assertEquals("", exchangeFunction.requests.single().queryValue("pdno"))
+        assertEquals("20260602", exchangeFunction.requests.single().queryValue("inqrStrtDt"))
+        assertEquals("20260602", exchangeFunction.requests.single().queryValue("inqrEndDt"))
+    }
+
+    @Test
+    fun `maps domestic rejected quantity to rejected status`() {
+        val adapter = domesticHistoryAdapter(
+            domesticHistoryResponse(
+                domesticRow(
+                    orderId = "rejected-domestic-order",
+                    orderedQuantity = "3",
+                    filledQuantity = "0",
+                    remainingQuantity = "0",
+                    rejectedQuantity = "3",
+                ),
+            ),
+        )
+
+        val status = adapter.findOrderHistory(domesticHistoryQuery()).single().toStatus()
+
+        assertEquals(BrokerOrderStatus.REJECTED, status.status)
+        assertEquals("broker rejected quantity=3", status.reason)
+    }
+
+    @Test
+    fun `maps domestic cancel fields to cancelled status`() {
+        val adapter = domesticHistoryAdapter(
+            domesticHistoryResponse(
+                domesticRow(
+                    orderId = "cancelled-domestic-order",
+                    orderedQuantity = "3",
+                    filledQuantity = "0",
+                    remainingQuantity = "3",
+                    cancelledQuantity = "3",
+                    cancelled = true,
+                ),
+            ),
+        )
+
+        val status = adapter.findOrderHistory(domesticHistoryQuery()).single().toStatus()
+
+        assertEquals(BrokerOrderStatus.CANCELLED, status.status)
+        assertEquals("broker cancelled quantity=3", status.reason)
+    }
+
+    @Test
+    fun `maps domestic partial fill as cumulative execution and submitted status`() {
+        val adapter = domesticHistoryAdapter(
+            domesticHistoryResponse(
+                domesticRow(
+                    orderId = "partial-domestic-order",
+                    orderedQuantity = "3",
+                    filledQuantity = "1",
+                    remainingQuantity = "2",
+                    averagePrice = "71200.5",
+                ),
+            ),
+        )
+
+        val item = adapter.findOrderHistory(domesticHistoryQuery()).single()
+        val execution = item.toExecutionDto()
+
+        assertEquals(BrokerOrderStatus.SUBMITTED, item.toStatus().status)
+        checkNotNull(execution)
+        assertEquals("005930", execution.stockId)
+        assertEquals("partial-domestic-order", execution.externalOrderId)
+        assertEquals(1, execution.quantity)
+        assertEquals(ExecutionTypeDto.PURCHASE, execution.type)
+        assertEquals(71200.5, execution.averageExecutionPrice)
+        assertEquals(ExecutionQuantityModeDto.CUMULATIVE, execution.quantityMode)
+    }
+
+    @Test
+    fun `maps domestic full fill as cumulative execution and submitted status`() {
+        val adapter = domesticHistoryAdapter(
+            domesticHistoryResponse(
+                domesticRow(
+                    orderId = "filled-domestic-order",
+                    orderedQuantity = "3",
+                    filledQuantity = "3",
+                    remainingQuantity = "0",
+                    averagePrice = "71300",
+                ),
+            ),
+        )
+
+        val item = adapter.findOrderHistory(domesticHistoryQuery()).single()
+        val execution = item.toExecutionDto()
+
+        assertEquals(BrokerOrderStatus.SUBMITTED, item.toStatus().status)
+        checkNotNull(execution)
+        assertEquals("filled-domestic-order", execution.externalOrderId)
+        assertEquals(3, execution.quantity)
+        assertEquals(71300.0, execution.averageExecutionPrice)
+        assertEquals(ExecutionQuantityModeDto.CUMULATIVE, execution.quantityMode)
     }
 
     @Test
@@ -354,6 +477,16 @@ class KisBrokerGatewayAdapterTest {
         )
     }
 
+    private fun domesticHistoryAdapter(
+        response: DailyExecutionOrdersResponseOuterClass.DailyExecutionOrdersResponse,
+    ): KisBrokerGatewayAdapter {
+        return KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(ResponseExchangeFunction(responses = listOf(protobufResponse(response))))
+                .build(),
+        )
+    }
+
     private fun historyQuery(): BrokerOrderHistoryQuery {
         return BrokerOrderHistoryQuery(
             market = StockOrderMarket.OVERSEAS_US,
@@ -362,6 +495,63 @@ class KisBrokerGatewayAdapterTest {
             to = ZonedDateTime.parse("2026-06-02T09:00:00+09:00"),
             isMock = false,
         )
+    }
+
+    private fun domesticHistoryQuery(): BrokerOrderHistoryQuery {
+        return BrokerOrderHistoryQuery(
+            market = StockOrderMarket.DOMESTIC,
+            symbol = "005930",
+            from = ZonedDateTime.parse("2026-06-02T09:00:00+09:00"),
+            to = ZonedDateTime.parse("2026-06-02T09:00:00+09:00"),
+            isMock = false,
+        )
+    }
+
+    private fun domesticHistoryResponse(
+        vararg rows: DailyExecutionOrdersResponseOuterClass.DailyExecutionOrdersOutput1,
+    ): DailyExecutionOrdersResponseOuterClass.DailyExecutionOrdersResponse {
+        return DailyExecutionOrdersResponseOuterClass.DailyExecutionOrdersResponse.newBuilder()
+            .setRtCd("0")
+            .setMsgCd("")
+            .setMsg1("")
+            .addAllOutput1(rows.toList())
+            .build()
+    }
+
+    private fun domesticRow(
+        orderId: String = "domestic-order-1",
+        orderedQuantity: String = "3",
+        filledQuantity: String = "0",
+        remainingQuantity: String = "3",
+        rejectedQuantity: String = "0",
+        cancelledQuantity: String = "0",
+        cancelled: Boolean = false,
+        side: OrderIntentSide = OrderIntentSide.BUY,
+        averagePrice: String = "",
+    ): DailyExecutionOrdersResponseOuterClass.DailyExecutionOrdersOutput1 {
+        return DailyExecutionOrdersResponseOuterClass.DailyExecutionOrdersOutput1.newBuilder()
+            .setOrdDt("20260602")
+            .setOrdGnoBrno("00001")
+            .setOdno(orderId)
+            .setSllBuyDvsnCd(side.toKisSideCode())
+            .setPdno("005930")
+            .setPrdtName("Samsung Electronics")
+            .setOrdQty(orderedQuantity)
+            .setOrdTmd("093000")
+            .setTotCcldQty(filledQuantity)
+            .setAvgPrvs(averagePrice)
+            .setCnclYn(if (cancelled) "Y" else "N")
+            .setCnclCfrmQty(cancelledQuantity)
+            .setRmnQty(remainingQuantity)
+            .setRjctQty(rejectedQuantity)
+            .build()
+    }
+
+    private fun OrderIntentSide.toKisSideCode(): String {
+        return when (this) {
+            OrderIntentSide.SELL -> "01"
+            OrderIntentSide.BUY -> "02"
+        }
     }
 
     private fun brokerCommand(
@@ -416,6 +606,16 @@ class KisBrokerGatewayAdapterTest {
     }
 
     private fun protobufResponse(response: ApiResponse.StockOrder): ClientResponse {
+        val dataBuffer = DefaultDataBufferFactory().wrap(response.toByteArray())
+        return ClientResponse.create(HttpStatus.OK)
+            .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PROTOBUF_VALUE)
+            .body(Flux.just(dataBuffer))
+            .build()
+    }
+
+    private fun protobufResponse(
+        response: DailyExecutionOrdersResponseOuterClass.DailyExecutionOrdersResponse,
+    ): ClientResponse {
         val dataBuffer = DefaultDataBufferFactory().wrap(response.toByteArray())
         return ClientResponse.create(HttpStatus.OK)
             .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PROTOBUF_VALUE)
