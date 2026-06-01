@@ -34,6 +34,7 @@ internal class OrderRiskControlAdapter(
         tradingHoursPolicy.rejectReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }
         orderNotionalReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }
         accountPendingBuyExposureReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }
+        accountCashReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }
         accountExposureReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }
         dailyOrderCountReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }
         duplicateOrderReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }
@@ -94,6 +95,28 @@ internal class OrderRiskControlAdapter(
         return if (projectedNotional > limit) {
             "account pending buy notional $projectedNotional exceeds limit $limit " +
                 "(active=$activeBuyNotional order=$orderNotional)"
+        } else {
+            null
+        }
+    }
+
+    private suspend fun accountCashReason(command: OrderRiskAssessmentCommand): String? {
+        if (!properties.accountCash.enabled || command.side != OrderIntentSide.BUY) return null
+
+        val orderNotional = command.estimatedNotional
+            ?: return "account cash cannot be assessed: order notional is missing for ${command.symbol}"
+        val reserveNotional = properties.accountCash.reserveNotional.coerceAtLeast(0.0)
+        val activeBuyNotional = orderRiskSubmissionReader.sumActiveBuyNotional()
+        val availableCash = runCatching {
+            marketServicePort.findAccountSnapshot(command.toAccountSnapshotQuery()).availableCashAmount
+        }.getOrElse { exception ->
+            return "account cash cannot be assessed: ${exception.message ?: exception::class.java.simpleName}"
+        } ?: return "account cash cannot be assessed: broker snapshot has no available cash amount"
+
+        val projectedCashUsage = activeBuyNotional + orderNotional + reserveNotional
+        return if (projectedCashUsage > availableCash) {
+            "account cash usage $projectedCashUsage exceeds available cash $availableCash " +
+                "(active=$activeBuyNotional order=$orderNotional reserve=$reserveNotional)"
         } else {
             null
         }

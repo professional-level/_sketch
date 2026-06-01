@@ -77,7 +77,7 @@ Before enabling real orders:
 - Point `akra.order.kis-open-api.base-url` and `akra.market-data.kis-open-api.base-url` to the deployed broker wrapper.
 - Point `akra.temporal.target` to the managed Temporal frontend.
 - Set real-vs-mock trading flags intentionally for the account being operated.
-- Confirm risk guard limits are set for order notional, account pending buy notional, symbol notional, daily order count, disabled strategies, and strategy trading environments.
+- Confirm risk guard limits are set for order notional, account pending buy notional, broker account exposure/cash, symbol notional, daily order count, disabled strategies, and strategy trading environments.
 - Configure domestic and US order windows, holidays, early-close dates, and LOC/MOC cutoffs until an exchange calendar sync is available.
 - Confirm `application-secret.properties` is not included in the built artifact or Git diff.
 
@@ -92,6 +92,8 @@ akra.order.risk.strategy-trading-environments[laor-v4-live]=LIVE
 akra.order.risk.strategy-trading-environments[laor-v4-paper]=MOCK
 akra.order.risk.account-exposure.overseas-exchange=NASD
 akra.order.risk.account-exposure.overseas-currency=USD
+akra.order.risk.account-cash.enabled=true
+akra.order.risk.account-cash.reserve-notional=100
 akra.order.risk.trading-hours.enabled=true
 akra.order.risk.trading-hours.domestic.regular-open=09:00
 akra.order.risk.trading-hours.domestic.regular-close=15:30
@@ -152,7 +154,7 @@ For live broker position checks, `stock-purchase-service` exposes:
 GET /operations/trading/account-snapshot?market=OVERSEAS_US&exchange=NASD&currency=USD
 ```
 
-This calls the broker wrapper's overseas balance lookup and returns current overseas positions with quantity, average purchase price, current price, purchase amount, evaluation amount, and profit/loss when KIS provides those fields. Domestic balance, settled cash, multi-currency conversion, and broader account cash/exposure modeling still require additional hardening.
+This calls the broker wrapper's overseas balance lookup and returns current overseas positions with quantity, average purchase price, current price, purchase amount, evaluation amount, profit/loss, and available cash amount when KIS provides those fields. Domestic balance, strict settled-cash classification, multi-currency conversion, and broader account cash/exposure modeling still require additional hardening.
 
 When `akra.order.risk.max-account-exposure-notional` is set, buy order risk checks use the overseas account snapshot to reject orders whose projected exposure would exceed the configured limit:
 
@@ -161,6 +163,14 @@ current broker evaluation amount + active pending buy notional + new order notio
 ```
 
 If the broker snapshot does not contain enough valuation data to calculate current exposure, the guard rejects the buy order instead of assuming zero exposure.
+
+When `akra.order.risk.account-cash.enabled=true`, buy order risk checks use the same overseas account snapshot to reject orders whose projected cash usage would exceed the broker-reported available cash amount:
+
+```text
+active pending buy notional + new order notional + configured cash reserve
+```
+
+If the broker snapshot does not contain an available cash amount, the guard rejects the buy order instead of assuming cash is available.
 
 ## Kafka And Temporal Restart Procedure
 

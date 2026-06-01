@@ -419,6 +419,7 @@ class KisBrokerGatewayAdapterTest {
                     }
                   ],
                   "output2": {
+                    "ovrs_ord_psbl_amt": "1250.25",
                     "frcr_buy_amt_smtl": "337.5",
                     "tot_evlu_amt": "360.0",
                     "tot_evlu_pfls_amt": "22.5"
@@ -445,6 +446,7 @@ class KisBrokerGatewayAdapterTest {
         assertEquals(StockOrderMarket.OVERSEAS_US, snapshot.market)
         assertEquals("NASD", snapshot.exchange)
         assertEquals("USD", snapshot.currency)
+        assertEquals(1250.25, snapshot.availableCashAmount)
         assertEquals(337.5, snapshot.totalPurchaseAmount)
         assertEquals(360.0, snapshot.totalEvaluationAmount)
         assertEquals(22.5, snapshot.totalProfitLossAmount)
@@ -479,7 +481,10 @@ class KisBrokerGatewayAdapterTest {
                       "ovrs_cblc_qty": "3"
                     }
                   ],
-                  "output2": {}
+                  "output2": {
+                    "ovrs_ord_psbl_amt": "1250.25",
+                    "tot_evlu_amt": "360.0"
+                  }
                 }
                 """.trimIndent(),
                 """
@@ -515,6 +520,8 @@ class KisBrokerGatewayAdapterTest {
         )
 
         assertEquals(listOf("TQQQ", "SOXL"), snapshot.positions.map { it.symbol })
+        assertEquals(1250.25, snapshot.availableCashAmount)
+        assertEquals(360.0, snapshot.totalEvaluationAmount)
         assertEquals(2, exchangeFunction.requests.size)
         assertEquals("FK1", exchangeFunction.requests[1].queryValue("ctxAreaFk200"))
         assertEquals("NK1", exchangeFunction.requests[1].queryValue("ctxAreaNk200"))

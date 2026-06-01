@@ -27,6 +27,7 @@ class BrokerAccountSnapshotControllerTest {
                         quantity = 3,
                     ),
                 ),
+                availableCashAmount = 1250.25,
                 totalPurchaseAmount = 337.5,
                 totalEvaluationAmount = 360.0,
                 totalProfitLossAmount = 22.5,
@@ -50,6 +51,7 @@ class BrokerAccountSnapshotControllerTest {
         assertEquals("NASD", response.exchange)
         assertEquals("USD", response.currency)
         assertEquals(result.snapshot.positions, response.positions)
+        assertEquals(1250.25, response.availableCashAmount)
         assertEquals(337.5, response.totalPurchaseAmount)
         assertEquals(360.0, response.totalEvaluationAmount)
         assertEquals(22.5, response.totalProfitLossAmount)

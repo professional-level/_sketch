@@ -97,6 +97,7 @@ internal class OverseasStockOrderAdapter(
                     profitLossAmount = it.profitLossAmount,
                 )
             },
+            availableCashAmount = snapshot.availableCashAmount,
             totalPurchaseAmount = snapshot.totalPurchaseAmount,
             totalEvaluationAmount = snapshot.totalEvaluationAmount,
             totalProfitLossAmount = snapshot.totalProfitLossAmount,

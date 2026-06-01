@@ -171,6 +171,7 @@ class StockOrderBrokerGatewayAdapterTest {
         assertEquals(StockOrderMarket.OVERSEAS_US, snapshot.market)
         assertEquals("NYSE", snapshot.exchange)
         assertEquals("USD", snapshot.currency)
+        assertEquals(1250.25, snapshot.availableCashAmount)
         with(brokerGateway.accountSnapshotQueries.single()) {
             assertEquals(StockOrderMarket.OVERSEAS_US, market)
             assertEquals("NYSE", exchange)
@@ -207,6 +208,7 @@ class StockOrderBrokerGatewayAdapterTest {
                 exchange = query.exchange,
                 currency = query.currency,
                 positions = emptyList(),
+                availableCashAmount = 1250.25,
             )
         }
     }

@@ -58,6 +58,7 @@ class GetBrokerAccountSnapshotServiceTest {
                     averagePurchasePrice = 112.5,
                 ),
             ),
+            availableCashAmount = 1250.25,
             totalPurchaseAmount = 337.5,
             totalEvaluationAmount = 360.0,
             totalProfitLossAmount = 22.5,

@@ -149,6 +149,7 @@ data class AccountSnapshotDto(
     val exchange: String,
     val currency: String,
     val positions: List<AccountPositionSnapshotDto>,
+    val availableCashAmount: Double? = null,
     val totalPurchaseAmount: Double? = null,
     val totalEvaluationAmount: Double? = null,
     val totalProfitLossAmount: Double? = null,

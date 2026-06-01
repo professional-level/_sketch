@@ -83,6 +83,7 @@ internal data class BrokerAccountSnapshot(
     val exchange: String,
     val currency: String,
     val positions: List<BrokerPositionSnapshot>,
+    val availableCashAmount: Double? = null,
     val totalPurchaseAmount: Double? = null,
     val totalEvaluationAmount: Double? = null,
     val totalProfitLossAmount: Double? = null,

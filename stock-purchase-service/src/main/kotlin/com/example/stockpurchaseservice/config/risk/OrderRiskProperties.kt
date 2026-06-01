@@ -15,11 +15,17 @@ class OrderRiskProperties {
     var symbolMaxOrderNotional: MutableMap<String, Double> = mutableMapOf()
     var strategyTradingEnvironments: MutableMap<String, OrderTradingEnvironment> = mutableMapOf()
     var accountExposure: AccountExposureProperties = AccountExposureProperties()
+    var accountCash: AccountCashProperties = AccountCashProperties()
     var tradingHours: TradingHoursProperties = TradingHoursProperties()
 
     class AccountExposureProperties {
         var overseasExchange: String = "NASD"
         var overseasCurrency: String = "USD"
+    }
+
+    class AccountCashProperties {
+        var enabled: Boolean = false
+        var reserveNotional: Double = 0.0
     }
 
     class TradingHoursProperties {

@@ -176,6 +176,68 @@ class OrderRiskControlAdapterTest {
     }
 
     @Test
+    fun `rejects buy when active orders plus reserve exceed broker available cash`() = runBlocking {
+        val properties = OrderRiskProperties().apply {
+            accountCash.enabled = true
+            accountCash.reserveNotional = 25.0
+        }
+        val reader = FakeOrderRiskSubmissionReader(activeBuyNotional = 850.0)
+        val marketService = FakeMarketServicePort(
+            snapshot = AccountSnapshotDto(
+                market = StockOrderMarket.OVERSEAS_US,
+                exchange = "NASD",
+                currency = "USD",
+                positions = emptyList(),
+                availableCashAmount = 1_000.0,
+            ),
+        )
+
+        val result = adapter(properties, reader, marketService).assess(
+            command(quantity = 2, limitPrice = 100.0),
+        )
+
+        assertFalse(result.accepted)
+        assertContains(result.reason ?: "", "account cash usage 1075.0 exceeds available cash 1000.0")
+        assertContains(result.reason ?: "", "(active=850.0 order=200.0 reserve=25.0)")
+    }
+
+    @Test
+    fun `rejects buy when configured account cash cannot be assessed`() = runBlocking {
+        val properties = OrderRiskProperties().apply {
+            accountCash.enabled = true
+        }
+        val marketService = FakeMarketServicePort(
+            snapshot = AccountSnapshotDto(
+                market = StockOrderMarket.OVERSEAS_US,
+                exchange = "NASD",
+                currency = "USD",
+                positions = emptyList(),
+            ),
+        )
+
+        val result = adapter(properties, marketService = marketService).assess(
+            command(quantity = 1, limitPrice = 100.0),
+        )
+
+        assertFalse(result.accepted)
+        assertContains(result.reason ?: "", "account cash cannot be assessed")
+    }
+
+    @Test
+    fun `does not apply account cash guard to sell orders`() = runBlocking {
+        val properties = OrderRiskProperties().apply {
+            accountCash.enabled = true
+        }
+        val reader = FakeOrderRiskSubmissionReader(activeBuyNotional = 2_000.0)
+
+        val result = adapter(properties, reader).assess(
+            command(side = OrderIntentSide.SELL, orderType = OrderIntentType.LOC, quantity = 2, limitPrice = 100.0),
+        )
+
+        assertTrue(result.accepted)
+    }
+
+    @Test
     fun `uses position values when account exposure summary is absent`() = runBlocking {
         val properties = OrderRiskProperties().apply {
             maxAccountExposureNotional = 1_000.0

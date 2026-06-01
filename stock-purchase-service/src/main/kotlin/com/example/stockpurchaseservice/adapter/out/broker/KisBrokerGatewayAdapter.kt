@@ -197,7 +197,7 @@ internal class KisBrokerGatewayAdapter(
             if (!seenCursors.add(cursor)) break
             val page = fetchOverseasAccountSnapshotPage(query.copy(pageCursor = cursor))
             positions += page.snapshot.positions
-            summary = page.snapshot.copy(positions = emptyList())
+            summary = summary.mergeSummaryFrom(page.snapshot)
             cursor = page.nextCursor
             pageCount += 1
         } while (cursor.hasNext() && pageCount < MAX_ACCOUNT_BALANCE_PAGES)
@@ -532,6 +532,20 @@ private fun JsonNode.toBrokerAccountSnapshot(query: BrokerAccountSnapshotQuery):
         exchange = query.exchange.uppercase(),
         currency = query.currency.uppercase(),
         positions = rows.mapNotNull { it.toBrokerPositionSnapshot() },
+        availableCashAmount = summary.textOrNull(
+            "ovrs_ord_psbl_amt",
+            "OVRS_ORD_PSBL_AMT",
+            "frcr_ord_psbl_amt",
+            "FRCR_ORD_PSBL_AMT",
+            "ord_psbl_frcr_amt",
+            "ORD_PSBL_FRCR_AMT",
+            "frcr_dncl_amt_2",
+            "FRCR_DNCL_AMT_2",
+            "frcr_dncl_amt",
+            "FRCR_DNCL_AMT",
+            "buy_psbl_amt",
+            "BUY_PSBL_AMT",
+        ).toDoubleValue(),
         totalPurchaseAmount = summary.textOrNull(
             "frcr_buy_amt_smtl",
             "FRCR_BUY_AMT_SMTL",
@@ -556,6 +570,19 @@ private fun JsonNode.toBrokerAccountSnapshot(query: BrokerAccountSnapshotQuery):
             "frcr_evlu_pfls_amt",
             "FRCR_EVLU_PFLS_AMT",
         ).toDoubleValue(),
+    )
+}
+
+private fun BrokerAccountSnapshot.mergeSummaryFrom(next: BrokerAccountSnapshot): BrokerAccountSnapshot {
+    return copy(
+        market = next.market,
+        exchange = next.exchange,
+        currency = next.currency,
+        positions = emptyList(),
+        availableCashAmount = next.availableCashAmount ?: availableCashAmount,
+        totalPurchaseAmount = next.totalPurchaseAmount ?: totalPurchaseAmount,
+        totalEvaluationAmount = next.totalEvaluationAmount ?: totalEvaluationAmount,
+        totalProfitLossAmount = next.totalProfitLossAmount ?: totalProfitLossAmount,
     )
 }
 
