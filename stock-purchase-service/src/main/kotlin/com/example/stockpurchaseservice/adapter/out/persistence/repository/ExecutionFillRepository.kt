@@ -12,4 +12,15 @@ internal class ExecutionFillRepository : AbstractReactiveRepository<ExecutionFil
     suspend fun exists(externalExecutionId: String): Boolean {
         return findById(externalExecutionId).awaitSuspending() != null
     }
+
+    suspend fun sumQuantityByExternalOrderId(externalOrderId: String): Long {
+        val quantity = sessionFactory.withSession { session ->
+            session.createQuery(
+                "SELECT COALESCE(SUM(e.quantity), 0) FROM ExecutionFillEntity e WHERE e.externalOrderId = :externalOrderId",
+                java.lang.Long::class.java,
+            ).setParameter("externalOrderId", externalOrderId).singleResult
+        }.awaitSuspending()
+
+        return quantity.toLong()
+    }
 }

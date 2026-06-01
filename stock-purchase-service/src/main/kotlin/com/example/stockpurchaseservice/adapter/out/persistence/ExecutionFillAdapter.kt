@@ -20,4 +20,8 @@ internal class ExecutionFillAdapter(
             true
         }.getOrDefault(false)
     }
+
+    override suspend fun sumQuantityByExternalOrderId(externalOrderId: String): Long {
+        return executionFillRepository.sumQuantityByExternalOrderId(externalOrderId)
+    }
 }

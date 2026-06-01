@@ -6,6 +6,7 @@ import java.time.ZonedDateTime
 
 interface ExecutionFillPort {
     suspend fun saveIfNew(fill: ExecutionFillDto): Boolean
+    suspend fun sumQuantityByExternalOrderId(externalOrderId: String): Long
 }
 
 data class ExecutionFillDto(

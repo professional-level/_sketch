@@ -9,6 +9,7 @@ import com.example.stockpurchaseservice.application.port.out.BrokerOrderSubmissi
 import com.example.stockpurchaseservice.application.port.out.MarketServicePort
 import com.example.stockpurchaseservice.application.port.out.OrderExecutionEventPort
 import com.example.stockpurchaseservice.application.port.out.OrderFilledMessage
+import com.example.stockpurchaseservice.application.port.out.OrderPartiallyFilledMessage
 import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionDto
 import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionPort
 import com.example.stockpurchaseservice.application.port.out.OrderRejectedMessage
@@ -187,5 +188,7 @@ class SubmitOrderIntentServiceTest {
         }
 
         override suspend fun publishFilled(event: OrderFilledMessage) = Unit
+
+        override suspend fun publishPartiallyFilled(event: OrderPartiallyFilledMessage) = Unit
     }
 }

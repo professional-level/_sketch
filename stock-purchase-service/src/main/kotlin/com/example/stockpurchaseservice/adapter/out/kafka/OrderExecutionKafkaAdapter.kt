@@ -5,9 +5,11 @@ import com.example.common.ExternalApiAdapter
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
 import com.example.stockpurchaseservice.application.port.out.OrderExecutionEventPort
 import com.example.stockpurchaseservice.application.port.out.OrderFilledMessage
+import com.example.stockpurchaseservice.application.port.out.OrderPartiallyFilledMessage
 import com.example.stockpurchaseservice.application.port.out.OrderRejectedMessage
 import com.example.stockpurchaseservice.application.port.out.OrderSubmittedMessage
 import common.Topic.ORDER_FILLED
+import common.Topic.ORDER_PARTIALLY_FILLED
 import common.Topic.ORDER_REJECTED
 import common.Topic.ORDER_SUBMITTED
 import common.proto.ProtoUtils.toProtobufTimestamp
@@ -43,6 +45,14 @@ internal class OrderExecutionKafkaAdapter(
         ).await()
     }
 
+    override suspend fun publishPartiallyFilled(event: OrderPartiallyFilledMessage) {
+        kafkaProtoTypeTemplate.send(
+            ORDER_PARTIALLY_FILLED,
+            event.strategyExecutionId,
+            event.toProto().toByteArray(),
+        ).await()
+    }
+
     private fun OrderSubmittedMessage.toProto(): Event.OrderSubmitted {
         return Event.OrderSubmitted.newBuilder()
             .setEventId(eventId.toString())
@@ -68,6 +78,21 @@ internal class OrderExecutionKafkaAdapter(
 
     private fun OrderFilledMessage.toProto(): Event.OrderFilled {
         return Event.OrderFilled.newBuilder()
+            .setEventId(eventId.toString())
+            .setStrategyExecutionId(strategyExecutionId)
+            .setOrderIntentId(orderIntentId)
+            .setBrokerOrderId(brokerOrderId)
+            .setSide(side.toProto())
+            .setFilledPrice(filledPrice)
+            .setFilledQuantity(filledQuantity)
+            .setOrderTag(orderTag)
+            .setFilledAt(filledAt.toProtobufTimestamp())
+            .setMeta(meta(filledAt))
+            .build()
+    }
+
+    private fun OrderPartiallyFilledMessage.toProto(): Event.OrderPartiallyFilled {
+        return Event.OrderPartiallyFilled.newBuilder()
             .setEventId(eventId.toString())
             .setStrategyExecutionId(strategyExecutionId)
             .setOrderIntentId(orderIntentId)

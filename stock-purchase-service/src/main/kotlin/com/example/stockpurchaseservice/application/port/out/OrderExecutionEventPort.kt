@@ -8,6 +8,7 @@ interface OrderExecutionEventPort {
     suspend fun publishSubmitted(event: OrderSubmittedMessage)
     suspend fun publishRejected(event: OrderRejectedMessage)
     suspend fun publishFilled(event: OrderFilledMessage)
+    suspend fun publishPartiallyFilled(event: OrderPartiallyFilledMessage)
 }
 
 data class OrderSubmittedMessage(
@@ -28,6 +29,18 @@ data class OrderRejectedMessage(
 )
 
 data class OrderFilledMessage(
+    val eventId: UUID,
+    val strategyExecutionId: String,
+    val orderIntentId: String,
+    val brokerOrderId: String,
+    val side: OrderIntentSide,
+    val filledPrice: Double,
+    val filledQuantity: Long,
+    val orderTag: String,
+    val filledAt: ZonedDateTime,
+)
+
+data class OrderPartiallyFilledMessage(
     val eventId: UUID,
     val strategyExecutionId: String,
     val orderIntentId: String,

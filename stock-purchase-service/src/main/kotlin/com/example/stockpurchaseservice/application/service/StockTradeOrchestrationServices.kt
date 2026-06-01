@@ -11,6 +11,7 @@ import com.example.stockpurchaseservice.application.port.out.ExecutionFillPort
 import com.example.stockpurchaseservice.application.port.out.MarketServicePort
 import com.example.stockpurchaseservice.application.port.out.OrderExecutionEventPort
 import com.example.stockpurchaseservice.application.port.out.OrderFilledMessage
+import com.example.stockpurchaseservice.application.port.out.OrderPartiallyFilledMessage
 import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionPort
 import com.example.stockpurchaseservice.application.service.strategy.toDto
 import com.example.stockpurchaseservice.domain.ExecutedStock
@@ -69,15 +70,16 @@ class ReconcileExecutionsService(
     override suspend fun execute() {
         // TODO: Add durable cursor/recovery handling; saveIfNew only deduplicates observed fills.
         val executedStockList: List<ExecutedStock> = marketService.findExecutionListAtOneDay().map { it.toDomain() }
-        val refinedExecutedStockList = executedStockList.filter { execution ->
-            executionFillPort.saveIfNew(ExecutionFillDto.from(ExecutionFill.from(execution)))
+        val refinedExecutedStockList = mutableListOf<ExecutedStock>()
+        executedStockList.forEach { execution ->
+            if (executionFillPort.saveIfNew(ExecutionFillDto.from(ExecutionFill.from(execution)))) {
+                refinedExecutedStockList += execution
+                publishOrderFillEventIfIntentSubmissionExists(execution)
+            }
         }
         if (refinedExecutedStockList.isEmpty()) return
 
         val (selled, purchased) = refinedExecutedStockList.partition { it.type == ExecutionType.Selling }
-        refinedExecutedStockList.forEach { execution ->
-            publishOrderFilledIfIntentSubmissionExists(execution)
-        }
         selled.forEach {
             // Selling reconciliation is modeled here so the scheduler no longer owns the branch.
             // A later order-state redesign can apply external execution ids to the aggregate.
@@ -86,6 +88,8 @@ class ReconcileExecutionsService(
         purchased.forEach { item ->
             // TODO: Unmatched broker executions should emit an event/log; normal fills should map to a known order.
             stockOrderRepository.findByExternalOrderId(item.externalOrderId)?.let { purchasedOrder ->
+                if (!isFullyFilled(item.externalOrderId.value, purchasedOrder.quantity.toLong())) return@let
+
                 purchasedOrder.changeOrderState(OrderState.PURCHASE_COMPLETED)
                 stockOrderRepository.save(purchasedOrder)
 
@@ -104,25 +108,49 @@ class ReconcileExecutionsService(
         }
     }
 
-    private suspend fun publishOrderFilledIfIntentSubmissionExists(execution: ExecutedStock) {
+    private suspend fun publishOrderFillEventIfIntentSubmissionExists(execution: ExecutedStock) {
         val submission = orderIntentSubmissionPort.findByExternalOrderId(execution.externalOrderId.value) ?: return
         val filledPrice = submission.submittedPrice ?: return
-        orderExecutionEventPort.publishFilled(
-            OrderFilledMessage(
-                eventId = UUID.nameUUIDFromBytes(
-                    "${execution.externalExecutionId.value}:ORDER_FILLED".toByteArray(StandardCharsets.UTF_8),
+        if (isFullyFilled(execution.externalOrderId.value, submission.quantity)) {
+            orderExecutionEventPort.publishFilled(
+                OrderFilledMessage(
+                    eventId = execution.toEventId("ORDER_FILLED"),
+                    strategyExecutionId = submission.strategyExecutionId,
+                    orderIntentId = submission.orderIntentId.toString(),
+                    brokerOrderId = execution.externalOrderId.value,
+                    side = execution.type.toOrderIntentSide(),
+                    filledPrice = filledPrice,
+                    filledQuantity = execution.quantity.toLong(),
+                    orderTag = submission.orderTag,
+                    filledAt = execution.createdAt,
                 ),
-                strategyExecutionId = submission.strategyExecutionId,
-                orderIntentId = submission.orderIntentId.toString(),
-                brokerOrderId = execution.externalOrderId.value,
-                side = execution.type.toOrderIntentSide(),
-                filledPrice = filledPrice,
-                filledQuantity = execution.quantity.toLong(),
-                orderTag = submission.orderTag,
-                filledAt = execution.createdAt,
-            ),
-        )
+            )
+        } else {
+            orderExecutionEventPort.publishPartiallyFilled(
+                OrderPartiallyFilledMessage(
+                    eventId = execution.toEventId("ORDER_PARTIALLY_FILLED"),
+                    strategyExecutionId = submission.strategyExecutionId,
+                    orderIntentId = submission.orderIntentId.toString(),
+                    brokerOrderId = execution.externalOrderId.value,
+                    side = execution.type.toOrderIntentSide(),
+                    filledPrice = filledPrice,
+                    filledQuantity = execution.quantity.toLong(),
+                    orderTag = submission.orderTag,
+                    filledAt = execution.createdAt,
+                ),
+            )
+        }
     }
+
+    private suspend fun isFullyFilled(externalOrderId: String, orderQuantity: Long): Boolean {
+        return executionFillPort.sumQuantityByExternalOrderId(externalOrderId) >= orderQuantity
+    }
+}
+
+private fun ExecutedStock.toEventId(eventType: String): UUID {
+    return UUID.nameUUIDFromBytes(
+        "${externalExecutionId.value}:$eventType".toByteArray(StandardCharsets.UTF_8),
+    )
 }
 
 @UseCaseImpl
