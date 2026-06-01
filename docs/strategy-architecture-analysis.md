@@ -617,6 +617,12 @@ stock-search-service
 - Rejected intents follow the existing risk rejection path: rejected submission storage plus `OrderRejected` publication.
 - This is still not a full exchange-calendar integration. Automatic holiday/early-close synchronization, per-date cutoff data, and broker-verified live-market acceptance checks remain production hardening work.
 
+### Trading Operations Status API
+
+- `stock-purchase-service` exposes `GET /operations/trading/status` for operator dashboard polling.
+- The endpoint reports order submission status counts, reconciliation cursor health, unmatched execution totals, and recent unmatched broker executions.
+- This fills the API side of the operating dashboard need. A UI, trace propagation, and dedicated incident-routing rules are still production hardening work.
+
 ## Open Questions
 
 - `autoRestart=true`일 때 execution-service가 즉시 다음 cycle을 여는 현재 정책으로 충분한가, 아니면 search-service의 재승인을 다시 받아야 하는가?

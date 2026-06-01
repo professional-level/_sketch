@@ -6,6 +6,7 @@ import com.example.stockpurchaseservice.adapter.out.persistence.entity.OrderInte
 import common.AbstractReactiveRepository
 import io.smallrye.mutiny.coroutines.awaitSuspending
 import jakarta.enterprise.context.ApplicationScoped
+import jakarta.persistence.Tuple
 import org.springframework.stereotype.Repository
 import java.time.ZonedDateTime
 import java.util.UUID
@@ -31,6 +32,24 @@ internal class OrderIntentSubmissionRepository :
                 OrderIntentSubmissionEntity::class.java,
             ).setParameter("status", status).resultList
         }.awaitSuspending()
+    }
+
+    suspend fun countByStatus(): Map<OrderIntentSubmissionStatus, Long> {
+        val rows = sessionFactory.withSession { session ->
+            session.createQuery(
+                """
+                SELECT o.status, COUNT(o)
+                FROM OrderIntentSubmissionEntity o
+                GROUP BY o.status
+                """.trimIndent(),
+                Tuple::class.java,
+            ).resultList
+        }.awaitSuspending()
+
+        return rows.associate { tuple ->
+            tuple.get(0, OrderIntentSubmissionStatus::class.java) to
+                tuple.get(1, java.lang.Number::class.java).longValue()
+        }
     }
 
     override suspend fun countBrokerSubmittedBetween(

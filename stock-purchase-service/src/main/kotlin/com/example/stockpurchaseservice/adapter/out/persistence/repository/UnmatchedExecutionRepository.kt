@@ -12,4 +12,25 @@ internal class UnmatchedExecutionRepository : AbstractReactiveRepository<Unmatch
     suspend fun exists(externalExecutionId: String): Boolean {
         return findById(externalExecutionId).awaitSuspending() != null
     }
+
+    suspend fun countAll(): Long {
+        val count = sessionFactory.withSession { session ->
+            session.createQuery(
+                "SELECT COUNT(e) FROM UnmatchedExecutionEntity e",
+                java.lang.Long::class.java,
+            ).singleResult
+        }.awaitSuspending()
+
+        return count.toLong()
+    }
+
+    suspend fun findRecent(limit: Int): List<UnmatchedExecutionEntity> {
+        if (limit <= 0) return emptyList()
+        return sessionFactory.withSession { session ->
+            session.createQuery(
+                "FROM UnmatchedExecutionEntity e ORDER BY e.observedAt DESC",
+                UnmatchedExecutionEntity::class.java,
+            ).setMaxResults(limit).resultList
+        }.awaitSuspending()
+    }
 }

@@ -11,6 +11,15 @@ import org.springframework.stereotype.Repository
 internal class ExecutionReconciliationCursorRepository :
     AbstractReactiveRepository<ExecutionReconciliationCursorEntity, String>() {
 
+    suspend fun findAllCursors(): List<ExecutionReconciliationCursorEntity> {
+        return sessionFactory.withSession { session ->
+            session.createQuery(
+                "FROM ExecutionReconciliationCursorEntity c ORDER BY c.source ASC",
+                ExecutionReconciliationCursorEntity::class.java,
+            ).resultList
+        }.awaitSuspending()
+    }
+
     suspend fun update(cursor: ExecutionReconciliationCursorEntity) {
         sessionFactory.withSession { session ->
             session.merge(cursor).flatMap { session.flush() }

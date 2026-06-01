@@ -128,6 +128,21 @@ akra.observability.operational-alerts.webhook.timeout=3s
 
 Keep real webhook URLs outside Git, because many alert platforms embed routing tokens in the URL. The webhook payload contains `type`, `severity`, `title`, `occurredAt`, and an `attributes` object with alert-specific fields.
 
+`stock-purchase-service` also exposes an operator status endpoint for dashboard polling or manual checks:
+
+```text
+GET /operations/trading/status
+```
+
+The response includes:
+
+- order submission counts by `SUBMITTED`, `SUBMISSION_UNKNOWN`, `REJECTED`, and `CANCELLED`
+- reconciliation cursor status, attempt counts, last observed execution id/time, saved fill count, unmatched execution count, and failure reason
+- total unmatched broker execution count
+- the 20 most recent unmatched broker executions
+
+Use this endpoint with the alert counters when checking whether broker submission recovery, reconciliation, and unmatched execution handling are advancing after a restart.
+
 ## Kafka And Temporal Restart Procedure
 
 When Kafka, Temporal, or an application service restarts:
