@@ -31,6 +31,59 @@ class OperationalAlertWebhookNotificationSinkTest {
     }
 
     @Test
+    fun `sends enabled slack notification`() = runBlocking {
+        val exchangeFunction = CapturingExchangeFunction()
+        val sink = OperationalAlertWebhookNotificationSink(
+            properties = OperationalAlertProperties().apply {
+                slack.enabled = true
+                slack.url = "https://hooks.slack.example.test/services/trading"
+            },
+            webClientBuilder = WebClient.builder().exchangeFunction(exchangeFunction),
+        )
+
+        sink.send(notification())
+
+        val request = exchangeFunction.requests.single()
+        assertEquals(HttpMethod.POST, request.method())
+        assertEquals("https://hooks.slack.example.test/services/trading", request.url().toString())
+    }
+
+    @Test
+    fun `sends enabled pagerduty notification`() = runBlocking {
+        val exchangeFunction = CapturingExchangeFunction()
+        val sink = OperationalAlertWebhookNotificationSink(
+            properties = OperationalAlertProperties().apply {
+                pagerDuty.enabled = true
+                pagerDuty.routingKey = "routing-key"
+                pagerDuty.url = "https://events.pagerduty.example.test/v2/enqueue"
+            },
+            webClientBuilder = WebClient.builder().exchangeFunction(exchangeFunction),
+        )
+
+        sink.send(notification())
+
+        val request = exchangeFunction.requests.single()
+        assertEquals(HttpMethod.POST, request.method())
+        assertEquals("https://events.pagerduty.example.test/v2/enqueue", request.url().toString())
+    }
+
+    @Test
+    fun `does not send pagerduty notification without routing key`() = runBlocking {
+        val exchangeFunction = CapturingExchangeFunction()
+        val sink = OperationalAlertWebhookNotificationSink(
+            properties = OperationalAlertProperties().apply {
+                pagerDuty.enabled = true
+                pagerDuty.routingKey = ""
+            },
+            webClientBuilder = WebClient.builder().exchangeFunction(exchangeFunction),
+        )
+
+        sink.send(notification())
+
+        assertEquals(emptyList(), exchangeFunction.requests)
+    }
+
+    @Test
     fun `does not send webhook when disabled`() = runBlocking {
         val exchangeFunction = CapturingExchangeFunction()
         val sink = OperationalAlertWebhookNotificationSink(
@@ -54,6 +107,42 @@ class OperationalAlertWebhookNotificationSinkTest {
         sink.send(notification())
 
         assertEquals(1, exchangeFunction.requests.size)
+    }
+
+    @Test
+    fun `builds slack payload with alert fields`() {
+        val properties = OperationalAlertProperties.Slack().apply {
+            channel = "#trading-alerts"
+            username = "akra-trading"
+        }
+
+        val payload = notification().toSlackPayload(properties)
+
+        assertEquals("[ERROR] Order submission failed", payload.text)
+        assertEquals("#trading-alerts", payload.channel)
+        assertEquals("akra-trading", payload.username)
+        assertEquals("danger", payload.attachments.single().color)
+        assertEquals("TQQQ", payload.attachments.single().fields.single { it.title == "symbol" }.value)
+        assertEquals("broker timeout", payload.attachments.single().fields.single { it.title == "reason" }.value)
+    }
+
+    @Test
+    fun `builds pagerduty trigger payload with dedup key`() {
+        val properties = OperationalAlertProperties.PagerDuty().apply {
+            routingKey = "routing-key"
+            source = "stock-purchase-service-live"
+        }
+
+        val payload = notification().toPagerDutyPayload(properties)
+
+        assertEquals("routing-key", payload.routingKey)
+        assertEquals("trigger", payload.eventAction)
+        assertEquals("order_submission_failed:Order submission failed", payload.dedupKey)
+        assertEquals("Order submission failed", payload.payload.summary)
+        assertEquals("stock-purchase-service-live", payload.payload.source)
+        assertEquals("error", payload.payload.severity)
+        assertEquals("order_submission_failed", payload.payload.customDetails["type"])
+        assertEquals("TQQQ", payload.payload.customDetails["symbol"])
     }
 
     private fun enabledProperties(): OperationalAlertProperties {

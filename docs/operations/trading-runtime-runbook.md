@@ -123,15 +123,23 @@ Operational alert counters are emitted through Micrometer as `stock.purchase.ope
 - `type`: `order_submission_failed`, `submission_unknown`, `reconciliation_failed`, `unmatched_execution`, `order_cancellation_submission_failed`, or `order_cancellation_submission_unknown`
 - `severity`: `error` or `warning`
 
-Optional outbound alert webhook:
+Optional outbound alert routes:
 
 ```properties
 akra.observability.operational-alerts.webhook.enabled=true
 akra.observability.operational-alerts.webhook.url=https://alerts.example.invalid/trading
 akra.observability.operational-alerts.webhook.timeout=3s
+akra.observability.operational-alerts.slack.enabled=true
+akra.observability.operational-alerts.slack.url=https://hooks.slack.example.invalid/services/REDACTED
+akra.observability.operational-alerts.slack.channel=#trading-alerts
+akra.observability.operational-alerts.slack.username=akra-trading
+akra.observability.operational-alerts.pager-duty.enabled=true
+akra.observability.operational-alerts.pager-duty.routing-key=REDACTED
+akra.observability.operational-alerts.pager-duty.url=https://events.pagerduty.com/v2/enqueue
+akra.observability.operational-alerts.pager-duty.source=stock-purchase-service
 ```
 
-Keep real webhook URLs outside Git, because many alert platforms embed routing tokens in the URL. The webhook payload contains `type`, `severity`, `title`, `occurredAt`, and an `attributes` object with alert-specific fields.
+Keep real webhook URLs and PagerDuty routing keys outside Git, because many alert platforms embed routing tokens in the URL. The generic webhook payload contains `type`, `severity`, `title`, `occurredAt`, and an `attributes` object with alert-specific fields. Slack uses an incoming-webhook attachment payload, and PagerDuty uses an Events API v2 `trigger` payload with deterministic dedup keys.
 
 `stock-purchase-service` also exposes an operator status endpoint for dashboard polling or manual checks:
 
