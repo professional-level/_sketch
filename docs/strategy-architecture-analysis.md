@@ -546,7 +546,7 @@ broker API 자체가 idempotency key를 지원하지 않는다면, purchase-serv
 - `stock-purchase-service`는 주문 제출 실패, `SUBMISSION_UNKNOWN` 지속, reconciliation 실패, 미매칭 broker execution을 `OperationalAlertPort`로 알리고, 기본 구현은 로그 기반 alert adapter, Micrometer operational alert counter, optional generic webhook, Slack incoming webhook, PagerDuty Events API v2 sink로 둔다.
 - `strategy-execution-service`는 `/strategy-executions/laor-v4`와 `/strategy-executions/laor-v4/{executionId}`에서 전략별 T, 현금, 보유 수량, 평균단가, cycle, mode를 조회할 수 있다.
 - `stock-purchase-service`와 `strategy-execution-service`는 production-like profile에서 로컬 broker/Temporal endpoint나 mock 주문 설정이 남아 있으면 startup validation으로 실패한다.
-- root sketch app의 KIS secret key 이름은 `src/main/resources/application-secret.properties.example` 템플릿으로 문서화했고, 운영 재시작 절차는 `docs/operations/trading-runtime-runbook.md`에 정리했다.
+- root sketch app의 KIS secret key 이름은 `src/main/resources/application-secret.properties.example` 템플릿으로 문서화했고, classpath secret 파일 없이 런타임 환경변수/secret source로도 주입할 수 있다. 운영 재시작 절차는 `docs/operations/trading-runtime-runbook.md`에 정리했다.
 - OpenTelemetry trace propagation, 운영 대시보드 UI는 아직 남아 있다.
 - 단발성 전략의 entry buy는 execution-service로 들어왔지만, sell policy와 completion lifecycle은 추가 정리가 필요하다.
 - daily execution schedule은 설정 기반 US trading calendar를 거쳐 실행된다. 주말과 설정된 휴장일은 active strategy 실행을 skip하며, 휴장일 데이터 자동 동기화와 조기폐장/LOC/MOC 마감 시간 정책은 남아 있다.
@@ -600,7 +600,7 @@ stock-search-service
 16. 부분 완료: stock-purchase-service의 broker 제출 전 risk guard를 추가한다. 주문 단위/종목별 금액 한도, 활성 매수 주문 기준 계좌 pending exposure 한도, KIS 해외 계좌 스냅샷 기반 계좌 exposure 한도, KIS 해외 available cash 기반 현금 사용 한도, 하루 broker 제출 건수 한도, 중복 주문 kill switch, 전략 prefix disable, 전략 prefix별 mock/live broker route 검증은 적용됐다. 국내 잔고, 엄밀한 settled cash 구분, 다통화/환율 반영, order intent 계약 수준의 trading environment 명시는 남아 있다.
 17. 부분 완료: 운영 관측성을 추가한다. 주문 제출 실패, `SUBMISSION_UNKNOWN` 지속, reconciliation 실패, 미매칭 broker execution은 log 기반 alert port, Micrometer counter, optional generic webhook, Slack incoming webhook, PagerDuty Events API v2로 노출하고, 라오어 전략별 T/현금/보유/평단 조회 API를 추가했다. OpenTelemetry trace propagation, 대시보드 UI는 남아 있다.
 18. 부분 완료: daily active strategy execution에 설정 기반 US trading calendar를 추가하고, stock-purchase-service broker 제출 전 설정 기반 주문 가능 시간/LOC/MOC 마감 guard를 추가한다. 주말과 설정 휴장일 skip, 설정 기반 주문 시간 guard는 적용됐고, 휴장일/조기폐장/마감 시간 데이터 자동 동기화와 per-date cutoff 정책은 남아 있다.
-19. 부분 완료: 배포/설정/보안 가드를 추가한다. KIS secret 템플릿, 운영 runbook, production-like profile startup validation은 적용했고, secret manager/vault 연동과 운영 DB/Kafka/Temporal 배포 자동화는 남아 있다.
+19. 부분 완료: 배포/설정/보안 가드를 추가한다. KIS secret 템플릿, runtime-injected KIS secret source 지원, 운영 runbook, production-like profile startup validation은 적용했고, secret manager/vault 배포 연동과 운영 DB/Kafka/Temporal 배포 자동화는 남아 있다.
 
 ### Broker Cancel Request Boundary
 

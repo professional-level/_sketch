@@ -6,12 +6,12 @@ This runbook covers the minimum runtime configuration and restart checks needed 
 
 ## Secret Handling
 
-The root sketch app reads KIS credentials from `src/main/resources/application-secret.properties`.
+The root sketch app reads KIS credentials from runtime-injected Spring `Environment` properties or the optional local `src/main/resources/application-secret.properties` file.
 
 - Never commit `application-secret.properties`.
 - Use `src/main/resources/application-secret.properties.example` as the local template.
 - Keep real account numbers, app keys, app secrets, and tokens outside Git.
-- For a real deployment, move these values to a secret manager or runtime-injected environment source instead of packaging them in the application jar.
+- For a real deployment, provide these values through environment variables, Kubernetes/Vault-injected properties, or another runtime secret source instead of packaging them in the application jar.
 
 Required keys:
 
@@ -26,6 +26,21 @@ mock_account=00000000
 mock_account_tail=01
 account=00000000
 account_tail=01
+```
+
+Equivalent runtime-injected environment variable names:
+
+```properties
+KIS_BASE_URL=https://openapi.koreainvestment.com:9443
+KIS_APP_KEY=REDACTED
+KIS_APP_SECRET=REDACTED
+KIS_MOCK_BASE_URL=https://openapivts.koreainvestment.com:29443
+KIS_MOCK_APP_KEY=REDACTED
+KIS_MOCK_APP_SECRET=REDACTED
+KIS_MOCK_ACCOUNT=00000000
+KIS_MOCK_ACCOUNT_TAIL=01
+KIS_ACCOUNT=00000000
+KIS_ACCOUNT_TAIL=01
 ```
 
 The root KIS wrapper keeps real and mock access tokens in separate in-memory cache scopes. Token cache entries are refreshed before the KIS expiry timestamp, or by `expires_in` when the explicit expiry field is absent.
@@ -79,7 +94,7 @@ Before enabling real orders:
 - Set real-vs-mock trading flags intentionally for the account being operated.
 - Confirm risk guard limits are set for order notional, account pending buy notional, broker account exposure/cash, symbol notional, daily order count, disabled strategies, and strategy trading environments.
 - Configure domestic and US order windows, holidays, early-close dates, and LOC/MOC cutoffs until an exchange calendar sync is available.
-- Confirm `application-secret.properties` is not included in the built artifact or Git diff.
+- Confirm `application-secret.properties` is not included in the built artifact or Git diff, or omit it entirely and inject the KIS values at runtime.
 
 Risk and trading-hours guard keys:
 

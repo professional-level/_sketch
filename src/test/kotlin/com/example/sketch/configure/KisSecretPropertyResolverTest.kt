@@ -1,0 +1,95 @@
+package com.example.sketch.configure
+
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+
+class KisSecretPropertyResolverTest {
+
+    @Test
+    fun `resolves local application secret property names`() {
+        val properties = mapOf(
+            "base_url" to "https://openapi.koreainvestment.com:9443",
+            "app_key" to "real-app-key",
+            "app_secret" to "real-app-secret",
+            "mock_base_url" to "https://openapivts.koreainvestment.com:29443",
+            "mock_app_key" to "mock-app-key",
+            "mock_app_secret" to "mock-app-secret",
+            "mock_account" to "00000000",
+            "mock_account_tail" to "01",
+            "account" to "11111111",
+            "account_tail" to "01",
+        )
+
+        val resolved = KisSecretPropertyResolver.resolve(properties::get)
+
+        assertEquals("https://openapi.koreainvestment.com:9443", resolved.baseUrl)
+        assertEquals("real-app-key", resolved.appKey)
+        assertEquals("real-app-secret", resolved.appSecret)
+        assertEquals("https://openapivts.koreainvestment.com:29443", resolved.mockBaseUrl)
+        assertEquals("mock-app-key", resolved.mockAppKey)
+        assertEquals("mock-app-secret", resolved.mockAppSecret)
+        assertEquals("00000000", resolved.mockAccount)
+        assertEquals("01", resolved.mockAccountTail)
+        assertEquals("11111111", resolved.account)
+        assertEquals("01", resolved.accountTail)
+    }
+
+    @Test
+    fun `resolves runtime injected environment style property names`() {
+        val properties = mapOf(
+            "KIS_BASE_URL" to "https://openapi.koreainvestment.com:9443",
+            "KIS_APP_KEY" to "real-app-key",
+            "KIS_APP_SECRET" to "real-app-secret",
+            "KIS_MOCK_BASE_URL" to "https://openapivts.koreainvestment.com:29443",
+            "KIS_MOCK_APP_KEY" to "mock-app-key",
+            "KIS_MOCK_APP_SECRET" to "mock-app-secret",
+            "KIS_MOCK_ACCOUNT" to "00000000",
+            "KIS_MOCK_ACCOUNT_TAIL" to "01",
+            "KIS_ACCOUNT" to "11111111",
+            "KIS_ACCOUNT_TAIL" to "01",
+        )
+
+        val resolved = KisSecretPropertyResolver.resolve(properties::get)
+
+        assertEquals("https://openapi.koreainvestment.com:9443", resolved.baseUrl)
+        assertEquals("real-app-key", resolved.appKey)
+        assertEquals("real-app-secret", resolved.appSecret)
+        assertEquals("https://openapivts.koreainvestment.com:29443", resolved.mockBaseUrl)
+        assertEquals("mock-app-key", resolved.mockAppKey)
+        assertEquals("mock-app-secret", resolved.mockAppSecret)
+        assertEquals("00000000", resolved.mockAccount)
+        assertEquals("01", resolved.mockAccountTail)
+        assertEquals("11111111", resolved.account)
+        assertEquals("01", resolved.accountTail)
+    }
+
+    @Test
+    fun `fails when a required secret is missing`() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            KisSecretPropertyResolver.resolve(emptyMap<String, String>()::get)
+        }
+
+        assertEquals(
+            "Missing required KIS secret property. Provide one of: base_url, kis.base-url, kis.base.url, KIS_BASE_URL",
+            exception.message,
+        )
+    }
+
+    @Test
+    fun `fails when a required secret still has a template placeholder`() {
+        val properties = mapOf(
+            "base_url" to "https://openapi.koreainvestment.com:9443",
+            "app_key" to "REPLACE_WITH_REAL_APP_KEY",
+        )
+
+        val exception = assertFailsWith<IllegalArgumentException> {
+            KisSecretPropertyResolver.resolve(properties::get)
+        }
+
+        assertEquals(
+            "KIS secret property is still a placeholder. Provide a real value for one of: app_key, kis.app-key, kis.app.key, KIS_APP_KEY",
+            exception.message,
+        )
+    }
+}
