@@ -52,6 +52,10 @@ enum class RequestType(
         requestURI = "/uapi/domestic-stock/v1/trading/order-rvsecncl",
         type = HttpMethod.POST,
     ),
+    GET_STOCK_ORDER_CANCELABLE(
+        requestURI = "/uapi/domestic-stock/v1/trading/inquire-psbl-rvsecncl",
+        type = HttpMethod.GET,
+    ),
     POST_OVERSEAS_STOCK_ORDER(
         requestURI = "/uapi/overseas-stock/v1/trading/order",
         type = HttpMethod.POST,
@@ -112,6 +116,7 @@ enum class QueryParameter(
     ORD_GNO_BRNO(emptyQueryParam),
     ODNO(emptyQueryParam),
     INQR_DVSN_3(emptyQueryParam),
+    INQR_DVSN_2(emptyQueryParam),
     INQR_DVSN_1(emptyQueryParam),
     EXCG_ID_DVSN_CD("KRX"),
     CTX_AREA_FK100(emptyQueryParam),
@@ -201,6 +206,10 @@ enum class QueryParameter(
 
                 RequestType.POST_STOCK_ORDER -> emptyList()
                 RequestType.POST_STOCK_ORDER_CANCEL -> emptyList()
+                RequestType.GET_STOCK_ORDER_CANCELABLE -> listOf(
+                    CANO, ACNT_PRDT_CD, INQR_DVSN_1, INQR_DVSN_2,
+                    CTX_AREA_FK100, CTX_AREA_NK100,
+                )
                 RequestType.POST_OVERSEAS_STOCK_ORDER -> emptyList()
                 RequestType.POST_OVERSEAS_STOCK_ORDER_CANCEL -> emptyList()
                 // TODO: 필요없는 파라미터 제거 필요.

@@ -580,6 +580,160 @@ class KisBrokerGatewayAdapterTest {
         assertEquals(1, exchangeFunction.requests.size)
     }
 
+    @Test
+    fun `domestic cancel checks cancelable order before submitting cancel request`() {
+        val exchangeFunction = ResponseExchangeFunction(
+            responses = listOf(
+                jsonResponse(
+                    """
+                    {
+                      "rt_cd": "0",
+                      "ctx_area_fk100": "",
+                      "ctx_area_nk100": "",
+                      "output": [
+                        {
+                          "ord_gno_brno": "00001",
+                          "odno": "domestic-order-1",
+                          "orgn_odno": "",
+                          "pdno": "005930",
+                          "psbl_qty": "3"
+                        }
+                      ]
+                    }
+                    """.trimIndent(),
+                ),
+                protobufResponse(
+                    ApiResponse.StockOrder.newBuilder()
+                        .setRtCd("0")
+                        .setOutput(
+                            ApiResponse.Output.newBuilder()
+                                .setODNO("cancel-order-1")
+                                .build(),
+                        )
+                        .build(),
+                ),
+            ),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        val submission = adapter.cancelOrder(
+            brokerCancelCommand(
+                market = StockOrderMarket.DOMESTIC,
+                symbol = "005930",
+                originalOrderId = "domestic-order-1",
+                branchOrderNumber = "00001",
+                price = 0.0,
+                quantity = 2,
+                orderType = StockOrderType.LIMIT,
+                isMock = false,
+            ),
+        )
+
+        assertEquals("cancel-order-1", submission.externalOrderId)
+        assertEquals(2, exchangeFunction.requests.size)
+        assertEquals("/open-api/trading/inquire-psbl-rvsecncl", exchangeFunction.requests[0].url().path)
+        assertEquals("false", exchangeFunction.requests[0].queryValue("isMock"))
+        assertEquals("1", exchangeFunction.requests[0].queryValue("inqrDvsn1"))
+        assertEquals("0", exchangeFunction.requests[0].queryValue("inqrDvsn2"))
+        assertEquals("/open-api/trading/order-rvsecncl", exchangeFunction.requests[1].url().path)
+    }
+
+    @Test
+    fun `domestic cancel rejects when possible quantity is lower than requested quantity`() {
+        val exchangeFunction = ResponseExchangeFunction(
+            responses = listOf(
+                jsonResponse(
+                    """
+                    {
+                      "rt_cd": "0",
+                      "ctx_area_fk100": "",
+                      "ctx_area_nk100": "",
+                      "output": [
+                        {
+                          "ord_gno_brno": "00001",
+                          "odno": "domestic-order-1",
+                          "pdno": "005930",
+                          "psbl_qty": "1"
+                        }
+                      ]
+                    }
+                    """.trimIndent(),
+                ),
+            ),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        val exception = assertFailsWith<BrokerOrderRejectedException> {
+            adapter.cancelOrder(
+                brokerCancelCommand(
+                    market = StockOrderMarket.DOMESTIC,
+                    symbol = "005930",
+                    originalOrderId = "domestic-order-1",
+                    branchOrderNumber = "00001",
+                    price = 0.0,
+                    quantity = 2,
+                    orderType = StockOrderType.LIMIT,
+                    isMock = false,
+                ),
+            )
+        }
+
+        assertEquals(
+            "domestic order cancel quantity exceeds possible quantity: requested=2 possible=1",
+            exception.message,
+        )
+        assertEquals(1, exchangeFunction.requests.size)
+    }
+
+    @Test
+    fun `domestic cancel rejects when order is not in cancelable list`() {
+        val exchangeFunction = ResponseExchangeFunction(
+            responses = listOf(
+                jsonResponse(
+                    """
+                    {
+                      "rt_cd": "0",
+                      "ctx_area_fk100": "",
+                      "ctx_area_nk100": "",
+                      "output": []
+                    }
+                    """.trimIndent(),
+                ),
+            ),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        val exception = assertFailsWith<BrokerOrderRejectedException> {
+            adapter.cancelOrder(
+                brokerCancelCommand(
+                    market = StockOrderMarket.DOMESTIC,
+                    symbol = "005930",
+                    originalOrderId = "domestic-order-1",
+                    branchOrderNumber = "00001",
+                    price = 0.0,
+                    quantity = 2,
+                    orderType = StockOrderType.LIMIT,
+                    isMock = false,
+                ),
+            )
+        }
+
+        assertEquals("domestic order is not cancelable: domestic-order-1", exception.message)
+        assertEquals(1, exchangeFunction.requests.size)
+    }
+
     private fun overseasHistoryAdapter(response: String): KisBrokerGatewayAdapter {
         return KisBrokerGatewayAdapter(
             WebClient.builder()
@@ -746,6 +900,13 @@ class KisBrokerGatewayAdapterTest {
         return ClientResponse.create(HttpStatus.OK)
             .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PROTOBUF_VALUE)
             .body(Flux.just(dataBuffer))
+            .build()
+    }
+
+    private fun jsonResponse(response: String): ClientResponse {
+        return ClientResponse.create(HttpStatus.OK)
+            .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+            .body(response)
             .build()
     }
 

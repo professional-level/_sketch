@@ -357,6 +357,35 @@ class OpenApiService(
         return executeHttpRequest(info = info, headers = headers, body = body, isMockApi = request.isMock)
     }
 
+    suspend fun getStockOrderCancelable(request: GetStockOrderCancelableRequest): OpenApiResponse {
+        val token = getToken(isMock = request.isMock)
+        val info = RequestType.GET_STOCK_ORDER_CANCELABLE
+        val headers = build(token = token, trId = "TTTC0084R")
+            .addHeader(HeaderBuilder.HeaderKey.CUSTOMER_TYPE, "P")
+            .build()
+            .withMockCredentialIfNeeded(request.isMock)
+        val (cano, acntPrdtCd) = stockAccount(request.isMock)
+        val queryParameters =
+            QueryParameter.forType(
+                info,
+                mapOf(
+                    QueryParameter.CANO to cano,
+                    QueryParameter.ACNT_PRDT_CD to acntPrdtCd,
+                    QueryParameter.INQR_DVSN_1 to request.inqrDvsn1,
+                    QueryParameter.INQR_DVSN_2 to request.inqrDvsn2,
+                    QueryParameter.CTX_AREA_FK100 to request.ctxAreaFk100,
+                    QueryParameter.CTX_AREA_NK100 to request.ctxAreaNk100,
+                ),
+            )
+
+        return executeHttpRequest(
+            info = info,
+            headers = headers,
+            queryParameters = queryParameters,
+            isMockApi = request.isMock,
+        )
+    }
+
     suspend fun postOverseasStockOrderCancel(request: OverseasStockOrderCancelRequest): OpenApiResponse {
         val token = getToken(isMock = request.isMock)
         val info = RequestType.POST_OVERSEAS_STOCK_ORDER_CANCEL

@@ -25,6 +25,19 @@ data class GetDailyExecutionOrdersRequest(
     val ctxAreaNk100: String = "",
 )
 
+data class GetStockOrderCancelableRequest(
+    val isMock: Boolean = true,
+    val inqrDvsn1: String = "1",
+    val inqrDvsn2: String = "0",
+    val ctxAreaFk100: String = "",
+    val ctxAreaNk100: String = "",
+) {
+    init {
+        require(inqrDvsn1.isNotBlank()) { "inqrDvsn1 must not be blank" }
+        require(inqrDvsn2.isNotBlank()) { "inqrDvsn2 must not be blank" }
+    }
+}
+
 data class GetOverseasExecutionOrdersRequest(
     val isMock: Boolean = true,
     val pdno: String = "",
