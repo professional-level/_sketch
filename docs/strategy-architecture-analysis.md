@@ -544,6 +544,8 @@ broker API 자체가 idempotency key를 지원하지 않는다면, purchase-serv
 - 계좌 전체 노출, 보유 수량 기반 exposure, 모의투자/실전투자 분리 정책은 별도 계좌/포지션 상태 모델이 필요하므로 아직 남아 있다.
 - `stock-purchase-service`는 주문 제출 실패, `SUBMISSION_UNKNOWN` 지속, reconciliation 실패를 `OperationalAlertPort`로 알리고, 기본 구현은 로그 기반 alert adapter로 둔다.
 - `strategy-execution-service`는 `/strategy-executions/laor-v4`와 `/strategy-executions/laor-v4/{executionId}`에서 전략별 T, 현금, 보유 수량, 평균단가, cycle, mode를 조회할 수 있다.
+- `stock-purchase-service`와 `strategy-execution-service`는 production-like profile에서 로컬 broker/Temporal endpoint나 mock 주문 설정이 남아 있으면 startup validation으로 실패한다.
+- root sketch app의 KIS secret key 이름은 `src/main/resources/application-secret.properties.example` 템플릿으로 문서화했고, 운영 재시작 절차는 `docs/operations/trading-runtime-runbook.md`에 정리했다.
 - Slack/PagerDuty 같은 외부 alert sink, Micrometer/OpenTelemetry metric, 운영 대시보드 UI는 아직 남아 있다.
 - 단발성 전략의 entry buy는 execution-service로 들어왔지만, sell policy와 completion lifecycle은 추가 정리가 필요하다.
 - daily execution schedule은 설정 기반 US trading calendar를 거쳐 실행된다. 주말과 설정된 휴장일은 active strategy 실행을 skip하며, 휴장일 데이터 자동 동기화와 조기폐장/LOC/MOC 마감 시간 정책은 남아 있다.
@@ -597,6 +599,7 @@ stock-search-service
 16. 부분 완료: stock-purchase-service의 broker 제출 전 risk guard를 추가한다. 주문 단위/종목별 금액 한도, 하루 broker 제출 건수 한도, 중복 주문 kill switch, 전략 prefix disable은 적용됐고, 계좌 전체 exposure와 모의/실전 계좌 분리는 남아 있다.
 17. 부분 완료: 운영 관측성을 추가한다. 주문 제출 실패, `SUBMISSION_UNKNOWN` 지속, reconciliation 실패는 log 기반 alert port로 노출하고, 라오어 전략별 T/현금/보유/평단 조회 API를 추가했다. 외부 alert sink, metric, 대시보드 UI는 남아 있다.
 18. 부분 완료: daily active strategy execution에 설정 기반 US trading calendar를 추가한다. 주말과 설정 휴장일 skip은 적용됐고, 휴장일 자동 동기화, 조기폐장, 주문 가능 시간, LOC/MOC 마감 시간 정책은 남아 있다.
+19. 부분 완료: 배포/설정/보안 가드를 추가한다. KIS secret 템플릿, 운영 runbook, production-like profile startup validation은 적용했고, secret manager/vault 연동과 운영 DB/Kafka/Temporal 배포 자동화는 남아 있다.
 
 ## Open Questions
 

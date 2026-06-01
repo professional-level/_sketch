@@ -25,6 +25,8 @@ Treat the bounded contexts as follows:
 - External integration events are protobuf contracts owned from `common/src/main/proto` while this remains a sketch.
 - Internal domain events stay inside each service and are converted to integration events at the application or adapter boundary.
 - Cross-service reliability is handled by outbox on publishing and processed-event/idempotency records on consumption.
+- Production-like runtime profiles must fail fast when trading services still point at local broker/Temporal endpoints or unintended mock-order flags.
+- KIS credentials remain local-only in this sketch and must be documented through redacted templates or supplied by a secret manager in real deployments.
 
 The target flow is:
 
@@ -47,3 +49,4 @@ stock-search-service
 - A future split into `market-data-service`, `strategy-service`, `order-service`, and `execution-service` remains possible without changing the core event semantics.
 - `common` must not become a shared domain model. It can hold technical annotations, small framework helpers, topics, and integration contracts only.
 - Scheduler classes should stay as trigger adapters and call use case interfaces rather than owning orchestration logic.
+- Runtime safety checks reduce configuration accidents, but they do not replace broker API hardening, a managed secret store, operational dashboards, or incident runbooks.
