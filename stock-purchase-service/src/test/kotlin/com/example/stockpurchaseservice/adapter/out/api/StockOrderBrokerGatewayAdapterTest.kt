@@ -5,10 +5,12 @@ import com.example.stockpurchaseservice.adapter.out.broker.BrokerOrderCommand
 import com.example.stockpurchaseservice.adapter.out.broker.BrokerOrderHistoryItem
 import com.example.stockpurchaseservice.adapter.out.broker.BrokerOrderHistoryQuery
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
+import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatusQuery
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderSubmissionDto
 import com.example.stockpurchaseservice.application.port.out.PurchaseOrderDto
 import com.example.stockpurchaseservice.application.port.out.StockOrderMarket
 import com.example.stockpurchaseservice.application.port.out.StockOrderType
+import java.time.ZonedDateTime
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -53,6 +55,34 @@ class StockOrderBrokerGatewayAdapterTest {
         with(brokerGateway.historyQueries.single()) {
             assertEquals(StockOrderMarket.DOMESTIC, market)
             assertEquals(true, isMock)
+        }
+    }
+
+    @Test
+    fun `overseas status lookup uses broker order id when known`() {
+        val brokerGateway = FakeBrokerGateway()
+        val adapter = OverseasStockOrderAdapter(brokerGateway, isMockOrder = false)
+        val submittedAt = ZonedDateTime.parse("2026-06-02T09:00:00+09:00")
+
+        adapter.findOrderSubmissionStatus(
+            BrokerOrderStatusQuery(
+                orderIntentId = UUID.fromString("00000000-0000-0000-0000-000000000011"),
+                internalOrderId = UUID.fromString("00000000-0000-0000-0000-000000000012"),
+                externalOrderId = "broker-order-1",
+                symbol = "TQQQ",
+                side = OrderIntentSide.BUY,
+                market = StockOrderMarket.OVERSEAS_US,
+                submittedAt = submittedAt,
+            ),
+        )
+
+        with(brokerGateway.historyQueries.single()) {
+            assertEquals(StockOrderMarket.OVERSEAS_US, market)
+            assertEquals("", symbol)
+            assertEquals("broker-order-1", externalOrderId)
+            assertEquals(submittedAt, from)
+            assertEquals(submittedAt, to)
+            assertEquals(false, isMock)
         }
     }
 
