@@ -259,6 +259,7 @@ private suspend fun submitLegacySellOrder(
         OrderIntentSubmissionStatus.SUBMITTED,
         OrderIntentSubmissionStatus.SKIPPED_DUPLICATE -> order.changeOrderState(OrderState.SELLING_IN_PROCESS)
         OrderIntentSubmissionStatus.SUBMISSION_UNKNOWN -> order.changeOrderState(OrderState.SUBMISSION_UNKNOWN)
+        OrderIntentSubmissionStatus.REJECTED -> order.changeOrderState(OrderState.SUBMIT_FAILED)
     }
     stockOrderRepository.save(order)
 }

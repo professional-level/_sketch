@@ -14,6 +14,8 @@ import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissi
 import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionPort
 import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionStatusDto
 import com.example.stockpurchaseservice.application.port.out.OrderRejectedMessage
+import com.example.stockpurchaseservice.application.port.out.OrderRiskAssessmentCommand
+import com.example.stockpurchaseservice.application.port.out.OrderRiskControlPort
 import com.example.stockpurchaseservice.application.port.out.OrderSubmittedMessage
 import com.example.stockpurchaseservice.application.port.out.ProcessedEventPort
 import com.example.stockpurchaseservice.application.port.out.PurchaseOrderDto
@@ -30,6 +32,7 @@ class SubmitOrderIntentService(
     private val processedEventPort: ProcessedEventPort,
     private val orderIntentSubmissionPort: OrderIntentSubmissionPort,
     private val orderExecutionEventPort: OrderExecutionEventPort,
+    private val orderRiskControlPort: OrderRiskControlPort,
 ) : SubmitOrderIntentUseCase {
 
     override suspend fun execute(command: SubmitOrderIntentCommand): SubmitOrderIntentResult {
@@ -39,13 +42,21 @@ class SubmitOrderIntentService(
         }
 
         return try {
-            val submission = submit(command)
+            val orderId = command.toInternalOrderId()
+            val market = command.symbol.toStockOrderMarket()
+            val orderType = command.orderType.toStockOrderType()
+            val riskAssessment = orderRiskControlPort.assess(command.toRiskAssessmentCommand(orderId, market))
+            if (!riskAssessment.accepted) {
+                return rejectByRisk(command, orderId, riskAssessment.reason ?: "order rejected by risk policy")
+            }
+
+            val submission = submit(command, orderId, market, orderType)
             orderIntentSubmissionPort.saveSubmitted(submission)
             orderExecutionEventPort.publishSubmitted(command.toSubmittedMessage(submission))
             processedEventPort.markSuccess(command.eventId)
             SubmitOrderIntentResult(OrderIntentSubmissionStatus.SUBMITTED)
         } catch (exception: BrokerOrderSubmissionUnknownException) {
-            val unknownSubmission = command.toUnknownSubmission(exception)
+            val unknownSubmission = command.toUnknownSubmission(exception, command.toInternalOrderId())
             orderIntentSubmissionPort.saveUnknown(unknownSubmission)
             processedEventPort.markSuccess(command.eventId)
             SubmitOrderIntentResult(OrderIntentSubmissionStatus.SUBMISSION_UNKNOWN)
@@ -58,11 +69,13 @@ class SubmitOrderIntentService(
         }
     }
 
-    private fun submit(command: SubmitOrderIntentCommand): OrderIntentSubmissionDto {
-        val orderId = UUID.nameUUIDFromBytes(command.idempotencyKey.toByteArray(StandardCharsets.UTF_8))
+    private fun submit(
+        command: SubmitOrderIntentCommand,
+        orderId: UUID,
+        market: StockOrderMarket,
+        orderType: StockOrderType,
+    ): OrderIntentSubmissionDto {
         val quantity = command.quantity.toInt()
-        val market = command.symbol.toStockOrderMarket()
-        val orderType = command.orderType.toStockOrderType()
         val submission = when (command.side) {
             OrderIntentSide.BUY -> marketService.buyStock(
                 PurchaseOrderDto(
@@ -104,10 +117,21 @@ class SubmitOrderIntentService(
         )
     }
 
+    private suspend fun rejectByRisk(
+        command: SubmitOrderIntentCommand,
+        orderId: UUID,
+        reason: String,
+    ): SubmitOrderIntentResult {
+        orderIntentSubmissionPort.saveRejected(command.toRejectedSubmission(orderId, reason))
+        orderExecutionEventPort.publishRejected(command.toRejectedMessage(reason))
+        processedEventPort.markSuccess(command.eventId)
+        return SubmitOrderIntentResult(OrderIntentSubmissionStatus.REJECTED)
+    }
+
     private fun SubmitOrderIntentCommand.toUnknownSubmission(
         exception: BrokerOrderSubmissionUnknownException,
+        orderId: UUID,
     ): OrderIntentSubmissionDto {
-        val orderId = UUID.nameUUIDFromBytes(idempotencyKey.toByteArray(StandardCharsets.UTF_8))
         return OrderIntentSubmissionDto(
             orderIntentId = eventId,
             idempotencyKey = idempotencyKey,
@@ -127,6 +151,29 @@ class SubmitOrderIntentService(
         )
     }
 
+    private fun SubmitOrderIntentCommand.toRejectedSubmission(
+        orderId: UUID,
+        reason: String,
+    ): OrderIntentSubmissionDto {
+        return OrderIntentSubmissionDto(
+            orderIntentId = eventId,
+            idempotencyKey = idempotencyKey,
+            strategyExecutionId = strategyExecutionId,
+            symbol = symbol,
+            side = side,
+            orderType = orderType,
+            submittedPrice = price,
+            quantity = quantity,
+            orderTag = orderTag,
+            internalOrderId = orderId,
+            externalOrderId = null,
+            submittedAt = ZonedDateTime.now(),
+            status = OrderIntentSubmissionStatusDto.REJECTED,
+            statusReason = reason,
+            lastStatusCheckedAt = null,
+        )
+    }
+
     private fun SubmitOrderIntentCommand.toSubmittedMessage(
         submission: OrderIntentSubmissionDto,
     ): OrderSubmittedMessage {
@@ -140,15 +187,44 @@ class SubmitOrderIntentService(
     }
 
     private fun SubmitOrderIntentCommand.toRejectedMessage(exception: Throwable): OrderRejectedMessage {
+        return toRejectedMessage(exception.message ?: exception::class.java.simpleName)
+    }
+
+    private fun SubmitOrderIntentCommand.toRejectedMessage(reason: String): OrderRejectedMessage {
         val rejectedAt = ZonedDateTime.now()
         return OrderRejectedMessage(
             eventId = deterministicEventId("${eventId}:REJECTED"),
             strategyExecutionId = strategyExecutionId,
             orderIntentId = eventId.toString(),
             brokerOrderId = null,
-            reason = exception.message ?: exception::class.java.simpleName,
+            reason = reason,
             rejectedAt = rejectedAt,
         )
+    }
+
+    private fun SubmitOrderIntentCommand.toRiskAssessmentCommand(
+        orderId: UUID,
+        market: StockOrderMarket,
+    ): OrderRiskAssessmentCommand {
+        return OrderRiskAssessmentCommand(
+            orderIntentId = eventId,
+            internalOrderId = orderId,
+            idempotencyKey = idempotencyKey,
+            strategyExecutionId = strategyExecutionId,
+            symbol = symbol,
+            side = side,
+            orderType = orderType,
+            quantity = quantity,
+            limitPrice = price,
+            estimatedNotional = price?.let { it * quantity },
+            market = market,
+            orderTag = orderTag,
+            createdAt = createdAt,
+        )
+    }
+
+    private fun SubmitOrderIntentCommand.toInternalOrderId(): UUID {
+        return UUID.nameUUIDFromBytes(idempotencyKey.toByteArray(StandardCharsets.UTF_8))
     }
 
     private fun deterministicEventId(seed: String): UUID {

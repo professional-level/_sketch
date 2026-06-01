@@ -18,6 +18,9 @@ import com.example.stockpurchaseservice.application.port.out.OrderPartiallyFille
 import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionDto
 import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionPort
 import com.example.stockpurchaseservice.application.port.out.OrderRejectedMessage
+import com.example.stockpurchaseservice.application.port.out.OrderRiskAssessmentCommand
+import com.example.stockpurchaseservice.application.port.out.OrderRiskAssessmentResult
+import com.example.stockpurchaseservice.application.port.out.OrderRiskControlPort
 import com.example.stockpurchaseservice.application.port.out.OrderSubmittedMessage
 import com.example.stockpurchaseservice.application.port.out.ProcessedEventPort
 import com.example.stockpurchaseservice.application.port.out.PurchaseOrderDto
@@ -38,7 +41,13 @@ class SubmitOrderIntentServiceTest {
         val processedEventPort = FakeProcessedEventPort()
         val submissionPort = FakeOrderIntentSubmissionPort()
         val eventPort = FakeOrderExecutionEventPort()
-        val service = SubmitOrderIntentService(marketPort, processedEventPort, submissionPort, eventPort)
+        val service = SubmitOrderIntentService(
+            marketPort,
+            processedEventPort,
+            submissionPort,
+            eventPort,
+            FakeOrderRiskControlPort(),
+        )
         val eventId = UUID.randomUUID()
 
         val result = service.execute(
@@ -78,6 +87,7 @@ class SubmitOrderIntentServiceTest {
             processedEventPort,
             FakeOrderIntentSubmissionPort(),
             FakeOrderExecutionEventPort(),
+            FakeOrderRiskControlPort(),
         )
 
         service.execute(
@@ -111,6 +121,7 @@ class SubmitOrderIntentServiceTest {
             processedEventPort,
             FakeOrderIntentSubmissionPort(),
             eventPort,
+            FakeOrderRiskControlPort(),
         )
 
         val result = service.execute(
@@ -141,7 +152,13 @@ class SubmitOrderIntentServiceTest {
         val processedEventPort = FakeProcessedEventPort()
         val submissionPort = FakeOrderIntentSubmissionPort()
         val eventPort = FakeOrderExecutionEventPort()
-        val service = SubmitOrderIntentService(marketPort, processedEventPort, submissionPort, eventPort)
+        val service = SubmitOrderIntentService(
+            marketPort,
+            processedEventPort,
+            submissionPort,
+            eventPort,
+            FakeOrderRiskControlPort(),
+        )
         val eventId = UUID.randomUUID()
 
         val result = service.execute(
@@ -164,6 +181,42 @@ class SubmitOrderIntentServiceTest {
         assertEquals(eventId, submissionPort.unknown.single().orderIntentId)
         assertEquals(emptyList(), eventPort.submitted)
         assertEquals(emptyList(), eventPort.rejected)
+    }
+
+    @Test
+    fun `rejects order intent by risk policy before broker submission`() = runBlocking {
+        val marketPort = FakeMarketServicePort()
+        val processedEventPort = FakeProcessedEventPort()
+        val submissionPort = FakeOrderIntentSubmissionPort()
+        val eventPort = FakeOrderExecutionEventPort()
+        val riskPort = FakeOrderRiskControlPort(
+            result = OrderRiskAssessmentResult.rejected("order notional exceeds limit"),
+        )
+        val service = SubmitOrderIntentService(marketPort, processedEventPort, submissionPort, eventPort, riskPort)
+        val eventId = UUID.randomUUID()
+
+        val result = service.execute(
+            SubmitOrderIntentCommand(
+                eventId = eventId,
+                idempotencyKey = "risk-blocked-buy",
+                strategyExecutionId = "laor-v4-strategy:TQQQ",
+                symbol = "TQQQ",
+                side = OrderIntentSide.BUY,
+                orderType = OrderIntentType.LOC,
+                price = 112.0,
+                quantity = 3,
+                orderTag = "FIRST_BUY",
+                createdAt = ZonedDateTime.parse("2026-05-30T09:00:00+09:00"),
+            ),
+        )
+
+        assertEquals(OrderIntentSubmissionStatus.REJECTED, result.status)
+        assertEquals(336.0, riskPort.assessed.single().estimatedNotional)
+        assertEquals(emptyList(), marketPort.buyOrders)
+        assertEquals(eventId, processedEventPort.succeeded.single())
+        assertEquals("order notional exceeds limit", submissionPort.rejected.single().statusReason)
+        assertEquals("order notional exceeds limit", eventPort.rejected.single().reason)
+        assertEquals(emptyList(), eventPort.submitted)
     }
 
     private class FakeMarketServicePort(
@@ -211,6 +264,7 @@ class SubmitOrderIntentServiceTest {
     private class FakeOrderIntentSubmissionPort : OrderIntentSubmissionPort {
         val saved: MutableList<OrderIntentSubmissionDto> = mutableListOf()
         val unknown: MutableList<OrderIntentSubmissionDto> = mutableListOf()
+        val rejected: MutableList<OrderIntentSubmissionDto> = mutableListOf()
 
         override suspend fun saveSubmitted(submission: OrderIntentSubmissionDto) {
             saved += submission
@@ -220,7 +274,9 @@ class SubmitOrderIntentServiceTest {
             unknown += submission
         }
 
-        override suspend fun saveRejected(submission: OrderIntentSubmissionDto) = Unit
+        override suspend fun saveRejected(submission: OrderIntentSubmissionDto) {
+            rejected += submission
+        }
 
         override suspend fun saveCancelled(submission: OrderIntentSubmissionDto) = Unit
 
@@ -229,6 +285,17 @@ class SubmitOrderIntentServiceTest {
         }
 
         override suspend fun findUnknownSubmissions(): List<OrderIntentSubmissionDto> = unknown
+    }
+
+    private class FakeOrderRiskControlPort(
+        private val result: OrderRiskAssessmentResult = OrderRiskAssessmentResult.accepted(),
+    ) : OrderRiskControlPort {
+        val assessed: MutableList<OrderRiskAssessmentCommand> = mutableListOf()
+
+        override suspend fun assess(command: OrderRiskAssessmentCommand): OrderRiskAssessmentResult {
+            assessed += command
+            return result
+        }
     }
 
     private class FakeOrderExecutionEventPort : OrderExecutionEventPort {

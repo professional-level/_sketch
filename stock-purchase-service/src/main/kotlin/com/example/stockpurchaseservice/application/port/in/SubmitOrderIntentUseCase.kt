@@ -42,6 +42,7 @@ enum class OrderIntentSubmissionStatus {
     SUBMITTED,
     SUBMISSION_UNKNOWN,
     SKIPPED_DUPLICATE,
+    REJECTED,
 }
 
 enum class OrderIntentSide {
