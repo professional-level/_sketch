@@ -7,12 +7,16 @@ import com.example.common.endpoint.Endpoint.GET_EXECUTION_ORDERS
 import com.example.common.endpoint.Endpoint.GET_OVERSEAS_EXECUTION_ORDERS
 import com.example.common.endpoint.Endpoint.POST_OVERSEAS_STOCK_ORDER
 import com.example.common.endpoint.Endpoint.POST_STOCK_ORDER
+import com.example.stockpurchaseservice.adapter.out.api.ExternalApiCallOptions
 import com.example.stockpurchaseservice.adapter.out.api.awaitExternalApi
 import com.example.stockpurchaseservice.adapter.out.api.getExternalApi
+import com.example.stockpurchaseservice.adapter.out.api.isTransientExternalApiFailure
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderSubmissionDto
+import com.example.stockpurchaseservice.application.port.out.BrokerOrderSubmissionUnknownException
 import com.example.stockpurchaseservice.application.port.out.StockOrderMarket
 import com.example.stockpurchaseservice.application.port.out.StockOrderType
+import com.example.stockpurchaseservice.config.broker.KisBrokerGatewayProperties
 import com.fasterxml.jackson.databind.JsonNode
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.http.MediaType
@@ -26,6 +30,7 @@ import java.time.format.DateTimeFormatter
 @ExternalApiAdapter
 internal class KisBrokerGatewayAdapter(
     @Qualifier("stockApiClient") private val stockApiClient: WebClient,
+    private val properties: KisBrokerGatewayProperties = KisBrokerGatewayProperties(),
 ) : BrokerGateway {
 
     override fun submitOrder(command: BrokerOrderCommand): BrokerOrderSubmissionDto {
@@ -33,13 +38,13 @@ internal class KisBrokerGatewayAdapter(
             StockOrderMarket.DOMESTIC -> stockApiClient.submitStockOrder(
                 uri = OPEN_API_PREFIX + POST_STOCK_ORDER,
                 body = command.toKisDomesticOrderRequest(),
-                fallbackOrderId = command.internalOrderId.toString(),
+                callOptions = properties.toSubmitCallOptions(),
             )
 
             StockOrderMarket.OVERSEAS_US -> stockApiClient.submitStockOrder(
                 uri = OPEN_API_PREFIX + POST_OVERSEAS_STOCK_ORDER,
                 body = command.toKisUsOverseasOrderRequest(),
-                fallbackOrderId = command.internalOrderId.toString(),
+                callOptions = properties.toSubmitCallOptions(),
             )
         }
     }
@@ -69,6 +74,7 @@ internal class KisBrokerGatewayAdapter(
             queryParameters = query.toKisDomesticExecutionOrderQuery(),
             responseType = DailyExecutionOrdersResponseOuterClass.DailyExecutionOrdersResponse::class.java,
             accept = MediaType.APPLICATION_PROTOBUF,
+            callOptions = properties.toQueryCallOptions(),
         )
         if (response.rtCd.isNotBlank() && response.rtCd != "0") {
             throw RuntimeException("domestic execution lookup failed: ${response.msgCd} ${response.msg1}".trim())
@@ -87,6 +93,7 @@ internal class KisBrokerGatewayAdapter(
             uri = OPEN_API_PREFIX + GET_OVERSEAS_EXECUTION_ORDERS,
             queryParameters = query.toKisOverseasExecutionOrderQuery(),
             responseType = JsonNode::class.java,
+            callOptions = properties.toQueryCallOptions(),
         )
         val returnCode = response.path("rt_cd").asText("")
         if (returnCode.isNotBlank() && returnCode != "0") {
@@ -165,7 +172,7 @@ private fun BrokerOrderHistoryQuery.toKisDomesticExecutionOrderQuery(): Map<Stri
     )
 }
 
-private fun BrokerOrderHistoryQuery.toKisOverseasExecutionOrderQuery(): Map<String, String> {
+internal fun BrokerOrderHistoryQuery.toKisOverseasExecutionOrderQuery(): Map<String, String> {
     return mapOf(
         "isMock" to isMock.toString(),
         "pdno" to if (isMock) "" else symbol.ifBlank { "%" }.uppercase(),
@@ -177,9 +184,26 @@ private fun BrokerOrderHistoryQuery.toKisOverseasExecutionOrderQuery(): Map<Stri
         "sortSqn" to "DS",
         "ordDt" to "",
         "ordGnoBrno" to "",
-        "odno" to "",
+        "odno" to externalOrderId,
         "ctxAreaNk200" to pageCursor.nextKeyContext,
         "ctxAreaFk200" to pageCursor.foreignKeyContext,
+    )
+}
+
+private fun KisBrokerGatewayProperties.toQueryCallOptions(): ExternalApiCallOptions {
+    return ExternalApiCallOptions(
+        timeout = requestTimeout,
+        maxAttempts = queryMaxAttempts,
+        backoff = queryBackoff,
+        transientHttpStatuses = transientHttpStatuses,
+    )
+}
+
+private fun KisBrokerGatewayProperties.toSubmitCallOptions(): ExternalApiCallOptions {
+    return ExternalApiCallOptions(
+        timeout = requestTimeout,
+        maxAttempts = 1,
+        transientHttpStatuses = transientHttpStatuses,
     )
 }
 
@@ -240,23 +264,35 @@ private fun JsonNode.toBrokerHistoryItem(): BrokerOrderHistoryItem? {
 private fun WebClient.submitStockOrder(
     uri: String,
     body: Map<String, Any>,
-    fallbackOrderId: String,
+    callOptions: ExternalApiCallOptions,
 ): BrokerOrderSubmissionDto {
-    val response = post()
-        .uri(uri)
-        .accept(MediaType.APPLICATION_PROTOBUF)
-        .bodyValue(body)
-        .retrieve()
-        .toEntity(ApiResponse.StockOrder::class.java)
-        .awaitExternalApi()
-        ?: throw RuntimeException("stock order response is empty")
+    val response = try {
+        post()
+            .uri(uri)
+            .accept(MediaType.APPLICATION_PROTOBUF)
+            .bodyValue(body)
+            .retrieve()
+            .toEntity(ApiResponse.StockOrder::class.java)
+            .awaitExternalApi(callOptions)
+    } catch (exception: Throwable) {
+        if (exception.isTransientExternalApiFailure(callOptions.transientHttpStatuses)) {
+            throw BrokerOrderSubmissionUnknownException(
+                message = "stock order submission status unknown after transient broker failure: " +
+                    (exception.message ?: exception::class.java.simpleName),
+            )
+        }
+        throw exception
+    } ?: throw BrokerOrderSubmissionUnknownException("stock order response is empty")
 
-    val order = response.body ?: throw RuntimeException("stock order body is empty")
+    val order = response.body ?: throw BrokerOrderSubmissionUnknownException("stock order body is empty")
     if (order.rtCd != "0") {
         throw RuntimeException("stock order request failed: ${order.msgCd} ${order.msg1}".trim())
     }
 
-    val externalOrderId = order.output.getODNO().takeIf { it.isNotBlank() } ?: fallbackOrderId
+    val externalOrderId = order.output.getODNO().takeIf { it.isNotBlank() }
+        ?: throw BrokerOrderSubmissionUnknownException(
+            message = "stock order accepted but broker order id is missing",
+        )
     return BrokerOrderSubmissionDto(externalOrderId = externalOrderId)
 }
 

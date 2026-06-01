@@ -1,8 +1,11 @@
 package com.example.stockpurchaseservice.adapter.out.broker
 
+import ApiResponse
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
+import com.example.stockpurchaseservice.application.port.out.BrokerOrderSubmissionUnknownException
 import com.example.stockpurchaseservice.application.port.out.StockOrderMarket
 import com.example.stockpurchaseservice.application.port.out.StockOrderType
+import org.springframework.core.io.buffer.DefaultDataBufferFactory
 import java.time.ZonedDateTime
 import java.util.UUID
 import org.springframework.http.HttpHeaders
@@ -12,9 +15,11 @@ import org.springframework.web.reactive.function.client.ClientRequest
 import org.springframework.web.reactive.function.client.ClientResponse
 import org.springframework.web.reactive.function.client.ExchangeFunction
 import org.springframework.web.reactive.function.client.WebClient
+import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class KisBrokerGatewayAdapterTest {
 
@@ -154,6 +159,84 @@ class KisBrokerGatewayAdapterTest {
         assertEquals("NK1", exchangeFunction.requests[1].queryValue("ctxAreaNk200"))
     }
 
+    @Test
+    fun `overseas order status lookup sends broker order id when present`() {
+        val query = BrokerOrderHistoryQuery(
+            market = StockOrderMarket.OVERSEAS_US,
+            symbol = "TQQQ",
+            externalOrderId = "broker-order-1",
+            from = ZonedDateTime.parse("2026-06-01T09:00:00+09:00"),
+            to = ZonedDateTime.parse("2026-06-01T09:00:00+09:00"),
+            isMock = false,
+        )
+
+        val params = query.toKisOverseasExecutionOrderQuery()
+
+        assertEquals("broker-order-1", params["odno"])
+        assertEquals("TQQQ", params["pdno"])
+    }
+
+    @Test
+    fun `throws submission unknown when transient error happens during order submit`() {
+        val exchangeFunction = StubExchangeFunction(
+            responses = listOf("temporary"),
+            statuses = listOf(HttpStatus.SERVICE_UNAVAILABLE),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        assertFailsWith<BrokerOrderSubmissionUnknownException> {
+            adapter.submitOrder(
+                brokerCommand(
+                    side = OrderIntentSide.BUY,
+                    symbol = "TQQQ",
+                    price = 112.5,
+                    quantity = 3,
+                    orderType = StockOrderType.LOC,
+                    isMock = false,
+                ),
+            )
+        }
+        assertEquals(1, exchangeFunction.requests.size)
+    }
+
+    @Test
+    fun `throws submission unknown when accepted order response has no broker order id`() {
+        val exchangeFunction = ResponseExchangeFunction(
+            responses = listOf(
+                protobufResponse(
+                    ApiResponse.StockOrder.newBuilder()
+                        .setRtCd("0")
+                        .build(),
+                ),
+            ),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        val exception = assertFailsWith<BrokerOrderSubmissionUnknownException> {
+            adapter.submitOrder(
+                brokerCommand(
+                    side = OrderIntentSide.BUY,
+                    symbol = "TQQQ",
+                    price = 112.5,
+                    quantity = 3,
+                    orderType = StockOrderType.LOC,
+                    isMock = false,
+                ),
+            )
+        }
+
+        assertEquals(null, exception.externalOrderId)
+        assertEquals(1, exchangeFunction.requests.size)
+    }
+
     private fun brokerCommand(
         side: OrderIntentSide,
         symbol: String,
@@ -176,19 +259,41 @@ class KisBrokerGatewayAdapterTest {
 
     private class StubExchangeFunction(
         responses: List<String>,
+        statuses: List<HttpStatus> = List(responses.size) { HttpStatus.OK },
+    ) : ExchangeFunction {
+        private val responses = ArrayDeque(responses)
+        private val responseStatuses = ArrayDeque(statuses)
+        val requests: MutableList<ClientRequest> = mutableListOf()
+
+        override fun exchange(request: ClientRequest): Mono<ClientResponse> {
+            requests += request
+            return Mono.just(
+                ClientResponse.create(responseStatuses.removeFirst())
+                    .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                    .body(responses.removeFirst())
+                    .build(),
+            )
+        }
+    }
+
+    private class ResponseExchangeFunction(
+        responses: List<ClientResponse>,
     ) : ExchangeFunction {
         private val responses = ArrayDeque(responses)
         val requests: MutableList<ClientRequest> = mutableListOf()
 
         override fun exchange(request: ClientRequest): Mono<ClientResponse> {
             requests += request
-            return Mono.just(
-                ClientResponse.create(HttpStatus.OK)
-                    .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                    .body(responses.removeFirst())
-                    .build(),
-            )
+            return Mono.just(responses.removeFirst())
         }
+    }
+
+    private fun protobufResponse(response: ApiResponse.StockOrder): ClientResponse {
+        val dataBuffer = DefaultDataBufferFactory().wrap(response.toByteArray())
+        return ClientResponse.create(HttpStatus.OK)
+            .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PROTOBUF_VALUE)
+            .body(Flux.just(dataBuffer))
+            .build()
     }
 
     private fun ClientRequest.queryValue(name: String): String? {
