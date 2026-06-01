@@ -606,6 +606,7 @@ stock-search-service
 - `stock-purchase-service` now has a separate cancel-submission use case and KIS domestic/overseas `order-rvsecncl` broker adapter path.
 - Operators can submit explicit cancel requests through `POST /orders/cancellations` in `stock-purchase-service`; this endpoint calls the cancel-submission use case and returns the broker cancel-request submission status.
 - Domestic cancel submissions now call KIS `inquire-psbl-rvsecncl` first and reject the cancel request when the original order is missing from the cancelable list or the requested quantity exceeds `psbl_qty`.
+- Overseas cancel submissions now query KIS `inquire-ccnl` first and reject the cancel request when the original order is missing, already rejected/cancelled, has no remaining quantity, or the requested cancel quantity exceeds the remaining quantity.
 - Cancel submission success is treated as broker acceptance of the cancel request, not as final cancellation. `OrderCancelled` remains emitted only after broker status lookup/recovery confirms the original order is cancelled.
 - Domestic KIS cancel requests require `KRX_FWDG_ORD_ORGNO` and `ORGN_ODNO`; overseas cancel requests use `OVRS_EXCG_CD`, `PDNO`, and `ORGN_ODNO`. Modify/revise orders and production credential/live-market verification are still production-hardening gaps.
 

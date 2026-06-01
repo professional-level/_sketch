@@ -16,6 +16,7 @@ import com.example.stockpurchaseservice.adapter.out.api.getExternalApi
 import com.example.stockpurchaseservice.adapter.out.api.isTransientExternalApiFailure
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderRejectedException
+import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatus
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderSubmissionDto
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderSubmissionUnknownException
 import com.example.stockpurchaseservice.application.port.out.StockOrderMarket
@@ -68,11 +69,14 @@ internal class KisBrokerGatewayAdapter(
                     )
                 }
 
-                StockOrderMarket.OVERSEAS_US -> stockApiClient.submitStockOrder(
-                    uri = OPEN_API_PREFIX + POST_OVERSEAS_STOCK_ORDER_CANCEL,
-                    body = command.toKisUsOverseasCancelRequest(),
-                    callOptions = properties.toSubmitCallOptions(),
-                )
+                StockOrderMarket.OVERSEAS_US -> {
+                    ensureOverseasOrderCancelable(command)
+                    stockApiClient.submitStockOrder(
+                        uri = OPEN_API_PREFIX + POST_OVERSEAS_STOCK_ORDER_CANCEL,
+                        body = command.toKisUsOverseasCancelRequest(),
+                        callOptions = properties.toSubmitCallOptions(),
+                    )
+                }
             }
         }
     }
@@ -105,6 +109,47 @@ internal class KisBrokerGatewayAdapter(
         } while (cursor.hasNext() && pageCount < MAX_CANCELABLE_ORDER_PAGES)
 
         return items
+    }
+
+    private fun ensureOverseasOrderCancelable(command: BrokerOrderCancelCommand) {
+        val order = findOrderHistory(
+            BrokerOrderHistoryQuery(
+                market = StockOrderMarket.OVERSEAS_US,
+                symbol = command.symbol,
+                externalOrderId = command.originalOrderId,
+                isMock = command.isMock,
+            ),
+        ).firstOrNull { it.matches(command) }
+            ?: throw BrokerOrderRejectedException(
+                message = "overseas order is not cancelable: ${command.originalOrderId}",
+            )
+
+        val status = order.toStatus()
+        when (status.status) {
+            BrokerOrderStatus.REJECTED,
+            BrokerOrderStatus.CANCELLED -> {
+                val reason = status.reason?.let { " reason=$it" }.orEmpty()
+                throw BrokerOrderRejectedException(
+                    message = "overseas order is not cancelable: " +
+                        "${command.originalOrderId} status=${status.status}$reason",
+                )
+            }
+
+            BrokerOrderStatus.SUBMITTED,
+            BrokerOrderStatus.UNKNOWN -> Unit
+        }
+
+        if (order.remainingQuantity <= 0) {
+            throw BrokerOrderRejectedException(
+                message = "overseas order has no cancelable quantity: ${command.originalOrderId}",
+            )
+        }
+        if (order.remainingQuantity < command.quantity) {
+            throw BrokerOrderRejectedException(
+                message = "overseas order cancel quantity exceeds remaining quantity: " +
+                    "requested=${command.quantity} remaining=${order.remainingQuantity}",
+            )
+        }
     }
 
     override fun findOrderHistory(query: BrokerOrderHistoryQuery): List<BrokerOrderHistoryItem> {
@@ -329,6 +374,12 @@ private fun JsonNode.toKisCancelableOrderItem(): KisCancelableOrderItem? {
         symbol = path("pdno").asText("").trim(),
         possibleQuantity = path("psbl_qty").asText("").toLongValue(),
     )
+}
+
+private fun BrokerOrderHistoryItem.matches(command: BrokerOrderCancelCommand): Boolean {
+    val sameOrder = externalOrderId == command.originalOrderId
+    val sameSymbol = symbol.isBlank() || symbol.equals(command.symbol, ignoreCase = true)
+    return sameOrder && sameSymbol
 }
 
 private fun BrokerOrderHistoryQuery.toKisDomesticExecutionOrderQuery(): Map<String, String> {

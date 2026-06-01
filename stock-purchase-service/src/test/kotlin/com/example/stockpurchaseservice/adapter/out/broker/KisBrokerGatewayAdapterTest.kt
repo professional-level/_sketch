@@ -165,6 +165,167 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `overseas cancel checks order history before submitting cancel request`() {
+        val exchangeFunction = ResponseExchangeFunction(
+            responses = listOf(
+                jsonResponse(
+                    """
+                    {
+                      "rt_cd": "0",
+                      "ctx_area_fk200": "",
+                      "ctx_area_nk200": "",
+                      "output": [
+                        {
+                          "odno": "overseas-order-1",
+                          "pdno": "TQQQ",
+                          "prdt_name": "ProShares UltraPro QQQ",
+                          "ord_dt": "20260602",
+                          "ord_tmd": "093000",
+                          "ft_ord_qty": "3",
+                          "ft_ccld_qty": "1",
+                          "nccs_qty": "2",
+                          "sll_buy_dvsn_cd": "02"
+                        }
+                      ]
+                    }
+                    """.trimIndent(),
+                ),
+                protobufResponse(
+                    ApiResponse.StockOrder.newBuilder()
+                        .setRtCd("0")
+                        .setOutput(
+                            ApiResponse.Output.newBuilder()
+                                .setODNO("overseas-cancel-1")
+                                .build(),
+                        )
+                        .build(),
+                ),
+            ),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        val submission = adapter.cancelOrder(
+            brokerCancelCommand(
+                market = StockOrderMarket.OVERSEAS_US,
+                symbol = "TQQQ",
+                originalOrderId = "overseas-order-1",
+                branchOrderNumber = null,
+                price = 112.5,
+                quantity = 2,
+                orderType = StockOrderType.LOC,
+                isMock = false,
+            ),
+        )
+
+        assertEquals("overseas-cancel-1", submission.externalOrderId)
+        assertEquals(2, exchangeFunction.requests.size)
+        assertEquals("/open-api/overseas/trading/inquire-ccnl", exchangeFunction.requests[0].url().path)
+        assertEquals("TQQQ", exchangeFunction.requests[0].queryValue("pdno"))
+        assertEquals("", exchangeFunction.requests[0].queryValue("odno"))
+        assertEquals("/open-api/overseas/trading/order-rvsecncl", exchangeFunction.requests[1].url().path)
+    }
+
+    @Test
+    fun `overseas cancel rejects when order is not found in history`() {
+        val exchangeFunction = ResponseExchangeFunction(
+            responses = listOf(
+                jsonResponse(
+                    """
+                    {
+                      "rt_cd": "0",
+                      "ctx_area_fk200": "",
+                      "ctx_area_nk200": "",
+                      "output": []
+                    }
+                    """.trimIndent(),
+                ),
+            ),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        val exception = assertFailsWith<BrokerOrderRejectedException> {
+            adapter.cancelOrder(
+                brokerCancelCommand(
+                    market = StockOrderMarket.OVERSEAS_US,
+                    symbol = "TQQQ",
+                    originalOrderId = "missing-overseas-order",
+                    branchOrderNumber = null,
+                    price = 112.5,
+                    quantity = 1,
+                    orderType = StockOrderType.LOC,
+                    isMock = false,
+                ),
+            )
+        }
+
+        assertEquals("overseas order is not cancelable: missing-overseas-order", exception.message)
+        assertEquals(1, exchangeFunction.requests.size)
+    }
+
+    @Test
+    fun `overseas cancel rejects when remaining quantity is lower than requested quantity`() {
+        val exchangeFunction = ResponseExchangeFunction(
+            responses = listOf(
+                jsonResponse(
+                    """
+                    {
+                      "rt_cd": "0",
+                      "ctx_area_fk200": "",
+                      "ctx_area_nk200": "",
+                      "output": [
+                        {
+                          "odno": "overseas-order-1",
+                          "pdno": "TQQQ",
+                          "ord_dt": "20260602",
+                          "ord_tmd": "093000",
+                          "ft_ord_qty": "3",
+                          "ft_ccld_qty": "2",
+                          "nccs_qty": "1",
+                          "sll_buy_dvsn_cd": "02"
+                        }
+                      ]
+                    }
+                    """.trimIndent(),
+                ),
+            ),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        val exception = assertFailsWith<BrokerOrderRejectedException> {
+            adapter.cancelOrder(
+                brokerCancelCommand(
+                    market = StockOrderMarket.OVERSEAS_US,
+                    symbol = "TQQQ",
+                    originalOrderId = "overseas-order-1",
+                    branchOrderNumber = null,
+                    price = 112.5,
+                    quantity = 2,
+                    orderType = StockOrderType.LOC,
+                    isMock = false,
+                ),
+            )
+        }
+
+        assertEquals(
+            "overseas order cancel quantity exceeds remaining quantity: requested=2 remaining=1",
+            exception.message,
+        )
+        assertEquals(1, exchangeFunction.requests.size)
+    }
+
+    @Test
     fun `overseas order history follows kis pagination cursor`() {
         val exchangeFunction = StubExchangeFunction(
             responses = listOf(
