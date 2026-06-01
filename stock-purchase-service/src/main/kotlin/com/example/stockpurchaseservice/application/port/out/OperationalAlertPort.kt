@@ -9,6 +9,7 @@ interface OperationalAlertPort {
     suspend fun alertOrderSubmissionFailed(alert: OrderSubmissionFailureAlert)
     suspend fun alertSubmissionUnknown(alert: SubmissionUnknownAlert)
     suspend fun alertReconciliationFailed(alert: ReconciliationFailureAlert)
+    suspend fun alertUnmatchedExecution(alert: UnmatchedExecutionAlert) = Unit
     suspend fun alertOrderCancellationSubmissionFailed(alert: OrderCancellationSubmissionAlert) = Unit
     suspend fun alertOrderCancellationSubmissionUnknown(alert: OrderCancellationSubmissionAlert) = Unit
 }
@@ -43,6 +44,17 @@ data class ReconciliationFailureAlert(
     val source: String,
     val reason: String?,
     val failedAt: ZonedDateTime,
+)
+
+data class UnmatchedExecutionAlert(
+    val source: String,
+    val externalExecutionId: String,
+    val externalOrderId: String,
+    val stockId: String,
+    val quantity: Int,
+    val type: ExecutionTypeDto,
+    val reason: String,
+    val observedAt: ZonedDateTime,
 )
 
 data class OrderCancellationSubmissionAlert(

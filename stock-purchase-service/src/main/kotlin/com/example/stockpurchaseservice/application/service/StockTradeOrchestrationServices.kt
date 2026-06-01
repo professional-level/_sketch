@@ -25,6 +25,7 @@ import com.example.stockpurchaseservice.application.port.out.OrderPartiallyFille
 import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionPort
 import com.example.stockpurchaseservice.application.port.out.OperationalAlertPort
 import com.example.stockpurchaseservice.application.port.out.ReconciliationFailureAlert
+import com.example.stockpurchaseservice.application.port.out.UnmatchedExecutionAlert
 import com.example.stockpurchaseservice.application.port.out.UnmatchedExecutionDto
 import com.example.stockpurchaseservice.domain.ExecutedStock
 import com.example.stockpurchaseservice.domain.ExecutionFill
@@ -121,11 +122,10 @@ class ReconcileExecutionsService(
                 val publishOutcome = publishOrderFillEventIfIntentSubmissionExists(execution)
                 if (publishOutcome.unmatchedReason != null) {
                     unmatchedExecutionCount += 1
-                    executionReconciliationStatePort.saveUnmatchedExecution(
-                        execution.toUnmatchedExecutionDto(
-                            reason = publishOutcome.unmatchedReason,
-                            observedAt = startedAt,
-                        ),
+                    recordUnmatchedExecution(
+                        execution = execution,
+                        reason = publishOutcome.unmatchedReason,
+                        observedAt = startedAt,
                     )
                 }
             }
@@ -201,6 +201,21 @@ class ReconcileExecutionsService(
 
     private suspend fun isFullyFilled(externalOrderId: String, orderQuantity: Long): Boolean {
         return executionFillPort.sumQuantityByExternalOrderId(externalOrderId) >= orderQuantity
+    }
+
+    private suspend fun recordUnmatchedExecution(
+        execution: ExecutedStock,
+        reason: String,
+        observedAt: ZonedDateTime,
+    ) {
+        val unmatchedExecution = execution.toUnmatchedExecutionDto(
+            reason = reason,
+            observedAt = observedAt,
+        )
+        executionReconciliationStatePort.saveUnmatchedExecution(unmatchedExecution)
+        runCatching {
+            operationalAlertPort.alertUnmatchedExecution(unmatchedExecution.toAlert(RECONCILIATION_SOURCE))
+        }
     }
 
     private suspend fun ExecutedStockDto.toDomainForReconciliation(): ExecutedStock? {
@@ -319,6 +334,19 @@ private fun ExecutedStock.toUnmatchedExecutionDto(
         createdAt = createdAt,
         quantity = quantity,
         type = ExecutionTypeDto.from(type),
+        reason = reason,
+        observedAt = observedAt,
+    )
+}
+
+private fun UnmatchedExecutionDto.toAlert(source: String): UnmatchedExecutionAlert {
+    return UnmatchedExecutionAlert(
+        source = source,
+        externalExecutionId = externalExecutionId,
+        externalOrderId = externalOrderId,
+        stockId = stockId,
+        quantity = quantity,
+        type = type,
         reason = reason,
         observedAt = observedAt,
     )

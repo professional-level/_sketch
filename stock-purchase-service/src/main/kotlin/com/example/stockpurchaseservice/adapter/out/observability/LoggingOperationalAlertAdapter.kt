@@ -6,6 +6,7 @@ import com.example.stockpurchaseservice.application.port.out.OperationalAlertPor
 import com.example.stockpurchaseservice.application.port.out.OrderSubmissionFailureAlert
 import com.example.stockpurchaseservice.application.port.out.ReconciliationFailureAlert
 import com.example.stockpurchaseservice.application.port.out.SubmissionUnknownAlert
+import com.example.stockpurchaseservice.application.port.out.UnmatchedExecutionAlert
 import org.slf4j.LoggerFactory
 
 @ExternalApiAdapter
@@ -46,6 +47,20 @@ internal class LoggingOperationalAlertAdapter : OperationalAlertPort {
             "Execution reconciliation failed: source={} failedAt={} reason={}",
             alert.source,
             alert.failedAt,
+            alert.reason,
+        )
+    }
+
+    override suspend fun alertUnmatchedExecution(alert: UnmatchedExecutionAlert) {
+        log.warn(
+            "Unmatched broker execution observed: source={} externalExecutionId={} externalOrderId={} stockId={} quantity={} type={} observedAt={} reason={}",
+            alert.source,
+            alert.externalExecutionId,
+            alert.externalOrderId,
+            alert.stockId,
+            alert.quantity,
+            alert.type,
+            alert.observedAt,
             alert.reason,
         )
     }

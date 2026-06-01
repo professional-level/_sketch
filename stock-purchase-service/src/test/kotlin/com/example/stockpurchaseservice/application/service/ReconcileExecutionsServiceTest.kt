@@ -34,6 +34,7 @@ import com.example.stockpurchaseservice.application.port.out.PurchaseOrderDto
 import com.example.stockpurchaseservice.application.port.out.ReconciliationFailureAlert
 import com.example.stockpurchaseservice.application.port.out.SellingOrderDto
 import com.example.stockpurchaseservice.application.port.out.SubmissionUnknownAlert
+import com.example.stockpurchaseservice.application.port.out.UnmatchedExecutionAlert
 import com.example.stockpurchaseservice.application.port.out.UnmatchedExecutionDto
 import com.example.stockpurchaseservice.domain.ExternalOrderId
 import com.example.stockpurchaseservice.domain.Money
@@ -149,6 +150,7 @@ class ReconcileExecutionsServiceTest {
     @Test
     fun `records reconciliation cursor and unmatched executions`() = runBlocking {
         val reconciliationStatePort = FakeExecutionReconciliationStatePort()
+        val alertPort = FakeOperationalAlertPort()
         val service = service(
             marketPort = FakeMarketServicePort(
                 executions = listOf(execution(externalExecutionId = "exec-1", quantity = 30)),
@@ -157,6 +159,7 @@ class ReconcileExecutionsServiceTest {
             submissionPort = FakeOrderIntentSubmissionPort(submissions = emptyList()),
             eventPort = FakeOrderExecutionEventPort(),
             reconciliationStatePort = reconciliationStatePort,
+            operationalAlertPort = alertPort,
         )
 
         service.execute()
@@ -168,6 +171,29 @@ class ReconcileExecutionsServiceTest {
         assertEquals(1, reconciliationStatePort.completed.single().unmatchedExecutionCount)
         assertEquals("exec-1", reconciliationStatePort.unmatched.single().externalExecutionId)
         assertEquals("NO_ORDER_INTENT_SUBMISSION", reconciliationStatePort.unmatched.single().reason)
+        assertEquals("exec-1", alertPort.unmatchedExecution.single().externalExecutionId)
+        assertEquals("NO_ORDER_INTENT_SUBMISSION", alertPort.unmatchedExecution.single().reason)
+        assertEquals("BROKER_EXECUTION_DAILY", alertPort.unmatchedExecution.single().source)
+    }
+
+    @Test
+    fun `unmatched execution alert failure does not fail reconciliation`() = runBlocking {
+        val reconciliationStatePort = FakeExecutionReconciliationStatePort()
+        val service = service(
+            marketPort = FakeMarketServicePort(
+                executions = listOf(execution(externalExecutionId = "exec-1", quantity = 30)),
+            ),
+            executionFillPort = FakeExecutionFillPort(),
+            submissionPort = FakeOrderIntentSubmissionPort(submissions = emptyList()),
+            eventPort = FakeOrderExecutionEventPort(),
+            reconciliationStatePort = reconciliationStatePort,
+            operationalAlertPort = FakeOperationalAlertPort(failUnmatchedAlert = true),
+        )
+
+        service.execute()
+
+        assertEquals("exec-1", reconciliationStatePort.unmatched.single().externalExecutionId)
+        assertEquals(1, reconciliationStatePort.completed.single().unmatchedExecutionCount)
     }
 
     @Test
@@ -545,10 +571,13 @@ class ReconcileExecutionsServiceTest {
         }
     }
 
-    private class FakeOperationalAlertPort : OperationalAlertPort {
+    private class FakeOperationalAlertPort(
+        private val failUnmatchedAlert: Boolean = false,
+    ) : OperationalAlertPort {
         val orderSubmissionFailed: MutableList<OrderSubmissionFailureAlert> = mutableListOf()
         val submissionUnknown: MutableList<SubmissionUnknownAlert> = mutableListOf()
         val reconciliationFailed: MutableList<ReconciliationFailureAlert> = mutableListOf()
+        val unmatchedExecution: MutableList<UnmatchedExecutionAlert> = mutableListOf()
 
         override suspend fun alertOrderSubmissionFailed(alert: OrderSubmissionFailureAlert) {
             orderSubmissionFailed += alert
@@ -560,6 +589,11 @@ class ReconcileExecutionsServiceTest {
 
         override suspend fun alertReconciliationFailed(alert: ReconciliationFailureAlert) {
             reconciliationFailed += alert
+        }
+
+        override suspend fun alertUnmatchedExecution(alert: UnmatchedExecutionAlert) {
+            if (failUnmatchedAlert) throw IllegalStateException("alert sink unavailable")
+            unmatchedExecution += alert
         }
     }
 
