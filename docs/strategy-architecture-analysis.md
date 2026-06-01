@@ -525,10 +525,13 @@ broker API 자체가 idempotency key를 지원하지 않는다면, purchase-serv
 - 라오어 cycle close, `autoRestart`, `cycleNo`, `COMPLETED` 상태가 execution state에 저장된다.
 - `strategy-execution-service`는 Temporal Schedule로 active strategy daily execution workflow를 등록한다.
 - scheduled workflow는 실행일 기준 `ACTIVE_STRATEGIES_DAILY:yyyy-MM-dd` execution run id를 만들고, 같은 run id를 이미 처리한 active strategy는 다시 실행하지 않는다.
+- `stock-purchase-service`는 체결 reconciliation 시작/성공/실패 상태를 durable cursor로 저장한다.
+- 내부 주문과 매칭되지 않는 broker execution은 `unmatched_execution` 저장소에 보존한다.
+- reconciliation 실패 시 cursor를 completed로 전진시키지 않고 failed 상태와 실패 사유를 기록한다.
 
 현재 남은 것:
 
-- `stock-purchase-service`의 체결 reconciliation은 관측된 체결의 중복 저장은 처리하지만, durable cursor, 재시작 복구, backfill, unmatched broker execution 처리 정책은 아직 부족하다.
+- `stock-purchase-service`의 체결 reconciliation은 cursor와 unmatched 저장은 갖췄지만, broker 조회 API가 아직 1일 조회 stub이라 날짜 범위 기반 backfill은 남아 있다.
 - `SUBMISSION_UNKNOWN` 주문을 broker 조회로 복구하는 흐름이 없다.
 - `OrderCancelled` 계약은 문서에 있지만 실제 발행/소비 흐름은 아직 없다.
 - direct sell submission은 legacy 흐름에 남아 있으며, 매도 제출/체결 lifecycle event가 주문 intent 흐름과 완전히 통일되지 않았다.
@@ -578,7 +581,7 @@ stock-search-service
 9. 완료: 라오어 cycle close와 auto restart 정책을 명시적으로 저장한다.
 10. 완료: active strategy state를 persistence adapter로 옮긴다.
 11. 완료: Temporal schedule로 daily execution trigger를 붙인다.
-12. 다음 작업: stock-purchase reconciliation에 durable cursor, recovery, backfill, unmatched execution 처리를 추가한다.
+12. 부분 완료: stock-purchase reconciliation에 durable cursor와 unmatched execution 저장을 추가한다. 날짜 범위 기반 backfill은 남아 있다.
 13. 다음 작업: 주문 lifecycle을 `SUBMISSION_UNKNOWN` 복구, `OrderCancelled`, direct sell event까지 확장한다.
 14. 다음 작업: 발행 측 outbox 적용 범위를 strategy-execution과 stock-purchase의 publisher까지 확장한다.
 15. 이후 작업: KIS broker wrapper service를 별도 anti-corruption layer로 분리한다.

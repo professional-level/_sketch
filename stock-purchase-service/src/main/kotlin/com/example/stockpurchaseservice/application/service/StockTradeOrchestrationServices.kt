@@ -8,11 +8,15 @@ import com.example.stockpurchaseservice.application.port.`in`.SimulateStockPurch
 import com.example.stockpurchaseservice.application.port.out.ExecutedStockDto
 import com.example.stockpurchaseservice.application.port.out.ExecutionFillDto
 import com.example.stockpurchaseservice.application.port.out.ExecutionFillPort
+import com.example.stockpurchaseservice.application.port.out.ExecutionReconciliationResultDto
+import com.example.stockpurchaseservice.application.port.out.ExecutionReconciliationStatePort
+import com.example.stockpurchaseservice.application.port.out.ExecutionTypeDto
 import com.example.stockpurchaseservice.application.port.out.MarketServicePort
 import com.example.stockpurchaseservice.application.port.out.OrderExecutionEventPort
 import com.example.stockpurchaseservice.application.port.out.OrderFilledMessage
 import com.example.stockpurchaseservice.application.port.out.OrderPartiallyFilledMessage
 import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionPort
+import com.example.stockpurchaseservice.application.port.out.UnmatchedExecutionDto
 import com.example.stockpurchaseservice.application.service.strategy.toDto
 import com.example.stockpurchaseservice.domain.ExecutedStock
 import com.example.stockpurchaseservice.domain.ExecutionFill
@@ -28,8 +32,8 @@ import com.example.stockpurchaseservice.domain.Stock
 import com.example.stockpurchaseservice.domain.StockId
 import com.example.stockpurchaseservice.domain.StrategyType
 import com.example.stockpurchaseservice.domain.repository.StockOrderRepository
-import java.time.ZonedDateTime
 import java.nio.charset.StandardCharsets
+import java.time.ZonedDateTime
 import java.util.UUID
 
 @UseCaseImpl
@@ -65,18 +69,48 @@ class ReconcileExecutionsService(
     private val executionFillPort: ExecutionFillPort,
     private val orderIntentSubmissionPort: OrderIntentSubmissionPort,
     private val orderExecutionEventPort: OrderExecutionEventPort,
+    private val executionReconciliationStatePort: ExecutionReconciliationStatePort,
 ) : ReconcileExecutionsUseCase {
 
     override suspend fun execute() {
-        // TODO: Add durable cursor/recovery handling; saveIfNew only deduplicates observed fills.
+        val startedAt = ZonedDateTime.now()
+        executionReconciliationStatePort.markStarted(RECONCILIATION_SOURCE, startedAt)
+
+        runCatching {
+            reconcile(startedAt)
+        }.onFailure { exception ->
+            executionReconciliationStatePort.markFailed(
+                source = RECONCILIATION_SOURCE,
+                failedAt = ZonedDateTime.now(),
+                reason = exception.message,
+            )
+        }.getOrThrow()
+    }
+
+    private suspend fun reconcile(startedAt: ZonedDateTime) {
         val executedStockList: List<ExecutedStock> = marketService.findExecutionListAtOneDay().map { it.toDomain() }
         val refinedExecutedStockList = mutableListOf<ExecutedStock>()
+        var unmatchedExecutionCount = 0
         executedStockList.forEach { execution ->
             if (executionFillPort.saveIfNew(ExecutionFillDto.from(ExecutionFill.from(execution)))) {
                 refinedExecutedStockList += execution
-                publishOrderFillEventIfIntentSubmissionExists(execution)
+                val publishOutcome = publishOrderFillEventIfIntentSubmissionExists(execution)
+                if (publishOutcome.unmatchedReason != null) {
+                    unmatchedExecutionCount += 1
+                    executionReconciliationStatePort.saveUnmatchedExecution(
+                        execution.toUnmatchedExecutionDto(
+                            reason = publishOutcome.unmatchedReason,
+                            observedAt = startedAt,
+                        ),
+                    )
+                }
             }
         }
+        markCompleted(
+            observedExecutions = executedStockList,
+            savedFillCount = refinedExecutedStockList.size,
+            unmatchedExecutionCount = unmatchedExecutionCount,
+        )
         if (refinedExecutedStockList.isEmpty()) return
 
         val (selled, purchased) = refinedExecutedStockList.partition { it.type == ExecutionType.Selling }
@@ -108,9 +142,10 @@ class ReconcileExecutionsService(
         }
     }
 
-    private suspend fun publishOrderFillEventIfIntentSubmissionExists(execution: ExecutedStock) {
-        val submission = orderIntentSubmissionPort.findByExternalOrderId(execution.externalOrderId.value) ?: return
-        val filledPrice = submission.submittedPrice ?: return
+    private suspend fun publishOrderFillEventIfIntentSubmissionExists(execution: ExecutedStock): FillPublishOutcome {
+        val submission = orderIntentSubmissionPort.findByExternalOrderId(execution.externalOrderId.value)
+            ?: return FillPublishOutcome.MISSING_SUBMISSION
+        val filledPrice = submission.submittedPrice ?: return FillPublishOutcome.MISSING_SUBMITTED_PRICE
         if (isFullyFilled(execution.externalOrderId.value, submission.quantity)) {
             orderExecutionEventPort.publishFilled(
                 OrderFilledMessage(
@@ -140,16 +175,65 @@ class ReconcileExecutionsService(
                 ),
             )
         }
+        return FillPublishOutcome.PUBLISHED
     }
 
     private suspend fun isFullyFilled(externalOrderId: String, orderQuantity: Long): Boolean {
         return executionFillPort.sumQuantityByExternalOrderId(externalOrderId) >= orderQuantity
+    }
+
+    private suspend fun markCompleted(
+        observedExecutions: List<ExecutedStock>,
+        savedFillCount: Int,
+        unmatchedExecutionCount: Int,
+    ) {
+        val lastObserved = observedExecutions.maxWithOrNull(
+            compareBy<ExecutedStock> { it.createdAt }.thenBy { it.externalExecutionId.value },
+        )
+        executionReconciliationStatePort.markCompleted(
+            source = RECONCILIATION_SOURCE,
+            completedAt = ZonedDateTime.now(),
+            result = ExecutionReconciliationResultDto(
+                lastObservedExecutionId = lastObserved?.externalExecutionId?.value,
+                lastObservedExecutionAt = lastObserved?.createdAt,
+                observedExecutionCount = observedExecutions.size,
+                savedFillCount = savedFillCount,
+                unmatchedExecutionCount = unmatchedExecutionCount,
+            ),
+        )
+    }
+
+    private enum class FillPublishOutcome(val unmatchedReason: String?) {
+        PUBLISHED(null),
+        MISSING_SUBMISSION("NO_ORDER_INTENT_SUBMISSION"),
+        MISSING_SUBMITTED_PRICE("MISSING_SUBMITTED_PRICE"),
+    }
+
+    companion object {
+        private const val RECONCILIATION_SOURCE = "BROKER_EXECUTION_DAILY"
     }
 }
 
 private fun ExecutedStock.toEventId(eventType: String): UUID {
     return UUID.nameUUIDFromBytes(
         "${externalExecutionId.value}:$eventType".toByteArray(StandardCharsets.UTF_8),
+    )
+}
+
+private fun ExecutedStock.toUnmatchedExecutionDto(
+    reason: String,
+    observedAt: ZonedDateTime,
+): UnmatchedExecutionDto {
+    return UnmatchedExecutionDto(
+        externalExecutionId = externalExecutionId.value,
+        externalOrderId = externalOrderId.value,
+        stockId = stock.id.value,
+        stockName = stock.name,
+        createdAt = createdAt,
+        quantity = quantity,
+        type = ExecutionTypeDto.from(type),
+        reason = reason,
+        observedAt = observedAt,
     )
 }
 

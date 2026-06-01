@@ -6,6 +6,8 @@ import com.example.stockpurchaseservice.application.port.out.BrokerOrderSubmissi
 import com.example.stockpurchaseservice.application.port.out.ExecutedStockDto
 import com.example.stockpurchaseservice.application.port.out.ExecutionFillDto
 import com.example.stockpurchaseservice.application.port.out.ExecutionFillPort
+import com.example.stockpurchaseservice.application.port.out.ExecutionReconciliationResultDto
+import com.example.stockpurchaseservice.application.port.out.ExecutionReconciliationStatePort
 import com.example.stockpurchaseservice.application.port.out.ExecutionTypeDto
 import com.example.stockpurchaseservice.application.port.out.MarketServicePort
 import com.example.stockpurchaseservice.application.port.out.OrderExecutionEventPort
@@ -17,6 +19,7 @@ import com.example.stockpurchaseservice.application.port.out.OrderRejectedMessag
 import com.example.stockpurchaseservice.application.port.out.OrderSubmittedMessage
 import com.example.stockpurchaseservice.application.port.out.PurchaseOrderDto
 import com.example.stockpurchaseservice.application.port.out.SellingOrderDto
+import com.example.stockpurchaseservice.application.port.out.UnmatchedExecutionDto
 import com.example.stockpurchaseservice.domain.ExternalOrderId
 import com.example.stockpurchaseservice.domain.Order
 import com.example.stockpurchaseservice.domain.OrderId
@@ -93,11 +96,56 @@ class ReconcileExecutionsServiceTest {
         assertEquals(emptyList(), eventPort.filled)
     }
 
+    @Test
+    fun `records reconciliation cursor and unmatched executions`() = runBlocking {
+        val reconciliationStatePort = FakeExecutionReconciliationStatePort()
+        val service = service(
+            marketPort = FakeMarketServicePort(
+                executions = listOf(execution(externalExecutionId = "exec-1", quantity = 30)),
+            ),
+            executionFillPort = FakeExecutionFillPort(),
+            submissionPort = FakeOrderIntentSubmissionPort(submissions = emptyList()),
+            eventPort = FakeOrderExecutionEventPort(),
+            reconciliationStatePort = reconciliationStatePort,
+        )
+
+        service.execute()
+
+        assertEquals(listOf("BROKER_EXECUTION_DAILY"), reconciliationStatePort.startedSources)
+        assertEquals("exec-1", reconciliationStatePort.completed.single().lastObservedExecutionId)
+        assertEquals(1, reconciliationStatePort.completed.single().observedExecutionCount)
+        assertEquals(1, reconciliationStatePort.completed.single().savedFillCount)
+        assertEquals(1, reconciliationStatePort.completed.single().unmatchedExecutionCount)
+        assertEquals("exec-1", reconciliationStatePort.unmatched.single().externalExecutionId)
+        assertEquals("NO_ORDER_INTENT_SUBMISSION", reconciliationStatePort.unmatched.single().reason)
+    }
+
+    @Test
+    fun `marks reconciliation failed without completing cursor when broker lookup fails`() = runBlocking {
+        val reconciliationStatePort = FakeExecutionReconciliationStatePort()
+        val service = service(
+            marketPort = FakeMarketServicePort(
+                failure = IllegalStateException("broker unavailable"),
+            ),
+            executionFillPort = FakeExecutionFillPort(),
+            submissionPort = FakeOrderIntentSubmissionPort(submissions = emptyList()),
+            eventPort = FakeOrderExecutionEventPort(),
+            reconciliationStatePort = reconciliationStatePort,
+        )
+
+        runCatching { service.execute() }
+
+        assertEquals(listOf("BROKER_EXECUTION_DAILY"), reconciliationStatePort.startedSources)
+        assertEquals(emptyList(), reconciliationStatePort.completed)
+        assertEquals(listOf<String?>("broker unavailable"), reconciliationStatePort.failedReasons)
+    }
+
     private fun service(
         marketPort: MarketServicePort,
         executionFillPort: ExecutionFillPort,
         submissionPort: OrderIntentSubmissionPort,
         eventPort: OrderExecutionEventPort,
+        reconciliationStatePort: ExecutionReconciliationStatePort = FakeExecutionReconciliationStatePort(),
     ): ReconcileExecutionsService {
         return ReconcileExecutionsService(
             stockOrderRepository = FakeStockOrderRepository(),
@@ -105,6 +153,7 @@ class ReconcileExecutionsServiceTest {
             executionFillPort = executionFillPort,
             orderIntentSubmissionPort = submissionPort,
             orderExecutionEventPort = eventPort,
+            executionReconciliationStatePort = reconciliationStatePort,
         )
     }
 
@@ -145,7 +194,8 @@ class ReconcileExecutionsServiceTest {
     }
 
     private class FakeMarketServicePort(
-        private val executions: List<ExecutedStockDto>,
+        private val executions: List<ExecutedStockDto> = emptyList(),
+        private val failure: RuntimeException? = null,
     ) : MarketServicePort {
         override fun buyStock(order: PurchaseOrderDto): BrokerOrderSubmissionDto {
             return BrokerOrderSubmissionDto(externalOrderId = "broker-buy")
@@ -156,6 +206,7 @@ class ReconcileExecutionsServiceTest {
         }
 
         override fun findExecutionListAtOneDay(): List<ExecutedStockDto> {
+            failure?.let { throw it }
             return executions
         }
     }
@@ -205,6 +256,33 @@ class ReconcileExecutionsServiceTest {
 
         override suspend fun publishPartiallyFilled(event: OrderPartiallyFilledMessage) {
             partiallyFilled += event
+        }
+    }
+
+    private class FakeExecutionReconciliationStatePort : ExecutionReconciliationStatePort {
+        val startedSources: MutableList<String> = mutableListOf()
+        val completed: MutableList<ExecutionReconciliationResultDto> = mutableListOf()
+        val failedReasons: MutableList<String?> = mutableListOf()
+        val unmatched: MutableList<UnmatchedExecutionDto> = mutableListOf()
+
+        override suspend fun markStarted(source: String, startedAt: ZonedDateTime) {
+            startedSources += source
+        }
+
+        override suspend fun markCompleted(
+            source: String,
+            completedAt: ZonedDateTime,
+            result: ExecutionReconciliationResultDto,
+        ) {
+            completed += result
+        }
+
+        override suspend fun markFailed(source: String, failedAt: ZonedDateTime, reason: String?) {
+            failedReasons += reason
+        }
+
+        override suspend fun saveUnmatchedExecution(execution: UnmatchedExecutionDto) {
+            unmatched += execution
         }
     }
 
