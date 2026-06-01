@@ -542,11 +542,11 @@ broker API 자체가 idempotency key를 지원하지 않는다면, purchase-serv
 - stock-purchase-service의 주문/조회 KIS 원문 계약은 `adapter/out/broker`의 broker gateway anti-corruption layer로 격리되었다. 주문 제출 POST는 중복 주문을 피하기 위해 retry하지 않고 transient 실패나 broker order id 누락을 `SUBMISSION_UNKNOWN`으로 보낸다. KIS 주문 응답의 `rt_cd != 0`은 `msg_cd/msg1`을 보존한 broker rejection으로 분리해 `OrderRejected`와 rejected submission으로 확정한다. 국내 주문체결조회는 `ODNO`, `rjct_qty`, `cncl_yn`, `cncl_cfrm_qty`, `tot_ccld_qty`, `rmn_qty`를 내부 주문 상태와 cumulative execution으로 매핑한다. 해외 주문체결조회는 KIS `ODNO` 검색 불가 제약 때문에 일자/종목 범위로 조회한 뒤 응답 row의 broker order id를 client-side에서 매칭한다. KIS wrapper 호출에는 local rate-limit와 circuit breaker가 있고, circuit open/rate-limit 초과처럼 broker에 닿지 않은 실패는 broker rejection 이벤트로 발행하지 않는다. root wrapper의 KIS token은 real/mock scope별 만료 기반 in-memory cache로 관리한다. 별도 broker wrapper service 배포와 token 영속 저장/secret manager 연동은 아직 남아 있다.
 - `stock-purchase-service`는 broker 제출 전 risk guard로 주문 단위 금액 한도, 종목별 주문 금액 한도, 활성 매수 주문 기준 계좌 pending exposure 한도, 하루 broker 제출 건수 한도, 동일 전략/종목/태그 중복 kill switch, 전략 prefix disable, 전략 prefix별 mock/live broker route 검증을 적용한다.
 - 실제 체결 보유 수량/현금 기반 계좌 전체 exposure와 order intent 계약 수준의 trading environment 명시는 별도 계좌/포지션 상태 모델과 이벤트 계약 확장이 필요하므로 아직 남아 있다.
-- `stock-purchase-service`는 주문 제출 실패, `SUBMISSION_UNKNOWN` 지속, reconciliation 실패, 미매칭 broker execution을 `OperationalAlertPort`로 알리고, 기본 구현은 로그 기반 alert adapter로 둔다.
+- `stock-purchase-service`는 주문 제출 실패, `SUBMISSION_UNKNOWN` 지속, reconciliation 실패, 미매칭 broker execution을 `OperationalAlertPort`로 알리고, 기본 구현은 로그 기반 alert adapter와 Micrometer operational alert counter로 둔다.
 - `strategy-execution-service`는 `/strategy-executions/laor-v4`와 `/strategy-executions/laor-v4/{executionId}`에서 전략별 T, 현금, 보유 수량, 평균단가, cycle, mode를 조회할 수 있다.
 - `stock-purchase-service`와 `strategy-execution-service`는 production-like profile에서 로컬 broker/Temporal endpoint나 mock 주문 설정이 남아 있으면 startup validation으로 실패한다.
 - root sketch app의 KIS secret key 이름은 `src/main/resources/application-secret.properties.example` 템플릿으로 문서화했고, 운영 재시작 절차는 `docs/operations/trading-runtime-runbook.md`에 정리했다.
-- Slack/PagerDuty 같은 외부 alert sink, Micrometer/OpenTelemetry metric, 운영 대시보드 UI는 아직 남아 있다.
+- Slack/PagerDuty 같은 외부 alert sink, OpenTelemetry trace propagation, 운영 대시보드 UI는 아직 남아 있다.
 - 단발성 전략의 entry buy는 execution-service로 들어왔지만, sell policy와 completion lifecycle은 추가 정리가 필요하다.
 - daily execution schedule은 설정 기반 US trading calendar를 거쳐 실행된다. 주말과 설정된 휴장일은 active strategy 실행을 skip하며, 휴장일 데이터 자동 동기화와 조기폐장/LOC/MOC 마감 시간 정책은 남아 있다.
 - outbox 저장과 Kafka 발행은 분리되었지만, 운영 수준의 transaction boundary와 publisher retry/backoff 정책은 추가 hardening이 필요하다.
@@ -597,7 +597,7 @@ stock-search-service
 14. 완료: 발행 측 outbox 적용 범위를 strategy-execution과 stock-purchase의 publisher까지 확장한다.
 15. 부분 완료: stock-purchase-service 내부 주문/조회 KIS 계약을 broker gateway anti-corruption layer로 분리한다. 주문 제출 transient 실패와 broker order id 누락은 `SUBMISSION_UNKNOWN` 복구 흐름으로 보내고, wrapper 호출 rate-limit/circuit breaker를 둔다. root wrapper의 token은 real/mock scope별 만료 기반 in-memory cache로 보강했다. 별도 broker wrapper service 배포와 token 영속 저장/secret manager 연동은 남아 있다.
 16. 부분 완료: stock-purchase-service의 broker 제출 전 risk guard를 추가한다. 주문 단위/종목별 금액 한도, 활성 매수 주문 기준 계좌 pending exposure 한도, 하루 broker 제출 건수 한도, 중복 주문 kill switch, 전략 prefix disable, 전략 prefix별 mock/live broker route 검증은 적용됐고, 실제 체결 포지션/현금 기반 계좌 전체 exposure와 order intent 계약 수준의 trading environment 명시는 남아 있다.
-17. 부분 완료: 운영 관측성을 추가한다. 주문 제출 실패, `SUBMISSION_UNKNOWN` 지속, reconciliation 실패, 미매칭 broker execution은 log 기반 alert port로 노출하고, 라오어 전략별 T/현금/보유/평단 조회 API를 추가했다. 외부 alert sink, metric, 대시보드 UI는 남아 있다.
+17. 부분 완료: 운영 관측성을 추가한다. 주문 제출 실패, `SUBMISSION_UNKNOWN` 지속, reconciliation 실패, 미매칭 broker execution은 log 기반 alert port와 Micrometer counter로 노출하고, 라오어 전략별 T/현금/보유/평단 조회 API를 추가했다. 외부 alert sink, OpenTelemetry trace propagation, 대시보드 UI는 남아 있다.
 18. 부분 완료: daily active strategy execution에 설정 기반 US trading calendar를 추가하고, stock-purchase-service broker 제출 전 설정 기반 주문 가능 시간/LOC/MOC 마감 guard를 추가한다. 주말과 설정 휴장일 skip, 설정 기반 주문 시간 guard는 적용됐고, 휴장일/조기폐장/마감 시간 데이터 자동 동기화와 per-date cutoff 정책은 남아 있다.
 19. 부분 완료: 배포/설정/보안 가드를 추가한다. KIS secret 템플릿, 운영 runbook, production-like profile startup validation은 적용했고, secret manager/vault 연동과 운영 DB/Kafka/Temporal 배포 자동화는 남아 있다.
 

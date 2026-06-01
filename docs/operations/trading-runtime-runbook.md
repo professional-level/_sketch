@@ -102,6 +102,22 @@ akra.order.risk.trading-hours.overseas-us.loc-cutoff=15:50
 akra.order.risk.trading-hours.overseas-us.moc-cutoff=15:50
 ```
 
+## Observability Checks
+
+`stock-purchase-service` exposes Spring Boot Actuator endpoints for health and metrics:
+
+```text
+GET /actuator/health
+GET /actuator/metrics
+GET /actuator/metrics/stock.purchase.operational.alerts
+GET /actuator/prometheus
+```
+
+Operational alert counters are emitted through Micrometer as `stock.purchase.operational.alerts` with low-cardinality tags:
+
+- `type`: `order_submission_failed`, `submission_unknown`, `reconciliation_failed`, `unmatched_execution`, `order_cancellation_submission_failed`, or `order_cancellation_submission_unknown`
+- `severity`: `error` or `warning`
+
 ## Kafka And Temporal Restart Procedure
 
 When Kafka, Temporal, or an application service restarts:
