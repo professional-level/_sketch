@@ -22,4 +22,5 @@ data class RunActiveStrategyExecutionsResult(
     val activeStrategyCount: Int,
     val executedStrategyCount: Int,
     val createdOrderIntentCount: Int,
+    val skippedReason: String? = null,
 )

@@ -26,6 +26,7 @@ data class RunActiveStrategyExecutionsWorkflowResult(
     val activeStrategyCount: Int = 0,
     val executedStrategyCount: Int = 0,
     val createdOrderIntentCount: Int = 0,
+    val skippedReason: String? = null,
 )
 
 data class RunLaorV4StrategyWorkflowInput(

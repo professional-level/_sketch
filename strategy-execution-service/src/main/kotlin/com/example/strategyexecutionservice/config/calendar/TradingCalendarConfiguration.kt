@@ -1,0 +1,8 @@
+package com.example.strategyexecutionservice.config.calendar
+
+import org.springframework.boot.context.properties.EnableConfigurationProperties
+import org.springframework.context.annotation.Configuration
+
+@Configuration
+@EnableConfigurationProperties(TradingCalendarProperties::class)
+class TradingCalendarConfiguration

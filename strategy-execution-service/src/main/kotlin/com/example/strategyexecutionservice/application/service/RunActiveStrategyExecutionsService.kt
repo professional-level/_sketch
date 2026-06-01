@@ -12,6 +12,8 @@ import com.example.strategyexecutionservice.application.port.out.LaorV4Execution
 import com.example.strategyexecutionservice.application.port.out.MarketDataPort
 import com.example.strategyexecutionservice.application.port.out.StrategyExecutionStatePort
 import com.example.strategyexecutionservice.application.port.out.StrategyMarketDataSnapshot
+import com.example.strategyexecutionservice.application.port.out.TradingCalendarPort
+import com.example.strategyexecutionservice.application.port.out.TradingMarket
 import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategyState
 
 @UseCaseImpl
@@ -19,10 +21,22 @@ class RunActiveStrategyExecutionsService(
     private val strategyExecutionStatePort: StrategyExecutionStatePort,
     private val marketDataPort: MarketDataPort,
     private val runStrategyExecutionUseCase: RunStrategyExecutionUseCase,
+    private val tradingCalendarPort: TradingCalendarPort,
 ) : RunActiveStrategyExecutionsUseCase {
 
     override suspend fun execute(command: RunActiveStrategyExecutionsCommand): RunActiveStrategyExecutionsResult {
         val activeStrategies = strategyExecutionStatePort.findActiveLaorV4Strategies()
+        val requestedDate = command.requestedAt.toLocalDate()
+        if (!tradingCalendarPort.isTradingDay(TradingMarket.US, requestedDate)) {
+            return RunActiveStrategyExecutionsResult(
+                executionRunId = command.executionRunId,
+                activeStrategyCount = activeStrategies.size,
+                executedStrategyCount = 0,
+                createdOrderIntentCount = 0,
+                skippedReason = "US market is closed on $requestedDate",
+            )
+        }
+
         var executedStrategyCount = 0
         var createdOrderIntentCount = 0
 

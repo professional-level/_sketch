@@ -9,7 +9,7 @@ Updated: 2026-06-02
 The sketch currently has three trading-facing services:
 
 - `stock-search-service`: market-data lookup, candidate analysis, and strategy execution start requests.
-- `strategy-execution-service`: strategy instance registration, strategy lifecycle state, strategy state query API, order intent generation, and long-running strategy execution.
+- `strategy-execution-service`: strategy instance registration, strategy lifecycle state, strategy state query API, trading-calendar gated execution, order intent generation, and long-running strategy execution.
 - `stock-purchase-service`: order intent consumption, pre-broker risk guard, broker order submission, order state management, execution reconciliation, and broker operation alerts.
 
 The original flow connected `stock-search-service` to `stock-purchase-service` directly through a strategy-created event. That is sufficient for simple sketches, but it makes long-running strategies such as LAOR hard to model. Once a strategy can span many trading days, the system needs a service that owns the strategy instance lifecycle independently of discovery and broker execution.
@@ -19,7 +19,7 @@ The original flow connected `stock-search-service` to `stock-purchase-service` d
 Treat the bounded contexts as follows:
 
 - `stock-search-service` is the strategy discovery context. It decides whether a strategy should start for a symbol.
-- `strategy-execution-service` is the strategy lifecycle context. It owns strategy execution state, exposes strategy state for operations, and emits order intents.
+- `strategy-execution-service` is the strategy lifecycle context. It owns strategy execution state, gates daily execution through a trading calendar, exposes strategy state for operations, and emits order intents.
 - `stock-purchase-service` is the broker order and execution context. It applies pre-broker risk guard policies, submits orders, tracks broker order ids, reconciles fills, emits execution result events, and raises broker operation alerts.
 - The broker wrapper service is the external KIS Open API anti-corruption layer.
 - External integration events are protobuf contracts owned from `common/src/main/proto` while this remains a sketch.
