@@ -3,6 +3,7 @@ plugins {
     id("io.spring.dependency-management") version "1.0.13.RELEASE"
     kotlin("jvm") version "1.8.0"
     kotlin("plugin.spring") version "1.8.0"
+    kotlin("plugin.jpa") version "1.8.0"
 }
 
 group = "com.example.strategyexecutionservice"
@@ -24,6 +25,15 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.9.0")
     implementation("com.google.protobuf:protobuf-kotlin:3.25.2")
     implementation("com.google.protobuf:protobuf-java:3.25.2")
+    implementation("io.smallrye.reactive:mutiny-kotlin:2.3.0")
+    implementation("jakarta.inject:jakarta.inject-api:2.0.1")
+    implementation("jakarta.enterprise:jakarta.enterprise.cdi-api:3.0.0")
+    implementation("jakarta.persistence:jakarta.persistence-api:3.1.0")
+    implementation("org.springframework.boot:spring-boot-starter-data-jpa:3.2.4")
+    implementation("org.hibernate.reactive:hibernate-reactive-core:2.3.0.Final")
+    implementation("io.vertx:vertx-jdbc-client:4.5.7")
+    implementation("io.agroal:agroal-pool:2.3")
+    runtimeOnly("com.h2database:h2:2.2.224")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test:3.2.4")
     testImplementation(kotlin("test"))
