@@ -1,6 +1,7 @@
 package com.example.stockpurchaseservice.adapter.out.persistence
 
-import com.example.stockpurchaseservice.adapter.out.persistence.repository.OrderIntentSubmissionRepository
+import com.example.stockpurchaseservice.adapter.out.persistence.entity.OrderIntentSubmissionSide
+import com.example.stockpurchaseservice.adapter.out.persistence.repository.OrderRiskSubmissionReader
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentType
 import com.example.stockpurchaseservice.application.port.out.OrderRiskAssessmentCommand
@@ -89,6 +90,49 @@ class OrderRiskControlAdapterTest {
     }
 
     @Test
+    fun `rejects buy when active pending buy notional plus new order exceeds account limit`() = runBlocking {
+        val properties = OrderRiskProperties().apply {
+            maxAccountPendingBuyNotional = 1_000.0
+        }
+        val reader = FakeOrderRiskSubmissionReader(activeBuyNotional = 850.0)
+
+        val result = adapter(properties, reader).assess(
+            command(quantity = 2, limitPrice = 100.0),
+        )
+
+        assertFalse(result.accepted)
+        assertContains(result.reason ?: "", "account pending buy notional 1050.0 exceeds limit 1000.0")
+    }
+
+    @Test
+    fun `accepts buy when projected pending buy notional equals account limit`() = runBlocking {
+        val properties = OrderRiskProperties().apply {
+            maxAccountPendingBuyNotional = 1_000.0
+        }
+        val reader = FakeOrderRiskSubmissionReader(activeBuyNotional = 800.0)
+
+        val result = adapter(properties, reader).assess(
+            command(quantity = 2, limitPrice = 100.0),
+        )
+
+        assertTrue(result.accepted)
+    }
+
+    @Test
+    fun `does not apply pending buy exposure limit to sell orders`() = runBlocking {
+        val properties = OrderRiskProperties().apply {
+            maxAccountPendingBuyNotional = 1_000.0
+        }
+        val reader = FakeOrderRiskSubmissionReader(activeBuyNotional = 1_500.0)
+
+        val result = adapter(properties, reader).assess(
+            command(side = OrderIntentSide.SELL, orderType = OrderIntentType.LOC, quantity = 2, limitPrice = 100.0),
+        )
+
+        assertTrue(result.accepted)
+    }
+
+    @Test
     fun `skips trading hours guard when disabled`() = runBlocking {
         val properties = OrderRiskProperties().apply {
             tradingHours.enabled = false
@@ -101,17 +145,23 @@ class OrderRiskControlAdapterTest {
         assertTrue(result.accepted)
     }
 
-    private fun adapter(properties: OrderRiskProperties = OrderRiskProperties()): OrderRiskControlAdapter {
+    private fun adapter(
+        properties: OrderRiskProperties = OrderRiskProperties(),
+        reader: OrderRiskSubmissionReader = FakeOrderRiskSubmissionReader(),
+    ): OrderRiskControlAdapter {
         properties.duplicateOrderKillSwitchEnabled = false
         return OrderRiskControlAdapter(
-            orderIntentSubmissionRepository = OrderIntentSubmissionRepository(),
+            orderRiskSubmissionReader = reader,
             properties = properties,
         )
     }
 
     private fun command(
+        side: OrderIntentSide = OrderIntentSide.BUY,
         orderType: OrderIntentType = OrderIntentType.LOC,
         market: StockOrderMarket = StockOrderMarket.OVERSEAS_US,
+        quantity: Long = 1,
+        limitPrice: Double? = 100.0,
         createdAt: ZonedDateTime = ZonedDateTime.parse("2026-06-01T10:00:00-04:00[America/New_York]"),
     ): OrderRiskAssessmentCommand {
         return OrderRiskAssessmentCommand(
@@ -120,14 +170,34 @@ class OrderRiskControlAdapterTest {
             idempotencyKey = UUID.randomUUID().toString(),
             strategyExecutionId = "laor-v4:TQQQ",
             symbol = "TQQQ",
-            side = OrderIntentSide.BUY,
+            side = side,
             orderType = orderType,
-            quantity = 1,
-            limitPrice = 100.0,
-            estimatedNotional = 100.0,
+            quantity = quantity,
+            limitPrice = limitPrice,
+            estimatedNotional = limitPrice?.let { it * quantity },
             market = market,
             orderTag = "FIRST_BUY",
             createdAt = createdAt,
         )
+    }
+
+    private class FakeOrderRiskSubmissionReader(
+        private val activeBuyNotional: Double = 0.0,
+    ) : OrderRiskSubmissionReader {
+        override suspend fun countBrokerSubmittedBetween(
+            from: ZonedDateTime,
+            to: ZonedDateTime,
+        ): Long = 0
+
+        override suspend fun existsActiveDuplicate(
+            strategyExecutionId: String,
+            symbol: String,
+            side: OrderIntentSubmissionSide,
+            orderTag: String,
+            from: ZonedDateTime,
+            to: ZonedDateTime,
+        ): Boolean = false
+
+        override suspend fun sumActiveBuyNotional(): Double = activeBuyNotional
     }
 }

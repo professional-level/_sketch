@@ -12,7 +12,9 @@ import java.util.UUID
 
 @ApplicationScoped
 @Repository
-internal class OrderIntentSubmissionRepository : AbstractReactiveRepository<OrderIntentSubmissionEntity, UUID>() {
+internal class OrderIntentSubmissionRepository :
+    AbstractReactiveRepository<OrderIntentSubmissionEntity, UUID>(),
+    OrderRiskSubmissionReader {
     suspend fun findByExternalOrderId(externalOrderId: String): OrderIntentSubmissionEntity? {
         return sessionFactory.withSession { session ->
             session.createQuery(
@@ -31,7 +33,7 @@ internal class OrderIntentSubmissionRepository : AbstractReactiveRepository<Orde
         }.awaitSuspending()
     }
 
-    suspend fun countBrokerSubmittedBetween(
+    override suspend fun countBrokerSubmittedBetween(
         from: ZonedDateTime,
         to: ZonedDateTime,
     ): Long {
@@ -53,7 +55,7 @@ internal class OrderIntentSubmissionRepository : AbstractReactiveRepository<Orde
         }.awaitSuspending().toLong()
     }
 
-    suspend fun existsActiveDuplicate(
+    override suspend fun existsActiveDuplicate(
         strategyExecutionId: String,
         symbol: String,
         side: OrderIntentSubmissionSide,
@@ -89,6 +91,26 @@ internal class OrderIntentSubmissionRepository : AbstractReactiveRepository<Orde
         return count > 0
     }
 
+    override suspend fun sumActiveBuyNotional(): Double {
+        val notional = sessionFactory.withSession { session ->
+            session.createQuery(
+                """
+                SELECT COALESCE(SUM(o.submittedPrice * o.quantity), 0.0)
+                FROM OrderIntentSubmissionEntity o
+                WHERE o.side = :side
+                  AND o.submittedPrice IS NOT NULL
+                  AND o.status IN (:statuses)
+                """.trimIndent(),
+                java.lang.Number::class.java,
+            )
+                .setParameter("side", OrderIntentSubmissionSide.BUY)
+                .setParameter("statuses", ACTIVE_EXPOSURE_STATUSES)
+                .singleResult
+        }.awaitSuspending()
+
+        return notional.doubleValue()
+    }
+
     suspend fun update(entity: OrderIntentSubmissionEntity) {
         sessionFactory.withSession { session ->
             session.merge(entity).flatMap { session.flush() }
@@ -102,6 +124,10 @@ internal class OrderIntentSubmissionRepository : AbstractReactiveRepository<Orde
             OrderIntentSubmissionStatus.CANCELLED,
         )
         private val ACTIVE_DUPLICATE_STATUSES = listOf(
+            OrderIntentSubmissionStatus.SUBMITTED,
+            OrderIntentSubmissionStatus.SUBMISSION_UNKNOWN,
+        )
+        private val ACTIVE_EXPOSURE_STATUSES = listOf(
             OrderIntentSubmissionStatus.SUBMITTED,
             OrderIntentSubmissionStatus.SUBMISSION_UNKNOWN,
         )

@@ -77,13 +77,16 @@ Before enabling real orders:
 - Point `akra.order.kis-open-api.base-url` and `akra.market-data.kis-open-api.base-url` to the deployed broker wrapper.
 - Point `akra.temporal.target` to the managed Temporal frontend.
 - Set real-vs-mock trading flags intentionally for the account being operated.
-- Confirm risk guard limits are set for order notional, symbol notional, daily order count, and disabled strategies.
+- Confirm risk guard limits are set for order notional, account pending buy notional, symbol notional, daily order count, and disabled strategies.
 - Configure domestic and US order windows, holidays, early-close dates, and LOC/MOC cutoffs until an exchange calendar sync is available.
 - Confirm `application-secret.properties` is not included in the built artifact or Git diff.
 
-Order trading-hours guard keys:
+Risk and trading-hours guard keys:
 
 ```properties
+akra.order.risk.max-order-notional=1000
+akra.order.risk.max-account-pending-buy-notional=5000
+akra.order.risk.max-daily-order-count=20
 akra.order.risk.trading-hours.enabled=true
 akra.order.risk.trading-hours.domestic.regular-open=09:00
 akra.order.risk.trading-hours.domestic.regular-close=15:30

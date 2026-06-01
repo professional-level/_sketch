@@ -2,7 +2,7 @@ package com.example.stockpurchaseservice.adapter.out.persistence
 
 import com.example.common.PersistenceAdapter
 import com.example.stockpurchaseservice.adapter.out.persistence.entity.OrderIntentSubmissionSide
-import com.example.stockpurchaseservice.adapter.out.persistence.repository.OrderIntentSubmissionRepository
+import com.example.stockpurchaseservice.adapter.out.persistence.repository.OrderRiskSubmissionReader
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
 import com.example.stockpurchaseservice.application.port.out.OrderRiskAssessmentCommand
 import com.example.stockpurchaseservice.application.port.out.OrderRiskAssessmentResult
@@ -12,7 +12,7 @@ import java.time.ZonedDateTime
 
 @PersistenceAdapter
 internal class OrderRiskControlAdapter(
-    private val orderIntentSubmissionRepository: OrderIntentSubmissionRepository,
+    private val orderRiskSubmissionReader: OrderRiskSubmissionReader,
     private val properties: OrderRiskProperties,
 ) : OrderRiskControlPort {
     private val tradingHoursPolicy = OrderTradingHoursPolicy(properties.tradingHours)
@@ -23,6 +23,7 @@ internal class OrderRiskControlAdapter(
         disabledStrategyReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }
         tradingHoursPolicy.rejectReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }
         orderNotionalReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }
+        accountPendingBuyExposureReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }
         dailyOrderCountReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }
         duplicateOrderReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }
 
@@ -53,9 +54,24 @@ internal class OrderRiskControlAdapter(
         if (limit <= 0) return null
 
         val window = command.createdAt.dayWindow()
-        val currentCount = orderIntentSubmissionRepository.countBrokerSubmittedBetween(window.first, window.second)
+        val currentCount = orderRiskSubmissionReader.countBrokerSubmittedBetween(window.first, window.second)
         return if (currentCount >= limit) {
             "daily broker order count $currentCount reached limit $limit"
+        } else {
+            null
+        }
+    }
+
+    private suspend fun accountPendingBuyExposureReason(command: OrderRiskAssessmentCommand): String? {
+        val limit = properties.maxAccountPendingBuyNotional ?: return null
+        if (limit <= 0.0 || command.side != OrderIntentSide.BUY) return null
+
+        val orderNotional = command.estimatedNotional ?: return null
+        val activeBuyNotional = orderRiskSubmissionReader.sumActiveBuyNotional()
+        val projectedNotional = activeBuyNotional + orderNotional
+        return if (projectedNotional > limit) {
+            "account pending buy notional $projectedNotional exceeds limit $limit " +
+                "(active=$activeBuyNotional order=$orderNotional)"
         } else {
             null
         }
@@ -65,7 +81,7 @@ internal class OrderRiskControlAdapter(
         if (!properties.duplicateOrderKillSwitchEnabled) return null
 
         val window = command.createdAt.dayWindow()
-        val exists = orderIntentSubmissionRepository.existsActiveDuplicate(
+        val exists = orderRiskSubmissionReader.existsActiveDuplicate(
             strategyExecutionId = command.strategyExecutionId,
             symbol = command.symbol,
             side = command.side.toEntity(),
