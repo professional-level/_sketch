@@ -93,6 +93,78 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `builds domestic cancel request using original broker order fields`() {
+        val command = brokerCancelCommand(
+            market = StockOrderMarket.DOMESTIC,
+            symbol = "005930",
+            originalOrderId = "domestic-order-1",
+            branchOrderNumber = "00001",
+            price = 0.0,
+            quantity = 2,
+            orderType = StockOrderType.LIMIT,
+            cancelAll = true,
+            isMock = false,
+        )
+
+        val body = command.toKisDomesticCancelRequest()
+
+        assertEquals("00001", body["KRX_FWDG_ORD_ORGNO"])
+        assertEquals("domestic-order-1", body["ORGN_ODNO"])
+        assertEquals("00", body["ORD_DVSN"])
+        assertEquals("02", body["RVSE_CNCL_DVSN_CD"])
+        assertEquals(2, body["ORD_QTY"])
+        assertEquals(0L, body["ORD_UNPR"])
+        assertEquals("Y", body["QTY_ALL_ORD_YN"])
+        assertEquals("KRX", body["EXCG_ID_DVSN_CD"])
+        assertEquals(false, body["isMock"])
+    }
+
+    @Test
+    fun `domestic cancel request requires branch order number`() {
+        val command = brokerCancelCommand(
+            market = StockOrderMarket.DOMESTIC,
+            symbol = "005930",
+            originalOrderId = "domestic-order-1",
+            branchOrderNumber = null,
+            price = 0.0,
+            quantity = 2,
+            orderType = StockOrderType.LIMIT,
+            isMock = false,
+        )
+
+        assertFailsWith<IllegalArgumentException> {
+            command.toKisDomesticCancelRequest()
+        }
+    }
+
+    @Test
+    fun `builds overseas cancel request using original broker order fields`() {
+        val command = brokerCancelCommand(
+            market = StockOrderMarket.OVERSEAS_US,
+            symbol = "tqqq",
+            originalOrderId = "overseas-order-1",
+            branchOrderNumber = null,
+            price = 112.5,
+            quantity = 3,
+            orderType = StockOrderType.LOC,
+            cancelAll = false,
+            isMock = true,
+        )
+
+        val body = command.toKisUsOverseasCancelRequest()
+
+        assertEquals("NASD", body["OVRS_EXCG_CD"])
+        assertEquals("TQQQ", body["PDNO"])
+        assertEquals("overseas-order-1", body["ORGN_ODNO"])
+        assertEquals("02", body["RVSE_CNCL_DVSN_CD"])
+        assertEquals(3, body["ORD_QTY"])
+        assertEquals("112.5", body["OVRS_ORD_UNPR"])
+        assertEquals("", body["MGCO_APTM_ODNO"])
+        assertEquals("0", body["ORD_SVR_DVSN_CD"])
+        assertEquals(true, body["isMock"])
+    }
+
+    @Test
     fun `overseas order history follows kis pagination cursor`() {
         val exchangeFunction = StubExchangeFunction(
             responses = listOf(
@@ -609,6 +681,31 @@ class KisBrokerGatewayAdapterTest {
             orderType = orderType,
             price = price,
             quantity = quantity,
+            isMock = isMock,
+        )
+    }
+
+    private fun brokerCancelCommand(
+        market: StockOrderMarket,
+        symbol: String,
+        originalOrderId: String,
+        branchOrderNumber: String?,
+        price: Double,
+        quantity: Int,
+        orderType: StockOrderType,
+        cancelAll: Boolean = true,
+        isMock: Boolean,
+    ): BrokerOrderCancelCommand {
+        return BrokerOrderCancelCommand(
+            internalOrderId = UUID.randomUUID(),
+            market = market,
+            symbol = symbol,
+            originalOrderId = originalOrderId,
+            branchOrderNumber = branchOrderNumber,
+            orderType = orderType,
+            price = price,
+            quantity = quantity,
+            cancelAll = cancelAll,
             isMock = isMock,
         )
     }

@@ -1,12 +1,14 @@
 package com.example.stockpurchaseservice.adapter.out.api
 
 import com.example.stockpurchaseservice.adapter.out.broker.BrokerGateway
+import com.example.stockpurchaseservice.adapter.out.broker.BrokerOrderCancelCommand
 import com.example.stockpurchaseservice.adapter.out.broker.BrokerOrderCommand
 import com.example.stockpurchaseservice.adapter.out.broker.BrokerOrderHistoryItem
 import com.example.stockpurchaseservice.adapter.out.broker.BrokerOrderHistoryQuery
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatusQuery
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderSubmissionDto
+import com.example.stockpurchaseservice.application.port.out.CancelOrderDto
 import com.example.stockpurchaseservice.application.port.out.PurchaseOrderDto
 import com.example.stockpurchaseservice.application.port.out.StockOrderMarket
 import com.example.stockpurchaseservice.application.port.out.StockOrderType
@@ -59,6 +61,70 @@ class StockOrderBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `domestic cancel adapter submits normalized broker cancel command`() {
+        val brokerGateway = FakeBrokerGateway()
+        val adapter = DomesticStockOrderAdapter(brokerGateway, isMockOrder = false)
+        val order = CancelOrderDto(
+            orderId = UUID.fromString("00000000-0000-0000-0000-000000000021"),
+            stockId = "005930",
+            originalOrderId = "domestic-order-1",
+            branchOrderNumber = "00001",
+            quantity = 2,
+            market = StockOrderMarket.DOMESTIC,
+            orderType = StockOrderType.LIMIT,
+            price = 0.0,
+            cancelAll = true,
+        )
+
+        val result = adapter.cancelOrder(order)
+
+        assertEquals("cancel-broker-1", result.externalOrderId)
+        with(brokerGateway.cancelled.single()) {
+            assertEquals(order.orderId, internalOrderId)
+            assertEquals(StockOrderMarket.DOMESTIC, market)
+            assertEquals("005930", symbol)
+            assertEquals("domestic-order-1", originalOrderId)
+            assertEquals("00001", branchOrderNumber)
+            assertEquals(2, quantity)
+            assertEquals(StockOrderType.LIMIT, orderType)
+            assertEquals(0.0, price)
+            assertEquals(true, cancelAll)
+            assertEquals(false, isMock)
+        }
+    }
+
+    @Test
+    fun `overseas cancel adapter submits normalized broker cancel command`() {
+        val brokerGateway = FakeBrokerGateway()
+        val adapter = OverseasStockOrderAdapter(brokerGateway, isMockOrder = true)
+        val order = CancelOrderDto(
+            orderId = UUID.fromString("00000000-0000-0000-0000-000000000022"),
+            stockId = "TQQQ",
+            originalOrderId = "overseas-order-1",
+            quantity = 3,
+            market = StockOrderMarket.OVERSEAS_US,
+            orderType = StockOrderType.LOC,
+            price = 112.5,
+            cancelAll = false,
+        )
+
+        adapter.cancelOrder(order)
+
+        with(brokerGateway.cancelled.single()) {
+            assertEquals(order.orderId, internalOrderId)
+            assertEquals(StockOrderMarket.OVERSEAS_US, market)
+            assertEquals("TQQQ", symbol)
+            assertEquals("overseas-order-1", originalOrderId)
+            assertEquals(null, branchOrderNumber)
+            assertEquals(3, quantity)
+            assertEquals(StockOrderType.LOC, orderType)
+            assertEquals(112.5, price)
+            assertEquals(false, cancelAll)
+            assertEquals(true, isMock)
+        }
+    }
+
+    @Test
     fun `overseas status lookup queries by symbol and filters broker order id client side`() {
         val brokerGateway = FakeBrokerGateway()
         val adapter = OverseasStockOrderAdapter(brokerGateway, isMockOrder = false)
@@ -88,11 +154,17 @@ class StockOrderBrokerGatewayAdapterTest {
 
     private class FakeBrokerGateway : BrokerGateway {
         val submitted: MutableList<BrokerOrderCommand> = mutableListOf()
+        val cancelled: MutableList<BrokerOrderCancelCommand> = mutableListOf()
         val historyQueries: MutableList<BrokerOrderHistoryQuery> = mutableListOf()
 
         override fun submitOrder(command: BrokerOrderCommand): BrokerOrderSubmissionDto {
             submitted += command
             return BrokerOrderSubmissionDto(externalOrderId = "broker-1")
+        }
+
+        override fun cancelOrder(command: BrokerOrderCancelCommand): BrokerOrderSubmissionDto {
+            cancelled += command
+            return BrokerOrderSubmissionDto(externalOrderId = "cancel-broker-1")
         }
 
         override fun findOrderHistory(query: BrokerOrderHistoryQuery): List<BrokerOrderHistoryItem> {

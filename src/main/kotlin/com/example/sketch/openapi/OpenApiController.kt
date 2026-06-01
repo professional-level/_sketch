@@ -14,7 +14,9 @@ import com.example.common.endpoint.Endpoint.GET_PROGRAM_TRADE_INFO_PER_INDIVIDUA
 import com.example.common.endpoint.Endpoint.GET_PROGRAM_TRADE_INFO_PER_INDIVIDUAL_AT_ONE_DAY
 import com.example.common.endpoint.Endpoint.GET_QUOTATIONS_OF_VOLUME_RANK
 import com.example.common.endpoint.Endpoint.POST_OVERSEAS_STOCK_ORDER
+import com.example.common.endpoint.Endpoint.POST_OVERSEAS_STOCK_ORDER_CANCEL
 import com.example.common.endpoint.Endpoint.POST_STOCK_ORDER
+import com.example.common.endpoint.Endpoint.POST_STOCK_ORDER_CANCEL
 import com.example.common.endpoint.Endpoint.REQUEST_TOKEN
 import com.example.sketch.utils.OpenApiResponse
 import com.example.sketch.utils.StringExtension.toRequestableDateFormat
@@ -172,6 +174,32 @@ class OpenApiController(
         response: ServerHttpResponse,
     ): ApiResponse.StockOrder {
         val result = service.postOverseasStockOrder(request).toPostStockOrderResponse()
+        response.statusCode = when (result.rtCd == "0") {
+            true -> HttpStatus.OK
+            false -> HttpStatus.INTERNAL_SERVER_ERROR
+        }
+        return result
+    }
+
+    @PostMapping(POST_STOCK_ORDER_CANCEL)
+    suspend fun postStockOrderCancel(
+        @RequestBody request: StockOrderCancelRequest,
+        response: ServerHttpResponse,
+    ): ApiResponse.StockOrder {
+        val result = service.postStockOrderCancel(request).toPostStockOrderResponse()
+        response.statusCode = when (result.rtCd == "0") {
+            true -> HttpStatus.OK
+            false -> HttpStatus.INTERNAL_SERVER_ERROR
+        }
+        return result
+    }
+
+    @PostMapping(POST_OVERSEAS_STOCK_ORDER_CANCEL)
+    suspend fun postOverseasStockOrderCancel(
+        @RequestBody request: OverseasStockOrderCancelRequest,
+        response: ServerHttpResponse,
+    ): ApiResponse.StockOrder {
+        val result = service.postOverseasStockOrderCancel(request).toPostStockOrderResponse()
         response.statusCode = when (result.rtCd == "0") {
             true -> HttpStatus.OK
             false -> HttpStatus.INTERNAL_SERVER_ERROR

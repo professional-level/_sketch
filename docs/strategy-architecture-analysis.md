@@ -601,6 +601,12 @@ stock-search-service
 18. 부분 완료: daily active strategy execution에 설정 기반 US trading calendar를 추가한다. 주말과 설정 휴장일 skip은 적용됐고, 휴장일 자동 동기화, 조기폐장, 주문 가능 시간, LOC/MOC 마감 시간 정책은 남아 있다.
 19. 부분 완료: 배포/설정/보안 가드를 추가한다. KIS secret 템플릿, 운영 runbook, production-like profile startup validation은 적용했고, secret manager/vault 연동과 운영 DB/Kafka/Temporal 배포 자동화는 남아 있다.
 
+### Broker Cancel Request Boundary
+
+- `stock-purchase-service` now has a separate cancel-submission use case and KIS domestic/overseas `order-rvsecncl` broker adapter path.
+- Cancel submission success is treated as broker acceptance of the cancel request, not as final cancellation. `OrderCancelled` remains emitted only after broker status lookup/recovery confirms the original order is cancelled.
+- Domestic KIS cancel requests require `KRX_FWDG_ORD_ORGNO` and `ORGN_ODNO`; overseas cancel requests use `OVRS_EXCG_CD`, `PDNO`, and `ORGN_ODNO`. Modify/revise orders and domestic possible-cancel precheck are still production-hardening gaps.
+
 ## Open Questions
 
 - `autoRestart=true`일 때 execution-service가 즉시 다음 cycle을 여는 현재 정책으로 충분한가, 아니면 search-service의 재승인을 다시 받아야 하는가?

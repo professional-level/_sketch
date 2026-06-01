@@ -332,6 +332,55 @@ class OpenApiService(
         return response
     }
 
+    suspend fun postStockOrderCancel(request: StockOrderCancelRequest): OpenApiResponse {
+        val token = getToken(isMock = request.isMock)
+        val info = RequestType.POST_STOCK_ORDER_CANCEL
+        val headers = build(token = token, trId = if (request.isMock) "VTTC0013U" else "TTTC0013U")
+            .addHeader(HeaderBuilder.HeaderKey.CUSTOMER_TYPE, "P")
+            .build()
+            .withMockCredentialIfNeeded(request.isMock)
+        val (cano, acntPrdtCd) = stockAccount(request.isMock)
+        val body = mapOf(
+            BodyParameter.CANO to cano,
+            BodyParameter.ACNT_PRDT_CD to acntPrdtCd,
+            BodyParameter.KRX_FWDG_ORD_ORGNO to request.KRX_FWDG_ORD_ORGNO,
+            BodyParameter.ORGN_ODNO to request.ORGN_ODNO,
+            BodyParameter.ORD_DVSN to request.ORD_DVSN,
+            BodyParameter.RVSE_CNCL_DVSN_CD to "02",
+            BodyParameter.ORD_QTY to request.ORD_QTY.toString(),
+            BodyParameter.ORD_UNPR to request.ORD_UNPR.toString(),
+            BodyParameter.QTY_ALL_ORD_YN to request.QTY_ALL_ORD_YN,
+            BodyParameter.EXCG_ID_DVSN_CD to request.EXCG_ID_DVSN_CD,
+            BodyParameter.CNDT_PRIC to request.CNDT_PRIC,
+        )
+
+        return executeHttpRequest(info = info, headers = headers, body = body, isMockApi = request.isMock)
+    }
+
+    suspend fun postOverseasStockOrderCancel(request: OverseasStockOrderCancelRequest): OpenApiResponse {
+        val token = getToken(isMock = request.isMock)
+        val info = RequestType.POST_OVERSEAS_STOCK_ORDER_CANCEL
+        val headers = build(token = token, trId = if (request.isMock) "VTTT1004U" else "TTTT1004U")
+            .addHeader(HeaderBuilder.HeaderKey.CUSTOMER_TYPE, "P")
+            .build()
+            .withMockCredentialIfNeeded(request.isMock)
+        val (cano, acntPrdtCd) = stockAccount(request.isMock)
+        val body = mapOf(
+            BodyParameter.CANO to cano,
+            BodyParameter.ACNT_PRDT_CD to acntPrdtCd,
+            BodyParameter.OVRS_EXCG_CD to request.OVRS_EXCG_CD.uppercase(),
+            BodyParameter.PDNO to request.PDNO.uppercase(),
+            BodyParameter.ORGN_ODNO to request.ORGN_ODNO,
+            BodyParameter.RVSE_CNCL_DVSN_CD to "02",
+            BodyParameter.ORD_QTY to request.ORD_QTY.toString(),
+            BodyParameter.OVRS_ORD_UNPR to request.OVRS_ORD_UNPR,
+            BodyParameter.MGCO_APTM_ODNO to request.MGCO_APTM_ODNO,
+            BodyParameter.ORD_SVR_DVSN_CD to request.ORD_SVR_DVSN_CD,
+        )
+
+        return executeHttpRequest(info = info, headers = headers, body = body, isMockApi = request.isMock)
+    }
+
     suspend fun getExecutionOrders(request: GetDailyExecutionOrdersRequest): OpenApiResponse {
         val token = getToken(isMock = request.isMock)
         val info: RequestType = RequestType.GET_EXECUTION_ORDERS
@@ -571,6 +620,10 @@ object BodyParameter {
     const val ORD_UNPR = "ORD_UNPR"
     const val EXCG_ID_DVSN_CD = "EXCG_ID_DVSN_CD"
     const val CNDT_PRIC = "CNDT_PRIC"
+    const val KRX_FWDG_ORD_ORGNO = "KRX_FWDG_ORD_ORGNO"
+    const val ORGN_ODNO = "ORGN_ODNO"
+    const val RVSE_CNCL_DVSN_CD = "RVSE_CNCL_DVSN_CD"
+    const val QTY_ALL_ORD_YN = "QTY_ALL_ORD_YN"
     const val OVRS_EXCG_CD = "OVRS_EXCG_CD"
     const val OVRS_ORD_UNPR = "OVRS_ORD_UNPR"
     const val CTAC_TLNO = "CTAC_TLNO"

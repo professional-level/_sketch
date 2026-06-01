@@ -7,6 +7,9 @@ import java.util.UUID
 interface MarketServicePort {
     fun buyStock(order: PurchaseOrderDto): BrokerOrderSubmissionDto
     fun sellStock(order: SellingOrderDto): BrokerOrderSubmissionDto
+    fun cancelOrder(order: CancelOrderDto): BrokerOrderSubmissionDto {
+        throw UnsupportedOperationException("cancel order is not supported")
+    }
     fun findExecutionList(query: ExecutionLookupQuery): List<ExecutedStockDto> = findExecutionListAtOneDay()
     fun findExecutionListAtOneDay(): List<ExecutedStockDto>
     fun findOrderSubmissionStatus(query: BrokerOrderStatusQuery): BrokerOrderStatusDto
@@ -15,6 +18,7 @@ interface MarketServicePort {
 interface DomesticStockOrderPort {
     fun buyStock(order: PurchaseOrderDto): BrokerOrderSubmissionDto
     fun sellStock(order: SellingOrderDto): BrokerOrderSubmissionDto
+    fun cancelOrder(order: CancelOrderDto): BrokerOrderSubmissionDto
     fun findExecutionList(query: ExecutionLookupQuery): List<ExecutedStockDto> = findExecutionListAtOneDay()
     fun findExecutionListAtOneDay(): List<ExecutedStockDto>
     fun findOrderSubmissionStatus(query: BrokerOrderStatusQuery): BrokerOrderStatusDto
@@ -23,6 +27,7 @@ interface DomesticStockOrderPort {
 interface OverseasStockOrderPort {
     fun buyStock(order: PurchaseOrderDto): BrokerOrderSubmissionDto
     fun sellStock(order: SellingOrderDto): BrokerOrderSubmissionDto
+    fun cancelOrder(order: CancelOrderDto): BrokerOrderSubmissionDto
     fun findExecutionList(query: ExecutionLookupQuery): List<ExecutedStockDto> = findExecutionListAtOneDay()
     fun findExecutionListAtOneDay(): List<ExecutedStockDto>
     fun findOrderSubmissionStatus(query: BrokerOrderStatusQuery): BrokerOrderStatusDto
@@ -90,6 +95,18 @@ data class SellingOrderDto(
     val quantity: Int,
     val market: StockOrderMarket = StockOrderMarket.DOMESTIC,
     val orderType: StockOrderType = StockOrderType.LIMIT,
+)
+
+data class CancelOrderDto(
+    val orderId: UUID,
+    val stockId: String,
+    val originalOrderId: String,
+    val branchOrderNumber: String? = null,
+    val quantity: Int,
+    val market: StockOrderMarket,
+    val orderType: StockOrderType = StockOrderType.LIMIT,
+    val price: Double = 0.0,
+    val cancelAll: Boolean = true,
 )
 
 enum class StockOrderMarket {

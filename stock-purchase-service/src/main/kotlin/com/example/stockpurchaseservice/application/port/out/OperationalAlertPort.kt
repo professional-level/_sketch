@@ -9,6 +9,8 @@ interface OperationalAlertPort {
     suspend fun alertOrderSubmissionFailed(alert: OrderSubmissionFailureAlert)
     suspend fun alertSubmissionUnknown(alert: SubmissionUnknownAlert)
     suspend fun alertReconciliationFailed(alert: ReconciliationFailureAlert)
+    suspend fun alertOrderCancellationSubmissionFailed(alert: OrderCancellationSubmissionAlert) = Unit
+    suspend fun alertOrderCancellationSubmissionUnknown(alert: OrderCancellationSubmissionAlert) = Unit
 }
 
 data class OrderSubmissionFailureAlert(
@@ -41,4 +43,15 @@ data class ReconciliationFailureAlert(
     val source: String,
     val reason: String?,
     val failedAt: ZonedDateTime,
+)
+
+data class OrderCancellationSubmissionAlert(
+    val cancellationRequestId: UUID,
+    val idempotencyKey: String,
+    val strategyExecutionId: String,
+    val symbol: String,
+    val originalBrokerOrderId: String,
+    val branchOrderNumber: String?,
+    val reason: String?,
+    val occurredAt: ZonedDateTime,
 )

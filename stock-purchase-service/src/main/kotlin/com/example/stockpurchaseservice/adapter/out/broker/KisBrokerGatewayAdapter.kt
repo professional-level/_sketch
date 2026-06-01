@@ -5,7 +5,9 @@ import DailyExecutionOrdersResponseOuterClass
 import com.example.common.ExternalApiAdapter
 import com.example.common.endpoint.Endpoint.GET_EXECUTION_ORDERS
 import com.example.common.endpoint.Endpoint.GET_OVERSEAS_EXECUTION_ORDERS
+import com.example.common.endpoint.Endpoint.POST_OVERSEAS_STOCK_ORDER_CANCEL
 import com.example.common.endpoint.Endpoint.POST_OVERSEAS_STOCK_ORDER
+import com.example.common.endpoint.Endpoint.POST_STOCK_ORDER_CANCEL
 import com.example.common.endpoint.Endpoint.POST_STOCK_ORDER
 import com.example.stockpurchaseservice.adapter.out.api.ExternalApiCallOptions
 import com.example.stockpurchaseservice.adapter.out.api.awaitExternalApi
@@ -47,6 +49,24 @@ internal class KisBrokerGatewayAdapter(
                 StockOrderMarket.OVERSEAS_US -> stockApiClient.submitStockOrder(
                     uri = OPEN_API_PREFIX + POST_OVERSEAS_STOCK_ORDER,
                     body = command.toKisUsOverseasOrderRequest(),
+                    callOptions = properties.toSubmitCallOptions(),
+                )
+            }
+        }
+    }
+
+    override fun cancelOrder(command: BrokerOrderCancelCommand): BrokerOrderSubmissionDto {
+        return guard.execute("cancel-order:${command.market}") {
+            when (command.market) {
+                StockOrderMarket.DOMESTIC -> stockApiClient.submitStockOrder(
+                    uri = OPEN_API_PREFIX + POST_STOCK_ORDER_CANCEL,
+                    body = command.toKisDomesticCancelRequest(),
+                    callOptions = properties.toSubmitCallOptions(),
+                )
+
+                StockOrderMarket.OVERSEAS_US -> stockApiClient.submitStockOrder(
+                    uri = OPEN_API_PREFIX + POST_OVERSEAS_STOCK_ORDER_CANCEL,
+                    body = command.toKisUsOverseasCancelRequest(),
                     callOptions = properties.toSubmitCallOptions(),
                 )
             }
@@ -162,6 +182,38 @@ internal fun BrokerOrderCommand.toKisUsOverseasOrderRequest(): Map<String, Any> 
     } else {
         baseRequest
     }
+}
+
+internal fun BrokerOrderCancelCommand.toKisDomesticCancelRequest(): Map<String, Any> {
+    val branchOrderNumber = requireNotNull(branchOrderNumber?.takeIf { it.isNotBlank() }) {
+        "domestic cancel requires branch order number"
+    }
+    return mapOf(
+        "KRX_FWDG_ORD_ORGNO" to branchOrderNumber,
+        "ORGN_ODNO" to originalOrderId,
+        "ORD_DVSN" to orderType.toKisDomesticOrderDivision(),
+        "RVSE_CNCL_DVSN_CD" to "02",
+        "ORD_QTY" to quantity,
+        "ORD_UNPR" to price.toLong(),
+        "QTY_ALL_ORD_YN" to if (cancelAll) "Y" else "N",
+        "EXCG_ID_DVSN_CD" to "KRX",
+        "CNDT_PRIC" to "",
+        "isMock" to isMock,
+    )
+}
+
+internal fun BrokerOrderCancelCommand.toKisUsOverseasCancelRequest(): Map<String, Any> {
+    return mapOf(
+        "OVRS_EXCG_CD" to exchangeForUsStock(symbol),
+        "PDNO" to symbol.uppercase(),
+        "ORGN_ODNO" to originalOrderId,
+        "RVSE_CNCL_DVSN_CD" to "02",
+        "ORD_QTY" to quantity,
+        "OVRS_ORD_UNPR" to price.toBrokerPrice(),
+        "MGCO_APTM_ODNO" to "",
+        "ORD_SVR_DVSN_CD" to "0",
+        "isMock" to isMock,
+    )
 }
 
 private fun BrokerOrderHistoryQuery.toKisDomesticExecutionOrderQuery(): Map<String, String> {

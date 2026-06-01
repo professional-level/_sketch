@@ -1,6 +1,7 @@
 package com.example.stockpurchaseservice.adapter.out.api
 
 import com.example.common.ExternalApiAdapter
+import com.example.stockpurchaseservice.application.port.out.CancelOrderDto
 import com.example.stockpurchaseservice.application.port.out.DomesticStockOrderPort
 import com.example.stockpurchaseservice.application.port.out.ExecutionLookupQuery
 import com.example.stockpurchaseservice.application.port.out.ExecutedStockDto
@@ -30,6 +31,13 @@ internal class MarketServiceAdapter(
         return when (order.market) {
             StockOrderMarket.DOMESTIC -> domesticStockOrderPort.sellStock(order)
             StockOrderMarket.OVERSEAS_US -> overseasStockOrderPort.sellStock(order)
+        }
+    }
+
+    override fun cancelOrder(order: CancelOrderDto): BrokerOrderSubmissionDto {
+        return when (order.market) {
+            StockOrderMarket.DOMESTIC -> domesticStockOrderPort.cancelOrder(order)
+            StockOrderMarket.OVERSEAS_US -> overseasStockOrderPort.cancelOrder(order)
         }
     }
 

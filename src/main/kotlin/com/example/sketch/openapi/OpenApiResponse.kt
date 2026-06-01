@@ -75,3 +75,44 @@ data class OverseasStockOrderRequest(
         require(ORD_SVR_DVSN_CD.isNotBlank()) { "ORD_SVR_DVSN_CD must not be blank" }
     }
 }
+
+data class StockOrderCancelRequest(
+    val KRX_FWDG_ORD_ORGNO: String,
+    val ORGN_ODNO: String,
+    val ORD_DVSN: String = "00",
+    val ORD_QTY: Long,
+    val ORD_UNPR: Long = 0,
+    val QTY_ALL_ORD_YN: String = "Y",
+    val EXCG_ID_DVSN_CD: String = "KRX",
+    val CNDT_PRIC: String = "",
+    val isMock: Boolean = true,
+) {
+    init {
+        require(KRX_FWDG_ORD_ORGNO.isNotBlank()) { "KRX_FWDG_ORD_ORGNO must not be blank" }
+        require(ORGN_ODNO.isNotBlank()) { "ORGN_ODNO must not be blank" }
+        require(ORD_DVSN.isNotBlank()) { "ORD_DVSN must not be blank" }
+        require(ORD_QTY > 0) { "ORD_QTY must be positive" }
+        require(QTY_ALL_ORD_YN in setOf("Y", "N")) { "QTY_ALL_ORD_YN must be Y or N" }
+        require(EXCG_ID_DVSN_CD.isNotBlank()) { "EXCG_ID_DVSN_CD must not be blank" }
+    }
+}
+
+data class OverseasStockOrderCancelRequest(
+    val OVRS_EXCG_CD: String = "NASD",
+    val PDNO: String,
+    val ORGN_ODNO: String,
+    val ORD_QTY: Long,
+    val OVRS_ORD_UNPR: String = "0",
+    val MGCO_APTM_ODNO: String = "",
+    val ORD_SVR_DVSN_CD: String = "0",
+    val isMock: Boolean = true,
+) {
+    init {
+        require(OVRS_EXCG_CD.isNotBlank()) { "OVRS_EXCG_CD must not be blank" }
+        require(PDNO.isNotBlank()) { "PDNO must not be blank" }
+        require(ORGN_ODNO.isNotBlank()) { "ORGN_ODNO must not be blank" }
+        require(ORD_QTY > 0) { "ORD_QTY must be positive" }
+        require(OVRS_ORD_UNPR.isNotBlank()) { "OVRS_ORD_UNPR must not be blank" }
+        require(ORD_SVR_DVSN_CD.isNotBlank()) { "ORD_SVR_DVSN_CD must not be blank" }
+    }
+}

@@ -48,8 +48,16 @@ enum class RequestType(
         requestURI = "/uapi/domestic-stock/v1/trading/order-cash", // 주식주문(현금) URI
         type = HttpMethod.POST,
     ),
+    POST_STOCK_ORDER_CANCEL(
+        requestURI = "/uapi/domestic-stock/v1/trading/order-rvsecncl",
+        type = HttpMethod.POST,
+    ),
     POST_OVERSEAS_STOCK_ORDER(
         requestURI = "/uapi/overseas-stock/v1/trading/order",
+        type = HttpMethod.POST,
+    ),
+    POST_OVERSEAS_STOCK_ORDER_CANCEL(
+        requestURI = "/uapi/overseas-stock/v1/trading/order-rvsecncl",
         type = HttpMethod.POST,
     ),
     GET_EXECUTION_ORDERS(
@@ -192,7 +200,9 @@ enum class QueryParameter(
                 }
 
                 RequestType.POST_STOCK_ORDER -> emptyList()
+                RequestType.POST_STOCK_ORDER_CANCEL -> emptyList()
                 RequestType.POST_OVERSEAS_STOCK_ORDER -> emptyList()
+                RequestType.POST_OVERSEAS_STOCK_ORDER_CANCEL -> emptyList()
                 // TODO: 필요없는 파라미터 제거 필요.
                 RequestType.GET_EXECUTION_ORDERS -> listOf(
                     CANO, ACNT_PRDT_CD, INQR_STRT_DT, INQR_END_DT,

@@ -16,6 +16,7 @@ import java.util.UUID
 
 internal interface BrokerGateway {
     fun submitOrder(command: BrokerOrderCommand): BrokerOrderSubmissionDto
+    fun cancelOrder(command: BrokerOrderCancelCommand): BrokerOrderSubmissionDto
     fun findOrderHistory(query: BrokerOrderHistoryQuery): List<BrokerOrderHistoryItem>
 }
 
@@ -29,6 +30,25 @@ internal data class BrokerOrderCommand(
     val quantity: Int,
     val isMock: Boolean,
 )
+
+internal data class BrokerOrderCancelCommand(
+    val internalOrderId: UUID,
+    val market: StockOrderMarket,
+    val symbol: String,
+    val originalOrderId: String,
+    val branchOrderNumber: String?,
+    val orderType: StockOrderType,
+    val price: Double,
+    val quantity: Int,
+    val cancelAll: Boolean,
+    val isMock: Boolean,
+) {
+    init {
+        require(symbol.isNotBlank()) { "symbol must not be blank" }
+        require(originalOrderId.isNotBlank()) { "originalOrderId must not be blank" }
+        require(quantity > 0) { "cancel quantity must be positive" }
+    }
+}
 
 internal data class BrokerOrderHistoryQuery(
     val market: StockOrderMarket,

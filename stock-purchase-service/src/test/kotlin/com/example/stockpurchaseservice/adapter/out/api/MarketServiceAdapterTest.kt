@@ -4,6 +4,7 @@ import com.example.stockpurchaseservice.application.port.out.BrokerOrderSubmissi
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatus
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatusDto
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatusQuery
+import com.example.stockpurchaseservice.application.port.out.CancelOrderDto
 import com.example.stockpurchaseservice.application.port.out.DomesticStockOrderPort
 import com.example.stockpurchaseservice.application.port.out.ExecutedStockDto
 import com.example.stockpurchaseservice.application.port.out.ExecutionTypeDto
@@ -76,6 +77,25 @@ class MarketServiceAdapterTest {
         assertEquals(emptyList(), domesticPort.statusQueries)
     }
 
+    @Test
+    fun `routes cancel order by market`() {
+        val domesticPort = FakeDomesticStockOrderPort()
+        val overseasPort = FakeOverseasStockOrderPort()
+        val adapter = MarketServiceAdapter(domesticPort, overseasPort)
+        val order = CancelOrderDto(
+            orderId = UUID.randomUUID(),
+            stockId = "TQQQ",
+            originalOrderId = "broker-1",
+            quantity = 1,
+            market = StockOrderMarket.OVERSEAS_US,
+        )
+
+        adapter.cancelOrder(order)
+
+        assertEquals(emptyList(), domesticPort.cancelOrders)
+        assertEquals(listOf(order), overseasPort.cancelOrders)
+    }
+
     private fun execution(stockId: String, externalOrderId: String): ExecutedStockDto {
         return ExecutedStockDto(
             stockId = stockId,
@@ -93,6 +113,7 @@ class MarketServiceAdapterTest {
         private val status: BrokerOrderStatusDto = BrokerOrderStatusDto(BrokerOrderStatus.UNKNOWN),
     ) : DomesticStockOrderPort {
         val buyOrders: MutableList<PurchaseOrderDto> = mutableListOf()
+        val cancelOrders: MutableList<CancelOrderDto> = mutableListOf()
         val statusQueries: MutableList<BrokerOrderStatusQuery> = mutableListOf()
 
         override fun buyStock(order: PurchaseOrderDto): BrokerOrderSubmissionDto {
@@ -101,6 +122,11 @@ class MarketServiceAdapterTest {
         }
 
         override fun sellStock(order: SellingOrderDto): BrokerOrderSubmissionDto {
+            return BrokerOrderSubmissionDto(order.orderId.toString())
+        }
+
+        override fun cancelOrder(order: CancelOrderDto): BrokerOrderSubmissionDto {
+            cancelOrders += order
             return BrokerOrderSubmissionDto(order.orderId.toString())
         }
 
@@ -119,6 +145,7 @@ class MarketServiceAdapterTest {
         private val status: BrokerOrderStatusDto = BrokerOrderStatusDto(BrokerOrderStatus.UNKNOWN),
     ) : OverseasStockOrderPort {
         val buyOrders: MutableList<PurchaseOrderDto> = mutableListOf()
+        val cancelOrders: MutableList<CancelOrderDto> = mutableListOf()
         val statusQueries: MutableList<BrokerOrderStatusQuery> = mutableListOf()
 
         override fun buyStock(order: PurchaseOrderDto): BrokerOrderSubmissionDto {
@@ -127,6 +154,11 @@ class MarketServiceAdapterTest {
         }
 
         override fun sellStock(order: SellingOrderDto): BrokerOrderSubmissionDto {
+            return BrokerOrderSubmissionDto(order.orderId.toString())
+        }
+
+        override fun cancelOrder(order: CancelOrderDto): BrokerOrderSubmissionDto {
+            cancelOrders += order
             return BrokerOrderSubmissionDto(order.orderId.toString())
         }
 

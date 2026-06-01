@@ -1,6 +1,7 @@
 package com.example.stockpurchaseservice.adapter.out.observability
 
 import com.example.common.ExternalApiAdapter
+import com.example.stockpurchaseservice.application.port.out.OrderCancellationSubmissionAlert
 import com.example.stockpurchaseservice.application.port.out.OperationalAlertPort
 import com.example.stockpurchaseservice.application.port.out.OrderSubmissionFailureAlert
 import com.example.stockpurchaseservice.application.port.out.ReconciliationFailureAlert
@@ -45,6 +46,30 @@ internal class LoggingOperationalAlertAdapter : OperationalAlertPort {
             "Execution reconciliation failed: source={} failedAt={} reason={}",
             alert.source,
             alert.failedAt,
+            alert.reason,
+        )
+    }
+
+    override suspend fun alertOrderCancellationSubmissionFailed(alert: OrderCancellationSubmissionAlert) {
+        log.error(
+            "Order cancellation submission failed: cancellationRequestId={} strategyExecutionId={} symbol={} originalBrokerOrderId={} branchOrderNumber={} reason={}",
+            alert.cancellationRequestId,
+            alert.strategyExecutionId,
+            alert.symbol,
+            alert.originalBrokerOrderId,
+            alert.branchOrderNumber,
+            alert.reason,
+        )
+    }
+
+    override suspend fun alertOrderCancellationSubmissionUnknown(alert: OrderCancellationSubmissionAlert) {
+        log.warn(
+            "Order cancellation submission remains unknown: cancellationRequestId={} strategyExecutionId={} symbol={} originalBrokerOrderId={} branchOrderNumber={} reason={}",
+            alert.cancellationRequestId,
+            alert.strategyExecutionId,
+            alert.symbol,
+            alert.originalBrokerOrderId,
+            alert.branchOrderNumber,
             alert.reason,
         )
     }
