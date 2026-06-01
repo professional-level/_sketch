@@ -21,7 +21,7 @@ Treat the bounded contexts as follows:
 - `stock-search-service` is the strategy discovery context. It decides whether a strategy should start for a symbol.
 - `strategy-execution-service` is the strategy lifecycle context. It owns strategy execution state, gates daily execution through a trading calendar, exposes strategy state for operations, and emits order intents.
 - `stock-purchase-service` is the broker order and execution context. It applies pre-broker risk guard policies, submits orders, tracks broker order ids, reconciles fills, emits execution result events, and raises broker operation alerts.
-- Broker cancel requests are submitted through `stock-purchase-service`, but final `OrderCancelled` events are emitted only after broker lookup/reconciliation confirms the original order cancellation.
+- Broker cancel requests are submitted through `stock-purchase-service` use cases or operational web adapters, but final `OrderCancelled` events are emitted only after broker lookup/reconciliation confirms the original order cancellation.
 - The broker wrapper service is the external KIS Open API anti-corruption layer.
 - External integration events are protobuf contracts owned from `common/src/main/proto` while this remains a sketch.
 - Internal domain events stay inside each service and are converted to integration events at the application or adapter boundary.

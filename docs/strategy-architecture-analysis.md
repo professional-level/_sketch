@@ -604,6 +604,7 @@ stock-search-service
 ### Broker Cancel Request Boundary
 
 - `stock-purchase-service` now has a separate cancel-submission use case and KIS domestic/overseas `order-rvsecncl` broker adapter path.
+- Operators can submit explicit cancel requests through `POST /orders/cancellations` in `stock-purchase-service`; this endpoint calls the cancel-submission use case and returns the broker cancel-request submission status.
 - Cancel submission success is treated as broker acceptance of the cancel request, not as final cancellation. `OrderCancelled` remains emitted only after broker status lookup/recovery confirms the original order is cancelled.
 - Domestic KIS cancel requests require `KRX_FWDG_ORD_ORGNO` and `ORGN_ODNO`; overseas cancel requests use `OVRS_EXCG_CD`, `PDNO`, and `ORGN_ODNO`. Modify/revise orders and domestic possible-cancel precheck are still production-hardening gaps.
 
