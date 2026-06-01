@@ -410,39 +410,66 @@ private fun DailyExecutionOrdersResponseOuterClass.DailyExecutionOrdersOutput1.t
 }
 
 private fun JsonNode.toBrokerHistoryItem(): BrokerOrderHistoryItem? {
-    val orderId = path("odno").asText("").trim()
+    val orderId = textOrNull("odno", "ODNO", "ord_no", "order_no") ?: ""
     if (orderId.isBlank()) return null
-    val orderedQuantity = path("ft_ord_qty").asText("").toLongValue()
-    val filledQuantity = path("ft_ccld_qty").asText("").toLongValue()
-    val remainingQuantity = path("nccs_qty").asText("").toLongValue()
-    val statusName = path("prcs_stat_name").textOrNull()
-    val revisionCancelName = path("rvse_cncl_dvsn_name").textOrNull()
+    val orderedQuantity = longValue("ft_ord_qty", "FT_ORD_QTY", "ord_qty", "ORD_QTY")
+    val filledQuantity = longValue("ft_ccld_qty", "FT_CCLD_QTY", "tot_ccld_qty", "TOT_CCLD_QTY", "ccld_qty")
+    val remainingQuantity = longValue("nccs_qty", "NCCS_QTY", "rmn_qty", "RMN_QTY")
+    val statusName = textOrNull("prcs_stat_name", "PRCS_STAT_NAME", "ord_stat_name", "ORD_STAT_NAME")
+    val revisionCancelName = textOrNull(
+        "rvse_cncl_dvsn_name",
+        "RVSE_CNCL_DVSN_NAME",
+        "cncl_dvsn_name",
+        "CNCL_DVSN_NAME",
+    )
     val statusMessage = joinedText(statusName, revisionCancelName)
     val rejectionReason = joinedText(
-        path("rjct_rson").textOrNull(),
-        path("rjct_rson_name").textOrNull(),
+        textOrNull("rjct_rson", "RJCT_RSON"),
+        textOrNull("rjct_rson_name", "RJCT_RSON_NAME"),
+        textOrNull("rjct_rson_cn", "RJCT_RSON_CN"),
+        textOrNull("rjct_rson_cd_name", "RJCT_RSON_CD_NAME"),
     )
     val cancelled = statusMessage?.contains(CANCELLED_KOREAN) == true
+    val explicitCancelledQuantity = longValue("cncl_cfrm_qty", "CNCL_CFRM_QTY", "cncl_qty", "CNCL_QTY")
     return BrokerOrderHistoryItem(
         externalOrderId = orderId,
-        branchOrderNumber = path("ord_gno_brno").textOrNull(),
-        symbol = path("pdno").asText("").trim(),
-        stockName = path("prdt_name").asText("").trim(),
+        branchOrderNumber = textOrNull("ord_gno_brno", "ORD_GNO_BRNO"),
+        symbol = textOrNull("pdno", "PDNO", "ovrs_pdno", "OVRS_PDNO").orEmpty(),
+        stockName = textOrNull("prdt_name", "PRDT_NAME", "prdt_eng_name", "PRDT_ENG_NAME").orEmpty(),
         orderedAt = parseKisOrderDateTime(
-            path("ord_dt").asText("").ifBlank { path("dmst_ord_dt").asText("") },
-            path("ord_tmd").asText("").ifBlank { path("thco_ord_tmd").asText("") },
+            textOrNull("ord_dt", "ORD_DT", "dmst_ord_dt", "DMST_ORD_DT").orEmpty(),
+            textOrNull("ord_tmd", "ORD_TMD", "thco_ord_tmd", "THCO_ORD_TMD").orEmpty(),
         ),
         orderedQuantity = orderedQuantity,
         cumulativeFilledQuantity = filledQuantity,
         remainingQuantity = remainingQuantity,
         rejectedQuantity = if (rejectionReason != null) orderedQuantity else 0,
-        cancelledQuantity = if (cancelled) remainingQuantity else 0,
+        cancelledQuantity = explicitCancelledQuantity.takeIf { it > 0 } ?: if (cancelled) remainingQuantity else 0,
         cancelled = cancelled,
-        side = path("sll_buy_dvsn_cd").asText("").toOrderIntentSide(),
-        averageExecutionPrice = path("ft_ccld_unpr3").asText("").toDoubleValue(),
+        side = textOrNull("sll_buy_dvsn_cd", "SLL_BUY_DVSN_CD", "sll_buy_dvsn_name", "SLL_BUY_DVSN_NAME")
+            .toOrderIntentSide(),
+        averageExecutionPrice = textOrNull(
+            "ft_ccld_unpr3",
+            "FT_CCLD_UNPR3",
+            "avg_prvs",
+            "AVG_PRVS",
+            "avg_ccld_pric",
+            "AVG_CCLD_PRIC",
+        ).toDoubleValue(),
         statusMessage = statusMessage,
         rejectionReason = rejectionReason,
     )
+}
+
+private fun JsonNode.textOrNull(vararg fieldNames: String): String? {
+    return fieldNames
+        .asSequence()
+        .map { path(it).asText("").trim() }
+        .firstOrNull { it.isNotBlank() }
+}
+
+private fun JsonNode.longValue(vararg fieldNames: String): Long {
+    return textOrNull(*fieldNames).toLongValue()
 }
 
 private fun JsonNode.textOrNull(): String? {
@@ -523,9 +550,11 @@ internal fun String?.toDoubleValue(): Double? {
 }
 
 internal fun String?.toOrderIntentSide(): OrderIntentSide? {
-    return when (this?.trim()) {
+    return when (this?.trim()?.uppercase()) {
         "01" -> OrderIntentSide.SELL
         "02" -> OrderIntentSide.BUY
+        "SELL", "SELLING", "S", "\uB9E4\uB3C4" -> OrderIntentSide.SELL
+        "BUY", "PURCHASE", "B", "\uB9E4\uC218" -> OrderIntentSide.BUY
         else -> null
     }
 }

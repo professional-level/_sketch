@@ -482,6 +482,115 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `maps overseas alias fields as cumulative execution`() {
+        val adapter = overseasHistoryAdapter(
+            """
+            {
+              "rt_cd": "0",
+              "ctx_area_fk200": "",
+              "ctx_area_nk200": "",
+              "output": [
+                {
+                  "ODNO": "alias-order",
+                  "ORD_GNO_BRNO": "00002",
+                  "PDNO": "TQQQ",
+                  "PRDT_ENG_NAME": "ProShares UltraPro QQQ",
+                  "ORD_DT": "20260602",
+                  "THCO_ORD_TMD": "093500",
+                  "ORD_QTY": "4",
+                  "TOT_CCLD_QTY": "2",
+                  "RMN_QTY": "2",
+                  "SLL_BUY_DVSN_NAME": "BUY",
+                  "AVG_PRVS": "113.75"
+                }
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        val item = adapter.findOrderHistory(historyQuery()).single()
+        val execution = item.toExecutionDto()
+
+        assertEquals("alias-order", item.externalOrderId)
+        assertEquals("00002", item.branchOrderNumber)
+        assertEquals(4, item.orderedQuantity)
+        assertEquals(2, item.cumulativeFilledQuantity)
+        assertEquals(2, item.remainingQuantity)
+        assertEquals(OrderIntentSide.BUY, item.side)
+        checkNotNull(execution)
+        assertEquals("TQQQ", execution.stockId)
+        assertEquals("ProShares UltraPro QQQ", execution.stockName)
+        assertEquals(2, execution.quantity)
+        assertEquals(113.75, execution.averageExecutionPrice)
+        assertEquals(ExecutionTypeDto.PURCHASE, execution.type)
+    }
+
+    @Test
+    fun `maps overseas english rejected status`() {
+        val adapter = overseasHistoryAdapter(
+            """
+            {
+              "rt_cd": "0",
+              "ctx_area_fk200": "",
+              "ctx_area_nk200": "",
+              "output": [
+                {
+                  "ODNO": "english-rejected-order",
+                  "PDNO": "TQQQ",
+                  "ORD_DT": "20260602",
+                  "ORD_TMD": "093000",
+                  "ORD_QTY": "3",
+                  "TOT_CCLD_QTY": "0",
+                  "RMN_QTY": "0",
+                  "SLL_BUY_DVSN_NAME": "BUY",
+                  "PRCS_STAT_NAME": "Rejected"
+                }
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        val status = adapter.findOrderHistory(historyQuery()).single().toStatus()
+
+        assertEquals(BrokerOrderStatus.REJECTED, status.status)
+        assertEquals("Rejected", status.reason)
+    }
+
+    @Test
+    fun `maps overseas english cancelled status and explicit cancel quantity`() {
+        val adapter = overseasHistoryAdapter(
+            """
+            {
+              "rt_cd": "0",
+              "ctx_area_fk200": "",
+              "ctx_area_nk200": "",
+              "output": [
+                {
+                  "ODNO": "english-cancelled-order",
+                  "PDNO": "TQQQ",
+                  "ORD_DT": "20260602",
+                  "ORD_TMD": "093000",
+                  "ORD_QTY": "3",
+                  "TOT_CCLD_QTY": "0",
+                  "RMN_QTY": "3",
+                  "CNCL_QTY": "3",
+                  "SLL_BUY_DVSN_NAME": "BUY",
+                  "PRCS_STAT_NAME": "Cancelled"
+                }
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        val item = adapter.findOrderHistory(historyQuery()).single()
+        val status = item.toStatus()
+
+        assertEquals(3, item.cancelledQuantity)
+        assertEquals(BrokerOrderStatus.CANCELLED, status.status)
+        assertEquals("Cancelled", status.reason)
+    }
+
+    @Test
     fun `throws submission unknown when transient error happens during order submit`() {
         val exchangeFunction = StubExchangeFunction(
             responses = listOf("temporary"),

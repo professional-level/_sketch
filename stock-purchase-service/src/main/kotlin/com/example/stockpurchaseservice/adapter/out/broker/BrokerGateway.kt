@@ -123,9 +123,12 @@ internal data class BrokerOrderHistoryItem(
         val status = when {
             !rejectionReason.isNullOrBlank() -> BrokerOrderStatus.REJECTED
             statusMessage?.contains(REJECTED_KOREAN_1) == true ||
-                statusMessage?.contains(REJECTED_KOREAN_2) == true -> BrokerOrderStatus.REJECTED
+                statusMessage?.contains(REJECTED_KOREAN_2) == true ||
+                statusMessage.containsStatusToken(REJECTED_ENGLISH) -> BrokerOrderStatus.REJECTED
             rejectedQuantity > 0 && cumulativeFilledQuantity <= 0 -> BrokerOrderStatus.REJECTED
-            statusMessage?.contains(CANCELLED_KOREAN) == true -> BrokerOrderStatus.CANCELLED
+            statusMessage?.contains(CANCELLED_KOREAN) == true ||
+                statusMessage.containsStatusToken(CANCELLED_ENGLISH_US) ||
+                statusMessage.containsStatusToken(CANCELLED_ENGLISH_UK) -> BrokerOrderStatus.CANCELLED
             cancelled || cancelledQuantity > 0 -> BrokerOrderStatus.CANCELLED
             else -> BrokerOrderStatus.SUBMITTED
         }
@@ -173,8 +176,15 @@ internal fun List<BrokerOrderHistoryItem>.findStatusFor(query: BrokerOrderStatus
     }
 }
 
+private fun String?.containsStatusToken(token: String): Boolean {
+    return this?.contains(token, ignoreCase = true) == true
+}
+
 internal val BROKER_ORDER_ZONE: ZoneId = ZoneId.of("Asia/Seoul")
 
 private const val REJECTED_KOREAN_1 = "\uAC70\uBD80"
 private const val REJECTED_KOREAN_2 = "\uAC70\uC808"
+private const val REJECTED_ENGLISH = "rejected"
+private const val CANCELLED_ENGLISH_US = "canceled"
+private const val CANCELLED_ENGLISH_UK = "cancelled"
 internal const val CANCELLED_KOREAN = "\uCDE8\uC18C"
