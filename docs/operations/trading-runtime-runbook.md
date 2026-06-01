@@ -78,8 +78,24 @@ Before enabling real orders:
 - Point `akra.temporal.target` to the managed Temporal frontend.
 - Set real-vs-mock trading flags intentionally for the account being operated.
 - Confirm risk guard limits are set for order notional, symbol notional, daily order count, and disabled strategies.
-- Configure US market holidays and early-close dates until an exchange calendar sync is available.
+- Configure domestic and US order windows, holidays, early-close dates, and LOC/MOC cutoffs until an exchange calendar sync is available.
 - Confirm `application-secret.properties` is not included in the built artifact or Git diff.
+
+Order trading-hours guard keys:
+
+```properties
+akra.order.risk.trading-hours.enabled=true
+akra.order.risk.trading-hours.domestic.regular-open=09:00
+akra.order.risk.trading-hours.domestic.regular-close=15:30
+akra.order.risk.trading-hours.overseas-us.regular-open=09:30
+akra.order.risk.trading-hours.overseas-us.regular-close=16:00
+akra.order.risk.trading-hours.domestic.holidays[0]=2026-10-05
+akra.order.risk.trading-hours.overseas-us.holidays[0]=2026-07-03
+akra.order.risk.trading-hours.overseas-us.early-close-dates[0]=2026-11-27
+akra.order.risk.trading-hours.overseas-us.early-close-time=13:00
+akra.order.risk.trading-hours.overseas-us.loc-cutoff=15:50
+akra.order.risk.trading-hours.overseas-us.moc-cutoff=15:50
+```
 
 ## Kafka And Temporal Restart Procedure
 

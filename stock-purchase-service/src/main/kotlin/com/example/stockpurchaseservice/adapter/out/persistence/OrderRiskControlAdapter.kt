@@ -15,11 +15,13 @@ internal class OrderRiskControlAdapter(
     private val orderIntentSubmissionRepository: OrderIntentSubmissionRepository,
     private val properties: OrderRiskProperties,
 ) : OrderRiskControlPort {
+    private val tradingHoursPolicy = OrderTradingHoursPolicy(properties.tradingHours)
 
     override suspend fun assess(command: OrderRiskAssessmentCommand): OrderRiskAssessmentResult {
         if (!properties.enabled) return OrderRiskAssessmentResult.accepted()
 
         disabledStrategyReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }
+        tradingHoursPolicy.rejectReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }
         orderNotionalReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }
         dailyOrderCountReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }
         duplicateOrderReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }

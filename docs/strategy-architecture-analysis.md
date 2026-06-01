@@ -609,6 +609,14 @@ stock-search-service
 - Cancel submission success is treated as broker acceptance of the cancel request, not as final cancellation. `OrderCancelled` remains emitted only after broker status lookup/recovery confirms the original order is cancelled.
 - Domestic KIS cancel requests require `KRX_FWDG_ORD_ORGNO` and `ORGN_ODNO`; overseas cancel requests use `OVRS_EXCG_CD`, `PDNO`, and `ORGN_ODNO`. Modify/revise orders and production credential/live-market verification are still production-hardening gaps.
 
+### Order Trading Hours Guard
+
+- `stock-purchase-service` now runs a config-backed trading-hours guard before broker submission through `OrderRiskControlPort`.
+- The guard blocks order intents before KIS calls when the request is outside the configured domestic or US order window, lands on a configured market holiday, or exceeds the configured LOC/MOC cutoff.
+- US early-close dates can be configured with a common early-close time; this limits LIMIT, LOC, and MOC submission windows for those dates.
+- Rejected intents follow the existing risk rejection path: rejected submission storage plus `OrderRejected` publication.
+- This is still not a full exchange-calendar integration. Automatic holiday/early-close synchronization, per-date cutoff data, and broker-verified live-market acceptance checks remain production hardening work.
+
 ## Open Questions
 
 - `autoRestart=true`일 때 execution-service가 즉시 다음 cycle을 여는 현재 정책으로 충분한가, 아니면 search-service의 재승인을 다시 받아야 하는가?
