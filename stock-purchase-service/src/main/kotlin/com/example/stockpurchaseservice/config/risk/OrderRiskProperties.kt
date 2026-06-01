@@ -8,12 +8,19 @@ class OrderRiskProperties {
     var enabled: Boolean = true
     var maxOrderNotional: Double? = null
     var maxAccountPendingBuyNotional: Double? = null
+    var maxAccountExposureNotional: Double? = null
     var maxDailyOrderCount: Long? = null
     var duplicateOrderKillSwitchEnabled: Boolean = true
     var disabledStrategyPrefixes: List<String> = emptyList()
     var symbolMaxOrderNotional: MutableMap<String, Double> = mutableMapOf()
     var strategyTradingEnvironments: MutableMap<String, OrderTradingEnvironment> = mutableMapOf()
+    var accountExposure: AccountExposureProperties = AccountExposureProperties()
     var tradingHours: TradingHoursProperties = TradingHoursProperties()
+
+    class AccountExposureProperties {
+        var overseasExchange: String = "NASD"
+        var overseasCurrency: String = "USD"
+    }
 
     class TradingHoursProperties {
         var enabled: Boolean = true

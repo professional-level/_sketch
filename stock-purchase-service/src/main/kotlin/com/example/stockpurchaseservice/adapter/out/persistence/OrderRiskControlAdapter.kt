@@ -8,6 +8,9 @@ import com.example.stockpurchaseservice.application.port.out.OrderRiskAssessment
 import com.example.stockpurchaseservice.application.port.out.OrderRiskAssessmentResult
 import com.example.stockpurchaseservice.application.port.out.OrderRiskControlPort
 import com.example.stockpurchaseservice.application.port.out.OrderTradingEnvironment
+import com.example.stockpurchaseservice.application.port.out.AccountSnapshotDto
+import com.example.stockpurchaseservice.application.port.out.AccountSnapshotQuery
+import com.example.stockpurchaseservice.application.port.out.MarketServicePort
 import com.example.stockpurchaseservice.application.port.out.StockOrderMarket
 import com.example.stockpurchaseservice.config.risk.OrderRiskProperties
 import org.springframework.beans.factory.annotation.Value
@@ -16,6 +19,7 @@ import java.time.ZonedDateTime
 @PersistenceAdapter
 internal class OrderRiskControlAdapter(
     private val orderRiskSubmissionReader: OrderRiskSubmissionReader,
+    private val marketServicePort: MarketServicePort,
     private val properties: OrderRiskProperties,
     @Value("\${akra.order.domestic.mock:true}") private val domesticMockOrder: Boolean = true,
     @Value("\${akra.order.overseas.mock:true}") private val overseasMockOrder: Boolean = true,
@@ -30,6 +34,7 @@ internal class OrderRiskControlAdapter(
         tradingHoursPolicy.rejectReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }
         orderNotionalReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }
         accountPendingBuyExposureReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }
+        accountExposureReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }
         dailyOrderCountReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }
         duplicateOrderReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }
 
@@ -94,6 +99,28 @@ internal class OrderRiskControlAdapter(
         }
     }
 
+    private suspend fun accountExposureReason(command: OrderRiskAssessmentCommand): String? {
+        val limit = properties.maxAccountExposureNotional ?: return null
+        if (limit <= 0.0 || command.side != OrderIntentSide.BUY) return null
+
+        val orderNotional = command.estimatedNotional
+            ?: return "account exposure cannot be assessed: order notional is missing for ${command.symbol}"
+        val activeBuyNotional = orderRiskSubmissionReader.sumActiveBuyNotional()
+        val currentExposure = runCatching {
+            marketServicePort.findAccountSnapshot(command.toAccountSnapshotQuery()).exposureNotional()
+        }.getOrElse { exception ->
+            return "account exposure cannot be assessed: ${exception.message ?: exception::class.java.simpleName}"
+        } ?: return "account exposure cannot be assessed: broker snapshot has no evaluation amount"
+
+        val projectedExposure = currentExposure + activeBuyNotional + orderNotional
+        return if (projectedExposure > limit) {
+            "account exposure notional $projectedExposure exceeds limit $limit " +
+                "(current=$currentExposure active=$activeBuyNotional order=$orderNotional)"
+        } else {
+            null
+        }
+    }
+
     private suspend fun duplicateOrderReason(command: OrderRiskAssessmentCommand): String? {
         if (!properties.duplicateOrderKillSwitchEnabled) return null
 
@@ -115,6 +142,31 @@ internal class OrderRiskControlAdapter(
 
     private fun OrderRiskAssessmentCommand.symbolMaxOrderNotional(): Double? {
         return properties.symbolMaxOrderNotional[symbol] ?: properties.symbolMaxOrderNotional[symbol.uppercase()]
+    }
+
+    private fun OrderRiskAssessmentCommand.toAccountSnapshotQuery(): AccountSnapshotQuery {
+        return when (market) {
+            StockOrderMarket.DOMESTIC -> AccountSnapshotQuery(market = StockOrderMarket.DOMESTIC)
+            StockOrderMarket.OVERSEAS_US -> AccountSnapshotQuery(
+                market = StockOrderMarket.OVERSEAS_US,
+                exchange = properties.accountExposure.overseasExchange,
+                currency = properties.accountExposure.overseasCurrency,
+            )
+        }
+    }
+
+    private fun AccountSnapshotDto.exposureNotional(): Double? {
+        totalEvaluationAmount?.let { return it }
+        val positionExposure = positions.map { position ->
+            position.evaluationAmount
+                ?: position.currentPrice?.let { currentPrice -> currentPrice * position.quantity }
+                ?: position.purchaseAmount
+        }
+        return if (positionExposure.isEmpty() || positionExposure.any { it == null }) {
+            null
+        } else {
+            positionExposure.filterNotNull().sum()
+        }
     }
 
     private fun OrderRiskAssessmentCommand.expectedTradingEnvironment(): StrategyTradingEnvironmentPolicy? {

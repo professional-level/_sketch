@@ -4,8 +4,19 @@ import com.example.stockpurchaseservice.adapter.out.persistence.entity.OrderInte
 import com.example.stockpurchaseservice.adapter.out.persistence.repository.OrderRiskSubmissionReader
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentType
+import com.example.stockpurchaseservice.application.port.out.AccountPositionSnapshotDto
+import com.example.stockpurchaseservice.application.port.out.AccountSnapshotDto
+import com.example.stockpurchaseservice.application.port.out.AccountSnapshotQuery
+import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatusDto
+import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatusQuery
+import com.example.stockpurchaseservice.application.port.out.BrokerOrderSubmissionDto
+import com.example.stockpurchaseservice.application.port.out.CancelOrderDto
+import com.example.stockpurchaseservice.application.port.out.ExecutedStockDto
+import com.example.stockpurchaseservice.application.port.out.MarketServicePort
 import com.example.stockpurchaseservice.application.port.out.OrderRiskAssessmentCommand
 import com.example.stockpurchaseservice.application.port.out.OrderTradingEnvironment
+import com.example.stockpurchaseservice.application.port.out.PurchaseOrderDto
+import com.example.stockpurchaseservice.application.port.out.SellingOrderDto
 import com.example.stockpurchaseservice.application.port.out.StockOrderMarket
 import com.example.stockpurchaseservice.config.risk.OrderRiskProperties
 import java.time.ZonedDateTime
@@ -13,6 +24,7 @@ import java.util.UUID
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertContains
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -134,6 +146,92 @@ class OrderRiskControlAdapterTest {
     }
 
     @Test
+    fun `rejects buy when broker account exposure plus pending and new order exceeds limit`() = runBlocking {
+        val properties = OrderRiskProperties().apply {
+            maxAccountExposureNotional = 1_000.0
+        }
+        val reader = FakeOrderRiskSubmissionReader(activeBuyNotional = 150.0)
+        val marketService = FakeMarketServicePort(
+            snapshot = AccountSnapshotDto(
+                market = StockOrderMarket.OVERSEAS_US,
+                exchange = "NASD",
+                currency = "USD",
+                positions = emptyList(),
+                totalEvaluationAmount = 800.0,
+            ),
+        )
+
+        val result = adapter(properties, reader, marketService).assess(
+            command(quantity = 1, limitPrice = 100.0),
+        )
+
+        assertFalse(result.accepted)
+        assertContains(result.reason ?: "", "account exposure notional 1050.0 exceeds limit 1000.0")
+        assertContains(result.reason ?: "", "(current=800.0 active=150.0 order=100.0)")
+        with(marketService.queries.single()) {
+            assertEquals(StockOrderMarket.OVERSEAS_US, market)
+            assertEquals("NASD", exchange)
+            assertEquals("USD", currency)
+        }
+    }
+
+    @Test
+    fun `uses position values when account exposure summary is absent`() = runBlocking {
+        val properties = OrderRiskProperties().apply {
+            maxAccountExposureNotional = 1_000.0
+        }
+        val marketService = FakeMarketServicePort(
+            snapshot = AccountSnapshotDto(
+                market = StockOrderMarket.OVERSEAS_US,
+                exchange = "NASD",
+                currency = "USD",
+                positions = listOf(
+                    AccountPositionSnapshotDto(
+                        symbol = "TQQQ",
+                        stockName = "ProShares UltraPro QQQ",
+                        quantity = 3,
+                        currentPrice = 100.0,
+                    ),
+                ),
+            ),
+        )
+
+        val result = adapter(properties, marketService = marketService).assess(
+            command(quantity = 1, limitPrice = 100.0),
+        )
+
+        assertTrue(result.accepted)
+    }
+
+    @Test
+    fun `rejects buy when configured account exposure cannot be assessed`() = runBlocking {
+        val properties = OrderRiskProperties().apply {
+            maxAccountExposureNotional = 1_000.0
+        }
+        val marketService = FakeMarketServicePort(
+            snapshot = AccountSnapshotDto(
+                market = StockOrderMarket.OVERSEAS_US,
+                exchange = "NASD",
+                currency = "USD",
+                positions = listOf(
+                    AccountPositionSnapshotDto(
+                        symbol = "TQQQ",
+                        stockName = "ProShares UltraPro QQQ",
+                        quantity = 3,
+                    ),
+                ),
+            ),
+        )
+
+        val result = adapter(properties, marketService = marketService).assess(
+            command(quantity = 1, limitPrice = 100.0),
+        )
+
+        assertFalse(result.accepted)
+        assertContains(result.reason ?: "", "account exposure cannot be assessed")
+    }
+
+    @Test
     fun `rejects strategy when expected live environment would route to mock broker`() = runBlocking {
         val properties = OrderRiskProperties().apply {
             strategyTradingEnvironments["laor-v4-live"] = OrderTradingEnvironment.LIVE
@@ -190,12 +288,14 @@ class OrderRiskControlAdapterTest {
     private fun adapter(
         properties: OrderRiskProperties = OrderRiskProperties(),
         reader: OrderRiskSubmissionReader = FakeOrderRiskSubmissionReader(),
+        marketService: MarketServicePort = FakeMarketServicePort(),
         domesticMockOrder: Boolean = true,
         overseasMockOrder: Boolean = true,
     ): OrderRiskControlAdapter {
         properties.duplicateOrderKillSwitchEnabled = false
         return OrderRiskControlAdapter(
             orderRiskSubmissionReader = reader,
+            marketServicePort = marketService,
             properties = properties,
             domesticMockOrder = domesticMockOrder,
             overseasMockOrder = overseasMockOrder,
@@ -246,5 +346,42 @@ class OrderRiskControlAdapterTest {
         ): Boolean = false
 
         override suspend fun sumActiveBuyNotional(): Double = activeBuyNotional
+    }
+
+    private class FakeMarketServicePort(
+        private val snapshot: AccountSnapshotDto = AccountSnapshotDto(
+            market = StockOrderMarket.OVERSEAS_US,
+            exchange = "NASD",
+            currency = "USD",
+            positions = emptyList(),
+            totalEvaluationAmount = 0.0,
+        ),
+    ) : MarketServicePort {
+        val queries: MutableList<AccountSnapshotQuery> = mutableListOf()
+
+        override fun buyStock(order: PurchaseOrderDto): BrokerOrderSubmissionDto {
+            error("not used")
+        }
+
+        override fun sellStock(order: SellingOrderDto): BrokerOrderSubmissionDto {
+            error("not used")
+        }
+
+        override fun cancelOrder(order: CancelOrderDto): BrokerOrderSubmissionDto {
+            error("not used")
+        }
+
+        override fun findExecutionListAtOneDay(): List<ExecutedStockDto> {
+            return emptyList()
+        }
+
+        override fun findOrderSubmissionStatus(query: BrokerOrderStatusQuery): BrokerOrderStatusDto {
+            error("not used")
+        }
+
+        override fun findAccountSnapshot(query: AccountSnapshotQuery): AccountSnapshotDto {
+            queries += query
+            return snapshot
+        }
     }
 }

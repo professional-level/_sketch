@@ -86,9 +86,12 @@ Risk and trading-hours guard keys:
 ```properties
 akra.order.risk.max-order-notional=1000
 akra.order.risk.max-account-pending-buy-notional=5000
+akra.order.risk.max-account-exposure-notional=20000
 akra.order.risk.max-daily-order-count=20
 akra.order.risk.strategy-trading-environments[laor-v4-live]=LIVE
 akra.order.risk.strategy-trading-environments[laor-v4-paper]=MOCK
+akra.order.risk.account-exposure.overseas-exchange=NASD
+akra.order.risk.account-exposure.overseas-currency=USD
 akra.order.risk.trading-hours.enabled=true
 akra.order.risk.trading-hours.domestic.regular-open=09:00
 akra.order.risk.trading-hours.domestic.regular-close=15:30
@@ -149,7 +152,15 @@ For live broker position checks, `stock-purchase-service` exposes:
 GET /operations/trading/account-snapshot?market=OVERSEAS_US&exchange=NASD&currency=USD
 ```
 
-This calls the broker wrapper's overseas balance lookup and returns current overseas positions with quantity, average purchase price, current price, purchase amount, evaluation amount, and profit/loss when KIS provides those fields. Domestic balance, settled cash, and account-wide exposure enforcement still require additional hardening.
+This calls the broker wrapper's overseas balance lookup and returns current overseas positions with quantity, average purchase price, current price, purchase amount, evaluation amount, and profit/loss when KIS provides those fields. Domestic balance, settled cash, multi-currency conversion, and broader account cash/exposure modeling still require additional hardening.
+
+When `akra.order.risk.max-account-exposure-notional` is set, buy order risk checks use the overseas account snapshot to reject orders whose projected exposure would exceed the configured limit:
+
+```text
+current broker evaluation amount + active pending buy notional + new order notional
+```
+
+If the broker snapshot does not contain enough valuation data to calculate current exposure, the guard rejects the buy order instead of assuming zero exposure.
 
 ## Kafka And Temporal Restart Procedure
 
