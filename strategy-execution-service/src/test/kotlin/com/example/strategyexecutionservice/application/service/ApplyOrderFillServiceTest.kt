@@ -2,6 +2,7 @@ package com.example.strategyexecutionservice.application.service
 
 import com.example.strategyexecutionservice.application.port.`in`.ApplyOrderFillCommand
 import com.example.strategyexecutionservice.application.port.`in`.ApplyOrderFillStatus
+import com.example.strategyexecutionservice.application.port.`in`.OrderFillKind
 import com.example.strategyexecutionservice.application.port.out.LaorV4ExecutionState
 import com.example.strategyexecutionservice.application.port.out.MarketDataPort
 import com.example.strategyexecutionservice.application.port.out.StrategyExecutionOrderEventPort
@@ -139,6 +140,48 @@ class ApplyOrderFillServiceTest {
 
         assertEquals(ApplyOrderFillStatus.SKIPPED_DUPLICATE, result.status)
         assertEquals(emptyList(), statePort.saved)
+    }
+
+    @Test
+    fun `partial fill updates holdings without advancing laor progress round`() = runBlocking {
+        val statePort = FakeStrategyExecutionStatePort(
+            initial = LaorV4ExecutionState(
+                executionId = "laor-v4:TQQQ",
+                symbol = LaorV4StrategySymbol.TQQQ,
+                totalSplitCount = 20,
+                state = LaorV4StrategyState(
+                    availableCash = 2_000.0,
+                    holdingQuantity = 10,
+                    averagePurchasePrice = 100.0,
+                    progressRound = 4.0,
+                ),
+            ),
+        )
+        val orderEventPort = FakeStrategyExecutionOrderEventPort()
+        val service = ApplyOrderFillService(statePort, FakeMarketDataPort(), orderEventPort)
+
+        val result = service.execute(
+            ApplyOrderFillCommand(
+                eventId = "partial-fill-1",
+                strategyExecutionId = "laor-v4:TQQQ",
+                orderIntentId = "intent-1",
+                brokerOrderId = "broker-1",
+                side = OrderSide.BUY,
+                fillKind = OrderFillKind.PARTIALLY_FILLED,
+                filledPrice = 90.0,
+                filledQuantity = 5,
+                orderTag = "STAR_HALF_BUY",
+                filledAt = ZonedDateTime.parse("2026-06-02T09:00:00+09:00"),
+            ),
+        )
+
+        assertEquals(ApplyOrderFillStatus.APPLIED, result.status)
+        assertEquals(StrategyExecutionOrderEventType.PARTIALLY_FILLED, orderEventPort.saved.single().type)
+        with(statePort.saved.single().state) {
+            assertEquals(4.0, progressRound)
+            assertEquals(15, holdingQuantity)
+            assertEquals(1_550.0, availableCash)
+        }
     }
 
     private class FakeStrategyExecutionStatePort(

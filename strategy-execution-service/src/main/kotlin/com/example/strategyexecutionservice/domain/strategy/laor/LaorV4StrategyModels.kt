@@ -74,6 +74,7 @@ data class LaorV4StrategyFill(
     val price: Double,
     val quantity: Long,
     val tag: LaorV4StrategyOrderTag,
+    val advancesProgressRound: Boolean = true,
 ) {
     init {
         require(price > 0.0) { "price must be positive" }

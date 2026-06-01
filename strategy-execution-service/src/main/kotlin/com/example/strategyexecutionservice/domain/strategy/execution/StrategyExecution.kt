@@ -67,6 +67,7 @@ data class StrategyExecutionFill(
     val price: Double,
     val quantity: Long,
     val tag: String,
+    val advancesProgressRound: Boolean = true,
 ) {
     init {
         require(price > 0.0) { "price must be positive" }

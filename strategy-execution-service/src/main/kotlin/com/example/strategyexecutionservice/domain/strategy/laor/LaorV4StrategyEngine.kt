@@ -62,7 +62,7 @@ object LaorV4StrategyEngine {
             working.progressRound = normalProgressRoundAfterSells(
                 progressRound = working.progressRound,
                 startingHoldingQuantity = working.holdingQuantity,
-                sellFills = sellFills,
+                sellFills = sellFills.filter { it.advancesProgressRound },
             )
             sellFills.forEach { fill -> applySell(working, fill) }
             buyFills.forEach { fill -> applyNormalBuy(working, fill) }
@@ -312,14 +312,18 @@ object LaorV4StrategyEngine {
         if (fill.tag == LaorV4StrategyOrderTag.REVERSE_MOC_SELL ||
             fill.tag == LaorV4StrategyOrderTag.REVERSE_LOC_SELL
         ) {
-            state.progressRound = cleanZero(state.progressRound * config.reverseSellFactor)
+            if (fill.advancesProgressRound) {
+                state.progressRound = cleanZero(state.progressRound * config.reverseSellFactor)
+            }
         }
         applySell(state, fill)
     }
 
     private fun applyNormalBuy(state: WorkingState, fill: LaorV4StrategyFill) {
         applyBuy(state, fill)
-        state.progressRound = cleanZero(state.progressRound + normalBuyProgressRoundIncrement(fill.tag))
+        if (fill.advancesProgressRound) {
+            state.progressRound = cleanZero(state.progressRound + normalBuyProgressRoundIncrement(fill.tag))
+        }
     }
 
     private fun applyReverseBuy(
@@ -327,10 +331,12 @@ object LaorV4StrategyEngine {
         state: WorkingState,
         fill: LaorV4StrategyFill,
     ) {
-        state.progressRound = cleanZero(
-            state.progressRound +
-                (config.totalSplitCount - state.progressRound) * REVERSE_BUY_AVAILABLE_CASH_RATIO,
-        )
+        if (fill.advancesProgressRound) {
+            state.progressRound = cleanZero(
+                state.progressRound +
+                    (config.totalSplitCount - state.progressRound) * REVERSE_BUY_AVAILABLE_CASH_RATIO,
+            )
+        }
         applyBuy(state, fill)
     }
 

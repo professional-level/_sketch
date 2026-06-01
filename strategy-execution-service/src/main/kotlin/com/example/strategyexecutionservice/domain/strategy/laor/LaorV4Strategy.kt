@@ -81,6 +81,7 @@ data class LaorV4Strategy(
             price = price,
             quantity = quantity,
             tag = LaorV4StrategyOrderTag.valueOf(tag),
+            advancesProgressRound = advancesProgressRound,
         )
     }
 

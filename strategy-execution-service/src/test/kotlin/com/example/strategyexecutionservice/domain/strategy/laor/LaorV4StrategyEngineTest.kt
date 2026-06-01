@@ -60,6 +60,29 @@ class LaorV4StrategyEngineTest {
     }
 
     @Test
+    fun `floors buy quantity and skips orders that cannot buy one share`() {
+        val config = LaorV4StrategyConfig(symbol = LaorV4StrategySymbol.TQQQ, totalSplitCount = 20)
+        val state = LaorV4StrategyState(availableCash = 2_240.0)
+
+        val orders = LaorV4StrategyEngine.generateOrders(
+            config = config,
+            state = state,
+            market = LaorV4StrategyMarket(previousClose = 100.0),
+        )
+
+        assertEquals(1, orders.size)
+        assertOrder(orders[0], LaorV4StrategySide.BUY, LaorV4StrategyOrderType.LOC, 112.0, 1, LaorV4StrategyOrderTag.FIRST_BUY)
+
+        val skipped = LaorV4StrategyEngine.generateOrders(
+            config = config,
+            state = LaorV4StrategyState(availableCash = 2_000.0),
+            market = LaorV4StrategyMarket(previousClose = 100.0),
+        )
+
+        assertEquals(emptyList(), skipped)
+    }
+
+    @Test
     fun `plans first reverse day MOC sell`() {
         val config = LaorV4StrategyConfig(symbol = LaorV4StrategySymbol.TQQQ, totalSplitCount = 20)
         val state = LaorV4StrategyState(
@@ -136,6 +159,73 @@ class LaorV4StrategyEngineTest {
         assertEquals(35, next.holdingQuantity)
         assertDouble(97.1428571429, next.averagePurchasePrice)
         assertDouble(1_125.0, next.realizedProfitLoss)
+    }
+
+    @Test
+    fun `normal buy T advances by filled order unit not by spent amount ratio`() {
+        val config = LaorV4StrategyConfig(symbol = LaorV4StrategySymbol.TQQQ, totalSplitCount = 40)
+        val state = LaorV4StrategyState(availableCash = 20_000.0)
+
+        val next = LaorV4StrategyEngine.applyFills(
+            config = config,
+            state = state,
+            fills = listOf(
+                LaorV4StrategyFill(LaorV4StrategySide.BUY, 239.0, 2, LaorV4StrategyOrderTag.FIRST_BUY),
+            ),
+            closePrice = 239.0,
+        )
+
+        assertDouble(1.0, next.progressRound)
+        assertDouble(19_522.0, next.availableCash)
+        assertEquals(2, next.holdingQuantity)
+    }
+
+    @Test
+    fun `partial fill updates position without advancing T until order is filled`() {
+        val config = LaorV4StrategyConfig(symbol = LaorV4StrategySymbol.TQQQ, totalSplitCount = 20)
+        val state = LaorV4StrategyState(
+            progressRound = 4.0,
+            availableCash = 2_000.0,
+            holdingQuantity = 10,
+            averagePurchasePrice = 100.0,
+        )
+
+        val afterPartial = LaorV4StrategyEngine.applyFills(
+            config = config,
+            state = state,
+            fills = listOf(
+                LaorV4StrategyFill(
+                    side = LaorV4StrategySide.BUY,
+                    price = 90.0,
+                    quantity = 5,
+                    tag = LaorV4StrategyOrderTag.STAR_HALF_BUY,
+                    advancesProgressRound = false,
+                ),
+            ),
+            closePrice = 90.0,
+        )
+
+        assertDouble(4.0, afterPartial.progressRound)
+        assertEquals(15, afterPartial.holdingQuantity)
+        assertDouble(96.6666666667, afterPartial.averagePurchasePrice)
+
+        val afterFilled = LaorV4StrategyEngine.applyFills(
+            config = config,
+            state = afterPartial,
+            fills = listOf(
+                LaorV4StrategyFill(
+                    side = LaorV4StrategySide.BUY,
+                    price = 90.0,
+                    quantity = 5,
+                    tag = LaorV4StrategyOrderTag.STAR_HALF_BUY,
+                ),
+            ),
+            closePrice = 90.0,
+        )
+
+        assertDouble(4.5, afterFilled.progressRound)
+        assertEquals(20, afterFilled.holdingQuantity)
+        assertDouble(95.0, afterFilled.averagePurchasePrice)
     }
 
     @Test

@@ -53,6 +53,7 @@ class ApplyOrderFillService(
                     price = command.filledPrice,
                     quantity = command.filledQuantity,
                     tag = command.orderTag,
+                    advancesProgressRound = command.fillKind == OrderFillKind.FILLED,
                 ),
             ),
             closePrice = market.previousClose,
