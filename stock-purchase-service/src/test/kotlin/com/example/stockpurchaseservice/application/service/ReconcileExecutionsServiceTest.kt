@@ -28,8 +28,12 @@ import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissi
 import com.example.stockpurchaseservice.application.port.out.OrderPartiallyFilledMessage
 import com.example.stockpurchaseservice.application.port.out.OrderRejectedMessage
 import com.example.stockpurchaseservice.application.port.out.OrderSubmittedMessage
+import com.example.stockpurchaseservice.application.port.out.OperationalAlertPort
+import com.example.stockpurchaseservice.application.port.out.OrderSubmissionFailureAlert
 import com.example.stockpurchaseservice.application.port.out.PurchaseOrderDto
+import com.example.stockpurchaseservice.application.port.out.ReconciliationFailureAlert
 import com.example.stockpurchaseservice.application.port.out.SellingOrderDto
+import com.example.stockpurchaseservice.application.port.out.SubmissionUnknownAlert
 import com.example.stockpurchaseservice.application.port.out.UnmatchedExecutionDto
 import com.example.stockpurchaseservice.domain.ExternalOrderId
 import com.example.stockpurchaseservice.domain.Money
@@ -169,6 +173,7 @@ class ReconcileExecutionsServiceTest {
     @Test
     fun `marks reconciliation failed without completing cursor when broker lookup fails`() = runBlocking {
         val reconciliationStatePort = FakeExecutionReconciliationStatePort()
+        val alertPort = FakeOperationalAlertPort()
         val service = service(
             marketPort = FakeMarketServicePort(
                 failure = IllegalStateException("broker unavailable"),
@@ -177,6 +182,7 @@ class ReconcileExecutionsServiceTest {
             submissionPort = FakeOrderIntentSubmissionPort(submissions = emptyList()),
             eventPort = FakeOrderExecutionEventPort(),
             reconciliationStatePort = reconciliationStatePort,
+            operationalAlertPort = alertPort,
         )
 
         runCatching { service.execute() }
@@ -184,6 +190,8 @@ class ReconcileExecutionsServiceTest {
         assertEquals(listOf("BROKER_EXECUTION_DAILY"), reconciliationStatePort.startedSources)
         assertEquals(emptyList(), reconciliationStatePort.completed)
         assertEquals(listOf<String?>("broker unavailable"), reconciliationStatePort.failedReasons)
+        assertEquals("BROKER_EXECUTION_DAILY", alertPort.reconciliationFailed.single().source)
+        assertEquals("broker unavailable", alertPort.reconciliationFailed.single().reason)
     }
 
     @Test
@@ -318,6 +326,7 @@ class ReconcileExecutionsServiceTest {
         submissionPort: OrderIntentSubmissionPort,
         eventPort: OrderExecutionEventPort,
         reconciliationStatePort: ExecutionReconciliationStatePort = FakeExecutionReconciliationStatePort(),
+        operationalAlertPort: OperationalAlertPort = FakeOperationalAlertPort(),
     ): ReconcileExecutionsService {
         return ReconcileExecutionsService(
             stockOrderRepository = stockOrderRepository,
@@ -327,6 +336,7 @@ class ReconcileExecutionsServiceTest {
             orderIntentSubmissionPort = submissionPort,
             orderExecutionEventPort = eventPort,
             executionReconciliationStatePort = reconciliationStatePort,
+            operationalAlertPort = operationalAlertPort,
         )
     }
 
@@ -532,6 +542,24 @@ class ReconcileExecutionsServiceTest {
 
         override suspend fun saveUnmatchedExecution(execution: UnmatchedExecutionDto) {
             unmatched += execution
+        }
+    }
+
+    private class FakeOperationalAlertPort : OperationalAlertPort {
+        val orderSubmissionFailed: MutableList<OrderSubmissionFailureAlert> = mutableListOf()
+        val submissionUnknown: MutableList<SubmissionUnknownAlert> = mutableListOf()
+        val reconciliationFailed: MutableList<ReconciliationFailureAlert> = mutableListOf()
+
+        override suspend fun alertOrderSubmissionFailed(alert: OrderSubmissionFailureAlert) {
+            orderSubmissionFailed += alert
+        }
+
+        override suspend fun alertSubmissionUnknown(alert: SubmissionUnknownAlert) {
+            submissionUnknown += alert
+        }
+
+        override suspend fun alertReconciliationFailed(alert: ReconciliationFailureAlert) {
+            reconciliationFailed += alert
         }
     }
 

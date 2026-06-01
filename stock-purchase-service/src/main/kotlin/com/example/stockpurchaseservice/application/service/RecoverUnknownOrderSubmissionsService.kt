@@ -12,6 +12,8 @@ import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissi
 import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionPort
 import com.example.stockpurchaseservice.application.port.out.OrderRejectedMessage
 import com.example.stockpurchaseservice.application.port.out.OrderSubmittedMessage
+import com.example.stockpurchaseservice.application.port.out.OperationalAlertPort
+import com.example.stockpurchaseservice.application.port.out.SubmissionUnknownAlert
 import com.example.stockpurchaseservice.application.port.out.StockOrderMarket
 import java.nio.charset.StandardCharsets
 import java.time.ZonedDateTime
@@ -22,6 +24,7 @@ class RecoverUnknownOrderSubmissionsService(
     private val marketService: MarketServicePort,
     private val orderIntentSubmissionPort: OrderIntentSubmissionPort,
     private val orderExecutionEventPort: OrderExecutionEventPort,
+    private val operationalAlertPort: OperationalAlertPort,
 ) : RecoverUnknownOrderSubmissionsUseCase {
 
     override suspend fun execute() {
@@ -36,12 +39,16 @@ class RecoverUnknownOrderSubmissionsService(
             BrokerOrderStatus.SUBMITTED -> markSubmitted(submission, status)
             BrokerOrderStatus.REJECTED -> markRejected(submission, status)
             BrokerOrderStatus.CANCELLED -> markCancelled(submission, status)
-            BrokerOrderStatus.UNKNOWN -> orderIntentSubmissionPort.saveUnknown(
-                submission.copy(
+            BrokerOrderStatus.UNKNOWN -> {
+                val unresolved = submission.copy(
                     statusReason = status.reason,
                     lastStatusCheckedAt = status.checkedAt,
-                ),
-            )
+                )
+                orderIntentSubmissionPort.saveUnknown(unresolved)
+                runCatching {
+                    operationalAlertPort.alertSubmissionUnknown(unresolved.toSubmissionUnknownAlert(status))
+                }
+            }
         }
     }
 
@@ -131,6 +138,24 @@ class RecoverUnknownOrderSubmissionsService(
             brokerOrderId = externalOrderId,
             reason = status.reason ?: "broker order cancelled",
             cancelledAt = status.checkedAt,
+        )
+    }
+
+    private fun OrderIntentSubmissionDto.toSubmissionUnknownAlert(
+        status: BrokerOrderStatusDto,
+    ): SubmissionUnknownAlert {
+        return SubmissionUnknownAlert(
+            orderIntentId = orderIntentId,
+            idempotencyKey = idempotencyKey,
+            strategyExecutionId = strategyExecutionId,
+            symbol = symbol,
+            side = side,
+            orderType = orderType,
+            orderTag = orderTag,
+            externalOrderId = status.externalOrderId ?: externalOrderId,
+            reason = status.reason,
+            submittedAt = submittedAt,
+            checkedAt = status.checkedAt,
         )
     }
 

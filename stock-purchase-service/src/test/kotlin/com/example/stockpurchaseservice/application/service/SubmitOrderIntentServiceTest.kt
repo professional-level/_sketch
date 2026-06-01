@@ -22,11 +22,15 @@ import com.example.stockpurchaseservice.application.port.out.OrderRiskAssessment
 import com.example.stockpurchaseservice.application.port.out.OrderRiskAssessmentResult
 import com.example.stockpurchaseservice.application.port.out.OrderRiskControlPort
 import com.example.stockpurchaseservice.application.port.out.OrderSubmittedMessage
+import com.example.stockpurchaseservice.application.port.out.OperationalAlertPort
+import com.example.stockpurchaseservice.application.port.out.OrderSubmissionFailureAlert
 import com.example.stockpurchaseservice.application.port.out.ProcessedEventPort
 import com.example.stockpurchaseservice.application.port.out.PurchaseOrderDto
+import com.example.stockpurchaseservice.application.port.out.ReconciliationFailureAlert
 import com.example.stockpurchaseservice.application.port.out.SellingOrderDto
 import com.example.stockpurchaseservice.application.port.out.StockOrderMarket
 import com.example.stockpurchaseservice.application.port.out.StockOrderType
+import com.example.stockpurchaseservice.application.port.out.SubmissionUnknownAlert
 import java.time.ZonedDateTime
 import java.util.UUID
 import kotlinx.coroutines.runBlocking
@@ -47,6 +51,7 @@ class SubmitOrderIntentServiceTest {
             submissionPort,
             eventPort,
             FakeOrderRiskControlPort(),
+            FakeOperationalAlertPort(),
         )
         val eventId = UUID.randomUUID()
 
@@ -88,6 +93,7 @@ class SubmitOrderIntentServiceTest {
             FakeOrderIntentSubmissionPort(),
             FakeOrderExecutionEventPort(),
             FakeOrderRiskControlPort(),
+            FakeOperationalAlertPort(),
         )
 
         service.execute(
@@ -122,6 +128,7 @@ class SubmitOrderIntentServiceTest {
             FakeOrderIntentSubmissionPort(),
             eventPort,
             FakeOrderRiskControlPort(),
+            FakeOperationalAlertPort(),
         )
 
         val result = service.execute(
@@ -152,12 +159,14 @@ class SubmitOrderIntentServiceTest {
         val processedEventPort = FakeProcessedEventPort()
         val submissionPort = FakeOrderIntentSubmissionPort()
         val eventPort = FakeOrderExecutionEventPort()
+        val alertPort = FakeOperationalAlertPort()
         val service = SubmitOrderIntentService(
             marketPort,
             processedEventPort,
             submissionPort,
             eventPort,
             FakeOrderRiskControlPort(),
+            alertPort,
         )
         val eventId = UUID.randomUUID()
 
@@ -179,8 +188,50 @@ class SubmitOrderIntentServiceTest {
         assertEquals(OrderIntentSubmissionStatus.SUBMISSION_UNKNOWN, result.status)
         assertEquals(eventId, processedEventPort.succeeded.single())
         assertEquals(eventId, submissionPort.unknown.single().orderIntentId)
+        assertEquals(eventId, alertPort.submissionUnknown.single().orderIntentId)
+        assertEquals("timeout after broker submit", alertPort.submissionUnknown.single().reason)
         assertEquals(emptyList(), eventPort.submitted)
         assertEquals(emptyList(), eventPort.rejected)
+    }
+
+    @Test
+    fun `alerts when broker submission fails clearly`() = runBlocking {
+        val marketPort = FakeMarketServicePort(
+            buyFailure = IllegalStateException("broker rejected request"),
+        )
+        val processedEventPort = FakeProcessedEventPort()
+        val eventPort = FakeOrderExecutionEventPort()
+        val alertPort = FakeOperationalAlertPort()
+        val service = SubmitOrderIntentService(
+            marketPort,
+            processedEventPort,
+            FakeOrderIntentSubmissionPort(),
+            eventPort,
+            FakeOrderRiskControlPort(),
+            alertPort,
+        )
+        val eventId = UUID.randomUUID()
+
+        runCatching {
+            service.execute(
+                SubmitOrderIntentCommand(
+                    eventId = eventId,
+                    idempotencyKey = "failed-buy",
+                    strategyExecutionId = "laor-v4-strategy:TQQQ",
+                    symbol = "TQQQ",
+                    side = OrderIntentSide.BUY,
+                    orderType = OrderIntentType.LOC,
+                    price = 112.0,
+                    quantity = 3,
+                    orderTag = "FIRST_BUY",
+                    createdAt = ZonedDateTime.parse("2026-05-30T09:00:00+09:00"),
+                ),
+            )
+        }
+
+        assertEquals(eventId, alertPort.orderSubmissionFailed.single().orderIntentId)
+        assertEquals("broker rejected request", alertPort.orderSubmissionFailed.single().reason)
+        assertEquals("broker rejected request", eventPort.rejected.single().reason)
     }
 
     @Test
@@ -192,7 +243,14 @@ class SubmitOrderIntentServiceTest {
         val riskPort = FakeOrderRiskControlPort(
             result = OrderRiskAssessmentResult.rejected("order notional exceeds limit"),
         )
-        val service = SubmitOrderIntentService(marketPort, processedEventPort, submissionPort, eventPort, riskPort)
+        val service = SubmitOrderIntentService(
+            marketPort,
+            processedEventPort,
+            submissionPort,
+            eventPort,
+            riskPort,
+            FakeOperationalAlertPort(),
+        )
         val eventId = UUID.randomUUID()
 
         val result = service.execute(
@@ -295,6 +353,24 @@ class SubmitOrderIntentServiceTest {
         override suspend fun assess(command: OrderRiskAssessmentCommand): OrderRiskAssessmentResult {
             assessed += command
             return result
+        }
+    }
+
+    private class FakeOperationalAlertPort : OperationalAlertPort {
+        val orderSubmissionFailed: MutableList<OrderSubmissionFailureAlert> = mutableListOf()
+        val submissionUnknown: MutableList<SubmissionUnknownAlert> = mutableListOf()
+        val reconciliationFailed: MutableList<ReconciliationFailureAlert> = mutableListOf()
+
+        override suspend fun alertOrderSubmissionFailed(alert: OrderSubmissionFailureAlert) {
+            orderSubmissionFailed += alert
+        }
+
+        override suspend fun alertSubmissionUnknown(alert: SubmissionUnknownAlert) {
+            submissionUnknown += alert
+        }
+
+        override suspend fun alertReconciliationFailed(alert: ReconciliationFailureAlert) {
+            reconciliationFailed += alert
         }
     }
 

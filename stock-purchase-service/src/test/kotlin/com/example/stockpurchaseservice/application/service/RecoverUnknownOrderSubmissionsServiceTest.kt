@@ -16,8 +16,12 @@ import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissi
 import com.example.stockpurchaseservice.application.port.out.OrderPartiallyFilledMessage
 import com.example.stockpurchaseservice.application.port.out.OrderRejectedMessage
 import com.example.stockpurchaseservice.application.port.out.OrderSubmittedMessage
+import com.example.stockpurchaseservice.application.port.out.OperationalAlertPort
+import com.example.stockpurchaseservice.application.port.out.OrderSubmissionFailureAlert
 import com.example.stockpurchaseservice.application.port.out.PurchaseOrderDto
+import com.example.stockpurchaseservice.application.port.out.ReconciliationFailureAlert
 import com.example.stockpurchaseservice.application.port.out.SellingOrderDto
+import com.example.stockpurchaseservice.application.port.out.SubmissionUnknownAlert
 import java.time.ZonedDateTime
 import java.util.UUID
 import kotlinx.coroutines.runBlocking
@@ -40,6 +44,7 @@ class RecoverUnknownOrderSubmissionsServiceTest {
             ),
             orderIntentSubmissionPort = submissionPort,
             orderExecutionEventPort = eventPort,
+            operationalAlertPort = FakeOperationalAlertPort(),
         )
 
         service.execute()
@@ -65,6 +70,7 @@ class RecoverUnknownOrderSubmissionsServiceTest {
             ),
             orderIntentSubmissionPort = submissionPort,
             orderExecutionEventPort = eventPort,
+            operationalAlertPort = FakeOperationalAlertPort(),
         )
 
         service.execute()
@@ -79,6 +85,7 @@ class RecoverUnknownOrderSubmissionsServiceTest {
         val original = submission(externalOrderId = "broker-1")
         val submissionPort = FakeOrderIntentSubmissionPort(listOf(original))
         val eventPort = FakeOrderExecutionEventPort()
+        val alertPort = FakeOperationalAlertPort()
         val service = RecoverUnknownOrderSubmissionsService(
             marketService = FakeMarketServicePort(
                 status = BrokerOrderStatusDto(
@@ -90,6 +97,7 @@ class RecoverUnknownOrderSubmissionsServiceTest {
             ),
             orderIntentSubmissionPort = submissionPort,
             orderExecutionEventPort = eventPort,
+            operationalAlertPort = alertPort,
         )
 
         service.execute()
@@ -99,6 +107,8 @@ class RecoverUnknownOrderSubmissionsServiceTest {
         assertEquals(emptyList(), eventPort.submitted)
         assertEquals(emptyList(), eventPort.rejected)
         assertEquals(emptyList(), eventPort.cancelled)
+        assertEquals(ORDER_INTENT_ID, alertPort.submissionUnknown.single().orderIntentId)
+        assertEquals("not found yet", alertPort.submissionUnknown.single().reason)
     }
 
     private fun submission(externalOrderId: String? = null): OrderIntentSubmissionDto {
@@ -189,6 +199,24 @@ class RecoverUnknownOrderSubmissionsServiceTest {
         override suspend fun publishFilled(event: OrderFilledMessage) = Unit
 
         override suspend fun publishPartiallyFilled(event: OrderPartiallyFilledMessage) = Unit
+    }
+
+    private class FakeOperationalAlertPort : OperationalAlertPort {
+        val orderSubmissionFailed: MutableList<OrderSubmissionFailureAlert> = mutableListOf()
+        val submissionUnknown: MutableList<SubmissionUnknownAlert> = mutableListOf()
+        val reconciliationFailed: MutableList<ReconciliationFailureAlert> = mutableListOf()
+
+        override suspend fun alertOrderSubmissionFailed(alert: OrderSubmissionFailureAlert) {
+            orderSubmissionFailed += alert
+        }
+
+        override suspend fun alertSubmissionUnknown(alert: SubmissionUnknownAlert) {
+            submissionUnknown += alert
+        }
+
+        override suspend fun alertReconciliationFailed(alert: ReconciliationFailureAlert) {
+            reconciliationFailed += alert
+        }
     }
 
     companion object {

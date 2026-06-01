@@ -23,6 +23,8 @@ import com.example.stockpurchaseservice.application.port.out.OrderExecutionEvent
 import com.example.stockpurchaseservice.application.port.out.OrderFilledMessage
 import com.example.stockpurchaseservice.application.port.out.OrderPartiallyFilledMessage
 import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionPort
+import com.example.stockpurchaseservice.application.port.out.OperationalAlertPort
+import com.example.stockpurchaseservice.application.port.out.ReconciliationFailureAlert
 import com.example.stockpurchaseservice.application.port.out.UnmatchedExecutionDto
 import com.example.stockpurchaseservice.domain.ExecutedStock
 import com.example.stockpurchaseservice.domain.ExecutionFill
@@ -74,6 +76,7 @@ class ReconcileExecutionsService(
     private val orderIntentSubmissionPort: OrderIntentSubmissionPort,
     private val orderExecutionEventPort: OrderExecutionEventPort,
     private val executionReconciliationStatePort: ExecutionReconciliationStatePort,
+    private val operationalAlertPort: OperationalAlertPort,
 ) : ReconcileExecutionsUseCase {
 
     override suspend fun execute() {
@@ -84,11 +87,21 @@ class ReconcileExecutionsService(
         runCatching {
             reconcile(startedAt, previousCursor)
         }.onFailure { exception ->
+            val failedAt = ZonedDateTime.now()
             executionReconciliationStatePort.markFailed(
                 source = RECONCILIATION_SOURCE,
-                failedAt = ZonedDateTime.now(),
+                failedAt = failedAt,
                 reason = exception.message,
             )
+            runCatching {
+                operationalAlertPort.alertReconciliationFailed(
+                    ReconciliationFailureAlert(
+                        source = RECONCILIATION_SOURCE,
+                        reason = exception.message,
+                        failedAt = failedAt,
+                    ),
+                )
+            }
         }.getOrThrow()
     }
 

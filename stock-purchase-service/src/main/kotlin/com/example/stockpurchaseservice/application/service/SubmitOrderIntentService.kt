@@ -17,6 +17,9 @@ import com.example.stockpurchaseservice.application.port.out.OrderRejectedMessag
 import com.example.stockpurchaseservice.application.port.out.OrderRiskAssessmentCommand
 import com.example.stockpurchaseservice.application.port.out.OrderRiskControlPort
 import com.example.stockpurchaseservice.application.port.out.OrderSubmittedMessage
+import com.example.stockpurchaseservice.application.port.out.OperationalAlertPort
+import com.example.stockpurchaseservice.application.port.out.OrderSubmissionFailureAlert
+import com.example.stockpurchaseservice.application.port.out.SubmissionUnknownAlert
 import com.example.stockpurchaseservice.application.port.out.ProcessedEventPort
 import com.example.stockpurchaseservice.application.port.out.PurchaseOrderDto
 import com.example.stockpurchaseservice.application.port.out.SellingOrderDto
@@ -33,6 +36,7 @@ class SubmitOrderIntentService(
     private val orderIntentSubmissionPort: OrderIntentSubmissionPort,
     private val orderExecutionEventPort: OrderExecutionEventPort,
     private val orderRiskControlPort: OrderRiskControlPort,
+    private val operationalAlertPort: OperationalAlertPort,
 ) : SubmitOrderIntentUseCase {
 
     override suspend fun execute(command: SubmitOrderIntentCommand): SubmitOrderIntentResult {
@@ -58,11 +62,17 @@ class SubmitOrderIntentService(
         } catch (exception: BrokerOrderSubmissionUnknownException) {
             val unknownSubmission = command.toUnknownSubmission(exception, command.toInternalOrderId())
             orderIntentSubmissionPort.saveUnknown(unknownSubmission)
+            runCatching {
+                operationalAlertPort.alertSubmissionUnknown(command.toSubmissionUnknownAlert(unknownSubmission, exception.message))
+            }
             processedEventPort.markSuccess(command.eventId)
             SubmitOrderIntentResult(OrderIntentSubmissionStatus.SUBMISSION_UNKNOWN)
         } catch (exception: Throwable) {
             runCatching {
                 orderExecutionEventPort.publishRejected(command.toRejectedMessage(exception))
+            }
+            runCatching {
+                operationalAlertPort.alertOrderSubmissionFailed(command.toFailureAlert(exception))
             }
             processedEventPort.markFailed(command.eventId, exception.message)
             throw exception
@@ -199,6 +209,40 @@ class SubmitOrderIntentService(
             brokerOrderId = null,
             reason = reason,
             rejectedAt = rejectedAt,
+        )
+    }
+
+    private fun SubmitOrderIntentCommand.toFailureAlert(exception: Throwable): OrderSubmissionFailureAlert {
+        return OrderSubmissionFailureAlert(
+            orderIntentId = eventId,
+            idempotencyKey = idempotencyKey,
+            strategyExecutionId = strategyExecutionId,
+            symbol = symbol,
+            side = side,
+            orderType = orderType,
+            orderTag = orderTag,
+            reason = exception.message ?: exception::class.java.simpleName,
+            occurredAt = ZonedDateTime.now(),
+        )
+    }
+
+    private fun SubmitOrderIntentCommand.toSubmissionUnknownAlert(
+        submission: OrderIntentSubmissionDto,
+        reason: String?,
+    ): SubmissionUnknownAlert {
+        val checkedAt = ZonedDateTime.now()
+        return SubmissionUnknownAlert(
+            orderIntentId = eventId,
+            idempotencyKey = idempotencyKey,
+            strategyExecutionId = strategyExecutionId,
+            symbol = symbol,
+            side = side,
+            orderType = orderType,
+            orderTag = orderTag,
+            externalOrderId = submission.externalOrderId,
+            reason = reason,
+            submittedAt = submission.submittedAt,
+            checkedAt = checkedAt,
         )
     }
 
