@@ -537,12 +537,12 @@ broker API 자체가 idempotency key를 지원하지 않는다면, purchase-serv
 현재 남은 것:
 
 - `stock-purchase-service`의 체결 reconciliation은 cursor와 unmatched 저장, KIS wrapper 기반 1일 주문/체결 조회 매핑은 갖췄지만, 날짜 범위 기반 backfill, pagination 완료 처리, rate-limit/retry 정책은 남아 있다.
-- direct sell submission은 legacy 흐름에 남아 있으며, 매도 제출/체결 lifecycle event가 주문 intent 흐름과 완전히 통일되지 않았다.
-- `strategy-execution-service`의 `OrderIntentCreated` 발행과 `stock-purchase-service`의 주문/체결 이벤트 발행은 direct Kafka adapter이며, 모든 publisher가 transactional outbox로 통일된 상태는 아니다.
+- legacy direct sell submission은 order intent lifecycle 경로로 통일되었다.
+- `strategy-execution-service`의 `OrderIntentCreated` 발행과 `stock-purchase-service`의 주문/체결 이벤트 발행은 outbox 저장 후 scheduled publisher가 Kafka로 발행한다.
 - broker wrapper service는 아직 별도 서비스로 분리되지 않았다. KIS token, rate limit, retry, circuit breaker 책임이 root wrapper와 각 adapter에 남아 있다.
 - 단발성 전략의 entry buy는 execution-service로 들어왔지만, sell policy와 completion lifecycle은 추가 정리가 필요하다.
 - daily execution schedule은 평일 calendar 기반이며, 미국장 휴장일 같은 trading calendar skip 정책은 아직 별도 구현이 필요하다.
-- 이번 단계는 DB 저장과 Kafka 발행이 보장된다는 전제로 direct Kafka 발행을 유지한다. outbox 전환은 별도 reliability hardening 작업으로 남긴다.
+- outbox 저장과 Kafka 발행은 분리되었지만, 운영 수준의 transaction boundary와 retry/backoff 정책은 추가 hardening이 필요하다.
 
 ## Migration From Legacy Flow
 
@@ -586,8 +586,8 @@ stock-search-service
 10. 완료: active strategy state를 persistence adapter로 옮긴다.
 11. 완료: Temporal schedule로 daily execution trigger를 붙인다.
 12. 부분 완료: stock-purchase reconciliation에 durable cursor, unmatched execution 저장, KIS wrapper 기반 1일 주문/체결 조회 매핑을 추가한다. 날짜 범위 기반 backfill은 남아 있다.
-13. 부분 완료: 주문 lifecycle을 `SUBMISSION_UNKNOWN` 복구와 `OrderCancelled`까지 확장한다. direct sell event 통일은 남아 있다.
-14. 다음 작업: 발행 측 outbox 적용 범위를 strategy-execution과 stock-purchase의 publisher까지 확장한다.
+13. 완료: 주문 lifecycle을 `SUBMISSION_UNKNOWN` 복구와 `OrderCancelled`까지 확장하고, direct sell event 경로를 order intent lifecycle로 통일한다.
+14. 완료: 발행 측 outbox 적용 범위를 strategy-execution과 stock-purchase의 publisher까지 확장한다.
 15. 이후 작업: KIS broker wrapper service를 별도 anti-corruption layer로 분리한다.
 
 ## Open Questions
@@ -597,7 +597,7 @@ stock-search-service
 - 체결 조회는 purchase-service scheduler와 durable cursor로 충분한가, broker webhook을 지원할 경우 webhook을 우선할 것인가?
 - 해외 주문에서 모의투자와 실전투자의 주문 유형 차이를 strategy parameter로 노출할 것인가, adapter 정책으로 숨길 것인가?
 - 내부 취소 intent를 별도 command로 모델링할 것인가, 현재처럼 broker 조회 결과 기반 `OrderCancelled`부터 유지할 것인가?
-- outbox를 모든 publisher에 적용할 때 각 서비스별 outbox table을 둘 것인가, 공통 outbox abstraction을 둘 것인가?
+- outbox는 현재 각 서비스별 table로 구현했다. 공통 abstraction으로 묶을지는 후속 리팩터링에서 판단한다.
 - daily execution에서 미국장 휴장일을 market-data adapter, broker calendar, 별도 trading-calendar service 중 어디에서 판단할 것인가?
 
 ## Final Shape
