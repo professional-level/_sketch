@@ -4,6 +4,8 @@ import com.example.strategyexecutionservice.application.temporal.StrategyExecuti
 import com.example.strategyexecutionservice.application.temporal.StrategyExecutionTemporalWorkflowImpl
 import io.temporal.client.WorkflowClient
 import io.temporal.client.WorkflowClientOptions
+import io.temporal.client.schedules.ScheduleClient
+import io.temporal.client.schedules.ScheduleClientOptions
 import io.temporal.serviceclient.WorkflowServiceStubs
 import io.temporal.serviceclient.WorkflowServiceStubsOptions
 import io.temporal.worker.WorkerFactory
@@ -38,6 +40,17 @@ class StrategyExecutionTemporalConfiguration {
         return WorkflowClient.newInstance(strategyExecutionTemporalWorkflowServiceStubs, options)
     }
 
+    @Bean
+    fun strategyExecutionTemporalScheduleClient(
+        strategyExecutionTemporalWorkflowServiceStubs: WorkflowServiceStubs,
+        properties: StrategyExecutionTemporalProperties,
+    ): ScheduleClient {
+        val options = ScheduleClientOptions.newBuilder()
+            .setNamespace(properties.namespace)
+            .build()
+        return ScheduleClient.newInstance(strategyExecutionTemporalWorkflowServiceStubs, options)
+    }
+
     @Bean(destroyMethod = "shutdown")
     fun strategyExecutionTemporalWorkerFactory(
         strategyExecutionTemporalWorkflowClient: WorkflowClient,
@@ -50,5 +63,19 @@ class StrategyExecutionTemporalConfiguration {
         worker.registerActivitiesImplementations(activities)
         factory.start()
         return factory
+    }
+
+    @Bean
+    @ConditionalOnProperty(
+        prefix = "akra.temporal.schedules.active-executions",
+        name = ["enabled"],
+        havingValue = "true",
+        matchIfMissing = true,
+    )
+    fun strategyExecutionTemporalScheduleRegistrar(
+        strategyExecutionTemporalScheduleClient: ScheduleClient,
+        properties: StrategyExecutionTemporalProperties,
+    ): StrategyExecutionTemporalScheduleRegistrar {
+        return StrategyExecutionTemporalScheduleRegistrar(strategyExecutionTemporalScheduleClient, properties)
     }
 }

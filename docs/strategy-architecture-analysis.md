@@ -501,27 +501,41 @@ broker API 자체가 idempotency key를 지원하지 않는다면, purchase-serv
 
 ## Current Implementation Status
 
+검토 기준: 2026-06-02
+
 현재 구현된 것:
 
-- `strategy-execution-service`에 라오어 도메인 엔진이 있다.
-- 라오어 active strategy 등록 API가 있다.
-- 라오어 active strategy 실행 use case가 있다.
-- 해외 일봉 조회 wrapper 경로가 있다.
-- `OrderIntentCreated` Kafka 발행 경로가 있다.
-- `stock-purchase-service`가 `OrderIntentCreated`를 소비한다.
-- 해외 미국 매수 주문 wrapper가 있다.
-- purchase-service 내부에 국내/해외 주문 adapter 분리가 시작되었다.
+- `StrategyExecutionStartRequested`, `OrderIntentCreated`, `OrderSubmitted`, `OrderRejected`, `OrderFilled`, `OrderPartiallyFilled` proto/event 계약이 있다.
+- `stock-search-service`는 전략 발견 결과를 outbox에 저장하고 `StrategyExecutionStartRequested`로 발행한다.
+- `strategy-execution-service`는 start request Kafka 이벤트를 수신하고, idempotency key 기준으로 중복 시작을 방지한다.
+- `strategy-execution-service`는 라오어 V4 실행 상태를 persistence adapter에 저장한다.
+- 라오어 V4 등록, 첫 진입, active strategy 실행 use case가 있다.
+- 단발성 `FinalPriceBatingV1`도 start request를 통해 entry buy `OrderIntentCreated`를 만들 수 있다.
+- `strategy-execution-service`는 `OrderIntentCreated`를 Kafka로 발행한다.
+- `stock-purchase-service`는 `OrderIntentCreated`를 소비하고 processed-event 저장소로 중복 주문을 방지한다.
+- `stock-purchase-service`는 broker order id와 internal order intent submission을 매핑한다.
+- 해외 미국 매수/매도 주문 adapter 경로가 있다.
+- `stock-purchase-service`는 주문 제출 성공/실패를 `OrderSubmitted`, `OrderRejected`로 발행한다.
+- `stock-purchase-service`는 체결 reconciliation 결과를 `OrderPartiallyFilled` 또는 `OrderFilled`로 구분해 발행한다.
+- full fill 판단은 같은 broker order id의 누적 체결 수량이 원 주문 수량 이상인지로 한다.
+- `strategy-execution-service`는 `OrderSubmitted`, `OrderRejected`, `OrderPartiallyFilled`, `OrderFilled`를 수신해 주문 이벤트를 idempotent하게 기록한다.
+- `OrderPartiallyFilled`는 현금, 보유 수량, 평균단가에는 반영하지만 라오어 진행 회차는 증가시키지 않는다.
+- 최종 `OrderFilled`는 주문 태그 기준 단위만큼 라오어 진행 회차를 증가시킨다.
+- 라오어 V4 주문 수량은 온주 기준 `floor(orderAmount / orderPrice)`로 계산하고, 1주 미만이면 주문을 만들지 않는다.
+- 라오어 cycle close, `autoRestart`, `cycleNo`, `COMPLETED` 상태가 execution state에 저장된다.
+- `strategy-execution-service`는 Temporal Schedule로 active strategy daily execution workflow를 등록한다.
+- scheduled workflow는 실행일 기준 `ACTIVE_STRATEGIES_DAILY:yyyy-MM-dd` execution run id를 만들고, 같은 run id를 이미 처리한 active strategy는 다시 실행하지 않는다.
 
-아직 부족한 것:
+현재 남은 것:
 
-- `stock-search-service`가 `StrategyExecutionStartRequested`를 발행하지 않는다.
-- `strategy-execution-service`가 start request를 수신하는 adapter가 없다.
-- 단발성 전략이 아직 execution-service 생명주기로 이관되지 않았다.
-- broker order id를 내부 주문 상태와 안정적으로 매핑하는 흐름이 부족하다.
-- purchase-service가 체결 이벤트를 strategy-execution-service로 되돌리는 흐름이 부족하다.
-- 라오어 `applyFills()`가 실제 체결 이벤트와 연결되지 않았다.
-- active strategy state가 아직 영속 저장소가 아니다.
-- 해외 매도 주문은 아직 연결되지 않았다.
+- `stock-purchase-service`의 체결 reconciliation은 관측된 체결의 중복 저장은 처리하지만, durable cursor, 재시작 복구, backfill, unmatched broker execution 처리 정책은 아직 부족하다.
+- `SUBMISSION_UNKNOWN` 주문을 broker 조회로 복구하는 흐름이 없다.
+- `OrderCancelled` 계약은 문서에 있지만 실제 발행/소비 흐름은 아직 없다.
+- direct sell submission은 legacy 흐름에 남아 있으며, 매도 제출/체결 lifecycle event가 주문 intent 흐름과 완전히 통일되지 않았다.
+- `strategy-execution-service`의 `OrderIntentCreated` 발행과 `stock-purchase-service`의 주문/체결 이벤트 발행은 direct Kafka adapter이며, 모든 publisher가 transactional outbox로 통일된 상태는 아니다.
+- broker wrapper service는 아직 별도 서비스로 분리되지 않았다. KIS token, TR ID, rate limit, retry, circuit breaker 책임이 각 adapter에 남아 있다.
+- 단발성 전략의 entry buy는 execution-service로 들어왔지만, sell policy와 completion lifecycle은 추가 정리가 필요하다.
+- daily execution schedule은 평일 calendar 기반이며, 미국장 휴장일 같은 trading calendar skip 정책은 아직 별도 구현이 필요하다.
 
 ## Migration From Legacy Flow
 
@@ -553,25 +567,31 @@ stock-search-service
 
 ## Implementation Order
 
-1. `StrategyExecutionStartRequested` proto/event 계약을 추가한다.
-2. `stock-search-service`가 기존 `StrategySavedEvent` 대신 또는 병행해서 start request를 발행한다.
-3. `strategy-execution-service`에 start request consumer를 추가한다.
-4. 단발성 전략도 execution-service에 실행 모델을 만든다.
-5. `strategy-execution-service`가 첫 실행에서 `OrderIntentCreated`를 발행하게 한다.
-6. purchase-service가 broker order id를 저장하고 internal order와 매핑한다.
-7. purchase-service가 `OrderSubmitted`, `OrderFilled`, `OrderRejected` 이벤트를 발행한다.
-8. strategy-execution-service가 fill event를 수신해 전략 상태를 갱신한다.
-9. 라오어 cycle close와 auto restart 정책을 명시적으로 저장한다.
-10. active strategy state를 persistence adapter로 옮긴다.
-11. Temporal schedule 또는 application scheduler로 daily execution trigger를 붙인다.
+1. 완료: `StrategyExecutionStartRequested` proto/event 계약을 추가한다.
+2. 완료: `stock-search-service`가 기존 저장 이벤트 대신 start request를 outbox로 발행한다.
+3. 완료: `strategy-execution-service`에 start request consumer를 추가한다.
+4. 부분 완료: 단발성 전략도 execution-service에서 entry buy intent를 만들 수 있다. sell policy와 completion lifecycle은 남아 있다.
+5. 완료: `strategy-execution-service`가 첫 실행에서 `OrderIntentCreated`를 발행한다.
+6. 완료: purchase-service가 broker order id를 저장하고 internal order intent submission과 매핑한다.
+7. 부분 완료: purchase-service가 `OrderSubmitted`, `OrderRejected`, `OrderFilled`, `OrderPartiallyFilled`를 발행한다. `OrderCancelled`는 남아 있다.
+8. 완료: strategy-execution-service가 주문/체결 이벤트를 수신해 기록하고, fill event로 전략 상태를 갱신한다.
+9. 완료: 라오어 cycle close와 auto restart 정책을 명시적으로 저장한다.
+10. 완료: active strategy state를 persistence adapter로 옮긴다.
+11. 완료: Temporal schedule로 daily execution trigger를 붙인다.
+12. 다음 작업: stock-purchase reconciliation에 durable cursor, recovery, backfill, unmatched execution 처리를 추가한다.
+13. 다음 작업: 주문 lifecycle을 `SUBMISSION_UNKNOWN` 복구, `OrderCancelled`, direct sell event까지 확장한다.
+14. 다음 작업: 발행 측 outbox 적용 범위를 strategy-execution과 stock-purchase의 publisher까지 확장한다.
+15. 이후 작업: KIS broker wrapper service를 별도 anti-corruption layer로 분리한다.
 
 ## Open Questions
 
-- 라오어는 전량 매도 후 항상 다음 턴을 시작하는가, 아니면 search-service가 다시 시작 조건을 승인해야 하는가?
-- 단발성 전략의 매도 정책은 execution-service가 소유할 것인가, purchase-service의 기존 scheduler를 단계적으로 유지할 것인가?
-- `StrategyExecutionStartRequested`를 Kafka 이벤트로만 받을 것인가, 내부 운영용 REST endpoint도 둘 것인가?
-- 체결 조회 주기는 purchase-service scheduler가 가질 것인가, broker webhook이 가능하면 webhook을 우선할 것인가?
+- `autoRestart=true`일 때 execution-service가 즉시 다음 cycle을 여는 현재 정책으로 충분한가, 아니면 search-service의 재승인을 다시 받아야 하는가?
+- 단발성 전략의 매도 정책과 완료 판정은 execution-service가 소유할 것인가, purchase-service의 기존 sell scheduler를 단계적으로 유지할 것인가?
+- 체결 조회는 purchase-service scheduler와 durable cursor로 충분한가, broker webhook을 지원할 경우 webhook을 우선할 것인가?
 - 해외 주문에서 모의투자와 실전투자의 주문 유형 차이를 strategy parameter로 노출할 것인가, adapter 정책으로 숨길 것인가?
+- `OrderCancelled`는 broker 취소 조회 결과로만 발행할 것인가, 내부 취소 intent를 별도 command로 모델링할 것인가?
+- outbox를 모든 publisher에 적용할 때 각 서비스별 outbox table을 둘 것인가, 공통 outbox abstraction을 둘 것인가?
+- daily execution에서 미국장 휴장일을 market-data adapter, broker calendar, 별도 trading-calendar service 중 어디에서 판단할 것인가?
 
 ## Final Shape
 

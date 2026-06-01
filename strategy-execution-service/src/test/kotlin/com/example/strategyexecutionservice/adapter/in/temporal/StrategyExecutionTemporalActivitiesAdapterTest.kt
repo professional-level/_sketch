@@ -91,6 +91,24 @@ class StrategyExecutionTemporalActivitiesAdapterTest {
         }
     }
 
+    @Test
+    fun `creates daily execution run id when scheduled activity input omits it`() {
+        val activeUseCase = FakeRunActiveStrategyExecutionsUseCase()
+        val useCase = FakeRunStrategyExecutionUseCase()
+        val adapter = StrategyExecutionTemporalActivitiesAdapter(activeUseCase, useCase)
+
+        adapter.runActiveStrategyExecutions(
+            RunActiveStrategyExecutionsWorkflowInput(
+                requestedAt = "2026-06-02T09:00:00+09:00",
+            ),
+        )
+
+        with(activeUseCase.commands.single()) {
+            assertEquals("ACTIVE_STRATEGIES_DAILY:2026-06-02", executionRunId)
+            assertEquals("2026-06-02T09:00+09:00", requestedAt.toString())
+        }
+    }
+
     private class FakeRunActiveStrategyExecutionsUseCase : RunActiveStrategyExecutionsUseCase {
         val commands: MutableList<RunActiveStrategyExecutionsCommand> = mutableListOf()
 

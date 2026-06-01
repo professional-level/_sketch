@@ -27,6 +27,9 @@ class RunActiveStrategyExecutionsService(
         var createdOrderIntentCount = 0
 
         for (strategy in activeStrategies) {
+            if (strategy.lastExecutionRunId == command.executionRunId) {
+                continue
+            }
             val market = marketDataPort.getMarketSnapshot(
                 symbol = strategy.symbol.ticker,
                 recentCloseCount = RECENT_CLOSE_COUNT,

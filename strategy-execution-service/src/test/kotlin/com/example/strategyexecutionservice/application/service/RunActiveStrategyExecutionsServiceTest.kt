@@ -80,6 +80,44 @@ class RunActiveStrategyExecutionsServiceTest {
         assertEquals(100.0, savedState.state.averagePurchasePrice)
     }
 
+    @Test
+    fun `skips strategy that already ran for same execution run id`() = runBlocking {
+        val statePort = FakeStrategyExecutionStatePort(
+            activeStates = listOf(
+                LaorV4ExecutionState(
+                    executionId = "laor-v4-strategy:TQQQ",
+                    symbol = LaorV4StrategySymbol.TQQQ,
+                    totalSplitCount = 20,
+                    state = LaorV4StrategyState(availableCash = 2_240.0),
+                    lastExecutionRunId = "ACTIVE_STRATEGIES_DAILY:2026-06-02",
+                ),
+            ),
+        )
+        val marketDataPort = FakeMarketDataPort()
+        val runStrategyExecutionUseCase = FakeRunStrategyExecutionUseCase(
+            plannedState = LaorV4State(availableCash = 2_240.0),
+        )
+        val service = RunActiveStrategyExecutionsService(
+            strategyExecutionStatePort = statePort,
+            marketDataPort = marketDataPort,
+            runStrategyExecutionUseCase = runStrategyExecutionUseCase,
+        )
+
+        val result = service.execute(
+            RunActiveStrategyExecutionsCommand(
+                executionRunId = "ACTIVE_STRATEGIES_DAILY:2026-06-02",
+                requestedAt = ZonedDateTime.parse("2026-06-02T09:00:00+09:00"),
+            ),
+        )
+
+        assertEquals(1, result.activeStrategyCount)
+        assertEquals(0, result.executedStrategyCount)
+        assertEquals(0, result.createdOrderIntentCount)
+        assertEquals(emptyList(), marketDataPort.requests)
+        assertEquals(emptyList(), runStrategyExecutionUseCase.commands)
+        assertEquals(emptyList(), statePort.saved)
+    }
+
     private class FakeStrategyExecutionStatePort(
         private val activeStates: List<LaorV4ExecutionState>,
     ) : StrategyExecutionStatePort {

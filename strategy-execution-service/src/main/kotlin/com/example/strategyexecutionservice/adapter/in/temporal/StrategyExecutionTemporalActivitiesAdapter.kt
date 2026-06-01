@@ -16,6 +16,7 @@ import com.example.strategyexecutionservice.application.temporal.StrategyExecuti
 import com.example.strategyexecutionservice.application.temporal.StrategyMarketWorkflowSnapshot
 import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategyMode
 import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategySymbol
+import java.time.ZoneId
 import java.time.ZonedDateTime
 import kotlinx.coroutines.runBlocking
 
@@ -54,7 +55,10 @@ class StrategyExecutionTemporalActivitiesAdapter(
         val requestedAt = requestedAt
             .takeIf { it.isNotBlank() }
             ?.let(ZonedDateTime::parse)
-            ?: ZonedDateTime.now()
+            ?: ZonedDateTime.now(ZoneId.of(timeZone))
+        val executionRunId = executionRunId
+            .takeIf { it.isNotBlank() }
+            ?: "$executionRunIdPrefix:${requestedAt.toLocalDate()}"
         return RunActiveStrategyExecutionsCommand(
             executionRunId = executionRunId,
             requestedAt = requestedAt,

@@ -2,7 +2,7 @@
 
 Date: 2026-05-30
 Status: Accepted for sketch architecture
-Updated: 2026-05-31
+Updated: 2026-06-02
 
 ## Context
 
@@ -34,7 +34,7 @@ stock-search-service
   -> strategy-execution-service
   -> OrderIntentCreated
   -> stock-purchase-service
-  -> OrderSubmitted / OrderFilled / OrderRejected
+  -> OrderSubmitted / OrderFilled / OrderPartiallyFilled / OrderRejected
   -> strategy-execution-service
 ```
 

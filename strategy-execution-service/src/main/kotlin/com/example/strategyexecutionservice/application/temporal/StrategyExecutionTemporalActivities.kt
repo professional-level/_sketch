@@ -17,6 +17,8 @@ interface StrategyExecutionTemporalActivities {
 data class RunActiveStrategyExecutionsWorkflowInput(
     val executionRunId: String = "",
     val requestedAt: String = "",
+    val executionRunIdPrefix: String = "ACTIVE_STRATEGIES_DAILY",
+    val timeZone: String = "Asia/Seoul",
 )
 
 data class RunActiveStrategyExecutionsWorkflowResult(
