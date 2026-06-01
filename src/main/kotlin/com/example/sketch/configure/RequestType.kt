@@ -56,6 +56,10 @@ enum class RequestType(
         requestURI = "/uapi/domestic-stock/v1/trading/inquire-daily-ccld", // 주식일별주문체결조회[v1_국내주식-005]
         type = HttpMethod.GET,
     ),
+    GET_OVERSEAS_EXECUTION_ORDERS(
+        requestURI = "/uapi/overseas-stock/v1/trading/inquire-ccnl",
+        type = HttpMethod.GET,
+    ),
     ;
 
     fun getRequestUri() = requestURI
@@ -101,8 +105,18 @@ enum class QueryParameter(
     ODNO(emptyQueryParam),
     INQR_DVSN_3(emptyQueryParam),
     INQR_DVSN_1(emptyQueryParam),
+    EXCG_ID_DVSN_CD("KRX"),
     CTX_AREA_FK100(emptyQueryParam),
     CTX_AREA_NK100(emptyQueryParam),
+    ORD_STRT_DT(emptyQueryParam),
+    ORD_END_DT(emptyQueryParam),
+    ORD_DT(emptyQueryParam),
+    SLL_BUY_DVSN(emptyQueryParam),
+    CCLD_NCCS_DVSN(emptyQueryParam),
+    OVRS_EXCG_CD(emptyQueryParam),
+    SORT_SQN(emptyQueryParam),
+    CTX_AREA_NK200(emptyQueryParam),
+    CTX_AREA_FK200(emptyQueryParam),
 
     AUTH(""),
     EXCD(emptyQueryParam),
@@ -184,7 +198,13 @@ enum class QueryParameter(
                     CANO, ACNT_PRDT_CD, INQR_STRT_DT, INQR_END_DT,
                     SLL_BUY_DVSN_CD, INQR_DVSN, PDNO, CCLD_DVSN,
                     ORD_GNO_BRNO, ODNO, INQR_DVSN_3, INQR_DVSN_1,
-                    CTX_AREA_FK100, CTX_AREA_NK100,
+                    EXCG_ID_DVSN_CD, CTX_AREA_FK100, CTX_AREA_NK100,
+                )
+
+                RequestType.GET_OVERSEAS_EXECUTION_ORDERS -> listOf(
+                    CANO, ACNT_PRDT_CD, PDNO, ORD_STRT_DT, ORD_END_DT,
+                    SLL_BUY_DVSN, CCLD_NCCS_DVSN, OVRS_EXCG_CD, SORT_SQN,
+                    ORD_DT, ORD_GNO_BRNO, ODNO, CTX_AREA_NK200, CTX_AREA_FK200,
                 )
             }.toResult(additionalInfo)
     }

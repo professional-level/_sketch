@@ -8,6 +8,7 @@ import com.example.common.endpoint.Endpoint.GET_CURRENT_PRICE
 import com.example.common.endpoint.Endpoint.GET_CURRENT_PRICE_OF_INVESTMENT
 import com.example.common.endpoint.Endpoint.GET_EXECUTION_ORDERS
 import com.example.common.endpoint.Endpoint.GET_FOREIGNER_TRADE_TREND
+import com.example.common.endpoint.Endpoint.GET_OVERSEAS_EXECUTION_ORDERS
 import com.example.common.endpoint.Endpoint.GET_OVERSEAS_DAILY_PRICE
 import com.example.common.endpoint.Endpoint.GET_PROGRAM_TRADE_INFO_PER_INDIVIDUAL
 import com.example.common.endpoint.Endpoint.GET_PROGRAM_TRADE_INFO_PER_INDIVIDUAL_AT_ONE_DAY
@@ -184,6 +185,13 @@ class OpenApiController(
     ): DailyExecutionOrdersResponse {
         return service.getExecutionOrders(request).toDailyExecutionOrdersResponse()
     }
+
+    @GetMapping(GET_OVERSEAS_EXECUTION_ORDERS)
+    suspend fun getOverseasExecutionOrders(
+        @ModelAttribute request: GetOverseasExecutionOrdersRequest,
+    ): OpenApiResponse {
+        return service.getOverseasExecutionOrders(request)
+    }
 }
 
 // TODO: 해당 to~로직을 다른 interface로 변경
@@ -294,7 +302,7 @@ private fun OpenApiResponse.toDailyExecutionOrdersResponse(): DailyExecutionOrde
         // output1 배열 처리
         val output1Array = this@toDailyExecutionOrdersResponse.get("output1")
         output1Array.forEach { item ->
-                dailyExecutionOrdersOutput1 {
+                output1 += dailyExecutionOrdersOutput1 {
                     ordDt = item.get("ord_dt").asText()
                     ordGnoBrno = item.get("ord_gno_brno").asText()
                     odno = item.get("odno").asText()

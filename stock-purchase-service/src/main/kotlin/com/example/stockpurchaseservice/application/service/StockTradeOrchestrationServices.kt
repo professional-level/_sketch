@@ -8,6 +8,7 @@ import com.example.stockpurchaseservice.application.port.`in`.SimulateStockPurch
 import com.example.stockpurchaseservice.application.port.out.ExecutedStockDto
 import com.example.stockpurchaseservice.application.port.out.ExecutionFillDto
 import com.example.stockpurchaseservice.application.port.out.ExecutionFillPort
+import com.example.stockpurchaseservice.application.port.out.ExecutionQuantityModeDto
 import com.example.stockpurchaseservice.application.port.out.ExecutionReconciliationResultDto
 import com.example.stockpurchaseservice.application.port.out.ExecutionReconciliationStatePort
 import com.example.stockpurchaseservice.application.port.out.ExecutionTypeDto
@@ -88,10 +89,13 @@ class ReconcileExecutionsService(
     }
 
     private suspend fun reconcile(startedAt: ZonedDateTime) {
-        val executedStockList: List<ExecutedStock> = marketService.findExecutionListAtOneDay().map { it.toDomain() }
+        val brokerExecutionList = marketService.findExecutionListAtOneDay()
+        val executedStockList = mutableListOf<ExecutedStock>()
         val refinedExecutedStockList = mutableListOf<ExecutedStock>()
         var unmatchedExecutionCount = 0
-        executedStockList.forEach { execution ->
+        brokerExecutionList.forEach { brokerExecution ->
+            val execution = brokerExecution.toDomainForReconciliation() ?: return@forEach
+            executedStockList += execution
             if (executionFillPort.saveIfNew(ExecutionFillDto.from(ExecutionFill.from(execution)))) {
                 refinedExecutedStockList += execution
                 val publishOutcome = publishOrderFillEventIfIntentSubmissionExists(execution)
@@ -145,7 +149,8 @@ class ReconcileExecutionsService(
     private suspend fun publishOrderFillEventIfIntentSubmissionExists(execution: ExecutedStock): FillPublishOutcome {
         val submission = orderIntentSubmissionPort.findByExternalOrderId(execution.externalOrderId.value)
             ?: return FillPublishOutcome.MISSING_SUBMISSION
-        val filledPrice = submission.submittedPrice ?: return FillPublishOutcome.MISSING_SUBMITTED_PRICE
+        val filledPrice = execution.averageExecutionPrice ?: submission.submittedPrice
+            ?: return FillPublishOutcome.MISSING_SUBMITTED_PRICE
         if (isFullyFilled(execution.externalOrderId.value, submission.quantity)) {
             orderExecutionEventPort.publishFilled(
                 OrderFilledMessage(
@@ -180,6 +185,18 @@ class ReconcileExecutionsService(
 
     private suspend fun isFullyFilled(externalOrderId: String, orderQuantity: Long): Boolean {
         return executionFillPort.sumQuantityByExternalOrderId(externalOrderId) >= orderQuantity
+    }
+
+    private suspend fun ExecutedStockDto.toDomainForReconciliation(): ExecutedStock? {
+        val reconciledQuantity = when (quantityMode) {
+            ExecutionQuantityModeDto.DELTA -> quantity
+            ExecutionQuantityModeDto.CUMULATIVE -> {
+                val alreadySavedQuantity = executionFillPort.sumQuantityByExternalOrderId(externalOrderId)
+                quantity - alreadySavedQuantity.toInt()
+            }
+        }
+        if (reconciledQuantity <= 0) return null
+        return copy(quantity = reconciledQuantity).toDomain()
     }
 
     private suspend fun markCompleted(
@@ -269,6 +286,7 @@ private fun ExecutedStockDto.toDomain(): ExecutedStock {
         type = type.toDomain(),
         externalOrderId = ExternalOrderId(externalOrderId),
         externalExecutionId = ExternalExecutionId(externalExecutionId),
+        averageExecutionPrice = averageExecutionPrice,
     )
 }
 

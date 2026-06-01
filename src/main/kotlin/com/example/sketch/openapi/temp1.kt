@@ -30,6 +30,9 @@ data class StockOrderRequest(
     val ORD_DVSN: String = "00", // 주문구분 (2자리 코드)
     val ORD_QTY: Long, // 주문수량 (String)
     val ORD_UNPR: Long, // 주문단가 (String)
+    val EXCG_ID_DVSN_CD: String = "KRX",
+    val SLL_TYPE: String = "",
+    val CNDT_PRIC: String = "",
     val isMock: Boolean = true,
 )
 

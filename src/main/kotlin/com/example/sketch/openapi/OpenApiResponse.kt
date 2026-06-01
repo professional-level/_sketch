@@ -20,8 +20,25 @@ data class GetDailyExecutionOrdersRequest(
     val odno: String = "",
     val inqrDvsn3: String = "00", // 전체
     val inqrDvsn1: String = "",
+    val excgIdDvsnCd: String = "KRX",
     val ctxAreaFk100: String = "",
     val ctxAreaNk100: String = "",
+)
+
+data class GetOverseasExecutionOrdersRequest(
+    val isMock: Boolean = true,
+    val pdno: String = "",
+    val ordStrtDt: String = ZonedDateTime.now(ZoneId.of("Asia/Seoul")).toDefaultDateStringFormat(),
+    val ordEndDt: String = ZonedDateTime.now(ZoneId.of("Asia/Seoul")).toDefaultDateStringFormat(),
+    val sllBuyDvsn: String = "00",
+    val ccldNccsDvsn: String = "00",
+    val ovrsExcgCd: String = "",
+    val sortSqn: String = "DS",
+    val ordDt: String = "",
+    val ordGnoBrno: String = "",
+    val odno: String = "",
+    val ctxAreaNk200: String = "",
+    val ctxAreaFk200: String = "",
 )
 
 data class OverseasDailyPriceResponse(
@@ -43,6 +60,7 @@ data class OverseasStockOrderRequest(
     val ORD_QTY: Long,
     val OVRS_ORD_UNPR: String,
     val ORD_DVSN: String = "00",
+    val SLL_TYPE: String = "",
     val CTAC_TLNO: String = "",
     val MGCO_APTM_ODNO: String = "",
     val ORD_SVR_DVSN_CD: String = "0",

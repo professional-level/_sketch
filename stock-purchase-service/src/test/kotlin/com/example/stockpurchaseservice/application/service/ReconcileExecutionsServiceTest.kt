@@ -9,6 +9,7 @@ import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatusQu
 import com.example.stockpurchaseservice.application.port.out.ExecutedStockDto
 import com.example.stockpurchaseservice.application.port.out.ExecutionFillDto
 import com.example.stockpurchaseservice.application.port.out.ExecutionFillPort
+import com.example.stockpurchaseservice.application.port.out.ExecutionQuantityModeDto
 import com.example.stockpurchaseservice.application.port.out.ExecutionReconciliationResultDto
 import com.example.stockpurchaseservice.application.port.out.ExecutionReconciliationStatePort
 import com.example.stockpurchaseservice.application.port.out.ExecutionTypeDto
@@ -101,6 +102,34 @@ class ReconcileExecutionsServiceTest {
     }
 
     @Test
+    fun `publishes only new delta when broker execution quantity is cumulative`() = runBlocking {
+        val eventPort = FakeOrderExecutionEventPort()
+        val service = service(
+            marketPort = FakeMarketServicePort(
+                executions = listOf(
+                    execution(
+                        externalExecutionId = "broker-1:70:PURCHASE",
+                        quantity = 70,
+                        quantityMode = ExecutionQuantityModeDto.CUMULATIVE,
+                    ),
+                ),
+            ),
+            executionFillPort = FakeExecutionFillPort(
+                initialQuantitiesByExternalOrderId = mapOf("broker-1" to 30),
+            ),
+            submissionPort = FakeOrderIntentSubmissionPort(
+                submissions = listOf(submission(quantity = 100)),
+            ),
+            eventPort = eventPort,
+        )
+
+        service.execute()
+
+        assertEquals(40, eventPort.partiallyFilled.single().filledQuantity)
+        assertEquals(emptyList(), eventPort.filled)
+    }
+
+    @Test
     fun `records reconciliation cursor and unmatched executions`() = runBlocking {
         val reconciliationStatePort = FakeExecutionReconciliationStatePort()
         val service = service(
@@ -165,6 +194,7 @@ class ReconcileExecutionsServiceTest {
         externalExecutionId: String,
         quantity: Int,
         externalOrderId: String = "broker-1",
+        quantityMode: ExecutionQuantityModeDto = ExecutionQuantityModeDto.DELTA,
     ): ExecutedStockDto {
         return ExecutedStockDto(
             stockId = "TQQQ",
@@ -174,6 +204,7 @@ class ReconcileExecutionsServiceTest {
             type = ExecutionTypeDto.PURCHASE,
             externalOrderId = externalOrderId,
             externalExecutionId = externalExecutionId,
+            quantityMode = quantityMode,
         )
     }
 

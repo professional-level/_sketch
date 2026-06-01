@@ -93,6 +93,7 @@ class RecoverUnknownOrderSubmissionsService(
             symbol = symbol,
             side = side,
             market = symbol.toStockOrderMarket(),
+            submittedAt = submittedAt,
         )
     }
 

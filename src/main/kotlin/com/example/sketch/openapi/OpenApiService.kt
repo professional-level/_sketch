@@ -274,7 +274,7 @@ class OpenApiService(
         val token = getToken(isMock = request.isMock)
         val info: RequestType = RequestType.POST_STOCK_ORDER
 
-        val trId = getTrIdForOrder(request.ORD_DVSN, request.isMock)
+        val trId = getTrIdForDomesticCashOrder(request.SLL_TYPE, request.isMock)
 
         val headers = build(token = token, trId = trId)
             .addHeader(HeaderBuilder.HeaderKey.CUSTOMER_TYPE, "P") // 개인 고객 타입
@@ -286,6 +286,9 @@ class OpenApiService(
         val body = mapOf(
             BodyParameter.CANO to cano,
             BodyParameter.ACNT_PRDT_CD to acntPrdtCd,
+            BodyParameter.EXCG_ID_DVSN_CD to request.EXCG_ID_DVSN_CD,
+            BodyParameter.SLL_TYPE to request.SLL_TYPE,
+            BodyParameter.CNDT_PRIC to request.CNDT_PRIC,
             BodyParameter.PDNO to request.PDNO, // 종목코드 6자리
             BodyParameter.ORD_DVSN to request.ORD_DVSN, // 주문구분 00 지정가 01 시장가
             BodyParameter.ORD_QTY to request.ORD_QTY.toString(), // 주문수량
@@ -300,7 +303,7 @@ class OpenApiService(
         requireSupportedUsBuyOrder(request)
         val token = getToken(isMock = request.isMock)
         val info = RequestType.POST_OVERSEAS_STOCK_ORDER
-        val trId = getTrIdForUsOverseasBuyOrder(request.isMock)
+        val trId = getTrIdForUsOverseasOrder(request.SLL_TYPE, request.isMock)
         val headers = build(token = token, trId = trId)
             .addHeader(HeaderBuilder.HeaderKey.CUSTOMER_TYPE, "P")
             .build()
@@ -316,7 +319,7 @@ class OpenApiService(
             BodyParameter.OVRS_ORD_UNPR to request.OVRS_ORD_UNPR,
             BodyParameter.CTAC_TLNO to request.CTAC_TLNO,
             BodyParameter.MGCO_APTM_ODNO to request.MGCO_APTM_ODNO,
-            BodyParameter.SLL_TYPE to "",
+            BodyParameter.SLL_TYPE to request.SLL_TYPE,
             BodyParameter.ORD_SVR_DVSN_CD to request.ORD_SVR_DVSN_CD,
             BodyParameter.ORD_DVSN to request.ORD_DVSN,
         )
@@ -329,7 +332,7 @@ class OpenApiService(
         val token = getToken(isMock = request.isMock)
         val info: RequestType = RequestType.GET_EXECUTION_ORDERS
 
-        val trId = if (request.isMock) "VTTC8001R" else "TTTC8001R" // TODO: 상황별 mapping 필요
+        val trId = if (request.isMock) "VTTC0081R" else "TTTC0081R"
         val headers = build(token = token, trId = trId)
             .addHeader(HeaderBuilder.HeaderKey.CUSTOMER_TYPE, "P")
             .build()
@@ -351,6 +354,7 @@ class OpenApiService(
                     QueryParameter.ODNO to request.odno,
                     QueryParameter.INQR_DVSN_3 to request.inqrDvsn3,
                     QueryParameter.INQR_DVSN_1 to request.inqrDvsn1,
+                    QueryParameter.EXCG_ID_DVSN_CD to request.excgIdDvsnCd,
                     QueryParameter.CTX_AREA_FK100 to request.ctxAreaFk100,
                     QueryParameter.CTX_AREA_NK100 to request.ctxAreaNk100,
                 ),
@@ -365,8 +369,70 @@ class OpenApiService(
         return response
     }
 
+    suspend fun getOverseasExecutionOrders(request: GetOverseasExecutionOrdersRequest): OpenApiResponse {
+        val token = getToken(isMock = request.isMock)
+        val info = RequestType.GET_OVERSEAS_EXECUTION_ORDERS
+        val headers = build(token = token, trId = if (request.isMock) "VTTS3035R" else "TTTS3035R")
+            .addHeader(HeaderBuilder.HeaderKey.CUSTOMER_TYPE, "P")
+            .build()
+            .withMockCredentialIfNeeded(request.isMock)
+        val (cano, acntPrdtCd) = stockAccount(request.isMock)
+        val queryParameters = QueryParameter.forType(
+            info,
+            mapOf(
+                CANO to cano,
+                QueryParameter.ACNT_PRDT_CD to acntPrdtCd,
+                QueryParameter.PDNO to request.pdno,
+                QueryParameter.ORD_STRT_DT to request.ordStrtDt,
+                QueryParameter.ORD_END_DT to request.ordEndDt,
+                QueryParameter.SLL_BUY_DVSN to request.sllBuyDvsn,
+                QueryParameter.CCLD_NCCS_DVSN to request.ccldNccsDvsn,
+                QueryParameter.OVRS_EXCG_CD to request.ovrsExcgCd,
+                QueryParameter.SORT_SQN to request.sortSqn,
+                QueryParameter.ORD_DT to request.ordDt,
+                QueryParameter.ORD_GNO_BRNO to request.ordGnoBrno,
+                QueryParameter.ODNO to request.odno,
+                QueryParameter.CTX_AREA_NK200 to request.ctxAreaNk200,
+                QueryParameter.CTX_AREA_FK200 to request.ctxAreaFk200,
+            ),
+        )
+
+        return executeHttpRequest(
+            info = info,
+            headers = headers,
+            queryParameters = queryParameters,
+            isMockApi = request.isMock,
+        )
+    }
+
     // end
     // sub-method
+    private fun getTrIdForDomesticCashOrder(
+        sellType: String,
+        isMock: Boolean,
+    ): String {
+        val isSell = sellType.isNotBlank()
+        return when {
+            isMock && isSell -> "VTTC0011U"
+            isMock -> "VTTC0012U"
+            isSell -> "TTTC0011U"
+            else -> "TTTC0012U"
+        }
+    }
+
+    private fun getTrIdForUsOverseasOrder(
+        sellType: String,
+        isMock: Boolean,
+    ): String {
+        val isSell = sellType.isNotBlank()
+        return when {
+            isMock && isSell -> "VTTT1006U"
+            isMock -> "VTTT1002U"
+            isSell -> "TTTT1006U"
+            else -> "TTTT1002U"
+        }
+    }
+
     private fun getTrIdForOrder(
         ordDvsn: String,
         isMock: Boolean,
@@ -388,12 +454,14 @@ class OpenApiService(
             "only US overseas buy exchanges are supported: NASD, NYSE, AMEX"
         }
 
-        val supportedOrderDivisions = when (request.isMock) {
-            true -> setOf("00")
-            false -> setOf("00", "32", "34")
+        val isSell = request.SLL_TYPE.isNotBlank()
+        val supportedOrderDivisions = when {
+            request.isMock -> setOf("00")
+            isSell -> setOf("00", "31", "32", "33", "34")
+            else -> setOf("00", "32", "34")
         }
         require(request.ORD_DVSN in supportedOrderDivisions) {
-            "unsupported US overseas buy order division: ${request.ORD_DVSN}"
+            "unsupported US overseas order division: ${request.ORD_DVSN}"
         }
     }
 
@@ -482,6 +550,8 @@ object BodyParameter {
     const val ORD_DVSN = "ORD_DVSN"
     const val ORD_QTY = "ORD_QTY"
     const val ORD_UNPR = "ORD_UNPR"
+    const val EXCG_ID_DVSN_CD = "EXCG_ID_DVSN_CD"
+    const val CNDT_PRIC = "CNDT_PRIC"
     const val OVRS_EXCG_CD = "OVRS_EXCG_CD"
     const val OVRS_ORD_UNPR = "OVRS_ORD_UNPR"
     const val CTAC_TLNO = "CTAC_TLNO"

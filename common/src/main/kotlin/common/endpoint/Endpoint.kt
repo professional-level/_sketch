@@ -12,4 +12,5 @@ object Endpoint {
     const val POST_STOCK_ORDER ="/trading/order-cash"
     const val POST_OVERSEAS_STOCK_ORDER = "/overseas/trading/order"
     const val GET_EXECUTION_ORDERS ="/trading/inquire-daily-ccld"
+    const val GET_OVERSEAS_EXECUTION_ORDERS = "/overseas/trading/inquire-ccnl"
 }

@@ -14,11 +14,15 @@ interface MarketServicePort {
 interface DomesticStockOrderPort {
     fun buyStock(order: PurchaseOrderDto): BrokerOrderSubmissionDto
     fun sellStock(order: SellingOrderDto): BrokerOrderSubmissionDto
+    fun findExecutionListAtOneDay(): List<ExecutedStockDto>
+    fun findOrderSubmissionStatus(query: BrokerOrderStatusQuery): BrokerOrderStatusDto
 }
 
 interface OverseasStockOrderPort {
     fun buyStock(order: PurchaseOrderDto): BrokerOrderSubmissionDto
     fun sellStock(order: SellingOrderDto): BrokerOrderSubmissionDto
+    fun findExecutionListAtOneDay(): List<ExecutedStockDto>
+    fun findOrderSubmissionStatus(query: BrokerOrderStatusQuery): BrokerOrderStatusDto
 }
 
 data class BrokerOrderSubmissionDto(
@@ -37,6 +41,7 @@ data class BrokerOrderStatusQuery(
     val symbol: String,
     val side: OrderIntentSide,
     val market: StockOrderMarket,
+    val submittedAt: ZonedDateTime? = null,
 )
 
 data class BrokerOrderStatusDto(
@@ -90,4 +95,11 @@ data class ExecutedStockDto(
     val type: ExecutionTypeDto,
     val externalOrderId: String,
     val externalExecutionId: String,
+    val averageExecutionPrice: Double? = null,
+    val quantityMode: ExecutionQuantityModeDto = ExecutionQuantityModeDto.DELTA,
 )
+
+enum class ExecutionQuantityModeDto {
+    DELTA,
+    CUMULATIVE,
+}

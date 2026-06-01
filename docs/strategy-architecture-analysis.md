@@ -519,6 +519,8 @@ broker API 자체가 idempotency key를 지원하지 않는다면, purchase-serv
 - `stock-purchase-service`는 체결 reconciliation 결과를 `OrderPartiallyFilled` 또는 `OrderFilled`로 구분해 발행한다.
 - `stock-purchase-service`는 broker 주문 취소 확인 시 `OrderCancelled`를 발행한다.
 - `stock-purchase-service`는 broker 제출 결과가 불명확한 order intent를 `SUBMISSION_UNKNOWN`으로 저장하고, recovery use case에서 broker 상태를 다시 조회해 submitted/rejected/cancelled로 확정한다.
+- `stock-purchase-service`의 국내/해외 주문 adapter는 KIS wrapper의 주문 제출, 1일 주문/체결 조회 응답을 내부 broker status와 execution DTO로 매핑한다.
+- KIS 누적 체결 수량(`tot_ccld_qty`, `ft_ccld_qty`)은 reconciliation 단계에서 이미 저장된 수량을 빼고 신규 delta만 `OrderPartiallyFilled` 또는 `OrderFilled`로 발행한다.
 - full fill 판단은 같은 broker order id의 누적 체결 수량이 원 주문 수량 이상인지로 한다.
 - `strategy-execution-service`는 `OrderSubmitted`, `OrderRejected`, `OrderPartiallyFilled`, `OrderFilled`를 수신해 주문 이벤트를 idempotent하게 기록한다.
 - `strategy-execution-service`는 `OrderCancelled`를 수신해 주문 이벤트를 idempotent하게 기록한다.
@@ -534,10 +536,10 @@ broker API 자체가 idempotency key를 지원하지 않는다면, purchase-serv
 
 현재 남은 것:
 
-- `stock-purchase-service`의 체결 reconciliation은 cursor와 unmatched 저장은 갖췄지만, broker 조회 API가 아직 1일 조회 stub이라 날짜 범위 기반 backfill은 남아 있다.
+- `stock-purchase-service`의 체결 reconciliation은 cursor와 unmatched 저장, KIS wrapper 기반 1일 주문/체결 조회 매핑은 갖췄지만, 날짜 범위 기반 backfill, pagination 완료 처리, rate-limit/retry 정책은 남아 있다.
 - direct sell submission은 legacy 흐름에 남아 있으며, 매도 제출/체결 lifecycle event가 주문 intent 흐름과 완전히 통일되지 않았다.
 - `strategy-execution-service`의 `OrderIntentCreated` 발행과 `stock-purchase-service`의 주문/체결 이벤트 발행은 direct Kafka adapter이며, 모든 publisher가 transactional outbox로 통일된 상태는 아니다.
-- broker wrapper service는 아직 별도 서비스로 분리되지 않았다. KIS token, TR ID, rate limit, retry, circuit breaker 책임이 각 adapter에 남아 있다.
+- broker wrapper service는 아직 별도 서비스로 분리되지 않았다. KIS token, rate limit, retry, circuit breaker 책임이 root wrapper와 각 adapter에 남아 있다.
 - 단발성 전략의 entry buy는 execution-service로 들어왔지만, sell policy와 completion lifecycle은 추가 정리가 필요하다.
 - daily execution schedule은 평일 calendar 기반이며, 미국장 휴장일 같은 trading calendar skip 정책은 아직 별도 구현이 필요하다.
 - 이번 단계는 DB 저장과 Kafka 발행이 보장된다는 전제로 direct Kafka 발행을 유지한다. outbox 전환은 별도 reliability hardening 작업으로 남긴다.
@@ -583,7 +585,7 @@ stock-search-service
 9. 완료: 라오어 cycle close와 auto restart 정책을 명시적으로 저장한다.
 10. 완료: active strategy state를 persistence adapter로 옮긴다.
 11. 완료: Temporal schedule로 daily execution trigger를 붙인다.
-12. 부분 완료: stock-purchase reconciliation에 durable cursor와 unmatched execution 저장을 추가한다. 날짜 범위 기반 backfill은 남아 있다.
+12. 부분 완료: stock-purchase reconciliation에 durable cursor, unmatched execution 저장, KIS wrapper 기반 1일 주문/체결 조회 매핑을 추가한다. 날짜 범위 기반 backfill은 남아 있다.
 13. 부분 완료: 주문 lifecycle을 `SUBMISSION_UNKNOWN` 복구와 `OrderCancelled`까지 확장한다. direct sell event 통일은 남아 있다.
 14. 다음 작업: 발행 측 outbox 적용 범위를 strategy-execution과 stock-purchase의 publisher까지 확장한다.
 15. 이후 작업: KIS broker wrapper service를 별도 anti-corruption layer로 분리한다.

@@ -11,6 +11,7 @@ data class ExecutedStock(
     val externalExecutionId: ExternalExecutionId = ExternalExecutionId(
         "${externalOrderId.value}:${type.name}:${createdAt.toInstant()}:$quantity",
     ),
+    val averageExecutionPrice: Double? = null,
     // 매수가격, 익절 목표 가격, 손절 목표 가격 명시 필요
 )
 
