@@ -9,6 +9,7 @@ import com.example.stockpurchaseservice.application.port.out.ReconciliationFailu
 import com.example.stockpurchaseservice.application.port.out.SubmissionUnknownAlert
 import com.example.stockpurchaseservice.application.port.out.UnmatchedExecutionAlert
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
+import org.slf4j.MDC
 import java.time.ZonedDateTime
 import java.util.UUID
 import kotlinx.coroutines.runBlocking
@@ -68,6 +69,26 @@ class LoggingOperationalAlertAdapterTest {
         adapter.alertOrderSubmissionFailed(orderSubmissionFailureAlert())
 
         assertEquals(1.0, meterRegistry.alertCount("order_submission_failed", "error"))
+    }
+
+    @Test
+    fun `enriches alert notifications with current trace context`() = runBlocking {
+        MDC.put("traceId", TRACE_ID)
+        MDC.put("spanId", SPAN_ID)
+        try {
+            val meterRegistry = SimpleMeterRegistry()
+            val sink = FakeOperationalAlertNotificationSink()
+            val adapter = LoggingOperationalAlertAdapter(meterRegistry, sink)
+
+            adapter.alertOrderSubmissionFailed(orderSubmissionFailureAlert())
+
+            val notification = sink.sent.single()
+            assertEquals(TRACE_ID, notification.traceContext.traceId)
+            assertEquals(SPAN_ID, notification.traceContext.spanId)
+            assertEquals("00-$TRACE_ID-$SPAN_ID-01", notification.traceContext.traceParent)
+        } finally {
+            MDC.clear()
+        }
     }
 
     private fun SimpleMeterRegistry.alertCount(type: String, severity: String): Double {
@@ -156,5 +177,7 @@ class LoggingOperationalAlertAdapterTest {
 
     private companion object {
         val ALERT_TIME: ZonedDateTime = ZonedDateTime.parse("2026-06-01T09:00:00+09:00")
+        const val TRACE_ID = "4bf92f3577b34da6a3ce929d0e0e4736"
+        const val SPAN_ID = "00f067aa0ba902b7"
     }
 }

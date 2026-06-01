@@ -102,6 +102,7 @@ internal fun OperationalAlertNotification.toWebhookPayload(): OperationalAlertWe
         title = title,
         occurredAt = occurredAt.toString(),
         attributes = nonNullAttributes(),
+        trace = traceContext.asAttributes().takeIf { it.isNotEmpty() },
     )
 }
 
@@ -109,6 +110,8 @@ internal fun OperationalAlertNotification.toSlackPayload(
     slack: OperationalAlertProperties.Slack,
 ): OperationalAlertSlackPayload {
     val fields = nonNullAttributes().map { (key, value) ->
+        OperationalAlertSlackField(title = key, value = value, short = value.length <= 40)
+    } + traceContext.asAttributes().map { (key, value) ->
         OperationalAlertSlackField(title = key, value = value, short = value.length <= 40)
     }
     val channel = slack.channel.trim().ifBlank { null }
@@ -139,7 +142,7 @@ internal fun OperationalAlertNotification.toPagerDutyPayload(
             source = pagerDuty.source.trim().ifBlank { "stock-purchase-service" },
             severity = severity.toPagerDutySeverity(),
             timestamp = occurredAt.toString(),
-            customDetails = nonNullAttributes() + mapOf("type" to type),
+            customDetails = nonNullAttributes() + traceContext.asAttributes() + mapOf("type" to type),
         ),
     )
 }
@@ -180,6 +183,7 @@ internal data class OperationalAlertWebhookPayload(
     val title: String,
     val occurredAt: String,
     val attributes: Map<String, String>,
+    val trace: Map<String, String>? = null,
 )
 
 @JsonInclude(JsonInclude.Include.NON_NULL)

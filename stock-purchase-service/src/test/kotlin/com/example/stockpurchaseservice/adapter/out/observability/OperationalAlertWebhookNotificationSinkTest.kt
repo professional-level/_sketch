@@ -127,6 +127,25 @@ class OperationalAlertWebhookNotificationSinkTest {
     }
 
     @Test
+    fun `builds webhook payload with trace context`() {
+        val payload = notificationWithTrace().toWebhookPayload()
+
+        assertEquals(TRACE_ID, payload.trace?.get("traceId"))
+        assertEquals(SPAN_ID, payload.trace?.get("spanId"))
+        assertEquals(TRACE_PARENT, payload.trace?.get("traceparent"))
+    }
+
+    @Test
+    fun `builds slack payload with trace fields`() {
+        val payload = notificationWithTrace().toSlackPayload(OperationalAlertProperties.Slack())
+
+        val fields = payload.attachments.single().fields
+        assertEquals(TRACE_ID, fields.single { it.title == "traceId" }.value)
+        assertEquals(SPAN_ID, fields.single { it.title == "spanId" }.value)
+        assertEquals(TRACE_PARENT, fields.single { it.title == "traceparent" }.value)
+    }
+
+    @Test
     fun `builds pagerduty trigger payload with dedup key`() {
         val properties = OperationalAlertProperties.PagerDuty().apply {
             routingKey = "routing-key"
@@ -143,6 +162,19 @@ class OperationalAlertWebhookNotificationSinkTest {
         assertEquals("error", payload.payload.severity)
         assertEquals("order_submission_failed", payload.payload.customDetails["type"])
         assertEquals("TQQQ", payload.payload.customDetails["symbol"])
+    }
+
+    @Test
+    fun `builds pagerduty trigger payload with trace details`() {
+        val properties = OperationalAlertProperties.PagerDuty().apply {
+            routingKey = "routing-key"
+        }
+
+        val payload = notificationWithTrace().toPagerDutyPayload(properties)
+
+        assertEquals(TRACE_ID, payload.payload.customDetails["traceId"])
+        assertEquals(SPAN_ID, payload.payload.customDetails["spanId"])
+        assertEquals(TRACE_PARENT, payload.payload.customDetails["traceparent"])
     }
 
     private fun enabledProperties(): OperationalAlertProperties {
@@ -162,6 +194,16 @@ class OperationalAlertWebhookNotificationSinkTest {
         )
     }
 
+    private fun notificationWithTrace(): OperationalAlertNotification {
+        return notification().copy(
+            traceContext = OperationalAlertTraceContext(
+                traceId = TRACE_ID,
+                spanId = SPAN_ID,
+                traceParent = TRACE_PARENT,
+            ),
+        )
+    }
+
     private class CapturingExchangeFunction(
         private val failure: RuntimeException? = null,
     ) : ExchangeFunction {
@@ -172,5 +214,11 @@ class OperationalAlertWebhookNotificationSinkTest {
             failure?.let { return Mono.error(it) }
             return Mono.just(ClientResponse.create(HttpStatus.ACCEPTED).build())
         }
+    }
+
+    private companion object {
+        const val TRACE_ID = "4bf92f3577b34da6a3ce929d0e0e4736"
+        const val SPAN_ID = "00f067aa0ba902b7"
+        const val TRACE_PARENT = "00-$TRACE_ID-$SPAN_ID-01"
     }
 }
