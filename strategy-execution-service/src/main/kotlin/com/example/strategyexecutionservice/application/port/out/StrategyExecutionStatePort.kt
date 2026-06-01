@@ -6,6 +6,7 @@ import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategyS
 import java.time.ZonedDateTime
 
 interface StrategyExecutionStatePort {
+    suspend fun tryMarkStartRequested(idempotencyKey: String): Boolean
     suspend fun findLaorV4Strategy(executionId: String): LaorV4ExecutionState?
     suspend fun findActiveLaorV4Strategies(): List<LaorV4ExecutionState>
     suspend fun saveLaorV4Strategy(state: LaorV4ExecutionState)
@@ -16,6 +17,9 @@ data class LaorV4ExecutionState(
     val symbol: LaorV4StrategySymbol,
     val totalSplitCount: Int,
     val firstBuyLimitMultiplier: Double = LaorV4StrategyConfig.DEFAULT_FIRST_BUY_LIMIT_MULTIPLIER,
+    val autoRestart: Boolean = true,
+    val cycleNo: Int = 1,
+    val status: StrategyExecutionLifecycleStatus = StrategyExecutionLifecycleStatus.ACTIVE,
     val state: LaorV4StrategyState,
     val lastExecutionRunId: String? = null,
     val lastExecutedAt: ZonedDateTime? = null,
@@ -24,5 +28,11 @@ data class LaorV4ExecutionState(
         require(executionId.isNotBlank()) { "executionId must not be blank" }
         require(totalSplitCount > 1) { "totalSplitCount must be greater than 1" }
         require(firstBuyLimitMultiplier > 1.0) { "firstBuyLimitMultiplier must be greater than 1" }
+        require(cycleNo > 0) { "cycleNo must be positive" }
     }
+}
+
+enum class StrategyExecutionLifecycleStatus {
+    ACTIVE,
+    COMPLETED,
 }

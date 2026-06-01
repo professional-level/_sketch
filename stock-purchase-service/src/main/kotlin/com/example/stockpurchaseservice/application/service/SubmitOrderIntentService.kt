@@ -8,18 +8,26 @@ import com.example.stockpurchaseservice.application.port.`in`.SubmitOrderIntentC
 import com.example.stockpurchaseservice.application.port.`in`.SubmitOrderIntentResult
 import com.example.stockpurchaseservice.application.port.`in`.SubmitOrderIntentUseCase
 import com.example.stockpurchaseservice.application.port.out.MarketServicePort
+import com.example.stockpurchaseservice.application.port.out.OrderExecutionEventPort
+import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionDto
+import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionPort
+import com.example.stockpurchaseservice.application.port.out.OrderRejectedMessage
+import com.example.stockpurchaseservice.application.port.out.OrderSubmittedMessage
 import com.example.stockpurchaseservice.application.port.out.ProcessedEventPort
 import com.example.stockpurchaseservice.application.port.out.PurchaseOrderDto
 import com.example.stockpurchaseservice.application.port.out.SellingOrderDto
 import com.example.stockpurchaseservice.application.port.out.StockOrderMarket
 import com.example.stockpurchaseservice.application.port.out.StockOrderType
 import java.nio.charset.StandardCharsets
+import java.time.ZonedDateTime
 import java.util.UUID
 
 @UseCaseImpl
 class SubmitOrderIntentService(
     private val marketService: MarketServicePort,
     private val processedEventPort: ProcessedEventPort,
+    private val orderIntentSubmissionPort: OrderIntentSubmissionPort,
+    private val orderExecutionEventPort: OrderExecutionEventPort,
 ) : SubmitOrderIntentUseCase {
 
     override suspend fun execute(command: SubmitOrderIntentCommand): SubmitOrderIntentResult {
@@ -28,23 +36,27 @@ class SubmitOrderIntentService(
             return SubmitOrderIntentResult(OrderIntentSubmissionStatus.SKIPPED_DUPLICATE)
         }
 
-        return runCatching {
-            submit(command)
-        }.onSuccess {
+        return try {
+            val submission = submit(command)
+            orderIntentSubmissionPort.saveSubmitted(submission)
+            orderExecutionEventPort.publishSubmitted(command.toSubmittedMessage(submission))
             processedEventPort.markSuccess(command.eventId)
-        }.onFailure { exception ->
-            processedEventPort.markFailed(command.eventId, exception.message)
-        }.map {
             SubmitOrderIntentResult(OrderIntentSubmissionStatus.SUBMITTED)
-        }.getOrThrow()
+        } catch (exception: Throwable) {
+            runCatching {
+                orderExecutionEventPort.publishRejected(command.toRejectedMessage(exception))
+            }
+            processedEventPort.markFailed(command.eventId, exception.message)
+            throw exception
+        }
     }
 
-    private fun submit(command: SubmitOrderIntentCommand) {
+    private fun submit(command: SubmitOrderIntentCommand): OrderIntentSubmissionDto {
         val orderId = UUID.nameUUIDFromBytes(command.idempotencyKey.toByteArray(StandardCharsets.UTF_8))
         val quantity = command.quantity.toInt()
         val market = command.symbol.toStockOrderMarket()
         val orderType = command.orderType.toStockOrderType()
-        when (command.side) {
+        val submission = when (command.side) {
             OrderIntentSide.BUY -> marketService.buyStock(
                 PurchaseOrderDto(
                     orderId = orderId,
@@ -67,6 +79,49 @@ class SubmitOrderIntentService(
                 ),
             )
         }
+
+        return OrderIntentSubmissionDto(
+            orderIntentId = command.eventId,
+            idempotencyKey = command.idempotencyKey,
+            strategyExecutionId = command.strategyExecutionId,
+            symbol = command.symbol,
+            side = command.side,
+            orderType = command.orderType,
+            submittedPrice = command.price,
+            quantity = command.quantity,
+            orderTag = command.orderTag,
+            internalOrderId = orderId,
+            externalOrderId = submission.externalOrderId,
+            submittedAt = ZonedDateTime.now(),
+        )
+    }
+
+    private fun SubmitOrderIntentCommand.toSubmittedMessage(
+        submission: OrderIntentSubmissionDto,
+    ): OrderSubmittedMessage {
+        return OrderSubmittedMessage(
+            eventId = deterministicEventId("${eventId}:SUBMITTED"),
+            strategyExecutionId = strategyExecutionId,
+            orderIntentId = eventId.toString(),
+            brokerOrderId = submission.externalOrderId,
+            submittedAt = submission.submittedAt,
+        )
+    }
+
+    private fun SubmitOrderIntentCommand.toRejectedMessage(exception: Throwable): OrderRejectedMessage {
+        val rejectedAt = ZonedDateTime.now()
+        return OrderRejectedMessage(
+            eventId = deterministicEventId("${eventId}:REJECTED"),
+            strategyExecutionId = strategyExecutionId,
+            orderIntentId = eventId.toString(),
+            brokerOrderId = null,
+            reason = exception.message ?: exception::class.java.simpleName,
+            rejectedAt = rejectedAt,
+        )
+    }
+
+    private fun deterministicEventId(seed: String): UUID {
+        return UUID.nameUUIDFromBytes(seed.toByteArray(StandardCharsets.UTF_8))
     }
 
     private fun String.toStockOrderMarket(): StockOrderMarket {

@@ -1,6 +1,7 @@
 package com.example.stockpurchaseservice.adapter.out.api
 
 import com.example.stockpurchaseservice.application.port.out.PurchaseOrderDto
+import com.example.stockpurchaseservice.application.port.out.SellingOrderDto
 import com.example.stockpurchaseservice.application.port.out.StockOrderMarket
 import com.example.stockpurchaseservice.application.port.out.StockOrderType
 import java.util.UUID
@@ -49,5 +50,26 @@ class OverseasStockOrderAdapterTest {
         assertEquals("24", body["OVRS_ORD_UNPR"])
         assertEquals("00", body["ORD_DVSN"])
         assertEquals(true, body["isMock"])
+    }
+
+    @Test
+    fun `builds real us overseas sell request using moc order division`() {
+        val order = SellingOrderDto(
+            orderId = UUID.randomUUID(),
+            stockId = "TQQQ",
+            sellingPrice = 0.0,
+            quantity = 2,
+            market = StockOrderMarket.OVERSEAS_US,
+            orderType = StockOrderType.MOC,
+        )
+
+        val body = order.toUsOverseasSellRequest(isMock = false)
+
+        assertEquals("TQQQ", body["PDNO"])
+        assertEquals("NASD", body["OVRS_EXCG_CD"])
+        assertEquals(2, body["ORD_QTY"])
+        assertEquals("0", body["OVRS_ORD_UNPR"])
+        assertEquals("33", body["ORD_DVSN"])
+        assertEquals("00", body["SLL_TYPE"])
     }
 }

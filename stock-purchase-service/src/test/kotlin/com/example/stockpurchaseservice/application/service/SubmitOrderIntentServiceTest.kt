@@ -5,7 +5,14 @@ import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSubmiss
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentType
 import com.example.stockpurchaseservice.application.port.`in`.SubmitOrderIntentCommand
 import com.example.stockpurchaseservice.application.port.out.ExecutedStockDto
+import com.example.stockpurchaseservice.application.port.out.BrokerOrderSubmissionDto
 import com.example.stockpurchaseservice.application.port.out.MarketServicePort
+import com.example.stockpurchaseservice.application.port.out.OrderExecutionEventPort
+import com.example.stockpurchaseservice.application.port.out.OrderFilledMessage
+import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionDto
+import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionPort
+import com.example.stockpurchaseservice.application.port.out.OrderRejectedMessage
+import com.example.stockpurchaseservice.application.port.out.OrderSubmittedMessage
 import com.example.stockpurchaseservice.application.port.out.ProcessedEventPort
 import com.example.stockpurchaseservice.application.port.out.PurchaseOrderDto
 import com.example.stockpurchaseservice.application.port.out.SellingOrderDto
@@ -23,7 +30,9 @@ class SubmitOrderIntentServiceTest {
     fun `submits buy order intent to market port`() = runBlocking {
         val marketPort = FakeMarketServicePort()
         val processedEventPort = FakeProcessedEventPort()
-        val service = SubmitOrderIntentService(marketPort, processedEventPort)
+        val submissionPort = FakeOrderIntentSubmissionPort()
+        val eventPort = FakeOrderExecutionEventPort()
+        val service = SubmitOrderIntentService(marketPort, processedEventPort, submissionPort, eventPort)
         val eventId = UUID.randomUUID()
 
         val result = service.execute(
@@ -43,6 +52,8 @@ class SubmitOrderIntentServiceTest {
 
         assertEquals(OrderIntentSubmissionStatus.SUBMITTED, result.status)
         assertEquals(eventId, processedEventPort.succeeded.single())
+        assertEquals(eventId, submissionPort.saved.single().orderIntentId)
+        assertEquals("broker-buy-1", eventPort.submitted.single().brokerOrderId)
         with(marketPort.buyOrders.single()) {
             assertEquals("TQQQ", stockId)
             assertEquals(112.0, purchasePrice)
@@ -56,7 +67,12 @@ class SubmitOrderIntentServiceTest {
     fun `routes six digit symbols to domestic market`() = runBlocking {
         val marketPort = FakeMarketServicePort()
         val processedEventPort = FakeProcessedEventPort()
-        val service = SubmitOrderIntentService(marketPort, processedEventPort)
+        val service = SubmitOrderIntentService(
+            marketPort,
+            processedEventPort,
+            FakeOrderIntentSubmissionPort(),
+            FakeOrderExecutionEventPort(),
+        )
 
         service.execute(
             SubmitOrderIntentCommand(
@@ -83,7 +99,13 @@ class SubmitOrderIntentServiceTest {
     fun `skips duplicate order intent`() = runBlocking {
         val marketPort = FakeMarketServicePort()
         val processedEventPort = FakeProcessedEventPort(startResult = false)
-        val service = SubmitOrderIntentService(marketPort, processedEventPort)
+        val eventPort = FakeOrderExecutionEventPort()
+        val service = SubmitOrderIntentService(
+            marketPort,
+            processedEventPort,
+            FakeOrderIntentSubmissionPort(),
+            eventPort,
+        )
 
         val result = service.execute(
             SubmitOrderIntentCommand(
@@ -102,18 +124,21 @@ class SubmitOrderIntentServiceTest {
 
         assertEquals(OrderIntentSubmissionStatus.SKIPPED_DUPLICATE, result.status)
         assertEquals(emptyList(), marketPort.sellOrders)
+        assertEquals(emptyList(), eventPort.submitted)
     }
 
     private class FakeMarketServicePort : MarketServicePort {
         val buyOrders: MutableList<PurchaseOrderDto> = mutableListOf()
         val sellOrders: MutableList<SellingOrderDto> = mutableListOf()
 
-        override fun buyStock(order: PurchaseOrderDto) {
+        override fun buyStock(order: PurchaseOrderDto): BrokerOrderSubmissionDto {
             buyOrders += order
+            return BrokerOrderSubmissionDto(externalOrderId = "broker-buy-${buyOrders.size}")
         }
 
-        override fun sellStock(order: SellingOrderDto) {
+        override fun sellStock(order: SellingOrderDto): BrokerOrderSubmissionDto {
             sellOrders += order
+            return BrokerOrderSubmissionDto(externalOrderId = "broker-sell-${sellOrders.size}")
         }
 
         override fun findExecutionListAtOneDay(): List<ExecutedStockDto> {
@@ -135,5 +160,32 @@ class SubmitOrderIntentServiceTest {
         }
 
         override suspend fun markFailed(eventId: UUID, reason: String?) = Unit
+    }
+
+    private class FakeOrderIntentSubmissionPort : OrderIntentSubmissionPort {
+        val saved: MutableList<OrderIntentSubmissionDto> = mutableListOf()
+
+        override suspend fun saveSubmitted(submission: OrderIntentSubmissionDto) {
+            saved += submission
+        }
+
+        override suspend fun findByExternalOrderId(externalOrderId: String): OrderIntentSubmissionDto? {
+            return saved.firstOrNull { it.externalOrderId == externalOrderId }
+        }
+    }
+
+    private class FakeOrderExecutionEventPort : OrderExecutionEventPort {
+        val submitted: MutableList<OrderSubmittedMessage> = mutableListOf()
+        val rejected: MutableList<OrderRejectedMessage> = mutableListOf()
+
+        override suspend fun publishSubmitted(event: OrderSubmittedMessage) {
+            submitted += event
+        }
+
+        override suspend fun publishRejected(event: OrderRejectedMessage) {
+            rejected += event
+        }
+
+        override suspend fun publishFilled(event: OrderFilledMessage) = Unit
     }
 }

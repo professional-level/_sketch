@@ -4,8 +4,8 @@ import java.time.ZonedDateTime
 import java.util.UUID
 
 interface MarketServicePort {
-    fun buyStock(order: PurchaseOrderDto)
-    fun sellStock(order: SellingOrderDto)
+    fun buyStock(order: PurchaseOrderDto): BrokerOrderSubmissionDto
+    fun sellStock(order: SellingOrderDto): BrokerOrderSubmissionDto
     fun findExecutionListAtOneDay(): List<ExecutedStockDto>
 }
 

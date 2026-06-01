@@ -15,7 +15,7 @@ class StockSearchServiceEventMapper : EventMapper<DomainEvent, ApplicationEvent>
         StrategyCreatedEvent::class to { event ->
             EventMessage(
                 convertedEvent = mapStrategyCreatedEvent(event as StrategyCreatedEvent),
-                messageTopic = MessageTopic.STRATEGY_SAVED,
+                messageTopic = MessageTopic.STRATEGY_EXECUTION_START_REQUESTED,
             )
         },
         // 다른 도메인 이벤트 매핑 추가

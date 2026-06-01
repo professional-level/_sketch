@@ -2,12 +2,16 @@ package com.example.stockpurchaseservice.application.service
 
 import com.example.common.UseCaseImpl
 import com.example.stockpurchaseservice.application.port.`in`.CreateSellOrdersByStrategyUseCase
+import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
 import com.example.stockpurchaseservice.application.port.`in`.ReconcileExecutionsUseCase
 import com.example.stockpurchaseservice.application.port.`in`.SimulateStockPurchaseUseCase
 import com.example.stockpurchaseservice.application.port.out.ExecutedStockDto
 import com.example.stockpurchaseservice.application.port.out.ExecutionFillDto
 import com.example.stockpurchaseservice.application.port.out.ExecutionFillPort
 import com.example.stockpurchaseservice.application.port.out.MarketServicePort
+import com.example.stockpurchaseservice.application.port.out.OrderExecutionEventPort
+import com.example.stockpurchaseservice.application.port.out.OrderFilledMessage
+import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionPort
 import com.example.stockpurchaseservice.application.service.strategy.toDto
 import com.example.stockpurchaseservice.domain.ExecutedStock
 import com.example.stockpurchaseservice.domain.ExecutionFill
@@ -24,6 +28,8 @@ import com.example.stockpurchaseservice.domain.StockId
 import com.example.stockpurchaseservice.domain.StrategyType
 import com.example.stockpurchaseservice.domain.repository.StockOrderRepository
 import java.time.ZonedDateTime
+import java.nio.charset.StandardCharsets
+import java.util.UUID
 
 @UseCaseImpl
 class CreateSellOrdersByStrategyService(
@@ -56,6 +62,8 @@ class ReconcileExecutionsService(
     private val stockOrderRepository: StockOrderRepository,
     private val marketService: MarketServicePort,
     private val executionFillPort: ExecutionFillPort,
+    private val orderIntentSubmissionPort: OrderIntentSubmissionPort,
+    private val orderExecutionEventPort: OrderExecutionEventPort,
 ) : ReconcileExecutionsUseCase {
 
     override suspend fun execute() {
@@ -67,6 +75,9 @@ class ReconcileExecutionsService(
         if (refinedExecutedStockList.isEmpty()) return
 
         val (selled, purchased) = refinedExecutedStockList.partition { it.type == ExecutionType.Selling }
+        refinedExecutedStockList.forEach { execution ->
+            publishOrderFilledIfIntentSubmissionExists(execution)
+        }
         selled.forEach {
             // Selling reconciliation is modeled here so the scheduler no longer owns the branch.
             // A later order-state redesign can apply external execution ids to the aggregate.
@@ -93,6 +104,25 @@ class ReconcileExecutionsService(
         }
     }
 
+    private suspend fun publishOrderFilledIfIntentSubmissionExists(execution: ExecutedStock) {
+        val submission = orderIntentSubmissionPort.findByExternalOrderId(execution.externalOrderId.value) ?: return
+        val filledPrice = submission.submittedPrice ?: return
+        orderExecutionEventPort.publishFilled(
+            OrderFilledMessage(
+                eventId = UUID.nameUUIDFromBytes(
+                    "${execution.externalExecutionId.value}:ORDER_FILLED".toByteArray(StandardCharsets.UTF_8),
+                ),
+                strategyExecutionId = submission.strategyExecutionId,
+                orderIntentId = submission.orderIntentId.toString(),
+                brokerOrderId = execution.externalOrderId.value,
+                side = execution.type.toOrderIntentSide(),
+                filledPrice = filledPrice,
+                filledQuantity = execution.quantity.toLong(),
+                orderTag = submission.orderTag,
+                filledAt = execution.createdAt,
+            ),
+        )
+    }
 }
 
 @UseCaseImpl
@@ -143,5 +173,12 @@ private fun makeSellOrderByStrategy(order: Order): SellingOrder? {
             )
             strategy.createSellingOrder(order.id)
         }
+    }
+}
+
+private fun ExecutionType.toOrderIntentSide(): OrderIntentSide {
+    return when (this) {
+        ExecutionType.Purchase -> OrderIntentSide.BUY
+        ExecutionType.Selling -> OrderIntentSide.SELL
     }
 }

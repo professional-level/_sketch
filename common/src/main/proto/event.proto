@@ -39,6 +39,85 @@ message OrderIntentCreatedEvent{
   EventMeta meta = 12;
 }
 
+message StrategyExecutionStartRequested {
+  string event_id = 1;
+  string idempotency_key = 2;
+  StrategyExecutionType strategy_type = 3;
+  string strategy_version = 4;
+  string symbol = 5;
+  string market = 6;
+  double budget = 7;
+  string source_service = 8;
+  string source_signal_id = 9;
+  google.protobuf.Timestamp requested_at = 10;
+  StrategyExecutionParameters parameters = 11;
+  EventMeta meta = 12;
+}
+
+message StrategyExecutionParameters {
+  oneof value {
+    LaorV4StartParameters laor_v4 = 1;
+    FinalPriceBatingV1StartParameters final_price_bating_v1 = 2;
+  }
+}
+
+message LaorV4StartParameters {
+  int32 total_split_count = 1;
+  double first_buy_limit_multiplier = 2;
+  bool auto_restart = 3;
+}
+
+message FinalPriceBatingV1StartParameters {
+  double target_buy_price = 1;
+  double budget = 2;
+  string quantity_policy = 3;
+}
+
+message OrderSubmitted {
+  string event_id = 1;
+  string strategy_execution_id = 2;
+  string order_intent_id = 3;
+  string broker_order_id = 4;
+  google.protobuf.Timestamp submitted_at = 5;
+  EventMeta meta = 6;
+}
+
+message OrderRejected {
+  string event_id = 1;
+  string strategy_execution_id = 2;
+  string order_intent_id = 3;
+  string broker_order_id = 4;
+  string reason = 5;
+  google.protobuf.Timestamp rejected_at = 6;
+  EventMeta meta = 7;
+}
+
+message OrderFilled {
+  string event_id = 1;
+  string strategy_execution_id = 2;
+  string order_intent_id = 3;
+  string broker_order_id = 4;
+  OrderIntentSide side = 5;
+  double filled_price = 6;
+  int64 filled_quantity = 7;
+  string order_tag = 8;
+  google.protobuf.Timestamp filled_at = 9;
+  EventMeta meta = 10;
+}
+
+message OrderPartiallyFilled {
+  string event_id = 1;
+  string strategy_execution_id = 2;
+  string order_intent_id = 3;
+  string broker_order_id = 4;
+  OrderIntentSide side = 5;
+  double filled_price = 6;
+  int64 filled_quantity = 7;
+  string order_tag = 8;
+  google.protobuf.Timestamp filled_at = 9;
+  EventMeta meta = 10;
+}
+
 enum StrategyType{
   UNDEFINED = 0;
   FINAL_PRICE_BATING_V1 = 1;

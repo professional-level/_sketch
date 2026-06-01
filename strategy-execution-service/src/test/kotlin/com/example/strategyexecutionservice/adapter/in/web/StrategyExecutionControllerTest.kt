@@ -44,6 +44,7 @@ class StrategyExecutionControllerTest {
                 budget = command.budget,
                 totalSplitCount = command.totalSplitCount,
                 firstBuyLimitMultiplier = command.firstBuyLimitMultiplier,
+                autoRestart = command.autoRestart,
             )
         }
     }

@@ -85,6 +85,10 @@ class RunActiveStrategyExecutionsServiceTest {
     ) : StrategyExecutionStatePort {
         val saved: MutableList<LaorV4ExecutionState> = mutableListOf()
 
+        override suspend fun tryMarkStartRequested(idempotencyKey: String): Boolean {
+            return true
+        }
+
         override suspend fun findLaorV4Strategy(executionId: String): LaorV4ExecutionState? {
             return activeStates.firstOrNull { it.executionId == executionId }
         }

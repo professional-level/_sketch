@@ -31,6 +31,7 @@ class StrategyExecutionController(
             budget = budget,
             totalSplitCount = totalSplitCount,
             firstBuyLimitMultiplier = firstBuyLimitMultiplier,
+            autoRestart = autoRestart,
         )
     }
 
@@ -42,6 +43,7 @@ class StrategyExecutionController(
             budget = budget,
             totalSplitCount = totalSplitCount,
             firstBuyLimitMultiplier = firstBuyLimitMultiplier,
+            autoRestart = autoRestart,
         )
     }
 }
@@ -52,6 +54,7 @@ data class RegisterLaorV4StrategyExecutionRequest(
     val budget: Double,
     val totalSplitCount: Int,
     val firstBuyLimitMultiplier: Double = LaorV4StrategyConfig.DEFAULT_FIRST_BUY_LIMIT_MULTIPLIER,
+    val autoRestart: Boolean = true,
 )
 
 data class RegisterLaorV4StrategyExecutionResponse(
@@ -61,4 +64,5 @@ data class RegisterLaorV4StrategyExecutionResponse(
     val budget: Double,
     val totalSplitCount: Int,
     val firstBuyLimitMultiplier: Double,
+    val autoRestart: Boolean,
 )

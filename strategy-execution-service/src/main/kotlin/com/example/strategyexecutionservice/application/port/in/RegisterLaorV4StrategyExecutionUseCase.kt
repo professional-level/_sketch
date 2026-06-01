@@ -15,6 +15,7 @@ data class RegisterLaorV4StrategyExecutionCommand(
     val budget: Double,
     val totalSplitCount: Int,
     val firstBuyLimitMultiplier: Double = LaorV4StrategyConfig.DEFAULT_FIRST_BUY_LIMIT_MULTIPLIER,
+    val autoRestart: Boolean = true,
 ) {
     init {
         require(executionId.isNotBlank()) { "executionId must not be blank" }
@@ -31,6 +32,7 @@ data class RegisterLaorV4StrategyExecutionResult(
     val budget: Double,
     val totalSplitCount: Int,
     val firstBuyLimitMultiplier: Double,
+    val autoRestart: Boolean,
 )
 
 enum class RegisterLaorV4StrategyExecutionStatus {

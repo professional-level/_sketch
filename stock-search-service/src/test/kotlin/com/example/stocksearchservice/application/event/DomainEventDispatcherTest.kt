@@ -43,7 +43,7 @@ class DomainEventDispatcherTest {
         )
 
         assertEquals(1, outbox.savedMessages.size)
-        assertEquals(MessageTopic.STRATEGY_SAVED, outbox.savedMessages.single().messageTopic)
+        assertEquals(MessageTopic.STRATEGY_EXECUTION_START_REQUESTED, outbox.savedMessages.single().messageTopic)
     }
 
     @Test
@@ -58,7 +58,7 @@ class DomainEventDispatcherTest {
         dispatcher.completeAndDispatch(strategy)
 
         assertEquals(1, outbox.savedMessages.size)
-        assertEquals(MessageTopic.STRATEGY_SAVED, outbox.savedMessages.single().messageTopic)
+        assertEquals(MessageTopic.STRATEGY_EXECUTION_START_REQUESTED, outbox.savedMessages.single().messageTopic)
         assertTrue(strategy.events.isEmpty())
     }
 

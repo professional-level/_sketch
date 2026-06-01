@@ -27,6 +27,7 @@ class RegisterLaorV4StrategyExecutionService(
             symbol = command.symbol,
             totalSplitCount = command.totalSplitCount,
             firstBuyLimitMultiplier = command.firstBuyLimitMultiplier,
+            autoRestart = command.autoRestart,
             state = LaorV4StrategyState(availableCash = command.budget),
         )
         strategyExecutionStatePort.saveLaorV4Strategy(registeredState)
@@ -43,6 +44,7 @@ class RegisterLaorV4StrategyExecutionService(
             budget = state.availableCash,
             totalSplitCount = totalSplitCount,
             firstBuyLimitMultiplier = firstBuyLimitMultiplier,
+            autoRestart = autoRestart,
         )
     }
 }

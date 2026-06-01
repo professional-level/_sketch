@@ -33,6 +33,7 @@ class RegisterLaorV4StrategyExecutionServiceTest {
             assertEquals(20, totalSplitCount)
             assertEquals(10_000.0, state.availableCash)
             assertEquals(0L, state.holdingQuantity)
+            assertEquals(true, autoRestart)
         }
     }
 
@@ -70,6 +71,11 @@ class RegisterLaorV4StrategyExecutionServiceTest {
     ) : StrategyExecutionStatePort {
         val states: MutableList<LaorV4ExecutionState> = initialStates.toMutableList()
         var saveCount: Int = 0
+        private val processedStartRequests: MutableSet<String> = mutableSetOf()
+
+        override suspend fun tryMarkStartRequested(idempotencyKey: String): Boolean {
+            return processedStartRequests.add(idempotencyKey)
+        }
 
         override suspend fun findLaorV4Strategy(executionId: String): LaorV4ExecutionState? {
             return states.firstOrNull { it.executionId == executionId }

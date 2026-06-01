@@ -28,7 +28,12 @@ internal class OverseasStockOrderAdapter(
     }
 
     override fun sellStock(order: SellingOrderDto): BrokerOrderSubmissionDto {
-        throw UnsupportedOperationException("overseas sell order is not wired yet")
+        val body = order.toUsOverseasSellRequest(isMockOrder)
+        return stockApiClient.submitStockOrder(
+            uri = OPEN_API_PREFIX + POST_OVERSEAS_STOCK_ORDER,
+            body = body,
+            fallbackOrderId = order.orderId.toString(),
+        )
     }
 }
 
@@ -60,6 +65,31 @@ private fun StockOrderType.toUsBuyOrderDivision(isMock: Boolean): String {
         StockOrderType.LIMIT -> "00"
         StockOrderType.LOC -> "34"
         StockOrderType.MOC -> throw UnsupportedOperationException("US overseas buy does not support MOC")
+    }
+}
+
+internal fun SellingOrderDto.toUsOverseasSellRequest(isMock: Boolean): Map<String, Any> {
+    return mapOf(
+        "PDNO" to stockId.uppercase(),
+        "OVRS_EXCG_CD" to exchangeForUsStock(stockId),
+        "ORD_QTY" to quantity,
+        "OVRS_ORD_UNPR" to sellingPrice.toBrokerPrice(),
+        "ORD_DVSN" to orderType.toUsSellOrderDivision(isMock),
+        "SLL_TYPE" to "00",
+        "CTAC_TLNO" to "",
+        "MGCO_APTM_ODNO" to "",
+        "ORD_SVR_DVSN_CD" to "0",
+        "isMock" to isMock,
+    )
+}
+
+private fun StockOrderType.toUsSellOrderDivision(isMock: Boolean): String {
+    if (isMock) return "00"
+
+    return when (this) {
+        StockOrderType.LIMIT -> "00"
+        StockOrderType.LOC -> "34"
+        StockOrderType.MOC -> "33"
     }
 }
 
