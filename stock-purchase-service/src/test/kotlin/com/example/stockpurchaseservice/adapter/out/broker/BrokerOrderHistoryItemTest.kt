@@ -1,4 +1,4 @@
-package com.example.stockpurchaseservice.adapter.out.api
+package com.example.stockpurchaseservice.adapter.out.broker
 
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatus
@@ -11,7 +11,7 @@ import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-class KisBrokerOrderHistoryRowTest {
+class BrokerOrderHistoryItemTest {
 
     @Test
     fun `maps cumulative filled row to execution dto`() {
@@ -68,8 +68,8 @@ class KisBrokerOrderHistoryRowTest {
         cancelled: Boolean = false,
         side: OrderIntentSide? = OrderIntentSide.BUY,
         averageExecutionPrice: Double? = null,
-    ): KisBrokerOrderHistoryRow {
-        return KisBrokerOrderHistoryRow(
+    ): BrokerOrderHistoryItem {
+        return BrokerOrderHistoryItem(
             externalOrderId = externalOrderId,
             branchOrderNumber = "00001",
             symbol = "TQQQ",

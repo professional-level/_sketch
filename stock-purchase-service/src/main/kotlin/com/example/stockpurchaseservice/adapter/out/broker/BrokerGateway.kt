@@ -1,18 +1,44 @@
-package com.example.stockpurchaseservice.adapter.out.api
+package com.example.stockpurchaseservice.adapter.out.broker
 
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatus
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatusDto
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatusQuery
+import com.example.stockpurchaseservice.application.port.out.BrokerOrderSubmissionDto
 import com.example.stockpurchaseservice.application.port.out.ExecutedStockDto
 import com.example.stockpurchaseservice.application.port.out.ExecutionQuantityModeDto
 import com.example.stockpurchaseservice.application.port.out.ExecutionTypeDto
-import java.time.LocalDate
-import java.time.LocalTime
+import com.example.stockpurchaseservice.application.port.out.StockOrderMarket
+import com.example.stockpurchaseservice.application.port.out.StockOrderType
 import java.time.ZoneId
 import java.time.ZonedDateTime
+import java.util.UUID
 
-internal data class KisBrokerOrderHistoryRow(
+internal interface BrokerGateway {
+    fun submitOrder(command: BrokerOrderCommand): BrokerOrderSubmissionDto
+    fun findOrderHistory(query: BrokerOrderHistoryQuery): List<BrokerOrderHistoryItem>
+}
+
+internal data class BrokerOrderCommand(
+    val internalOrderId: UUID,
+    val market: StockOrderMarket,
+    val side: OrderIntentSide,
+    val symbol: String,
+    val orderType: StockOrderType,
+    val price: Double,
+    val quantity: Int,
+    val isMock: Boolean,
+)
+
+internal data class BrokerOrderHistoryQuery(
+    val market: StockOrderMarket,
+    val symbol: String = "",
+    val externalOrderId: String = "",
+    val date: ZonedDateTime = ZonedDateTime.now(BROKER_ORDER_ZONE),
+    val isMock: Boolean,
+)
+
+internal data class BrokerOrderHistoryItem(
     val externalOrderId: String,
     val branchOrderNumber: String?,
     val symbol: String,
@@ -77,7 +103,7 @@ internal data class KisBrokerOrderHistoryRow(
     }
 }
 
-internal fun List<KisBrokerOrderHistoryRow>.findStatusFor(query: BrokerOrderStatusQuery): BrokerOrderStatusDto {
+internal fun List<BrokerOrderHistoryItem>.findStatusFor(query: BrokerOrderStatusQuery): BrokerOrderStatusDto {
     val candidates = filter { row ->
         when {
             query.externalOrderId != null -> row.externalOrderId == query.externalOrderId
@@ -103,40 +129,8 @@ internal fun List<KisBrokerOrderHistoryRow>.findStatusFor(query: BrokerOrderStat
     }
 }
 
-internal fun parseKisOrderDateTime(date: String, time: String): ZonedDateTime {
-    val parsedDate = date.takeIf { it.length == 8 }?.let {
-        LocalDate.of(
-            it.substring(0, 4).toInt(),
-            it.substring(4, 6).toInt(),
-            it.substring(6, 8).toInt(),
-        )
-    } ?: LocalDate.now(KIS_ORDER_ZONE)
-    val normalizedTime = time.filter(Char::isDigit).padEnd(6, '0').take(6)
-    val parsedTime = LocalTime.of(
-        normalizedTime.substring(0, 2).toIntOrNull() ?: 0,
-        normalizedTime.substring(2, 4).toIntOrNull() ?: 0,
-        normalizedTime.substring(4, 6).toIntOrNull() ?: 0,
-    )
-    return ZonedDateTime.of(parsedDate, parsedTime, KIS_ORDER_ZONE)
-}
+internal val BROKER_ORDER_ZONE: ZoneId = ZoneId.of("Asia/Seoul")
 
-internal fun String?.toLongValue(): Long {
-    return this?.replace(",", "")?.trim()?.toBigDecimalOrNull()?.toLong() ?: 0L
-}
-
-internal fun String?.toDoubleValue(): Double? {
-    return this?.replace(",", "")?.trim()?.takeIf { it.isNotBlank() }?.toDoubleOrNull()
-}
-
-internal fun String?.toOrderIntentSide(): OrderIntentSide? {
-    return when (this?.trim()) {
-        "01" -> OrderIntentSide.SELL
-        "02" -> OrderIntentSide.BUY
-        else -> null
-    }
-}
-
-private val KIS_ORDER_ZONE: ZoneId = ZoneId.of("Asia/Seoul")
 private const val REJECTED_KOREAN_1 = "\uAC70\uBD80"
 private const val REJECTED_KOREAN_2 = "\uAC70\uC808"
 internal const val CANCELLED_KOREAN = "\uCDE8\uC18C"
