@@ -2,7 +2,7 @@
 
 ## Scope
 
-This runbook covers the minimum runtime configuration and restart checks needed before running the trading sketch against real broker infrastructure. It does not make the system production complete. KIS token storage, rate limiting, retry/backoff, circuit breakers, and a managed secret store are still separate hardening work.
+This runbook covers the minimum runtime configuration and restart checks needed before running the trading sketch against real broker infrastructure. It does not make the system production complete. KIS token persistence, broker-wrapper deployment, and a managed secret store are still separate hardening work.
 
 ## Secret Handling
 
@@ -27,6 +27,17 @@ mock_account_tail=01
 account=00000000
 account_tail=01
 ```
+
+The root KIS wrapper keeps real and mock access tokens in separate in-memory cache scopes. Token cache entries are refreshed before the KIS expiry timestamp, or by `expires_in` when the explicit expiry field is absent.
+
+Token cache knobs:
+
+```properties
+akra.kis.token.refresh-before-expiry=10m
+akra.kis.token.fallback-ttl=23h
+```
+
+The cache is process-local. Restarting the wrapper fetches a new token, and a multi-instance deployment still needs shared token storage or single-writer token issuance policy.
 
 ## Startup Safety Checks
 

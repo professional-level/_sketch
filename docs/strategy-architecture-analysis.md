@@ -539,7 +539,7 @@ broker API 자체가 idempotency key를 지원하지 않는다면, purchase-serv
 - `stock-purchase-service`의 체결 reconciliation은 cursor와 unmatched 저장, KIS wrapper 기반 주문/체결 조회 매핑, cursor 기준 날짜 범위 backfill, KIS 조회 cursor pagination을 갖췄다. KIS wrapper 조회성 호출에는 설정 기반 retry/backoff를 적용했고, wrapper 호출 전 rate-limit와 circuit breaker도 적용한다.
 - legacy direct sell submission은 order intent lifecycle 경로로 통일되었다.
 - `strategy-execution-service`의 `OrderIntentCreated` 발행과 `stock-purchase-service`의 주문/체결 이벤트 발행은 outbox 저장 후 scheduled publisher가 Kafka로 발행한다.
-- stock-purchase-service의 주문/조회 KIS 원문 계약은 `adapter/out/broker`의 broker gateway anti-corruption layer로 격리되었다. 주문 제출 POST는 중복 주문을 피하기 위해 retry하지 않고 transient 실패나 broker order id 누락을 `SUBMISSION_UNKNOWN`으로 보낸다. KIS wrapper 호출에는 local rate-limit와 circuit breaker가 있고, circuit open/rate-limit 초과처럼 broker에 닿지 않은 실패는 broker rejection 이벤트로 발행하지 않는다. 별도 broker wrapper service 배포와 token 관리 책임 분리는 아직 남아 있다.
+- stock-purchase-service의 주문/조회 KIS 원문 계약은 `adapter/out/broker`의 broker gateway anti-corruption layer로 격리되었다. 주문 제출 POST는 중복 주문을 피하기 위해 retry하지 않고 transient 실패나 broker order id 누락을 `SUBMISSION_UNKNOWN`으로 보낸다. KIS wrapper 호출에는 local rate-limit와 circuit breaker가 있고, circuit open/rate-limit 초과처럼 broker에 닿지 않은 실패는 broker rejection 이벤트로 발행하지 않는다. root wrapper의 KIS token은 real/mock scope별 만료 기반 in-memory cache로 관리한다. 별도 broker wrapper service 배포와 token 영속 저장/secret manager 연동은 아직 남아 있다.
 - `stock-purchase-service`는 broker 제출 전 risk guard로 주문 단위 금액 한도, 종목별 주문 금액 한도, 하루 broker 제출 건수 한도, 동일 전략/종목/태그 중복 kill switch, 전략 prefix disable을 적용한다.
 - 계좌 전체 노출, 보유 수량 기반 exposure, 모의투자/실전투자 분리 정책은 별도 계좌/포지션 상태 모델이 필요하므로 아직 남아 있다.
 - `stock-purchase-service`는 주문 제출 실패, `SUBMISSION_UNKNOWN` 지속, reconciliation 실패를 `OperationalAlertPort`로 알리고, 기본 구현은 로그 기반 alert adapter로 둔다.
@@ -595,7 +595,7 @@ stock-search-service
 12. 완료: stock-purchase reconciliation에 durable cursor, unmatched execution 저장, KIS wrapper 기반 주문/체결 조회 매핑, cursor 기준 날짜 범위 backfill, KIS 조회 cursor pagination, 조회성 호출 retry/backoff, wrapper 호출 rate-limit/circuit breaker를 추가한다.
 13. 완료: 주문 lifecycle을 `SUBMISSION_UNKNOWN` 복구와 `OrderCancelled`까지 확장하고, direct sell event 경로를 order intent lifecycle로 통일한다.
 14. 완료: 발행 측 outbox 적용 범위를 strategy-execution과 stock-purchase의 publisher까지 확장한다.
-15. 부분 완료: stock-purchase-service 내부 주문/조회 KIS 계약을 broker gateway anti-corruption layer로 분리한다. 주문 제출 transient 실패와 broker order id 누락은 `SUBMISSION_UNKNOWN` 복구 흐름으로 보내고, wrapper 호출 rate-limit/circuit breaker를 둔다. 별도 broker wrapper service 배포와 token 관리 책임 분리는 남아 있다.
+15. 부분 완료: stock-purchase-service 내부 주문/조회 KIS 계약을 broker gateway anti-corruption layer로 분리한다. 주문 제출 transient 실패와 broker order id 누락은 `SUBMISSION_UNKNOWN` 복구 흐름으로 보내고, wrapper 호출 rate-limit/circuit breaker를 둔다. root wrapper의 token은 real/mock scope별 만료 기반 in-memory cache로 보강했다. 별도 broker wrapper service 배포와 token 영속 저장/secret manager 연동은 남아 있다.
 16. 부분 완료: stock-purchase-service의 broker 제출 전 risk guard를 추가한다. 주문 단위/종목별 금액 한도, 하루 broker 제출 건수 한도, 중복 주문 kill switch, 전략 prefix disable은 적용됐고, 계좌 전체 exposure와 모의/실전 계좌 분리는 남아 있다.
 17. 부분 완료: 운영 관측성을 추가한다. 주문 제출 실패, `SUBMISSION_UNKNOWN` 지속, reconciliation 실패는 log 기반 alert port로 노출하고, 라오어 전략별 T/현금/보유/평단 조회 API를 추가했다. 외부 alert sink, metric, 대시보드 UI는 남아 있다.
 18. 부분 완료: daily active strategy execution에 설정 기반 US trading calendar를 추가한다. 주말과 설정 휴장일 skip은 적용됐고, 휴장일 자동 동기화, 조기폐장, 주문 가능 시간, LOC/MOC 마감 시간 정책은 남아 있다.

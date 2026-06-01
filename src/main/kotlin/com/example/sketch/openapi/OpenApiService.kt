@@ -25,8 +25,6 @@ import com.fasterxml.jackson.databind.JsonNode
 import kotlinx.coroutines.reactor.awaitSingleOrNull
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Qualifier
-import org.springframework.cache.annotation.Cacheable
-import org.springframework.context.ApplicationContext
 import org.springframework.http.ResponseEntity
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
@@ -36,11 +34,10 @@ import org.springframework.web.reactive.function.client.toEntity
 @Service
 class OpenApiService(
     // TODO: 모든 api 응답이 캐싱 처리가 필요하다. 왜냐하면 외부와 통신하는 api의 경우 빈번하게 호출되기 때문에, 극도의 성능 필요
-    @Autowired val applicationContext: ApplicationContext,
     @Qualifier("webClient") @Autowired val webClient: WebClient,
     @Qualifier("mockWebclient") @Autowired val mockWebClient: WebClient,
+    private val tokenCache: KisAccessTokenCache,
 ) {
-    @Cacheable(cacheNames = ["authentication"], key = "'api_token'")
     suspend fun requestToken(
         info: RequestType = RequestType.GET_TOKEN,
         requestBody: Map<String, String> =
@@ -50,6 +47,10 @@ class OpenApiService(
                 "appsecret" to APP_SECRET,
             ),
     ): TokenResponse {
+        val cachedToken = tokenCache.getOrRefresh(KisTokenScope.REAL) {
+            fetchToken(webClient, info, requestBody)
+        }
+        if (cachedToken.token.isNotBlank()) return cachedToken
         val toEntity: ResponseEntity<String> =
             (webClient.requestInfo(info) as RequestBodySpec) // TODO: as RequestBodySpec 이 부분을 고민해야함
                 .bodyValue(requestBody)
@@ -69,7 +70,6 @@ class OpenApiService(
     }
 
     // TODO: 모의계좌, 실전계좌의 토큰 발급 로직을 좀 더 체계적으로 변경
-    @Cacheable(cacheNames = ["mock_authentication"], key = "'mock_api_token'")
     suspend fun requestMockToken(
         info: RequestType = RequestType.GET_TOKEN,
         requestBody: Map<String, String> =
@@ -79,6 +79,10 @@ class OpenApiService(
                 "appsecret" to MOCK_APP_SECRET,
             ),
     ): TokenResponse {
+        val cachedToken = tokenCache.getOrRefresh(KisTokenScope.MOCK) {
+            fetchToken(mockWebClient, info, requestBody)
+        }
+        if (cachedToken.token.isNotBlank()) return cachedToken
         val toEntity: ResponseEntity<String> =
             (mockWebClient.requestInfo(info) as RequestBodySpec) // TODO: as RequestBodySpec 이 부분을 고민해야함
                 .bodyValue(requestBody)
@@ -94,7 +98,7 @@ class OpenApiService(
 
     suspend fun getCurrentPrice(): OpenApiResponse { // TODO: getToken()이 suspend이므로 문제가 전파된다. 반드시 해결 필요
         // 변화 과정을 위해 일부로 inline 하지 않음
-        val token = applicationContext.getBean(OpenApiService::class.java).requestToken().token
+        val token = requestToken().token
         /** TODO: Point 프록시 객체가 아닌 실제 메서드를 직접 호출하면 AOP가 적용되지 않아 캐싱이 동작하지 않는 문제
          self-invocation을 피하기 위해, ApplicationContext 프록시 객체를 가져와서, 메서드 호출. 고도화 필요*/
         require(token.isNotBlank()) // TODO: token validation 필요
@@ -525,13 +529,28 @@ class OpenApiService(
 
     // private method
     private suspend fun getToken(isMock: Boolean = false): String {
-        val self = applicationContext.getBean(OpenApiService::class.java)
         val token = when (isMock) {
-            false -> self.requestToken().token
-            true -> self.requestMockToken().token
+            false -> requestToken().token
+            true -> requestMockToken().token
         }
         require(token.isNotBlank())
         return token
+    }
+
+    private suspend fun fetchToken(
+        client: WebClient,
+        info: RequestType,
+        requestBody: Map<String, String>,
+    ): JsonNode {
+        val toEntity: ResponseEntity<String> =
+            (client.requestInfo(info) as RequestBodySpec)
+                .bodyValue(requestBody)
+                .retrieve()
+                .toEntity<String>()
+                .awaitSingleOrNull() ?: ResponseEntity
+                .notFound()
+                .build<String>()
+        return parseJsonResponse(toEntity)
     }
 
     private fun JsonNode.getOutput() = get(ResponseParameter.OUTPUT.value)
