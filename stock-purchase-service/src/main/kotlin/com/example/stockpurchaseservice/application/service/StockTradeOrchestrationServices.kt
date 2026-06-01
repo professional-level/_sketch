@@ -3,8 +3,12 @@ package com.example.stockpurchaseservice.application.service
 import com.example.common.UseCaseImpl
 import com.example.stockpurchaseservice.application.port.`in`.CreateSellOrdersByStrategyUseCase
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
+import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSubmissionStatus
+import com.example.stockpurchaseservice.application.port.`in`.OrderIntentType
 import com.example.stockpurchaseservice.application.port.`in`.ReconcileExecutionsUseCase
 import com.example.stockpurchaseservice.application.port.`in`.SimulateStockPurchaseUseCase
+import com.example.stockpurchaseservice.application.port.`in`.SubmitOrderIntentCommand
+import com.example.stockpurchaseservice.application.port.`in`.SubmitOrderIntentUseCase
 import com.example.stockpurchaseservice.application.port.out.ExecutedStockDto
 import com.example.stockpurchaseservice.application.port.out.ExecutionFillDto
 import com.example.stockpurchaseservice.application.port.out.ExecutionFillPort
@@ -18,7 +22,6 @@ import com.example.stockpurchaseservice.application.port.out.OrderFilledMessage
 import com.example.stockpurchaseservice.application.port.out.OrderPartiallyFilledMessage
 import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionPort
 import com.example.stockpurchaseservice.application.port.out.UnmatchedExecutionDto
-import com.example.stockpurchaseservice.application.service.strategy.toDto
 import com.example.stockpurchaseservice.domain.ExecutedStock
 import com.example.stockpurchaseservice.domain.ExecutionFill
 import com.example.stockpurchaseservice.domain.ExecutionType
@@ -40,7 +43,7 @@ import java.util.UUID
 @UseCaseImpl
 class CreateSellOrdersByStrategyService(
     private val stockOrderRepository: StockOrderRepository,
-    private val marketService: MarketServicePort,
+    private val submitOrderIntentUseCase: SubmitOrderIntentUseCase,
 ) : CreateSellOrdersByStrategyUseCase {
 
     override suspend fun execute() {
@@ -52,14 +55,11 @@ class CreateSellOrdersByStrategyService(
     }
 
     private suspend fun submitSellOrder(order: SellingOrder) {
-        stockOrderRepository.save(order)
-        runCatching {
-            marketService.sellStock(order.toDto())
-            order.changeOrderState(OrderState.SELLING_IN_PROCESS)
-        }.onFailure {
-            order.changeOrderState(OrderState.SUBMISSION_UNKNOWN)
-        }
-        stockOrderRepository.save(order)
+        submitLegacySellOrder(
+            order = order,
+            submitOrderIntentUseCase = submitOrderIntentUseCase,
+            stockOrderRepository = stockOrderRepository,
+        )
     }
 }
 
@@ -67,6 +67,7 @@ class CreateSellOrdersByStrategyService(
 class ReconcileExecutionsService(
     private val stockOrderRepository: StockOrderRepository,
     private val marketService: MarketServicePort,
+    private val submitOrderIntentUseCase: SubmitOrderIntentUseCase,
     private val executionFillPort: ExecutionFillPort,
     private val orderIntentSubmissionPort: OrderIntentSubmissionPort,
     private val orderExecutionEventPort: OrderExecutionEventPort,
@@ -132,15 +133,11 @@ class ReconcileExecutionsService(
                 stockOrderRepository.save(purchasedOrder)
 
                 makeSellOrderByStrategy(purchasedOrder)?.let { sellingOrder ->
-                    stockOrderRepository.save(sellingOrder)
-                    runCatching {
-                        // TODO: Publish submission lifecycle events once direct broker calls are split from orchestration.
-                        marketService.sellStock(sellingOrder.toDto(quantity = item.quantity))
-                        sellingOrder.changeOrderState(OrderState.SELLING_IN_PROCESS)
-                    }.onFailure {
-                        sellingOrder.changeOrderState(OrderState.SUBMISSION_UNKNOWN)
-                    }
-                    stockOrderRepository.save(sellingOrder)
+                    submitLegacySellOrder(
+                        order = sellingOrder,
+                        submitOrderIntentUseCase = submitOrderIntentUseCase,
+                        stockOrderRepository = stockOrderRepository,
+                    )
                 }
             }
         }
@@ -231,6 +228,52 @@ class ReconcileExecutionsService(
     }
 }
 
+private suspend fun submitLegacySellOrder(
+    order: SellingOrder,
+    submitOrderIntentUseCase: SubmitOrderIntentUseCase,
+    stockOrderRepository: StockOrderRepository,
+) {
+    stockOrderRepository.save(order)
+    val result = runCatching {
+        submitOrderIntentUseCase.execute(order.toSellIntentCommand())
+    }.getOrElse {
+        order.changeOrderState(OrderState.SUBMIT_FAILED)
+        stockOrderRepository.save(order)
+        return
+    }
+
+    when (result.status) {
+        OrderIntentSubmissionStatus.SUBMITTED,
+        OrderIntentSubmissionStatus.SKIPPED_DUPLICATE -> order.changeOrderState(OrderState.SELLING_IN_PROCESS)
+        OrderIntentSubmissionStatus.SUBMISSION_UNKNOWN -> order.changeOrderState(OrderState.SUBMISSION_UNKNOWN)
+    }
+    stockOrderRepository.save(order)
+}
+
+private fun SellingOrder.toSellIntentCommand(): SubmitOrderIntentCommand {
+    val strategyExecutionId = strategyId ?: "${strategyType}:${stockId.value}"
+    val idempotencyKey = "legacy-sell:$strategyExecutionId:${id.value}:$quantity:${sellingPrice.price}"
+    return SubmitOrderIntentCommand(
+        eventId = UUID.nameUUIDFromBytes("$idempotencyKey:ORDER_INTENT_CREATED".toByteArray(StandardCharsets.UTF_8)),
+        idempotencyKey = idempotencyKey,
+        strategyExecutionId = strategyExecutionId,
+        symbol = stockId.value,
+        side = OrderIntentSide.SELL,
+        orderType = OrderIntentType.LIMIT,
+        price = sellingPrice.price,
+        quantity = quantity.toLong(),
+        orderTag = strategyType.toLegacySellOrderTag(),
+        createdAt = ZonedDateTime.now(),
+    )
+}
+
+private fun StrategyType.toLegacySellOrderTag(): String {
+    return when (this) {
+        StrategyType.Undefined -> "LEGACY_SELL"
+        StrategyType.FinalPriceBatingV1 -> "FINAL_PRICE_BATING_V1_SELL"
+    }
+}
+
 private fun ExecutedStock.toEventId(eventType: String): UUID {
     return UUID.nameUUIDFromBytes(
         "${externalExecutionId.value}:$eventType".toByteArray(StandardCharsets.UTF_8),
@@ -291,6 +334,8 @@ private fun ExecutedStockDto.toDomain(): ExecutedStock {
 }
 
 private fun makeSellOrderByStrategy(order: Order): SellingOrder? {
+    if (order !is PurchaseOrder || order.orderState != OrderState.PURCHASE_COMPLETED) return null
+
     return when (order.strategyType) {
         StrategyType.Undefined -> throw RuntimeException("Undefined strategy type ${order.strategyType}")
         StrategyType.FinalPriceBatingV1 -> {

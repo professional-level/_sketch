@@ -1,7 +1,11 @@
 package com.example.stockpurchaseservice.application.service
 
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
+import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSubmissionStatus
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentType
+import com.example.stockpurchaseservice.application.port.`in`.SubmitOrderIntentCommand
+import com.example.stockpurchaseservice.application.port.`in`.SubmitOrderIntentResult
+import com.example.stockpurchaseservice.application.port.`in`.SubmitOrderIntentUseCase
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderSubmissionDto
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatus
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatusDto
@@ -26,9 +30,14 @@ import com.example.stockpurchaseservice.application.port.out.PurchaseOrderDto
 import com.example.stockpurchaseservice.application.port.out.SellingOrderDto
 import com.example.stockpurchaseservice.application.port.out.UnmatchedExecutionDto
 import com.example.stockpurchaseservice.domain.ExternalOrderId
+import com.example.stockpurchaseservice.domain.Money
 import com.example.stockpurchaseservice.domain.Order
 import com.example.stockpurchaseservice.domain.OrderId
+import com.example.stockpurchaseservice.domain.OrderState
+import com.example.stockpurchaseservice.domain.PurchaseOrder
+import com.example.stockpurchaseservice.domain.SellingOrder
 import com.example.stockpurchaseservice.domain.StockId
+import com.example.stockpurchaseservice.domain.StrategyType
 import com.example.stockpurchaseservice.domain.repository.StockOrderRepository
 import java.time.ZonedDateTime
 import java.util.UUID
@@ -173,7 +182,90 @@ class ReconcileExecutionsServiceTest {
         assertEquals(listOf<String?>("broker unavailable"), reconciliationStatePort.failedReasons)
     }
 
+    @Test
+    fun `legacy sell scheduler submits sell order through order intent lifecycle`() = runBlocking {
+        val stockOrderRepository = FakeStockOrderRepository(
+            notCompletedOrders = listOf(purchaseOrder(orderState = OrderState.PURCHASE_COMPLETED)),
+        )
+        val submitOrderIntentUseCase = FakeSubmitOrderIntentUseCase()
+        val service = CreateSellOrdersByStrategyService(
+            stockOrderRepository = stockOrderRepository,
+            submitOrderIntentUseCase = submitOrderIntentUseCase,
+        )
+
+        service.execute()
+
+        with(submitOrderIntentUseCase.commands.single()) {
+            assertEquals(OrderIntentSide.SELL, side)
+            assertEquals(OrderIntentType.LIMIT, orderType)
+            assertEquals(10L, quantity)
+            assertEquals("FINAL_PRICE_BATING_V1_SELL", orderTag)
+        }
+        assertEquals(
+            listOf(OrderState.SELLING_WAITING, OrderState.SELLING_IN_PROCESS),
+            stockOrderRepository.savedStates,
+        )
+    }
+
+    @Test
+    fun `legacy sell scheduler ignores existing sell orders`() = runBlocking {
+        val stockOrderRepository = FakeStockOrderRepository(
+            notCompletedOrders = listOf(sellingOrder(orderState = OrderState.SELLING_IN_PROCESS)),
+        )
+        val submitOrderIntentUseCase = FakeSubmitOrderIntentUseCase()
+        val service = CreateSellOrdersByStrategyService(
+            stockOrderRepository = stockOrderRepository,
+            submitOrderIntentUseCase = submitOrderIntentUseCase,
+        )
+
+        service.execute()
+
+        assertEquals(emptyList(), submitOrderIntentUseCase.commands)
+        assertEquals(emptyList(), stockOrderRepository.savedStates)
+    }
+
+    @Test
+    fun `completed purchase reconciliation submits follow up sell through order intent lifecycle`() = runBlocking {
+        val stockOrderRepository = FakeStockOrderRepository(
+            orderByExternalOrderId = mapOf(
+                "broker-1" to purchaseOrder(orderState = OrderState.PURCHASE_IN_PROCESS),
+            ),
+        )
+        val submitOrderIntentUseCase = FakeSubmitOrderIntentUseCase()
+        val service = service(
+            stockOrderRepository = stockOrderRepository,
+            submitOrderIntentUseCase = submitOrderIntentUseCase,
+            marketPort = FakeMarketServicePort(
+                executions = listOf(execution(externalExecutionId = "exec-1", quantity = 10)),
+            ),
+            executionFillPort = FakeExecutionFillPort(),
+            submissionPort = FakeOrderIntentSubmissionPort(
+                submissions = listOf(submission(quantity = 10)),
+            ),
+            eventPort = FakeOrderExecutionEventPort(),
+        )
+
+        service.execute()
+
+        with(submitOrderIntentUseCase.commands.single()) {
+            assertEquals(OrderIntentSide.SELL, side)
+            assertEquals(OrderIntentType.LIMIT, orderType)
+            assertEquals(10L, quantity)
+            assertEquals("FINAL_PRICE_BATING_V1_SELL", orderTag)
+        }
+        assertEquals(
+            listOf(
+                OrderState.PURCHASE_COMPLETED,
+                OrderState.SELLING_WAITING,
+                OrderState.SELLING_IN_PROCESS,
+            ),
+            stockOrderRepository.savedStates,
+        )
+    }
+
     private fun service(
+        stockOrderRepository: StockOrderRepository = FakeStockOrderRepository(),
+        submitOrderIntentUseCase: SubmitOrderIntentUseCase = FakeSubmitOrderIntentUseCase(),
         marketPort: MarketServicePort,
         executionFillPort: ExecutionFillPort,
         submissionPort: OrderIntentSubmissionPort,
@@ -181,8 +273,9 @@ class ReconcileExecutionsServiceTest {
         reconciliationStatePort: ExecutionReconciliationStatePort = FakeExecutionReconciliationStatePort(),
     ): ReconcileExecutionsService {
         return ReconcileExecutionsService(
-            stockOrderRepository = FakeStockOrderRepository(),
+            stockOrderRepository = stockOrderRepository,
             marketService = marketPort,
+            submitOrderIntentUseCase = submitOrderIntentUseCase,
             executionFillPort = executionFillPort,
             orderIntentSubmissionPort = submissionPort,
             orderExecutionEventPort = eventPort,
@@ -226,6 +319,52 @@ class ReconcileExecutionsServiceTest {
             externalOrderId = externalOrderId,
             submittedAt = ZonedDateTime.parse("2026-06-02T09:00:00+09:00"),
         )
+    }
+
+    private fun purchaseOrder(
+        orderState: OrderState,
+    ): PurchaseOrder {
+        return PurchaseOrder(
+            id = OrderId(UUID.fromString("00000000-0000-0000-0000-000000000010")),
+            strategyId = "legacy-final-price:TQQQ",
+            stockId = StockId("TQQQ"),
+            stockName = "TQQQ",
+            requestedAt = ZonedDateTime.parse("2026-06-02T09:00:00+09:00"),
+            strategyType = StrategyType.FinalPriceBatingV1,
+            purchasePrice = Money(100_000.0),
+            purchasedAt = ZonedDateTime.parse("2026-06-02T09:00:00+09:00"),
+            quantity = 10,
+            orderState = orderState,
+        )
+    }
+
+    private fun sellingOrder(
+        orderState: OrderState,
+    ): SellingOrder {
+        return SellingOrder.from(
+            id = OrderId(UUID.fromString("00000000-0000-0000-0000-000000000011")),
+            strategyId = "legacy-final-price:TQQQ",
+            stockId = StockId("TQQQ"),
+            stockName = "TQQQ",
+            requestedAt = ZonedDateTime.parse("2026-06-02T09:00:00+09:00"),
+            strategyType = StrategyType.FinalPriceBatingV1,
+            sellingPrice = Money(103_000.0),
+            purchasePrice = Money(100_000.0),
+            purchasedAt = ZonedDateTime.parse("2026-06-02T09:00:00+09:00"),
+            quantity = 10,
+            orderState = orderState,
+        )
+    }
+
+    private class FakeSubmitOrderIntentUseCase(
+        private val status: OrderIntentSubmissionStatus = OrderIntentSubmissionStatus.SUBMITTED,
+    ) : SubmitOrderIntentUseCase {
+        val commands: MutableList<SubmitOrderIntentCommand> = mutableListOf()
+
+        override suspend fun execute(command: SubmitOrderIntentCommand): SubmitOrderIntentResult {
+            commands += command
+            return SubmitOrderIntentResult(status)
+        }
     }
 
     private class FakeMarketServicePort(
@@ -335,20 +474,31 @@ class ReconcileExecutionsServiceTest {
         }
     }
 
-    private class FakeStockOrderRepository : StockOrderRepository {
-        override suspend fun save(order: Order) = Unit
+    private class FakeStockOrderRepository(
+        private val notCompletedOrders: List<Order> = emptyList(),
+        private val orderByExternalOrderId: Map<String, Order> = emptyMap(),
+    ) : StockOrderRepository {
+        val savedStates: MutableList<OrderState> = mutableListOf()
 
-        override suspend fun save(order: Order, externalOrderId: ExternalOrderId) = Unit
+        override suspend fun save(order: Order) {
+            savedStates += order.orderState
+        }
+
+        override suspend fun save(order: Order, externalOrderId: ExternalOrderId) {
+            savedStates += order.orderState
+        }
 
         override suspend fun existsByStrategyId(strategyId: String): Boolean = false
 
-        override suspend fun findAllNotCompleted(): List<Order> = emptyList()
+        override suspend fun findAllNotCompleted(): List<Order> = notCompletedOrders
 
         override suspend fun findAllWithPurchaseWaiting(): List<Order> = emptyList()
 
         override suspend fun findByStockIdAndQuantity(stockId: StockId, quantity: Int): Order? = null
 
-        override suspend fun findByExternalOrderId(externalOrderId: ExternalOrderId): Order? = null
+        override suspend fun findByExternalOrderId(externalOrderId: ExternalOrderId): Order? {
+            return orderByExternalOrderId[externalOrderId.value]
+        }
 
         override fun findById(id: OrderId): Order? = null
     }
