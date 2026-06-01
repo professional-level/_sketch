@@ -14,6 +14,7 @@ object Endpoint {
     const val GET_STOCK_ORDER_CANCELABLE = "/trading/inquire-psbl-rvsecncl"
     const val POST_OVERSEAS_STOCK_ORDER = "/overseas/trading/order"
     const val POST_OVERSEAS_STOCK_ORDER_CANCEL = "/overseas/trading/order-rvsecncl"
+    const val GET_OVERSEAS_STOCK_BALANCE = "/overseas/trading/inquire-balance"
     const val GET_EXECUTION_ORDERS ="/trading/inquire-daily-ccld"
     const val GET_OVERSEAS_EXECUTION_ORDERS = "/overseas/trading/inquire-ccnl"
 }

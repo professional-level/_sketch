@@ -18,6 +18,7 @@ internal interface BrokerGateway {
     fun submitOrder(command: BrokerOrderCommand): BrokerOrderSubmissionDto
     fun cancelOrder(command: BrokerOrderCancelCommand): BrokerOrderSubmissionDto
     fun findOrderHistory(query: BrokerOrderHistoryQuery): List<BrokerOrderHistoryItem>
+    fun findAccountSnapshot(query: BrokerAccountSnapshotQuery): BrokerAccountSnapshot
 }
 
 internal data class BrokerOrderCommand(
@@ -67,6 +68,35 @@ internal data class BrokerOrderHistoryQuery(
 internal data class BrokerOrderHistoryPage(
     val items: List<BrokerOrderHistoryItem>,
     val nextCursor: BrokerOrderHistoryPageCursor,
+)
+
+internal data class BrokerAccountSnapshotQuery(
+    val market: StockOrderMarket,
+    val exchange: String = "NASD",
+    val currency: String = "USD",
+    val isMock: Boolean,
+    val pageCursor: BrokerOrderHistoryPageCursor = BrokerOrderHistoryPageCursor.EMPTY,
+)
+
+internal data class BrokerAccountSnapshot(
+    val market: StockOrderMarket,
+    val exchange: String,
+    val currency: String,
+    val positions: List<BrokerPositionSnapshot>,
+    val totalPurchaseAmount: Double? = null,
+    val totalEvaluationAmount: Double? = null,
+    val totalProfitLossAmount: Double? = null,
+)
+
+internal data class BrokerPositionSnapshot(
+    val symbol: String,
+    val stockName: String,
+    val quantity: Long,
+    val averagePurchasePrice: Double? = null,
+    val currentPrice: Double? = null,
+    val purchaseAmount: Double? = null,
+    val evaluationAmount: Double? = null,
+    val profitLossAmount: Double? = null,
 )
 
 internal data class BrokerOrderHistoryPageCursor(

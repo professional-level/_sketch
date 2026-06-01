@@ -541,7 +541,8 @@ broker API 자체가 idempotency key를 지원하지 않는다면, purchase-serv
 - `strategy-execution-service`의 `OrderIntentCreated` 발행과 `stock-purchase-service`의 주문/체결 이벤트 발행은 outbox 저장 후 scheduled publisher가 Kafka로 발행한다.
 - stock-purchase-service의 주문/조회 KIS 원문 계약은 `adapter/out/broker`의 broker gateway anti-corruption layer로 격리되었다. 주문 제출 POST는 중복 주문을 피하기 위해 retry하지 않고 transient 실패나 broker order id 누락을 `SUBMISSION_UNKNOWN`으로 보낸다. KIS 주문 응답의 `rt_cd != 0`은 `msg_cd/msg1`을 보존한 broker rejection으로 분리해 `OrderRejected`와 rejected submission으로 확정한다. root wrapper는 KIS 표준 주문 응답 객체의 top-level `rt_cd`, `msg_cd`, `msg1`과 nested `output.ODNO`를 stock-purchase-service용 protobuf로 정규화한다. 국내 주문체결조회는 `ODNO`, `rjct_qty`, `cncl_yn`, `cncl_cfrm_qty`, `tot_ccld_qty`, `rmn_qty`를 내부 주문 상태와 cumulative execution으로 매핑한다. 해외 주문체결조회는 KIS `ODNO` 검색 불가 제약 때문에 일자/종목 범위로 조회한 뒤 응답 row의 broker order id를 client-side에서 매칭한다. 해외 row 매핑은 `ODNO/odno`, `ORD_QTY/ft_ord_qty`, `TOT_CCLD_QTY/ft_ccld_qty`, `RMN_QTY/nccs_qty`, `AVG_PRVS/ft_ccld_unpr3` 같은 wrapper alias를 허용하고, 한글/영문 rejected/cancelled 상태명을 내부 주문 상태로 정규화한다. KIS wrapper 호출에는 local rate-limit와 circuit breaker가 있고, circuit open/rate-limit 초과처럼 broker에 닿지 않은 실패는 broker rejection 이벤트로 발행하지 않는다. root wrapper의 KIS token은 real/mock scope별 만료 기반 in-memory cache로 관리한다. 별도 broker wrapper service 배포와 token 영속 저장/secret manager 연동은 아직 남아 있다.
 - `stock-purchase-service`는 broker 제출 전 risk guard로 주문 단위 금액 한도, 종목별 주문 금액 한도, 활성 매수 주문 기준 계좌 pending exposure 한도, 하루 broker 제출 건수 한도, 동일 전략/종목/태그 중복 kill switch, 전략 prefix disable, 전략 prefix별 mock/live broker route 검증을 적용한다.
-- 실제 체결 보유 수량/현금 기반 계좌 전체 exposure와 order intent 계약 수준의 trading environment 명시는 별도 계좌/포지션 상태 모델과 이벤트 계약 확장이 필요하므로 아직 남아 있다.
+- `stock-purchase-service`는 broker gateway를 통해 KIS 해외주식 잔고조회(`inquire-balance`)를 호출하고, `/operations/trading/account-snapshot`에서 해외 포지션 수량, 평균매입가, 현재가, 매입금액, 평가금액, 평가손익을 조회할 수 있다.
+- 국내 잔고, settled cash, 실제 계좌 전체 exposure 기반 risk guard, order intent 계약 수준의 trading environment 명시는 별도 계좌/현금 상태 모델과 이벤트 계약 확장이 필요하므로 아직 남아 있다.
 - `stock-purchase-service`는 주문 제출 실패, `SUBMISSION_UNKNOWN` 지속, reconciliation 실패, 미매칭 broker execution을 `OperationalAlertPort`로 알리고, 기본 구현은 로그 기반 alert adapter, Micrometer operational alert counter, optional outbound webhook sink로 둔다.
 - `strategy-execution-service`는 `/strategy-executions/laor-v4`와 `/strategy-executions/laor-v4/{executionId}`에서 전략별 T, 현금, 보유 수량, 평균단가, cycle, mode를 조회할 수 있다.
 - `stock-purchase-service`와 `strategy-execution-service`는 production-like profile에서 로컬 broker/Temporal endpoint나 mock 주문 설정이 남아 있으면 startup validation으로 실패한다.
@@ -596,7 +597,7 @@ stock-search-service
 13. 완료: 주문 lifecycle을 `SUBMISSION_UNKNOWN` 복구와 `OrderCancelled`까지 확장하고, direct sell event 경로를 order intent lifecycle로 통일한다.
 14. 완료: 발행 측 outbox 적용 범위를 strategy-execution과 stock-purchase의 publisher까지 확장한다.
 15. 부분 완료: stock-purchase-service 내부 주문/조회 KIS 계약을 broker gateway anti-corruption layer로 분리한다. 주문 제출 transient 실패와 broker order id 누락은 `SUBMISSION_UNKNOWN` 복구 흐름으로 보내고, wrapper 호출 rate-limit/circuit breaker를 둔다. root wrapper의 token은 real/mock scope별 만료 기반 in-memory cache로 보강했다. 별도 broker wrapper service 배포와 token 영속 저장/secret manager 연동은 남아 있다.
-16. 부분 완료: stock-purchase-service의 broker 제출 전 risk guard를 추가한다. 주문 단위/종목별 금액 한도, 활성 매수 주문 기준 계좌 pending exposure 한도, 하루 broker 제출 건수 한도, 중복 주문 kill switch, 전략 prefix disable, 전략 prefix별 mock/live broker route 검증은 적용됐고, 실제 체결 포지션/현금 기반 계좌 전체 exposure와 order intent 계약 수준의 trading environment 명시는 남아 있다.
+16. 부분 완료: stock-purchase-service의 broker 제출 전 risk guard를 추가한다. 주문 단위/종목별 금액 한도, 활성 매수 주문 기준 계좌 pending exposure 한도, 하루 broker 제출 건수 한도, 중복 주문 kill switch, 전략 prefix disable, 전략 prefix별 mock/live broker route 검증은 적용됐고, KIS 해외 포지션 스냅샷 조회 API도 추가됐다. 국내 잔고, settled cash, 실제 계좌 전체 exposure 기반 risk guard와 order intent 계약 수준의 trading environment 명시는 남아 있다.
 17. 부분 완료: 운영 관측성을 추가한다. 주문 제출 실패, `SUBMISSION_UNKNOWN` 지속, reconciliation 실패, 미매칭 broker execution은 log 기반 alert port, Micrometer counter, optional outbound webhook으로 노출하고, 라오어 전략별 T/현금/보유/평단 조회 API를 추가했다. Slack/PagerDuty 전용 라우팅/포맷, OpenTelemetry trace propagation, 대시보드 UI는 남아 있다.
 18. 부분 완료: daily active strategy execution에 설정 기반 US trading calendar를 추가하고, stock-purchase-service broker 제출 전 설정 기반 주문 가능 시간/LOC/MOC 마감 guard를 추가한다. 주말과 설정 휴장일 skip, 설정 기반 주문 시간 guard는 적용됐고, 휴장일/조기폐장/마감 시간 데이터 자동 동기화와 per-date cutoff 정책은 남아 있다.
 19. 부분 완료: 배포/설정/보안 가드를 추가한다. KIS secret 템플릿, 운영 runbook, production-like profile startup validation은 적용했고, secret manager/vault 연동과 운영 DB/Kafka/Temporal 배포 자동화는 남아 있다.
@@ -623,6 +624,12 @@ stock-search-service
 - `stock-purchase-service` exposes `GET /operations/trading/status` for operator dashboard polling.
 - The endpoint reports order submission status counts, reconciliation cursor health, unmatched execution totals, and recent unmatched broker executions.
 - This fills the API side of the operating dashboard need. A UI, trace propagation, and dedicated incident-routing rules are still production hardening work.
+
+### Broker Account Snapshot API
+
+- `stock-purchase-service` exposes `GET /operations/trading/account-snapshot` for broker-backed account position checks.
+- The first supported market is `OVERSEAS_US`; the adapter calls the root KIS wrapper's `/open-api/overseas/trading/inquire-balance` endpoint.
+- The response reports overseas positions and optional KIS summary fields. Domestic balances, settled cash, and risk-guard integration with account-wide exposure remain hardening work.
 
 ## Open Questions
 

@@ -5,6 +5,7 @@ import DailyExecutionOrdersResponseOuterClass
 import com.example.common.ExternalApiAdapter
 import com.example.common.endpoint.Endpoint.GET_EXECUTION_ORDERS
 import com.example.common.endpoint.Endpoint.GET_OVERSEAS_EXECUTION_ORDERS
+import com.example.common.endpoint.Endpoint.GET_OVERSEAS_STOCK_BALANCE
 import com.example.common.endpoint.Endpoint.GET_STOCK_ORDER_CANCELABLE
 import com.example.common.endpoint.Endpoint.POST_OVERSEAS_STOCK_ORDER_CANCEL
 import com.example.common.endpoint.Endpoint.POST_OVERSEAS_STOCK_ORDER
@@ -171,6 +172,39 @@ internal class KisBrokerGatewayAdapter(
         return items
     }
 
+    override fun findAccountSnapshot(query: BrokerAccountSnapshotQuery): BrokerAccountSnapshot {
+        return when (query.market) {
+            StockOrderMarket.DOMESTIC -> throw UnsupportedOperationException(
+                "domestic account snapshot is not supported",
+            )
+
+            StockOrderMarket.OVERSEAS_US -> findOverseasAccountSnapshot(query)
+        }
+    }
+
+    private fun findOverseasAccountSnapshot(query: BrokerAccountSnapshotQuery): BrokerAccountSnapshot {
+        val positions = mutableListOf<BrokerPositionSnapshot>()
+        var summary = BrokerAccountSnapshot(
+            market = StockOrderMarket.OVERSEAS_US,
+            exchange = query.exchange,
+            currency = query.currency,
+            positions = emptyList(),
+        )
+        var cursor = query.pageCursor
+        val seenCursors = mutableSetOf<BrokerOrderHistoryPageCursor>()
+        var pageCount = 0
+        do {
+            if (!seenCursors.add(cursor)) break
+            val page = fetchOverseasAccountSnapshotPage(query.copy(pageCursor = cursor))
+            positions += page.snapshot.positions
+            summary = page.snapshot.copy(positions = emptyList())
+            cursor = page.nextCursor
+            pageCount += 1
+        } while (cursor.hasNext() && pageCount < MAX_ACCOUNT_BALANCE_PAGES)
+
+        return summary.copy(positions = positions)
+    }
+
     private fun fetchDomesticOrderHistoryPage(query: BrokerOrderHistoryQuery): BrokerOrderHistoryPage {
         return guard.execute("domestic-order-history") {
             val response = stockApiClient.getExternalApi(
@@ -225,9 +259,36 @@ internal class KisBrokerGatewayAdapter(
         }
     }
 
+    private fun fetchOverseasAccountSnapshotPage(query: BrokerAccountSnapshotQuery): BrokerAccountSnapshotPage {
+        return guard.execute("overseas-account-balance") {
+            val response = stockApiClient.getExternalApi(
+                uri = OPEN_API_PREFIX + GET_OVERSEAS_STOCK_BALANCE,
+                queryParameters = query.toKisOverseasBalanceQuery(),
+                responseType = JsonNode::class.java,
+                callOptions = properties.toQueryCallOptions(),
+            )
+            val returnCode = response.path("rt_cd").asText("")
+            if (returnCode.isNotBlank() && returnCode != "0") {
+                throw RuntimeException(
+                    "overseas balance lookup failed: ${
+                        response.path("msg_cd").asText()
+                    } ${response.path("msg1").asText()}".trim(),
+                )
+            }
+            BrokerAccountSnapshotPage(
+                snapshot = response.toBrokerAccountSnapshot(query),
+                nextCursor = BrokerOrderHistoryPageCursor(
+                    foreignKeyContext = response.path("ctx_area_fk200").asText(""),
+                    nextKeyContext = response.path("ctx_area_nk200").asText(""),
+                ),
+            )
+        }
+    }
+
     companion object {
         private const val MAX_HISTORY_PAGES = 20
         private const val MAX_CANCELABLE_ORDER_PAGES = 10
+        private const val MAX_ACCOUNT_BALANCE_PAGES = 20
     }
 }
 
@@ -347,6 +408,11 @@ private data class KisCancelableOrderPage(
     val nextCursor: BrokerOrderHistoryPageCursor,
 )
 
+private data class BrokerAccountSnapshotPage(
+    val snapshot: BrokerAccountSnapshot,
+    val nextCursor: BrokerOrderHistoryPageCursor,
+)
+
 private data class KisCancelableOrderItem(
     val branchOrderNumber: String?,
     val orderId: String,
@@ -400,6 +466,16 @@ private fun BrokerOrderHistoryQuery.toKisDomesticExecutionOrderQuery(): Map<Stri
     )
 }
 
+private fun BrokerAccountSnapshotQuery.toKisOverseasBalanceQuery(): Map<String, String> {
+    return mapOf(
+        "isMock" to isMock.toString(),
+        "ovrsExcgCd" to exchange.uppercase(),
+        "trCrcyCd" to currency.uppercase(),
+        "ctxAreaFk200" to pageCursor.foreignKeyContext,
+        "ctxAreaNk200" to pageCursor.nextKeyContext,
+    )
+}
+
 internal fun BrokerOrderHistoryQuery.toKisOverseasExecutionOrderQuery(): Map<String, String> {
     return mapOf(
         "isMock" to isMock.toString(),
@@ -438,6 +514,79 @@ private fun KisBrokerGatewayProperties.toSubmitCallOptions(): ExternalApiCallOpt
 
 private fun ZonedDateTime.toKisDate(): String {
     return toLocalDate().format(DateTimeFormatter.BASIC_ISO_DATE)
+}
+
+private fun JsonNode.toBrokerAccountSnapshot(query: BrokerAccountSnapshotQuery): BrokerAccountSnapshot {
+    val output1 = path("output1")
+    val rows = when {
+        output1.isArray -> output1.toList()
+        output1.isObject -> listOf(output1)
+        path("output").isArray -> path("output").toList()
+        path("output").isObject -> listOf(path("output"))
+        else -> emptyList()
+    }
+    val summary = path("output2")
+
+    return BrokerAccountSnapshot(
+        market = StockOrderMarket.OVERSEAS_US,
+        exchange = query.exchange.uppercase(),
+        currency = query.currency.uppercase(),
+        positions = rows.mapNotNull { it.toBrokerPositionSnapshot() },
+        totalPurchaseAmount = summary.textOrNull(
+            "frcr_buy_amt_smtl",
+            "FRCR_BUY_AMT_SMTL",
+            "tot_pchs_amt",
+            "TOT_PCHS_AMT",
+            "pchs_amt_smtl",
+            "PCHS_AMT_SMTL",
+        ).toDoubleValue(),
+        totalEvaluationAmount = summary.textOrNull(
+            "tot_evlu_amt",
+            "TOT_EVLU_AMT",
+            "frcr_evlu_amt2",
+            "FRCR_EVLU_AMT2",
+            "ovrs_stck_evlu_amt",
+            "OVRS_STCK_EVLU_AMT",
+        ).toDoubleValue(),
+        totalProfitLossAmount = summary.textOrNull(
+            "tot_evlu_pfls_amt",
+            "TOT_EVLU_PFLS_AMT",
+            "evlu_pfls_amt_smtl",
+            "EVLU_PFLS_AMT_SMTL",
+            "frcr_evlu_pfls_amt",
+            "FRCR_EVLU_PFLS_AMT",
+        ).toDoubleValue(),
+    )
+}
+
+private fun JsonNode.toBrokerPositionSnapshot(): BrokerPositionSnapshot? {
+    val symbol = textOrNull("ovrs_pdno", "OVRS_PDNO", "pdno", "PDNO") ?: return null
+    val quantity = textOrNull("ovrs_cblc_qty", "OVRS_CBLC_QTY", "cblc_qty", "CBLC_QTY")
+        .toLongValue()
+    if (quantity <= 0) return null
+    return BrokerPositionSnapshot(
+        symbol = symbol,
+        stockName = textOrNull("ovrs_item_name", "OVRS_ITEM_NAME", "prdt_name", "PRDT_NAME").orEmpty(),
+        quantity = quantity,
+        averagePurchasePrice = textOrNull("pchs_avg_pric", "PCHS_AVG_PRIC", "avg_prvs", "AVG_PRVS")
+            .toDoubleValue(),
+        currentPrice = textOrNull("now_pric2", "NOW_PRIC2", "ovrs_now_pric1", "OVRS_NOW_PRIC1")
+            .toDoubleValue(),
+        purchaseAmount = textOrNull("frcr_pchs_amt1", "FRCR_PCHS_AMT1", "pchs_amt", "PCHS_AMT")
+            .toDoubleValue(),
+        evaluationAmount = textOrNull(
+            "ovrs_stck_evlu_amt",
+            "OVRS_STCK_EVLU_AMT",
+            "frcr_evlu_amt2",
+            "FRCR_EVLU_AMT2",
+        ).toDoubleValue(),
+        profitLossAmount = textOrNull(
+            "frcr_evlu_pfls_amt",
+            "FRCR_EVLU_PFLS_AMT",
+            "evlu_pfls_amt",
+            "EVLU_PFLS_AMT",
+        ).toDoubleValue(),
+    )
 }
 
 private fun DailyExecutionOrdersResponseOuterClass.DailyExecutionOrdersOutput1.toBrokerHistoryItem(): BrokerOrderHistoryItem? {

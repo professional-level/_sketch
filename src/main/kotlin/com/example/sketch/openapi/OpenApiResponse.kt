@@ -54,6 +54,19 @@ data class GetOverseasExecutionOrdersRequest(
     val ctxAreaFk200: String = "",
 )
 
+data class GetOverseasStockBalanceRequest(
+    val isMock: Boolean = true,
+    val ovrsExcgCd: String = "NASD",
+    val trCrcyCd: String = "USD",
+    val ctxAreaFk200: String = "",
+    val ctxAreaNk200: String = "",
+) {
+    init {
+        require(ovrsExcgCd.isNotBlank()) { "ovrsExcgCd must not be blank" }
+        require(trCrcyCd.isNotBlank()) { "trCrcyCd must not be blank" }
+    }
+}
+
 data class OverseasDailyPriceResponse(
     val symbol: String,
     val exchange: String,

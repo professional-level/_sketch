@@ -398,6 +398,129 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `overseas account snapshot maps balance positions and summary`() {
+        val exchangeFunction = StubExchangeFunction(
+            responses = listOf(
+                """
+                {
+                  "rt_cd": "0",
+                  "ctx_area_fk200": "",
+                  "ctx_area_nk200": "",
+                  "output1": [
+                    {
+                      "ovrs_pdno": "TQQQ",
+                      "ovrs_item_name": "ProShares UltraPro QQQ",
+                      "ovrs_cblc_qty": "3",
+                      "pchs_avg_pric": "112.5",
+                      "now_pric2": "120.0",
+                      "frcr_pchs_amt1": "337.5",
+                      "ovrs_stck_evlu_amt": "360.0",
+                      "frcr_evlu_pfls_amt": "22.5"
+                    }
+                  ],
+                  "output2": {
+                    "frcr_buy_amt_smtl": "337.5",
+                    "tot_evlu_amt": "360.0",
+                    "tot_evlu_pfls_amt": "22.5"
+                  }
+                }
+                """.trimIndent(),
+            ),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        val snapshot = adapter.findAccountSnapshot(
+            BrokerAccountSnapshotQuery(
+                market = StockOrderMarket.OVERSEAS_US,
+                exchange = "NASD",
+                currency = "USD",
+                isMock = false,
+            ),
+        )
+
+        assertEquals(StockOrderMarket.OVERSEAS_US, snapshot.market)
+        assertEquals("NASD", snapshot.exchange)
+        assertEquals("USD", snapshot.currency)
+        assertEquals(337.5, snapshot.totalPurchaseAmount)
+        assertEquals(360.0, snapshot.totalEvaluationAmount)
+        assertEquals(22.5, snapshot.totalProfitLossAmount)
+        with(snapshot.positions.single()) {
+            assertEquals("TQQQ", symbol)
+            assertEquals("ProShares UltraPro QQQ", stockName)
+            assertEquals(3, quantity)
+            assertEquals(112.5, averagePurchasePrice)
+            assertEquals(120.0, currentPrice)
+            assertEquals(337.5, purchaseAmount)
+            assertEquals(360.0, evaluationAmount)
+            assertEquals(22.5, profitLossAmount)
+        }
+        assertEquals("/open-api/overseas/trading/inquire-balance", exchangeFunction.requests.single().url().path)
+        assertEquals("NASD", exchangeFunction.requests.single().queryValue("ovrsExcgCd"))
+        assertEquals("USD", exchangeFunction.requests.single().queryValue("trCrcyCd"))
+    }
+
+    @Test
+    fun `overseas account snapshot follows balance pagination cursor`() {
+        val exchangeFunction = StubExchangeFunction(
+            responses = listOf(
+                """
+                {
+                  "rt_cd": "0",
+                  "ctx_area_fk200": "FK1",
+                  "ctx_area_nk200": "NK1",
+                  "output1": [
+                    {
+                      "ovrs_pdno": "TQQQ",
+                      "ovrs_item_name": "ProShares UltraPro QQQ",
+                      "ovrs_cblc_qty": "3"
+                    }
+                  ],
+                  "output2": {}
+                }
+                """.trimIndent(),
+                """
+                {
+                  "rt_cd": "0",
+                  "ctx_area_fk200": "",
+                  "ctx_area_nk200": "",
+                  "output1": [
+                    {
+                      "ovrs_pdno": "SOXL",
+                      "ovrs_item_name": "Direxion Daily Semiconductor Bull 3X Shares",
+                      "ovrs_cblc_qty": "2"
+                    }
+                  ],
+                  "output2": {}
+                }
+                """.trimIndent(),
+            ),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        val snapshot = adapter.findAccountSnapshot(
+            BrokerAccountSnapshotQuery(
+                market = StockOrderMarket.OVERSEAS_US,
+                exchange = "NASD",
+                currency = "USD",
+                isMock = false,
+            ),
+        )
+
+        assertEquals(listOf("TQQQ", "SOXL"), snapshot.positions.map { it.symbol })
+        assertEquals(2, exchangeFunction.requests.size)
+        assertEquals("FK1", exchangeFunction.requests[1].queryValue("ctxAreaFk200"))
+        assertEquals("NK1", exchangeFunction.requests[1].queryValue("ctxAreaNk200"))
+    }
+
+    @Test
     fun `domestic order history sends broker order id when present`() {
         val exchangeFunction = ResponseExchangeFunction(
             responses = listOf(protobufResponse(domesticHistoryResponse())),

@@ -143,6 +143,14 @@ The response includes:
 
 Use this endpoint with the alert counters when checking whether broker submission recovery, reconciliation, and unmatched execution handling are advancing after a restart.
 
+For live broker position checks, `stock-purchase-service` exposes:
+
+```text
+GET /operations/trading/account-snapshot?market=OVERSEAS_US&exchange=NASD&currency=USD
+```
+
+This calls the broker wrapper's overseas balance lookup and returns current overseas positions with quantity, average purchase price, current price, purchase amount, evaluation amount, and profit/loss when KIS provides those fields. Domestic balance, settled cash, and account-wide exposure enforcement still require additional hardening.
+
 ## Kafka And Temporal Restart Procedure
 
 When Kafka, Temporal, or an application service restarts:

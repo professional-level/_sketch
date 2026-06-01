@@ -13,6 +13,9 @@ interface MarketServicePort {
     fun findExecutionList(query: ExecutionLookupQuery): List<ExecutedStockDto> = findExecutionListAtOneDay()
     fun findExecutionListAtOneDay(): List<ExecutedStockDto>
     fun findOrderSubmissionStatus(query: BrokerOrderStatusQuery): BrokerOrderStatusDto
+    fun findAccountSnapshot(query: AccountSnapshotQuery): AccountSnapshotDto {
+        throw UnsupportedOperationException("account snapshot is not supported")
+    }
 }
 
 interface DomesticStockOrderPort {
@@ -22,6 +25,9 @@ interface DomesticStockOrderPort {
     fun findExecutionList(query: ExecutionLookupQuery): List<ExecutedStockDto> = findExecutionListAtOneDay()
     fun findExecutionListAtOneDay(): List<ExecutedStockDto>
     fun findOrderSubmissionStatus(query: BrokerOrderStatusQuery): BrokerOrderStatusDto
+    fun findAccountSnapshot(query: AccountSnapshotQuery): AccountSnapshotDto {
+        throw UnsupportedOperationException("domestic account snapshot is not supported")
+    }
 }
 
 interface OverseasStockOrderPort {
@@ -31,6 +37,9 @@ interface OverseasStockOrderPort {
     fun findExecutionList(query: ExecutionLookupQuery): List<ExecutedStockDto> = findExecutionListAtOneDay()
     fun findExecutionListAtOneDay(): List<ExecutedStockDto>
     fun findOrderSubmissionStatus(query: BrokerOrderStatusQuery): BrokerOrderStatusDto
+    fun findAccountSnapshot(query: AccountSnapshotQuery): AccountSnapshotDto {
+        throw UnsupportedOperationException("overseas account snapshot is not supported")
+    }
 }
 
 data class BrokerOrderSubmissionDto(
@@ -128,6 +137,33 @@ data class ExecutionLookupQuery(
         require(!from.isAfter(to)) { "execution lookup from must be before or equal to to" }
     }
 }
+
+data class AccountSnapshotQuery(
+    val market: StockOrderMarket,
+    val exchange: String = "NASD",
+    val currency: String = "USD",
+)
+
+data class AccountSnapshotDto(
+    val market: StockOrderMarket,
+    val exchange: String,
+    val currency: String,
+    val positions: List<AccountPositionSnapshotDto>,
+    val totalPurchaseAmount: Double? = null,
+    val totalEvaluationAmount: Double? = null,
+    val totalProfitLossAmount: Double? = null,
+)
+
+data class AccountPositionSnapshotDto(
+    val symbol: String,
+    val stockName: String,
+    val quantity: Long,
+    val averagePurchasePrice: Double? = null,
+    val currentPrice: Double? = null,
+    val purchaseAmount: Double? = null,
+    val evaluationAmount: Double? = null,
+    val profitLossAmount: Double? = null,
+)
 
 data class ExecutedStockDto(
     val stockId: String,

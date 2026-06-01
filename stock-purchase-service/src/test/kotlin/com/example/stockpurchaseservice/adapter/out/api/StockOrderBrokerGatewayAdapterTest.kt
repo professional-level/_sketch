@@ -1,11 +1,14 @@
 package com.example.stockpurchaseservice.adapter.out.api
 
 import com.example.stockpurchaseservice.adapter.out.broker.BrokerGateway
+import com.example.stockpurchaseservice.adapter.out.broker.BrokerAccountSnapshot
+import com.example.stockpurchaseservice.adapter.out.broker.BrokerAccountSnapshotQuery
 import com.example.stockpurchaseservice.adapter.out.broker.BrokerOrderCancelCommand
 import com.example.stockpurchaseservice.adapter.out.broker.BrokerOrderCommand
 import com.example.stockpurchaseservice.adapter.out.broker.BrokerOrderHistoryItem
 import com.example.stockpurchaseservice.adapter.out.broker.BrokerOrderHistoryQuery
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
+import com.example.stockpurchaseservice.application.port.out.AccountSnapshotQuery
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatusQuery
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderSubmissionDto
 import com.example.stockpurchaseservice.application.port.out.CancelOrderDto
@@ -152,10 +155,35 @@ class StockOrderBrokerGatewayAdapterTest {
         }
     }
 
+    @Test
+    fun `overseas account snapshot passes exchange and currency to broker gateway`() {
+        val brokerGateway = FakeBrokerGateway()
+        val adapter = OverseasStockOrderAdapter(brokerGateway, isMockOrder = false)
+
+        val snapshot = adapter.findAccountSnapshot(
+            AccountSnapshotQuery(
+                market = StockOrderMarket.OVERSEAS_US,
+                exchange = "NYSE",
+                currency = "USD",
+            ),
+        )
+
+        assertEquals(StockOrderMarket.OVERSEAS_US, snapshot.market)
+        assertEquals("NYSE", snapshot.exchange)
+        assertEquals("USD", snapshot.currency)
+        with(brokerGateway.accountSnapshotQueries.single()) {
+            assertEquals(StockOrderMarket.OVERSEAS_US, market)
+            assertEquals("NYSE", exchange)
+            assertEquals("USD", currency)
+            assertEquals(false, isMock)
+        }
+    }
+
     private class FakeBrokerGateway : BrokerGateway {
         val submitted: MutableList<BrokerOrderCommand> = mutableListOf()
         val cancelled: MutableList<BrokerOrderCancelCommand> = mutableListOf()
         val historyQueries: MutableList<BrokerOrderHistoryQuery> = mutableListOf()
+        val accountSnapshotQueries: MutableList<BrokerAccountSnapshotQuery> = mutableListOf()
 
         override fun submitOrder(command: BrokerOrderCommand): BrokerOrderSubmissionDto {
             submitted += command
@@ -170,6 +198,16 @@ class StockOrderBrokerGatewayAdapterTest {
         override fun findOrderHistory(query: BrokerOrderHistoryQuery): List<BrokerOrderHistoryItem> {
             historyQueries += query
             return emptyList()
+        }
+
+        override fun findAccountSnapshot(query: BrokerAccountSnapshotQuery): BrokerAccountSnapshot {
+            accountSnapshotQueries += query
+            return BrokerAccountSnapshot(
+                market = query.market,
+                exchange = query.exchange,
+                currency = query.currency,
+                positions = emptyList(),
+            )
         }
     }
 }

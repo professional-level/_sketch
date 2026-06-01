@@ -64,6 +64,10 @@ enum class RequestType(
         requestURI = "/uapi/overseas-stock/v1/trading/order-rvsecncl",
         type = HttpMethod.POST,
     ),
+    GET_OVERSEAS_STOCK_BALANCE(
+        requestURI = "/uapi/overseas-stock/v1/trading/inquire-balance",
+        type = HttpMethod.GET,
+    ),
     GET_EXECUTION_ORDERS(
         requestURI = "/uapi/domestic-stock/v1/trading/inquire-daily-ccld", // 주식일별주문체결조회[v1_국내주식-005]
         type = HttpMethod.GET,
@@ -127,6 +131,7 @@ enum class QueryParameter(
     SLL_BUY_DVSN(emptyQueryParam),
     CCLD_NCCS_DVSN(emptyQueryParam),
     OVRS_EXCG_CD(emptyQueryParam),
+    TR_CRCY_CD(emptyQueryParam),
     SORT_SQN(emptyQueryParam),
     CTX_AREA_NK200(emptyQueryParam),
     CTX_AREA_FK200(emptyQueryParam),
@@ -212,6 +217,10 @@ enum class QueryParameter(
                 )
                 RequestType.POST_OVERSEAS_STOCK_ORDER -> emptyList()
                 RequestType.POST_OVERSEAS_STOCK_ORDER_CANCEL -> emptyList()
+                RequestType.GET_OVERSEAS_STOCK_BALANCE -> listOf(
+                    CANO, ACNT_PRDT_CD, OVRS_EXCG_CD, TR_CRCY_CD,
+                    CTX_AREA_FK200, CTX_AREA_NK200,
+                )
                 // TODO: 필요없는 파라미터 제거 필요.
                 RequestType.GET_EXECUTION_ORDERS -> listOf(
                     CANO, ACNT_PRDT_CD, INQR_STRT_DT, INQR_END_DT,

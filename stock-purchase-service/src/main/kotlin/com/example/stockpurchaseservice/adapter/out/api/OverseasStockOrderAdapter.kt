@@ -2,11 +2,15 @@ package com.example.stockpurchaseservice.adapter.out.api
 
 import com.example.common.ExternalApiAdapter
 import com.example.stockpurchaseservice.adapter.out.broker.BROKER_ORDER_ZONE
+import com.example.stockpurchaseservice.adapter.out.broker.BrokerAccountSnapshotQuery
 import com.example.stockpurchaseservice.adapter.out.broker.BrokerGateway
 import com.example.stockpurchaseservice.adapter.out.broker.BrokerOrderCancelCommand
 import com.example.stockpurchaseservice.adapter.out.broker.BrokerOrderCommand
 import com.example.stockpurchaseservice.adapter.out.broker.BrokerOrderHistoryQuery
 import com.example.stockpurchaseservice.adapter.out.broker.findStatusFor
+import com.example.stockpurchaseservice.application.port.out.AccountPositionSnapshotDto
+import com.example.stockpurchaseservice.application.port.out.AccountSnapshotDto
+import com.example.stockpurchaseservice.application.port.out.AccountSnapshotQuery
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatusDto
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatusQuery
@@ -66,6 +70,37 @@ internal class OverseasStockOrderAdapter(
                 isMock = isMockOrder,
             ),
         ).findStatusFor(query)
+    }
+
+    override fun findAccountSnapshot(query: AccountSnapshotQuery): AccountSnapshotDto {
+        val snapshot = brokerGateway.findAccountSnapshot(
+            BrokerAccountSnapshotQuery(
+                market = StockOrderMarket.OVERSEAS_US,
+                exchange = query.exchange,
+                currency = query.currency,
+                isMock = isMockOrder,
+            ),
+        )
+        return AccountSnapshotDto(
+            market = snapshot.market,
+            exchange = snapshot.exchange,
+            currency = snapshot.currency,
+            positions = snapshot.positions.map {
+                AccountPositionSnapshotDto(
+                    symbol = it.symbol,
+                    stockName = it.stockName,
+                    quantity = it.quantity,
+                    averagePurchasePrice = it.averagePurchasePrice,
+                    currentPrice = it.currentPrice,
+                    purchaseAmount = it.purchaseAmount,
+                    evaluationAmount = it.evaluationAmount,
+                    profitLossAmount = it.profitLossAmount,
+                )
+            },
+            totalPurchaseAmount = snapshot.totalPurchaseAmount,
+            totalEvaluationAmount = snapshot.totalEvaluationAmount,
+            totalProfitLossAmount = snapshot.totalProfitLossAmount,
+        )
     }
 
     private fun PurchaseOrderDto.toBrokerCommand(side: OrderIntentSide, price: Double): BrokerOrderCommand {

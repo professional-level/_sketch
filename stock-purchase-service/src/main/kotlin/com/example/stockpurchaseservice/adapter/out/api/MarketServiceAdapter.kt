@@ -1,6 +1,8 @@
 package com.example.stockpurchaseservice.adapter.out.api
 
 import com.example.common.ExternalApiAdapter
+import com.example.stockpurchaseservice.application.port.out.AccountSnapshotDto
+import com.example.stockpurchaseservice.application.port.out.AccountSnapshotQuery
 import com.example.stockpurchaseservice.application.port.out.CancelOrderDto
 import com.example.stockpurchaseservice.application.port.out.DomesticStockOrderPort
 import com.example.stockpurchaseservice.application.port.out.ExecutionLookupQuery
@@ -55,6 +57,13 @@ internal class MarketServiceAdapter(
         return when (query.market) {
             StockOrderMarket.DOMESTIC -> domesticStockOrderPort.findOrderSubmissionStatus(query)
             StockOrderMarket.OVERSEAS_US -> overseasStockOrderPort.findOrderSubmissionStatus(query)
+        }
+    }
+
+    override fun findAccountSnapshot(query: AccountSnapshotQuery): AccountSnapshotDto {
+        return when (query.market) {
+            StockOrderMarket.DOMESTIC -> domesticStockOrderPort.findAccountSnapshot(query)
+            StockOrderMarket.OVERSEAS_US -> overseasStockOrderPort.findAccountSnapshot(query)
         }
     }
 }

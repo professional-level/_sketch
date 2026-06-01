@@ -10,6 +10,7 @@ import com.example.common.endpoint.Endpoint.GET_EXECUTION_ORDERS
 import com.example.common.endpoint.Endpoint.GET_FOREIGNER_TRADE_TREND
 import com.example.common.endpoint.Endpoint.GET_OVERSEAS_EXECUTION_ORDERS
 import com.example.common.endpoint.Endpoint.GET_OVERSEAS_DAILY_PRICE
+import com.example.common.endpoint.Endpoint.GET_OVERSEAS_STOCK_BALANCE
 import com.example.common.endpoint.Endpoint.GET_PROGRAM_TRADE_INFO_PER_INDIVIDUAL
 import com.example.common.endpoint.Endpoint.GET_PROGRAM_TRADE_INFO_PER_INDIVIDUAL_AT_ONE_DAY
 import com.example.common.endpoint.Endpoint.GET_QUOTATIONS_OF_VOLUME_RANK
@@ -228,6 +229,13 @@ class OpenApiController(
         @ModelAttribute request: GetOverseasExecutionOrdersRequest,
     ): OpenApiResponse {
         return service.getOverseasExecutionOrders(request)
+    }
+
+    @GetMapping(GET_OVERSEAS_STOCK_BALANCE)
+    suspend fun getOverseasStockBalance(
+        @ModelAttribute request: GetOverseasStockBalanceRequest,
+    ): OpenApiResponse {
+        return service.getOverseasStockBalance(request)
     }
 }
 
