@@ -13,6 +13,7 @@ import com.example.stockpurchaseservice.application.port.out.OrderPartiallyFille
 import com.example.stockpurchaseservice.application.port.out.OrderRejectedMessage
 import com.example.stockpurchaseservice.application.port.out.OrderSubmittedMessage
 import common.MessageTopic
+import common.observability.TraceContext
 import io.smallrye.mutiny.coroutines.awaitSuspending
 import java.util.UUID
 
@@ -80,6 +81,9 @@ internal class OrderExecutionOutboxAdapter(
                 messageKey = event.messageKey,
                 payload = event.payload,
                 retryCount = event.retryCount,
+                traceId = event.traceId,
+                spanId = event.spanId,
+                traceParent = event.traceParent,
             )
         }
     }
@@ -103,6 +107,7 @@ internal class OrderExecutionOutboxAdapter(
         eventType: String,
         payload: ByteArray,
     ) {
+        val traceContext = TraceContext.current()
         outboxEventRepository.save(
             OrderExecutionOutboxEventEntity.pending(
                 id = id,
@@ -110,6 +115,9 @@ internal class OrderExecutionOutboxAdapter(
                 messageKey = messageKey,
                 eventType = eventType,
                 payload = payload,
+                traceId = traceContext.traceId,
+                spanId = traceContext.spanId,
+                traceParent = traceContext.traceParent,
             ),
         ).awaitSuspending()
     }

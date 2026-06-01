@@ -623,7 +623,15 @@ stock-search-service
 
 - `stock-purchase-service` exposes `GET /operations/trading/status` for operator dashboard polling.
 - The endpoint reports order submission status counts, reconciliation cursor health, unmatched execution totals, and recent unmatched broker executions.
-- This fills the API side of the operating dashboard need. A UI and cross-service Kafka/Temporal trace propagation are still production hardening work.
+- This fills the API side of the operating dashboard need. A UI plus Temporal schedule/activity trace propagation are still production hardening work.
+
+### Kafka Trace Propagation
+
+- `strategy-execution-service` and `stock-purchase-service` now persist `traceId`, `spanId`, and `traceparent` with outbox rows.
+- Outbox Kafka publishers copy the stored trace values into Kafka headers before sending the event.
+- Kafka listeners restore those headers into MDC before invoking use cases, so downstream logs and operational alerts can keep the same trace context.
+- Production DB migrations must add the outbox trace columns before deployment.
+- Temporal schedule/activity trace propagation, OpenTelemetry exporter wiring, and dashboard UI correlation remain production hardening work.
 
 ### Broker Account Snapshot API
 

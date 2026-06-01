@@ -9,6 +9,7 @@ import com.example.strategyexecutionservice.application.port.out.OrderIntentOutb
 import com.example.strategyexecutionservice.application.port.out.OrderIntentOutboxPort
 import com.example.strategyexecutionservice.application.port.out.OrderIntentPort
 import common.MessageTopic
+import common.observability.TraceContext
 import io.smallrye.mutiny.coroutines.awaitSuspending
 import java.util.UUID
 
@@ -20,6 +21,7 @@ internal class OrderIntentOutboxAdapter(
 
     override suspend fun publishAll(orderIntents: List<OrderIntentMessage>) {
         orderIntents.forEach { orderIntent ->
+            val traceContext = TraceContext.current()
             outboxEventRepository.save(
                 OrderIntentOutboxEventEntity.pending(
                     id = orderIntent.eventId,
@@ -27,6 +29,9 @@ internal class OrderIntentOutboxAdapter(
                     messageKey = orderIntent.strategyExecutionId,
                     eventType = "OrderIntentCreatedEvent",
                     payload = serializer.serialize(orderIntent),
+                    traceId = traceContext.traceId,
+                    spanId = traceContext.spanId,
+                    traceParent = traceContext.traceParent,
                 ),
             ).awaitSuspending()
         }
@@ -40,6 +45,9 @@ internal class OrderIntentOutboxAdapter(
                 messageKey = event.messageKey,
                 payload = event.payload,
                 retryCount = event.retryCount,
+                traceId = event.traceId,
+                spanId = event.spanId,
+                traceParent = event.traceParent,
             )
         }
     }

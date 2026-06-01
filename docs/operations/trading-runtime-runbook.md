@@ -156,6 +156,8 @@ akra.observability.operational-alerts.pager-duty.source=stock-purchase-service
 
 Keep real webhook URLs and PagerDuty routing keys outside Git, because many alert platforms embed routing tokens in the URL. The generic webhook payload contains `type`, `severity`, `title`, `occurredAt`, an `attributes` object with alert-specific fields, and a `trace` object when MDC contains `traceId`/`spanId` or `traceparent`. Slack uses an incoming-webhook attachment payload, and PagerDuty uses an Events API v2 `trigger` payload with deterministic dedup keys. Slack fields and PagerDuty `custom_details` also include `traceId`, `spanId`, and `traceparent` when available.
 
+Kafka event boundaries carry the same trace fields through outbox rows and Kafka headers. Before deploying the current schema, add nullable `traceId`, `spanId`, and `traceParent` columns to the strategy-execution and stock-purchase outbox tables. Listener-side MDC restoration lets subsequent logs and operational alerts retain the upstream trace context. Temporal schedule/activity propagation is still a separate hardening task.
+
 `stock-purchase-service` also exposes an operator status endpoint for dashboard polling or manual checks:
 
 ```text

@@ -27,6 +27,12 @@ internal class OrderIntentOutboxEventEntity private constructor(
     @Lob
     @Column(nullable = false)
     val payload: ByteArray,
+    @Column
+    val traceId: String?,
+    @Column
+    val spanId: String?,
+    @Column
+    val traceParent: String?,
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     var status: OrderIntentOutboxEventStatus,
@@ -58,6 +64,9 @@ internal class OrderIntentOutboxEventEntity private constructor(
             messageKey: String,
             eventType: String,
             payload: ByteArray,
+            traceId: String? = null,
+            spanId: String? = null,
+            traceParent: String? = null,
         ): OrderIntentOutboxEventEntity {
             return OrderIntentOutboxEventEntity(
                 id = id,
@@ -65,6 +74,9 @@ internal class OrderIntentOutboxEventEntity private constructor(
                 messageKey = messageKey,
                 eventType = eventType,
                 payload = payload,
+                traceId = traceId,
+                spanId = spanId,
+                traceParent = traceParent,
                 status = OrderIntentOutboxEventStatus.PENDING,
                 retryCount = 0,
                 createdAt = ZonedDateTime.now(),

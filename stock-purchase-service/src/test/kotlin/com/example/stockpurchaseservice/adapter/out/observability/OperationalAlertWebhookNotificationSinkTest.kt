@@ -1,5 +1,6 @@
 package com.example.stockpurchaseservice.adapter.out.observability
 
+import common.observability.TraceContext
 import com.example.stockpurchaseservice.config.observability.OperationalAlertProperties
 import java.time.ZonedDateTime
 import kotlinx.coroutines.runBlocking
@@ -196,7 +197,7 @@ class OperationalAlertWebhookNotificationSinkTest {
 
     private fun notificationWithTrace(): OperationalAlertNotification {
         return notification().copy(
-            traceContext = OperationalAlertTraceContext(
+            traceContext = TraceContext(
                 traceId = TRACE_ID,
                 spanId = SPAN_ID,
                 traceParent = TRACE_PARENT,

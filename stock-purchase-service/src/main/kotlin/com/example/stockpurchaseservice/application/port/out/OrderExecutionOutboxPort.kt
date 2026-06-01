@@ -15,4 +15,7 @@ data class OrderExecutionOutboxMessage(
     val messageKey: String,
     val payload: ByteArray,
     val retryCount: Int,
+    val traceId: String? = null,
+    val spanId: String? = null,
+    val traceParent: String? = null,
 )

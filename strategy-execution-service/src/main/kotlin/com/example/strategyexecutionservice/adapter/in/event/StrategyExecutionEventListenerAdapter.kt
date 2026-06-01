@@ -19,8 +19,11 @@ import common.Topic.ORDER_CANCELLED
 import common.Topic.ORDER_REJECTED
 import common.Topic.ORDER_SUBMITTED
 import common.Topic.STRATEGY_EXECUTION_START_REQUESTED
+import common.observability.TraceContext
 import common.proto.ProtoUtils.toZonedDateTime
+import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.springframework.kafka.annotation.KafkaListener
+import java.nio.charset.StandardCharsets
 
 @ExternalApiAdapter
 internal class StrategyExecutionEventListenerAdapter(
@@ -29,40 +32,73 @@ internal class StrategyExecutionEventListenerAdapter(
     private val recordOrderExecutionEventUseCase: RecordOrderExecutionEventUseCase,
 ) {
     @KafkaListener(topics = [STRATEGY_EXECUTION_START_REQUESTED], groupId = STRATEGY_EXECUTION_SERVICE)
-    suspend fun strategyExecutionStartRequests(message: ByteArray) {
-        val event = Event.StrategyExecutionStartRequested.parseFrom(message)
-        startStrategyExecutionUseCase.execute(event.toCommand())
+    suspend fun strategyExecutionStartRequests(record: ConsumerRecord<String, ByteArray>) {
+        record.withTraceContext {
+            val event = Event.StrategyExecutionStartRequested.parseFrom(record.value())
+            startStrategyExecutionUseCase.execute(event.toCommand())
+        }
     }
 
     @KafkaListener(topics = [ORDER_FILLED], groupId = STRATEGY_EXECUTION_SERVICE)
-    suspend fun orderFills(message: ByteArray) {
-        val event = Event.OrderFilled.parseFrom(message)
-        applyOrderFillUseCase.execute(event.toCommand())
+    suspend fun orderFills(record: ConsumerRecord<String, ByteArray>) {
+        record.withTraceContext {
+            val event = Event.OrderFilled.parseFrom(record.value())
+            applyOrderFillUseCase.execute(event.toCommand())
+        }
     }
 
     @KafkaListener(topics = [ORDER_PARTIALLY_FILLED], groupId = STRATEGY_EXECUTION_SERVICE)
-    suspend fun partialOrderFills(message: ByteArray) {
-        val event = Event.OrderPartiallyFilled.parseFrom(message)
-        applyOrderFillUseCase.execute(event.toCommand())
+    suspend fun partialOrderFills(record: ConsumerRecord<String, ByteArray>) {
+        record.withTraceContext {
+            val event = Event.OrderPartiallyFilled.parseFrom(record.value())
+            applyOrderFillUseCase.execute(event.toCommand())
+        }
     }
 
     @KafkaListener(topics = [ORDER_SUBMITTED], groupId = STRATEGY_EXECUTION_SERVICE)
-    suspend fun orderSubmissions(message: ByteArray) {
-        val event = Event.OrderSubmitted.parseFrom(message)
-        recordOrderExecutionEventUseCase.execute(event.toCommand())
+    suspend fun orderSubmissions(record: ConsumerRecord<String, ByteArray>) {
+        record.withTraceContext {
+            val event = Event.OrderSubmitted.parseFrom(record.value())
+            recordOrderExecutionEventUseCase.execute(event.toCommand())
+        }
     }
 
     @KafkaListener(topics = [ORDER_REJECTED], groupId = STRATEGY_EXECUTION_SERVICE)
-    suspend fun orderRejections(message: ByteArray) {
-        val event = Event.OrderRejected.parseFrom(message)
-        recordOrderExecutionEventUseCase.execute(event.toCommand())
+    suspend fun orderRejections(record: ConsumerRecord<String, ByteArray>) {
+        record.withTraceContext {
+            val event = Event.OrderRejected.parseFrom(record.value())
+            recordOrderExecutionEventUseCase.execute(event.toCommand())
+        }
     }
 
     @KafkaListener(topics = [ORDER_CANCELLED], groupId = STRATEGY_EXECUTION_SERVICE)
-    suspend fun orderCancellations(message: ByteArray) {
-        val event = Event.OrderCancelled.parseFrom(message)
-        recordOrderExecutionEventUseCase.execute(event.toCommand())
+    suspend fun orderCancellations(record: ConsumerRecord<String, ByteArray>) {
+        record.withTraceContext {
+            val event = Event.OrderCancelled.parseFrom(record.value())
+            recordOrderExecutionEventUseCase.execute(event.toCommand())
+        }
     }
+}
+
+private suspend fun ConsumerRecord<*, ByteArray>.withTraceContext(block: suspend () -> Unit) {
+    val traceContext = traceContext()
+    if (traceContext.isEmpty()) {
+        block()
+    } else {
+        traceContext.withMdc(block)
+    }
+}
+
+private fun ConsumerRecord<*, *>.traceContext(): TraceContext {
+    return TraceContext.fromHeaders(
+        traceParent = headerValue(TraceContext.TRACEPARENT_KEY),
+        traceId = headerValue(TraceContext.TRACE_ID_KEY),
+        spanId = headerValue(TraceContext.SPAN_ID_KEY),
+    )
+}
+
+private fun ConsumerRecord<*, *>.headerValue(key: String): String? {
+    return headers().lastHeader(key)?.value()?.toString(StandardCharsets.UTF_8)
 }
 
 private fun Event.StrategyExecutionStartRequested.toCommand(): StartStrategyExecutionCommand {

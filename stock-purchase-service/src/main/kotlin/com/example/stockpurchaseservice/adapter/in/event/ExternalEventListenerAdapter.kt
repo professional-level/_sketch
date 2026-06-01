@@ -8,7 +8,9 @@ import com.example.stockpurchaseservice.application.port.`in`.SubmitOrderIntentC
 import com.example.stockpurchaseservice.application.port.`in`.SubmitOrderIntentUseCase
 import common.ConsumerGroupId.PURCHASE_SERVICE
 import common.Topic.ORDER_INTENT_CREATED
+import common.observability.TraceContext
 import common.proto.ProtoUtils.toZonedDateTime
+import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.springframework.kafka.annotation.KafkaListener
 import java.nio.charset.StandardCharsets
 import java.util.UUID
@@ -18,10 +20,33 @@ internal class ExternalEventListenerAdapter(
     private val submitOrderIntentUseCase: SubmitOrderIntentUseCase,
 ) {
     @KafkaListener(topics = [ORDER_INTENT_CREATED], groupId = PURCHASE_SERVICE)
-    suspend fun orderIntents(message: ByteArray) {
-        val event = Event.OrderIntentCreatedEvent.parseFrom(message)
-        submitOrderIntentUseCase.execute(event.toCommand())
+    suspend fun orderIntents(record: ConsumerRecord<String, ByteArray>) {
+        record.withTraceContext {
+            val event = Event.OrderIntentCreatedEvent.parseFrom(record.value())
+            submitOrderIntentUseCase.execute(event.toCommand())
+        }
     }
+}
+
+private suspend fun ConsumerRecord<*, ByteArray>.withTraceContext(block: suspend () -> Unit) {
+    val traceContext = traceContext()
+    if (traceContext.isEmpty()) {
+        block()
+    } else {
+        traceContext.withMdc(block)
+    }
+}
+
+private fun ConsumerRecord<*, *>.traceContext(): TraceContext {
+    return TraceContext.fromHeaders(
+        traceParent = headerValue(TraceContext.TRACEPARENT_KEY),
+        traceId = headerValue(TraceContext.TRACE_ID_KEY),
+        spanId = headerValue(TraceContext.SPAN_ID_KEY),
+    )
+}
+
+private fun ConsumerRecord<*, *>.headerValue(key: String): String? {
+    return headers().lastHeader(key)?.value()?.toString(StandardCharsets.UTF_8)
 }
 
 fun Event.OrderIntentCreatedEvent.toCommand(): SubmitOrderIntentCommand {
