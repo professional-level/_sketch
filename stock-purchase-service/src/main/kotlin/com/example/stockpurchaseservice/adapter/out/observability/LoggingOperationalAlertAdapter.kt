@@ -14,11 +14,28 @@ import org.slf4j.LoggerFactory
 @ExternalApiAdapter
 internal class LoggingOperationalAlertAdapter(
     private val meterRegistry: MeterRegistry,
+    private val notificationSink: OperationalAlertNotificationSink,
 ) : OperationalAlertPort {
     private val log = LoggerFactory.getLogger(javaClass)
 
     override suspend fun alertOrderSubmissionFailed(alert: OrderSubmissionFailureAlert) {
-        recordAlert(type = "order_submission_failed", severity = "error")
+        emitAlert(
+            OperationalAlertNotification(
+                type = "order_submission_failed",
+                severity = "error",
+                title = "Order submission failed",
+                occurredAt = alert.occurredAt,
+                attributes = mapOf(
+                    "orderIntentId" to alert.orderIntentId.toString(),
+                    "strategyExecutionId" to alert.strategyExecutionId,
+                    "symbol" to alert.symbol,
+                    "side" to alert.side.name,
+                    "orderType" to alert.orderType.name,
+                    "orderTag" to alert.orderTag,
+                    "reason" to alert.reason,
+                ),
+            ),
+        )
         log.error(
             "Order submission failed: orderIntentId={} strategyExecutionId={} symbol={} side={} orderType={} orderTag={} reason={}",
             alert.orderIntentId,
@@ -32,7 +49,25 @@ internal class LoggingOperationalAlertAdapter(
     }
 
     override suspend fun alertSubmissionUnknown(alert: SubmissionUnknownAlert) {
-        recordAlert(type = "submission_unknown", severity = "warning")
+        emitAlert(
+            OperationalAlertNotification(
+                type = "submission_unknown",
+                severity = "warning",
+                title = "Order submission remains unknown",
+                occurredAt = alert.checkedAt,
+                attributes = mapOf(
+                    "orderIntentId" to alert.orderIntentId.toString(),
+                    "strategyExecutionId" to alert.strategyExecutionId,
+                    "symbol" to alert.symbol,
+                    "side" to alert.side.name,
+                    "orderType" to alert.orderType.name,
+                    "orderTag" to alert.orderTag,
+                    "externalOrderId" to alert.externalOrderId,
+                    "submittedAt" to alert.submittedAt.toString(),
+                    "reason" to alert.reason,
+                ),
+            ),
+        )
         log.warn(
             "Order submission remains unknown: orderIntentId={} strategyExecutionId={} symbol={} side={} orderType={} orderTag={} externalOrderId={} submittedAt={} checkedAt={} reason={}",
             alert.orderIntentId,
@@ -49,7 +84,18 @@ internal class LoggingOperationalAlertAdapter(
     }
 
     override suspend fun alertReconciliationFailed(alert: ReconciliationFailureAlert) {
-        recordAlert(type = "reconciliation_failed", severity = "error")
+        emitAlert(
+            OperationalAlertNotification(
+                type = "reconciliation_failed",
+                severity = "error",
+                title = "Execution reconciliation failed",
+                occurredAt = alert.failedAt,
+                attributes = mapOf(
+                    "source" to alert.source,
+                    "reason" to alert.reason,
+                ),
+            ),
+        )
         log.error(
             "Execution reconciliation failed: source={} failedAt={} reason={}",
             alert.source,
@@ -59,7 +105,23 @@ internal class LoggingOperationalAlertAdapter(
     }
 
     override suspend fun alertUnmatchedExecution(alert: UnmatchedExecutionAlert) {
-        recordAlert(type = "unmatched_execution", severity = "warning")
+        emitAlert(
+            OperationalAlertNotification(
+                type = "unmatched_execution",
+                severity = "warning",
+                title = "Unmatched broker execution observed",
+                occurredAt = alert.observedAt,
+                attributes = mapOf(
+                    "source" to alert.source,
+                    "externalExecutionId" to alert.externalExecutionId,
+                    "externalOrderId" to alert.externalOrderId,
+                    "stockId" to alert.stockId,
+                    "quantity" to alert.quantity.toString(),
+                    "type" to alert.type.name,
+                    "reason" to alert.reason,
+                ),
+            ),
+        )
         log.warn(
             "Unmatched broker execution observed: source={} externalExecutionId={} externalOrderId={} stockId={} quantity={} type={} observedAt={} reason={}",
             alert.source,
@@ -74,7 +136,22 @@ internal class LoggingOperationalAlertAdapter(
     }
 
     override suspend fun alertOrderCancellationSubmissionFailed(alert: OrderCancellationSubmissionAlert) {
-        recordAlert(type = "order_cancellation_submission_failed", severity = "error")
+        emitAlert(
+            OperationalAlertNotification(
+                type = "order_cancellation_submission_failed",
+                severity = "error",
+                title = "Order cancellation submission failed",
+                occurredAt = alert.occurredAt,
+                attributes = mapOf(
+                    "cancellationRequestId" to alert.cancellationRequestId.toString(),
+                    "strategyExecutionId" to alert.strategyExecutionId,
+                    "symbol" to alert.symbol,
+                    "originalBrokerOrderId" to alert.originalBrokerOrderId,
+                    "branchOrderNumber" to alert.branchOrderNumber,
+                    "reason" to alert.reason,
+                ),
+            ),
+        )
         log.error(
             "Order cancellation submission failed: cancellationRequestId={} strategyExecutionId={} symbol={} originalBrokerOrderId={} branchOrderNumber={} reason={}",
             alert.cancellationRequestId,
@@ -87,7 +164,22 @@ internal class LoggingOperationalAlertAdapter(
     }
 
     override suspend fun alertOrderCancellationSubmissionUnknown(alert: OrderCancellationSubmissionAlert) {
-        recordAlert(type = "order_cancellation_submission_unknown", severity = "warning")
+        emitAlert(
+            OperationalAlertNotification(
+                type = "order_cancellation_submission_unknown",
+                severity = "warning",
+                title = "Order cancellation submission remains unknown",
+                occurredAt = alert.occurredAt,
+                attributes = mapOf(
+                    "cancellationRequestId" to alert.cancellationRequestId.toString(),
+                    "strategyExecutionId" to alert.strategyExecutionId,
+                    "symbol" to alert.symbol,
+                    "originalBrokerOrderId" to alert.originalBrokerOrderId,
+                    "branchOrderNumber" to alert.branchOrderNumber,
+                    "reason" to alert.reason,
+                ),
+            ),
+        )
         log.warn(
             "Order cancellation submission remains unknown: cancellationRequestId={} strategyExecutionId={} symbol={} originalBrokerOrderId={} branchOrderNumber={} reason={}",
             alert.cancellationRequestId,
@@ -97,6 +189,20 @@ internal class LoggingOperationalAlertAdapter(
             alert.branchOrderNumber,
             alert.reason,
         )
+    }
+
+    private suspend fun emitAlert(notification: OperationalAlertNotification) {
+        recordAlert(type = notification.type, severity = notification.severity)
+        runCatching {
+            notificationSink.send(notification)
+        }.onFailure { exception ->
+            log.warn(
+                "Failed to send operational alert notification: type={} severity={}",
+                notification.type,
+                notification.severity,
+                exception,
+            )
+        }
     }
 
     private fun recordAlert(type: String, severity: String) {

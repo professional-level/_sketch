@@ -118,6 +118,16 @@ Operational alert counters are emitted through Micrometer as `stock.purchase.ope
 - `type`: `order_submission_failed`, `submission_unknown`, `reconciliation_failed`, `unmatched_execution`, `order_cancellation_submission_failed`, or `order_cancellation_submission_unknown`
 - `severity`: `error` or `warning`
 
+Optional outbound alert webhook:
+
+```properties
+akra.observability.operational-alerts.webhook.enabled=true
+akra.observability.operational-alerts.webhook.url=https://alerts.example.invalid/trading
+akra.observability.operational-alerts.webhook.timeout=3s
+```
+
+Keep real webhook URLs outside Git, because many alert platforms embed routing tokens in the URL. The webhook payload contains `type`, `severity`, `title`, `occurredAt`, and an `attributes` object with alert-specific fields.
+
 ## Kafka And Temporal Restart Procedure
 
 When Kafka, Temporal, or an application service restarts:
