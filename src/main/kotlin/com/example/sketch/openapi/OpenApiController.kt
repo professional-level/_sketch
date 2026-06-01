@@ -21,6 +21,7 @@ import com.example.common.endpoint.Endpoint.POST_STOCK_ORDER_CANCEL
 import com.example.common.endpoint.Endpoint.REQUEST_TOKEN
 import com.example.sketch.utils.OpenApiResponse
 import com.example.sketch.utils.StringExtension.toRequestableDateFormat
+import com.fasterxml.jackson.databind.JsonNode
 import dailyExecutionOrdersOutput1
 import dailyExecutionOrdersOutput2
 import dailyExecutionOrdersResponse
@@ -231,20 +232,36 @@ class OpenApiController(
 }
 
 // TODO: 해당 to~로직을 다른 interface로 변경
-private fun OpenApiResponse.toPostStockOrderResponse(): ApiResponse.StockOrder {
-    val response = this.get(0)?.let {
-        stockOrder {
-            rtCd = it.get("rt_cd").asText()
-            msgCd = it.get("msg_cd").asText()
-            msg1 = it.get("msg_1").asText()
-            output = output {
-                kRXFWDGORDORGNO = it.get("KRX_FWDG_ORD_ORGNO").asText()
-                oDNO = it.get("ODNO").asText()
-                oRDTMD = it.get("ORD_TMD").asText()
-            }
+internal fun OpenApiResponse.toPostStockOrderResponse(): ApiResponse.StockOrder {
+    val responseNode = normalizedKisResponseNode() ?: return stockOrder {}
+    val outputNode = responseNode.path("output").takeIf { !it.isMissingNode && !it.isNull } ?: responseNode
+
+    return stockOrder {
+        rtCd = responseNode.text("rt_cd", "rtCd")
+        msgCd = responseNode.text("msg_cd", "msgCd")
+        msg1 = responseNode.text("msg1", "msg_1")
+        output = output {
+            kRXFWDGORDORGNO = outputNode.text("KRX_FWDG_ORD_ORGNO", "krx_fwdg_ord_orgno")
+            oDNO = outputNode.text("ODNO", "odno")
+            oRDTMD = outputNode.text("ORD_TMD", "ord_tmd")
         }
-    } ?: stockOrder {}
-    return response
+    }
+}
+
+private fun JsonNode.normalizedKisResponseNode(): JsonNode? {
+    return when {
+        isArray -> firstOrNull()
+        isObject -> this
+        else -> null
+    }
+}
+
+private fun JsonNode.text(vararg fieldNames: String): String {
+    return fieldNames
+        .asSequence()
+        .map { path(it).asText("").trim() }
+        .firstOrNull { it.isNotBlank() }
+        .orEmpty()
 }
 
 private fun OpenApiResponse.toGetProgramTradeInfoPerIndividualAtOneDayResponse(): ProgramTradeVolume.ProgramStockOfDateTime {
