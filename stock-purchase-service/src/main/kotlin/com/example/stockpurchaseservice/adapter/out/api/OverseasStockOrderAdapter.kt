@@ -54,8 +54,7 @@ internal class OverseasStockOrderAdapter(
         return brokerGateway.findOrderHistory(
             BrokerOrderHistoryQuery(
                 market = StockOrderMarket.OVERSEAS_US,
-                symbol = query.symbol.takeIf { query.externalOrderId == null }.orEmpty(),
-                externalOrderId = query.externalOrderId.orEmpty(),
+                symbol = query.symbol,
                 from = query.submittedAt ?: ZonedDateTime.now(BROKER_ORDER_ZONE),
                 to = query.submittedAt ?: ZonedDateTime.now(BROKER_ORDER_ZONE),
                 isMock = isMockOrder,

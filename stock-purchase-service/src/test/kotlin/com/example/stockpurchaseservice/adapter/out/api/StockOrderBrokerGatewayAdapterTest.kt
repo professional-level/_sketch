@@ -59,7 +59,7 @@ class StockOrderBrokerGatewayAdapterTest {
     }
 
     @Test
-    fun `overseas status lookup uses broker order id when known`() {
+    fun `overseas status lookup queries by symbol and filters broker order id client side`() {
         val brokerGateway = FakeBrokerGateway()
         val adapter = OverseasStockOrderAdapter(brokerGateway, isMockOrder = false)
         val submittedAt = ZonedDateTime.parse("2026-06-02T09:00:00+09:00")
@@ -78,8 +78,8 @@ class StockOrderBrokerGatewayAdapterTest {
 
         with(brokerGateway.historyQueries.single()) {
             assertEquals(StockOrderMarket.OVERSEAS_US, market)
-            assertEquals("", symbol)
-            assertEquals("broker-order-1", externalOrderId)
+            assertEquals("TQQQ", symbol)
+            assertEquals("", externalOrderId)
             assertEquals(submittedAt, from)
             assertEquals(submittedAt, to)
             assertEquals(false, isMock)

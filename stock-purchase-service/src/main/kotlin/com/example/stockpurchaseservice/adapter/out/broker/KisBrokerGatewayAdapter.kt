@@ -193,7 +193,8 @@ internal fun BrokerOrderHistoryQuery.toKisOverseasExecutionOrderQuery(): Map<Str
         "sortSqn" to "DS",
         "ordDt" to "",
         "ordGnoBrno" to "",
-        "odno" to externalOrderId,
+        // KIS overseas inquire-ccnl documents ODNO as non-searchable; match by order id client-side.
+        "odno" to "",
         "ctxAreaNk200" to pageCursor.nextKeyContext,
         "ctxAreaFk200" to pageCursor.foreignKeyContext,
     )
@@ -246,11 +247,17 @@ private fun JsonNode.toBrokerHistoryItem(): BrokerOrderHistoryItem? {
     val orderedQuantity = path("ft_ord_qty").asText("").toLongValue()
     val filledQuantity = path("ft_ccld_qty").asText("").toLongValue()
     val remainingQuantity = path("nccs_qty").asText("").toLongValue()
-    val statusName = path("prcs_stat_name").asText("").takeIf { it.isNotBlank() }
-    val rejectionReason = path("rjct_rson").asText("").takeIf { it.isNotBlank() }
+    val statusName = path("prcs_stat_name").textOrNull()
+    val revisionCancelName = path("rvse_cncl_dvsn_name").textOrNull()
+    val statusMessage = joinedText(statusName, revisionCancelName)
+    val rejectionReason = joinedText(
+        path("rjct_rson").textOrNull(),
+        path("rjct_rson_name").textOrNull(),
+    )
+    val cancelled = statusMessage?.contains(CANCELLED_KOREAN) == true
     return BrokerOrderHistoryItem(
         externalOrderId = orderId,
-        branchOrderNumber = path("ord_gno_brno").asText("").takeIf { it.isNotBlank() },
+        branchOrderNumber = path("ord_gno_brno").textOrNull(),
         symbol = path("pdno").asText("").trim(),
         stockName = path("prdt_name").asText("").trim(),
         orderedAt = parseKisOrderDateTime(
@@ -261,13 +268,25 @@ private fun JsonNode.toBrokerHistoryItem(): BrokerOrderHistoryItem? {
         cumulativeFilledQuantity = filledQuantity,
         remainingQuantity = remainingQuantity,
         rejectedQuantity = if (rejectionReason != null) orderedQuantity else 0,
-        cancelledQuantity = if (statusName?.contains(CANCELLED_KOREAN) == true) remainingQuantity else 0,
-        cancelled = statusName?.contains(CANCELLED_KOREAN) == true,
+        cancelledQuantity = if (cancelled) remainingQuantity else 0,
+        cancelled = cancelled,
         side = path("sll_buy_dvsn_cd").asText("").toOrderIntentSide(),
         averageExecutionPrice = path("ft_ccld_unpr3").asText("").toDoubleValue(),
-        statusMessage = statusName,
+        statusMessage = statusMessage,
         rejectionReason = rejectionReason,
     )
+}
+
+private fun JsonNode.textOrNull(): String? {
+    return asText("").trim().takeIf { it.isNotBlank() }
+}
+
+private fun joinedText(vararg values: String?): String? {
+    return values
+        .mapNotNull { it?.trim()?.takeIf(String::isNotBlank) }
+        .distinct()
+        .joinToString("; ")
+        .takeIf(String::isNotBlank)
 }
 
 private fun WebClient.submitStockOrder(

@@ -2,7 +2,9 @@ package com.example.stockpurchaseservice.adapter.out.broker
 
 import ApiResponse
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
+import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatus
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderSubmissionUnknownException
+import com.example.stockpurchaseservice.application.port.out.ExecutionQuantityModeDto
 import com.example.stockpurchaseservice.application.port.out.StockOrderMarket
 import com.example.stockpurchaseservice.application.port.out.StockOrderType
 import org.springframework.core.io.buffer.DefaultDataBufferFactory
@@ -160,7 +162,7 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
-    fun `overseas order status lookup sends broker order id when present`() {
+    fun `overseas order status lookup leaves unsupported broker order id query blank`() {
         val query = BrokerOrderHistoryQuery(
             market = StockOrderMarket.OVERSEAS_US,
             symbol = "TQQQ",
@@ -172,8 +174,115 @@ class KisBrokerGatewayAdapterTest {
 
         val params = query.toKisOverseasExecutionOrderQuery()
 
-        assertEquals("broker-order-1", params["odno"])
+        assertEquals("", params["odno"])
         assertEquals("TQQQ", params["pdno"])
+    }
+
+    @Test
+    fun `maps overseas rejection reason name to rejected status`() {
+        val adapter = overseasHistoryAdapter(
+            """
+            {
+              "rt_cd": "0",
+              "ctx_area_fk200": "",
+              "ctx_area_nk200": "",
+              "output": [
+                {
+                  "odno": "rejected-order",
+                  "pdno": "TQQQ",
+                  "prdt_name": "ProShares UltraPro QQQ",
+                  "ord_dt": "20260602",
+                  "ord_tmd": "093000",
+                  "ft_ord_qty": "3",
+                  "ft_ccld_qty": "0",
+                  "nccs_qty": "0",
+                  "sll_buy_dvsn_cd": "02",
+                  "prcs_stat_name": "접수거부",
+                  "rjct_rson": "",
+                  "rjct_rson_name": "주문가능수량 부족"
+                }
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        val item = adapter.findOrderHistory(historyQuery()).single()
+        val status = item.toStatus()
+
+        assertEquals(BrokerOrderStatus.REJECTED, status.status)
+        assertEquals("주문가능수량 부족", status.reason)
+    }
+
+    @Test
+    fun `maps overseas cancel status from revision cancel field`() {
+        val adapter = overseasHistoryAdapter(
+            """
+            {
+              "rt_cd": "0",
+              "ctx_area_fk200": "",
+              "ctx_area_nk200": "",
+              "output": [
+                {
+                  "odno": "cancelled-order",
+                  "pdno": "TQQQ",
+                  "prdt_name": "ProShares UltraPro QQQ",
+                  "ord_dt": "20260602",
+                  "ord_tmd": "093000",
+                  "ft_ord_qty": "3",
+                  "ft_ccld_qty": "0",
+                  "nccs_qty": "3",
+                  "sll_buy_dvsn_cd": "02",
+                  "prcs_stat_name": "처리완료",
+                  "rvse_cncl_dvsn_name": "취소"
+                }
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        val item = adapter.findOrderHistory(historyQuery()).single()
+        val status = item.toStatus()
+
+        assertEquals(BrokerOrderStatus.CANCELLED, status.status)
+        assertEquals("처리완료; 취소", status.reason)
+    }
+
+    @Test
+    fun `maps overseas partial fill as cumulative execution and submitted status`() {
+        val adapter = overseasHistoryAdapter(
+            """
+            {
+              "rt_cd": "0",
+              "ctx_area_fk200": "",
+              "ctx_area_nk200": "",
+              "output": [
+                {
+                  "odno": "partial-order",
+                  "pdno": "TQQQ",
+                  "prdt_name": "ProShares UltraPro QQQ",
+                  "ord_dt": "20260602",
+                  "ord_tmd": "093000",
+                  "ft_ord_qty": "3",
+                  "ft_ccld_qty": "1",
+                  "nccs_qty": "2",
+                  "sll_buy_dvsn_cd": "02",
+                  "ft_ccld_unpr3": "112.5",
+                  "prcs_stat_name": "접수"
+                }
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        val item = adapter.findOrderHistory(historyQuery()).single()
+        val execution = item.toExecutionDto()
+
+        assertEquals(BrokerOrderStatus.SUBMITTED, item.toStatus().status)
+        checkNotNull(execution)
+        assertEquals("partial-order", execution.externalOrderId)
+        assertEquals(1, execution.quantity)
+        assertEquals(112.5, execution.averageExecutionPrice)
+        assertEquals(ExecutionQuantityModeDto.CUMULATIVE, execution.quantityMode)
     }
 
     @Test
@@ -235,6 +344,24 @@ class KisBrokerGatewayAdapterTest {
 
         assertEquals(null, exception.externalOrderId)
         assertEquals(1, exchangeFunction.requests.size)
+    }
+
+    private fun overseasHistoryAdapter(response: String): KisBrokerGatewayAdapter {
+        return KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(StubExchangeFunction(responses = listOf(response)))
+                .build(),
+        )
+    }
+
+    private fun historyQuery(): BrokerOrderHistoryQuery {
+        return BrokerOrderHistoryQuery(
+            market = StockOrderMarket.OVERSEAS_US,
+            symbol = "TQQQ",
+            from = ZonedDateTime.parse("2026-06-02T09:00:00+09:00"),
+            to = ZonedDateTime.parse("2026-06-02T09:00:00+09:00"),
+            isMock = false,
+        )
     }
 
     private fun brokerCommand(
