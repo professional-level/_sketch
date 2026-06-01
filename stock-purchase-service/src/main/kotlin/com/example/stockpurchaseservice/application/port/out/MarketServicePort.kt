@@ -38,6 +38,13 @@ class BrokerOrderSubmissionUnknownException(
     cause: Throwable? = null,
 ) : RuntimeException(message, cause)
 
+class BrokerOrderRejectedException(
+    message: String,
+    val brokerReturnCode: String? = null,
+    val brokerMessageCode: String? = null,
+    cause: Throwable? = null,
+) : RuntimeException(message, cause)
+
 class BrokerOrderTemporaryUnavailableException(
     message: String,
     cause: Throwable? = null,

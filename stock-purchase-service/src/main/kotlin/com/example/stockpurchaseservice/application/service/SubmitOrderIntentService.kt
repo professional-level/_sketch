@@ -8,6 +8,7 @@ import com.example.stockpurchaseservice.application.port.`in`.SubmitOrderIntentC
 import com.example.stockpurchaseservice.application.port.`in`.SubmitOrderIntentResult
 import com.example.stockpurchaseservice.application.port.`in`.SubmitOrderIntentUseCase
 import com.example.stockpurchaseservice.application.port.out.MarketServicePort
+import com.example.stockpurchaseservice.application.port.out.BrokerOrderRejectedException
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderSubmissionUnknownException
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderTemporaryUnavailableException
 import com.example.stockpurchaseservice.application.port.out.OrderExecutionEventPort
@@ -68,6 +69,16 @@ class SubmitOrderIntentService(
             }
             processedEventPort.markSuccess(command.eventId)
             SubmitOrderIntentResult(OrderIntentSubmissionStatus.SUBMISSION_UNKNOWN)
+        } catch (exception: BrokerOrderRejectedException) {
+            val reason = exception.message ?: "broker order rejected"
+            val rejectedSubmission = command.toRejectedSubmission(command.toInternalOrderId(), reason)
+            orderIntentSubmissionPort.saveRejected(rejectedSubmission)
+            orderExecutionEventPort.publishRejected(command.toRejectedMessage(reason))
+            runCatching {
+                operationalAlertPort.alertOrderSubmissionFailed(command.toFailureAlert(exception))
+            }
+            processedEventPort.markSuccess(command.eventId)
+            SubmitOrderIntentResult(OrderIntentSubmissionStatus.REJECTED)
         } catch (exception: BrokerOrderTemporaryUnavailableException) {
             runCatching {
                 operationalAlertPort.alertOrderSubmissionFailed(command.toFailureAlert(exception))

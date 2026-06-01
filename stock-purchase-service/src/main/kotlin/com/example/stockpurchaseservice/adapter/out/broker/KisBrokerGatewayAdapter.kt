@@ -12,6 +12,7 @@ import com.example.stockpurchaseservice.adapter.out.api.awaitExternalApi
 import com.example.stockpurchaseservice.adapter.out.api.getExternalApi
 import com.example.stockpurchaseservice.adapter.out.api.isTransientExternalApiFailure
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
+import com.example.stockpurchaseservice.application.port.out.BrokerOrderRejectedException
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderSubmissionDto
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderSubmissionUnknownException
 import com.example.stockpurchaseservice.application.port.out.StockOrderMarket
@@ -315,7 +316,11 @@ private fun WebClient.submitStockOrder(
 
     val order = response.body ?: throw BrokerOrderSubmissionUnknownException("stock order body is empty")
     if (order.rtCd != "0") {
-        throw RuntimeException("stock order request failed: ${order.msgCd} ${order.msg1}".trim())
+        throw BrokerOrderRejectedException(
+            message = "stock order rejected by broker: ${order.msgCd} ${order.msg1}".trim(),
+            brokerReturnCode = order.rtCd,
+            brokerMessageCode = order.msgCd.takeIf { it.isNotBlank() },
+        )
     }
 
     val externalOrderId = order.output.getODNO().takeIf { it.isNotBlank() }

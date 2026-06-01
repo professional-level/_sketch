@@ -6,6 +6,7 @@ import com.example.stockpurchaseservice.application.port.`in`.OrderIntentType
 import com.example.stockpurchaseservice.application.port.`in`.SubmitOrderIntentCommand
 import com.example.stockpurchaseservice.application.port.out.ExecutedStockDto
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderSubmissionDto
+import com.example.stockpurchaseservice.application.port.out.BrokerOrderRejectedException
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatus
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatusDto
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatusQuery
@@ -194,6 +195,52 @@ class SubmitOrderIntentServiceTest {
         assertEquals("timeout after broker submit", alertPort.submissionUnknown.single().reason)
         assertEquals(emptyList(), eventPort.submitted)
         assertEquals(emptyList(), eventPort.rejected)
+    }
+
+    @Test
+    fun `stores broker rejection as rejected submission without marking event failed`() = runBlocking {
+        val rejection = BrokerOrderRejectedException(
+            message = "stock order rejected by broker: APBK001 insufficient buying power",
+            brokerReturnCode = "1",
+            brokerMessageCode = "APBK001",
+        )
+        val marketPort = FakeMarketServicePort(buyFailure = rejection)
+        val processedEventPort = FakeProcessedEventPort()
+        val submissionPort = FakeOrderIntentSubmissionPort()
+        val eventPort = FakeOrderExecutionEventPort()
+        val alertPort = FakeOperationalAlertPort()
+        val service = SubmitOrderIntentService(
+            marketPort,
+            processedEventPort,
+            submissionPort,
+            eventPort,
+            FakeOrderRiskControlPort(),
+            alertPort,
+        )
+        val eventId = UUID.randomUUID()
+
+        val result = service.execute(
+            SubmitOrderIntentCommand(
+                eventId = eventId,
+                idempotencyKey = "broker-rejected-buy",
+                strategyExecutionId = "laor-v4-strategy:TQQQ",
+                symbol = "TQQQ",
+                side = OrderIntentSide.BUY,
+                orderType = OrderIntentType.LOC,
+                price = 112.0,
+                quantity = 3,
+                orderTag = "FIRST_BUY",
+                createdAt = ZonedDateTime.parse("2026-05-30T09:00:00+09:00"),
+            ),
+        )
+
+        assertEquals(OrderIntentSubmissionStatus.REJECTED, result.status)
+        assertEquals(eventId, processedEventPort.succeeded.single())
+        assertEquals(emptyList(), processedEventPort.failed)
+        assertEquals("stock order rejected by broker: APBK001 insufficient buying power", submissionPort.rejected.single().statusReason)
+        assertEquals("stock order rejected by broker: APBK001 insufficient buying power", eventPort.rejected.single().reason)
+        assertEquals(eventId, alertPort.orderSubmissionFailed.single().orderIntentId)
+        assertEquals(emptyList(), eventPort.submitted)
     }
 
     @Test

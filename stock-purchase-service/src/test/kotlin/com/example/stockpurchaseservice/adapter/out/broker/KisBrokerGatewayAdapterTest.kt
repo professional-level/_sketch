@@ -4,6 +4,7 @@ import ApiResponse
 import DailyExecutionOrdersResponseOuterClass
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatus
+import com.example.stockpurchaseservice.application.port.out.BrokerOrderRejectedException
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderSubmissionUnknownException
 import com.example.stockpurchaseservice.application.port.out.ExecutionQuantityModeDto
 import com.example.stockpurchaseservice.application.port.out.ExecutionTypeDto
@@ -466,6 +467,44 @@ class KisBrokerGatewayAdapterTest {
         }
 
         assertEquals(null, exception.externalOrderId)
+        assertEquals(1, exchangeFunction.requests.size)
+    }
+
+    @Test
+    fun `throws broker rejected when stock order response has nonzero return code`() {
+        val exchangeFunction = ResponseExchangeFunction(
+            responses = listOf(
+                protobufResponse(
+                    ApiResponse.StockOrder.newBuilder()
+                        .setRtCd("1")
+                        .setMsgCd("APBK001")
+                        .setMsg1("insufficient buying power")
+                        .build(),
+                ),
+            ),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        val exception = assertFailsWith<BrokerOrderRejectedException> {
+            adapter.submitOrder(
+                brokerCommand(
+                    side = OrderIntentSide.BUY,
+                    symbol = "TQQQ",
+                    price = 112.5,
+                    quantity = 3,
+                    orderType = StockOrderType.LOC,
+                    isMock = false,
+                ),
+            )
+        }
+
+        assertEquals("1", exception.brokerReturnCode)
+        assertEquals("APBK001", exception.brokerMessageCode)
+        assertEquals("stock order rejected by broker: APBK001 insufficient buying power", exception.message)
         assertEquals(1, exchangeFunction.requests.size)
     }
 
