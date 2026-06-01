@@ -7,13 +7,18 @@ import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
 import com.example.stockpurchaseservice.application.port.out.OrderRiskAssessmentCommand
 import com.example.stockpurchaseservice.application.port.out.OrderRiskAssessmentResult
 import com.example.stockpurchaseservice.application.port.out.OrderRiskControlPort
+import com.example.stockpurchaseservice.application.port.out.OrderTradingEnvironment
+import com.example.stockpurchaseservice.application.port.out.StockOrderMarket
 import com.example.stockpurchaseservice.config.risk.OrderRiskProperties
+import org.springframework.beans.factory.annotation.Value
 import java.time.ZonedDateTime
 
 @PersistenceAdapter
 internal class OrderRiskControlAdapter(
     private val orderRiskSubmissionReader: OrderRiskSubmissionReader,
     private val properties: OrderRiskProperties,
+    @Value("\${akra.order.domestic.mock:true}") private val domesticMockOrder: Boolean = true,
+    @Value("\${akra.order.overseas.mock:true}") private val overseasMockOrder: Boolean = true,
 ) : OrderRiskControlPort {
     private val tradingHoursPolicy = OrderTradingHoursPolicy(properties.tradingHours)
 
@@ -21,6 +26,7 @@ internal class OrderRiskControlAdapter(
         if (!properties.enabled) return OrderRiskAssessmentResult.accepted()
 
         disabledStrategyReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }
+        tradingEnvironmentReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }
         tradingHoursPolicy.rejectReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }
         orderNotionalReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }
         accountPendingBuyExposureReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }
@@ -36,6 +42,17 @@ internal class OrderRiskControlAdapter(
             .filter(String::isNotBlank)
             .firstOrNull { command.strategyExecutionId.startsWith(it) }
         return matchedPrefix?.let { "strategy disabled by risk policy: prefix=$it" }
+    }
+
+    private fun tradingEnvironmentReason(command: OrderRiskAssessmentCommand): String? {
+        val matchedPolicy = command.expectedTradingEnvironment() ?: return null
+        val actualEnvironment = command.market.actualTradingEnvironment()
+        return if (actualEnvironment != matchedPolicy.environment) {
+            "strategy trading environment mismatch: prefix=${matchedPolicy.prefix} " +
+                "expected=${matchedPolicy.environment} actual=$actualEnvironment market=${command.market}"
+        } else {
+            null
+        }
     }
 
     private fun orderNotionalReason(command: OrderRiskAssessmentCommand): String? {
@@ -100,6 +117,27 @@ internal class OrderRiskControlAdapter(
         return properties.symbolMaxOrderNotional[symbol] ?: properties.symbolMaxOrderNotional[symbol.uppercase()]
     }
 
+    private fun OrderRiskAssessmentCommand.expectedTradingEnvironment(): StrategyTradingEnvironmentPolicy? {
+        return properties.strategyTradingEnvironments
+            .mapNotNull { (prefix, environment) ->
+                val normalizedPrefix = prefix.trim()
+                if (normalizedPrefix.isBlank() || !strategyExecutionId.startsWith(normalizedPrefix)) {
+                    null
+                } else {
+                    StrategyTradingEnvironmentPolicy(normalizedPrefix, environment)
+                }
+            }
+            .maxByOrNull { it.prefix.length }
+    }
+
+    private fun StockOrderMarket.actualTradingEnvironment(): OrderTradingEnvironment {
+        val isMock = when (this) {
+            StockOrderMarket.DOMESTIC -> domesticMockOrder
+            StockOrderMarket.OVERSEAS_US -> overseasMockOrder
+        }
+        return if (isMock) OrderTradingEnvironment.MOCK else OrderTradingEnvironment.LIVE
+    }
+
     private fun ZonedDateTime.dayWindow(): Pair<ZonedDateTime, ZonedDateTime> {
         val start = toLocalDate().atStartOfDay(zone)
         return start to start.plusDays(1)
@@ -111,4 +149,9 @@ internal class OrderRiskControlAdapter(
             OrderIntentSide.SELL -> OrderIntentSubmissionSide.SELL
         }
     }
+
+    private data class StrategyTradingEnvironmentPolicy(
+        val prefix: String,
+        val environment: OrderTradingEnvironment,
+    )
 }

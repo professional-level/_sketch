@@ -5,6 +5,7 @@ import com.example.stockpurchaseservice.adapter.out.persistence.repository.Order
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentType
 import com.example.stockpurchaseservice.application.port.out.OrderRiskAssessmentCommand
+import com.example.stockpurchaseservice.application.port.out.OrderTradingEnvironment
 import com.example.stockpurchaseservice.application.port.out.StockOrderMarket
 import com.example.stockpurchaseservice.config.risk.OrderRiskProperties
 import java.time.ZonedDateTime
@@ -133,6 +134,47 @@ class OrderRiskControlAdapterTest {
     }
 
     @Test
+    fun `rejects strategy when expected live environment would route to mock broker`() = runBlocking {
+        val properties = OrderRiskProperties().apply {
+            strategyTradingEnvironments["laor-v4-live"] = OrderTradingEnvironment.LIVE
+        }
+
+        val result = adapter(properties, overseasMockOrder = true).assess(
+            command(strategyExecutionId = "laor-v4-live:TQQQ"),
+        )
+
+        assertFalse(result.accepted)
+        assertContains(result.reason ?: "", "expected=LIVE actual=MOCK")
+    }
+
+    @Test
+    fun `accepts strategy when expected live environment routes to live broker`() = runBlocking {
+        val properties = OrderRiskProperties().apply {
+            strategyTradingEnvironments["laor-v4-live"] = OrderTradingEnvironment.LIVE
+        }
+
+        val result = adapter(properties, overseasMockOrder = false).assess(
+            command(strategyExecutionId = "laor-v4-live:TQQQ"),
+        )
+
+        assertTrue(result.accepted)
+    }
+
+    @Test
+    fun `uses longest matching strategy trading environment prefix`() = runBlocking {
+        val properties = OrderRiskProperties().apply {
+            strategyTradingEnvironments["laor-v4"] = OrderTradingEnvironment.MOCK
+            strategyTradingEnvironments["laor-v4:TQQQ:live"] = OrderTradingEnvironment.LIVE
+        }
+
+        val result = adapter(properties, overseasMockOrder = false).assess(
+            command(strategyExecutionId = "laor-v4:TQQQ:live:cycle-1"),
+        )
+
+        assertTrue(result.accepted)
+    }
+
+    @Test
     fun `skips trading hours guard when disabled`() = runBlocking {
         val properties = OrderRiskProperties().apply {
             tradingHours.enabled = false
@@ -148,15 +190,20 @@ class OrderRiskControlAdapterTest {
     private fun adapter(
         properties: OrderRiskProperties = OrderRiskProperties(),
         reader: OrderRiskSubmissionReader = FakeOrderRiskSubmissionReader(),
+        domesticMockOrder: Boolean = true,
+        overseasMockOrder: Boolean = true,
     ): OrderRiskControlAdapter {
         properties.duplicateOrderKillSwitchEnabled = false
         return OrderRiskControlAdapter(
             orderRiskSubmissionReader = reader,
             properties = properties,
+            domesticMockOrder = domesticMockOrder,
+            overseasMockOrder = overseasMockOrder,
         )
     }
 
     private fun command(
+        strategyExecutionId: String = "laor-v4:TQQQ",
         side: OrderIntentSide = OrderIntentSide.BUY,
         orderType: OrderIntentType = OrderIntentType.LOC,
         market: StockOrderMarket = StockOrderMarket.OVERSEAS_US,
@@ -168,7 +215,7 @@ class OrderRiskControlAdapterTest {
             orderIntentId = UUID.randomUUID(),
             internalOrderId = UUID.randomUUID(),
             idempotencyKey = UUID.randomUUID().toString(),
-            strategyExecutionId = "laor-v4:TQQQ",
+            strategyExecutionId = strategyExecutionId,
             symbol = "TQQQ",
             side = side,
             orderType = orderType,

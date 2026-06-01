@@ -1,5 +1,6 @@
 package com.example.stockpurchaseservice.config.risk
 
+import com.example.stockpurchaseservice.application.port.out.OrderTradingEnvironment
 import org.springframework.boot.context.properties.ConfigurationProperties
 
 @ConfigurationProperties(prefix = "akra.order.risk")
@@ -11,6 +12,7 @@ class OrderRiskProperties {
     var duplicateOrderKillSwitchEnabled: Boolean = true
     var disabledStrategyPrefixes: List<String> = emptyList()
     var symbolMaxOrderNotional: MutableMap<String, Double> = mutableMapOf()
+    var strategyTradingEnvironments: MutableMap<String, OrderTradingEnvironment> = mutableMapOf()
     var tradingHours: TradingHoursProperties = TradingHoursProperties()
 
     class TradingHoursProperties {

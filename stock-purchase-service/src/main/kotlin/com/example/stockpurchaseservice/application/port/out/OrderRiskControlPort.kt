@@ -37,3 +37,8 @@ data class OrderRiskAssessmentResult(
         }
     }
 }
+
+enum class OrderTradingEnvironment {
+    MOCK,
+    LIVE,
+}
