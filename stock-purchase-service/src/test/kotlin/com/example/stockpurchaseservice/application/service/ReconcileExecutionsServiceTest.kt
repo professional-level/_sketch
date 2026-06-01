@@ -13,7 +13,9 @@ import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatusQu
 import com.example.stockpurchaseservice.application.port.out.ExecutedStockDto
 import com.example.stockpurchaseservice.application.port.out.ExecutionFillDto
 import com.example.stockpurchaseservice.application.port.out.ExecutionFillPort
+import com.example.stockpurchaseservice.application.port.out.ExecutionLookupQuery
 import com.example.stockpurchaseservice.application.port.out.ExecutionQuantityModeDto
+import com.example.stockpurchaseservice.application.port.out.ExecutionReconciliationCursorDto
 import com.example.stockpurchaseservice.application.port.out.ExecutionReconciliationResultDto
 import com.example.stockpurchaseservice.application.port.out.ExecutionReconciliationStatePort
 import com.example.stockpurchaseservice.application.port.out.ExecutionTypeDto
@@ -39,11 +41,13 @@ import com.example.stockpurchaseservice.domain.SellingOrder
 import com.example.stockpurchaseservice.domain.StockId
 import com.example.stockpurchaseservice.domain.StrategyType
 import com.example.stockpurchaseservice.domain.repository.StockOrderRepository
+import java.time.Duration
 import java.time.ZonedDateTime
 import java.util.UUID
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class ReconcileExecutionsServiceTest {
 
@@ -180,6 +184,49 @@ class ReconcileExecutionsServiceTest {
         assertEquals(listOf("BROKER_EXECUTION_DAILY"), reconciliationStatePort.startedSources)
         assertEquals(emptyList(), reconciliationStatePort.completed)
         assertEquals(listOf<String?>("broker unavailable"), reconciliationStatePort.failedReasons)
+    }
+
+    @Test
+    fun `broker execution lookup starts from previous reconciliation cursor`() = runBlocking {
+        val previousExecutionAt = ZonedDateTime.parse("2026-06-01T09:00:00+09:00")
+        val marketPort = FakeMarketServicePort()
+        val service = service(
+            marketPort = marketPort,
+            executionFillPort = FakeExecutionFillPort(),
+            submissionPort = FakeOrderIntentSubmissionPort(submissions = emptyList()),
+            eventPort = FakeOrderExecutionEventPort(),
+            reconciliationStatePort = FakeExecutionReconciliationStatePort(
+                cursor = ExecutionReconciliationCursorDto(
+                    source = "BROKER_EXECUTION_DAILY",
+                    lastObservedExecutionId = "exec-prev",
+                    lastObservedExecutionAt = previousExecutionAt,
+                ),
+            ),
+        )
+
+        service.execute()
+
+        with(marketPort.lookupQueries.single()) {
+            assertEquals(previousExecutionAt, from)
+            assertTrue(to >= previousExecutionAt)
+        }
+    }
+
+    @Test
+    fun `broker execution lookup backfills seven days when cursor is empty`() = runBlocking {
+        val marketPort = FakeMarketServicePort()
+        val service = service(
+            marketPort = marketPort,
+            executionFillPort = FakeExecutionFillPort(),
+            submissionPort = FakeOrderIntentSubmissionPort(submissions = emptyList()),
+            eventPort = FakeOrderExecutionEventPort(),
+        )
+
+        service.execute()
+
+        with(marketPort.lookupQueries.single()) {
+            assertEquals(7, Duration.between(from, to).toDays())
+        }
     }
 
     @Test
@@ -371,6 +418,8 @@ class ReconcileExecutionsServiceTest {
         private val executions: List<ExecutedStockDto> = emptyList(),
         private val failure: RuntimeException? = null,
     ) : MarketServicePort {
+        val lookupQueries: MutableList<ExecutionLookupQuery> = mutableListOf()
+
         override fun buyStock(order: PurchaseOrderDto): BrokerOrderSubmissionDto {
             return BrokerOrderSubmissionDto(externalOrderId = "broker-buy")
         }
@@ -380,6 +429,12 @@ class ReconcileExecutionsServiceTest {
         }
 
         override fun findExecutionListAtOneDay(): List<ExecutedStockDto> {
+            failure?.let { throw it }
+            return executions
+        }
+
+        override fun findExecutionList(query: ExecutionLookupQuery): List<ExecutedStockDto> {
+            lookupQueries += query
             failure?.let { throw it }
             return executions
         }
@@ -447,11 +502,17 @@ class ReconcileExecutionsServiceTest {
         }
     }
 
-    private class FakeExecutionReconciliationStatePort : ExecutionReconciliationStatePort {
+    private class FakeExecutionReconciliationStatePort(
+        private val cursor: ExecutionReconciliationCursorDto? = null,
+    ) : ExecutionReconciliationStatePort {
         val startedSources: MutableList<String> = mutableListOf()
         val completed: MutableList<ExecutionReconciliationResultDto> = mutableListOf()
         val failedReasons: MutableList<String?> = mutableListOf()
         val unmatched: MutableList<UnmatchedExecutionDto> = mutableListOf()
+
+        override suspend fun findCursor(source: String): ExecutionReconciliationCursorDto? {
+            return cursor?.takeIf { it.source == source }
+        }
 
         override suspend fun markStarted(source: String, startedAt: ZonedDateTime) {
             startedSources += source

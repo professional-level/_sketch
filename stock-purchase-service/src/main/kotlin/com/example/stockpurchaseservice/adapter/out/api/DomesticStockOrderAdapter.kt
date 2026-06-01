@@ -11,6 +11,7 @@ import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatusDt
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatusQuery
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderSubmissionDto
 import com.example.stockpurchaseservice.application.port.out.DomesticStockOrderPort
+import com.example.stockpurchaseservice.application.port.out.ExecutionLookupQuery
 import com.example.stockpurchaseservice.application.port.out.ExecutedStockDto
 import com.example.stockpurchaseservice.application.port.out.PurchaseOrderDto
 import com.example.stockpurchaseservice.application.port.out.SellingOrderDto
@@ -33,10 +34,16 @@ internal class DomesticStockOrderAdapter(
     }
 
     override fun findExecutionListAtOneDay(): List<ExecutedStockDto> {
+        val now = ZonedDateTime.now(BROKER_ORDER_ZONE)
+        return findExecutionList(ExecutionLookupQuery(from = now, to = now))
+    }
+
+    override fun findExecutionList(query: ExecutionLookupQuery): List<ExecutedStockDto> {
         return brokerGateway.findOrderHistory(
             BrokerOrderHistoryQuery(
                 market = StockOrderMarket.DOMESTIC,
-                date = ZonedDateTime.now(BROKER_ORDER_ZONE),
+                from = query.from,
+                to = query.to,
                 isMock = isMockOrder,
             ),
         ).mapNotNull { it.toExecutionDto() }
@@ -48,7 +55,8 @@ internal class DomesticStockOrderAdapter(
                 market = StockOrderMarket.DOMESTIC,
                 symbol = query.symbol.takeIf { query.externalOrderId == null }.orEmpty(),
                 externalOrderId = query.externalOrderId.orEmpty(),
-                date = query.submittedAt ?: ZonedDateTime.now(BROKER_ORDER_ZONE),
+                from = query.submittedAt ?: ZonedDateTime.now(BROKER_ORDER_ZONE),
+                to = query.submittedAt ?: ZonedDateTime.now(BROKER_ORDER_ZONE),
                 isMock = isMockOrder,
             ),
         ).findStatusFor(query)

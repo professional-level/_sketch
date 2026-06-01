@@ -45,13 +45,25 @@ internal class KisBrokerGatewayAdapter(
     }
 
     override fun findOrderHistory(query: BrokerOrderHistoryQuery): List<BrokerOrderHistoryItem> {
-        return when (query.market) {
-            StockOrderMarket.DOMESTIC -> fetchDomesticOrderHistory(query)
-            StockOrderMarket.OVERSEAS_US -> fetchOverseasOrderHistory(query)
-        }
+        val items = mutableListOf<BrokerOrderHistoryItem>()
+        var cursor = query.pageCursor
+        val seenCursors = mutableSetOf<BrokerOrderHistoryPageCursor>()
+        var pageCount = 0
+        do {
+            if (!seenCursors.add(cursor)) break
+            val page = when (query.market) {
+                StockOrderMarket.DOMESTIC -> fetchDomesticOrderHistoryPage(query.copy(pageCursor = cursor))
+                StockOrderMarket.OVERSEAS_US -> fetchOverseasOrderHistoryPage(query.copy(pageCursor = cursor))
+            }
+            items += page.items
+            cursor = page.nextCursor
+            pageCount += 1
+        } while (cursor.hasNext() && pageCount < MAX_HISTORY_PAGES)
+
+        return items
     }
 
-    private fun fetchDomesticOrderHistory(query: BrokerOrderHistoryQuery): List<BrokerOrderHistoryItem> {
+    private fun fetchDomesticOrderHistoryPage(query: BrokerOrderHistoryQuery): BrokerOrderHistoryPage {
         val response = stockApiClient.getExternalApi(
             uri = OPEN_API_PREFIX + GET_EXECUTION_ORDERS,
             queryParameters = query.toKisDomesticExecutionOrderQuery(),
@@ -61,10 +73,16 @@ internal class KisBrokerGatewayAdapter(
         if (response.rtCd.isNotBlank() && response.rtCd != "0") {
             throw RuntimeException("domestic execution lookup failed: ${response.msgCd} ${response.msg1}".trim())
         }
-        return response.output1List.mapNotNull { it.toBrokerHistoryItem() }
+        return BrokerOrderHistoryPage(
+            items = response.output1List.mapNotNull { it.toBrokerHistoryItem() },
+            nextCursor = BrokerOrderHistoryPageCursor(
+                foreignKeyContext = response.ctxAreaFk100,
+                nextKeyContext = response.ctxAreaNk100,
+            ),
+        )
     }
 
-    private fun fetchOverseasOrderHistory(query: BrokerOrderHistoryQuery): List<BrokerOrderHistoryItem> {
+    private fun fetchOverseasOrderHistoryPage(query: BrokerOrderHistoryQuery): BrokerOrderHistoryPage {
         val response = stockApiClient.getExternalApi(
             uri = OPEN_API_PREFIX + GET_OVERSEAS_EXECUTION_ORDERS,
             queryParameters = query.toKisOverseasExecutionOrderQuery(),
@@ -82,7 +100,17 @@ internal class KisBrokerGatewayAdapter(
             output.isObject -> listOf(output)
             else -> emptyList()
         }
-        return rows.mapNotNull { it.toBrokerHistoryItem() }
+        return BrokerOrderHistoryPage(
+            items = rows.mapNotNull { it.toBrokerHistoryItem() },
+            nextCursor = BrokerOrderHistoryPageCursor(
+                foreignKeyContext = response.path("ctx_area_fk200").asText(""),
+                nextKeyContext = response.path("ctx_area_nk200").asText(""),
+            ),
+        )
+    }
+
+    companion object {
+        private const val MAX_HISTORY_PAGES = 20
     }
 }
 
@@ -120,11 +148,10 @@ internal fun BrokerOrderCommand.toKisUsOverseasOrderRequest(): Map<String, Any> 
 }
 
 private fun BrokerOrderHistoryQuery.toKisDomesticExecutionOrderQuery(): Map<String, String> {
-    val yyyymmdd = date.format(DateTimeFormatter.BASIC_ISO_DATE)
     return mapOf(
         "isMock" to isMock.toString(),
-        "inqrStrtDt" to yyyymmdd,
-        "inqrEndDt" to yyyymmdd,
+        "inqrStrtDt" to from.toKisDate(),
+        "inqrEndDt" to to.toKisDate(),
         "sllBuyDvsnCd" to "00",
         "inqrDvsn" to "00",
         "pdno" to symbol,
@@ -133,18 +160,17 @@ private fun BrokerOrderHistoryQuery.toKisDomesticExecutionOrderQuery(): Map<Stri
         "odno" to externalOrderId,
         "inqrDvsn3" to "00",
         "inqrDvsn1" to "",
-        "ctxAreaFk100" to "",
-        "ctxAreaNk100" to "",
+        "ctxAreaFk100" to pageCursor.foreignKeyContext,
+        "ctxAreaNk100" to pageCursor.nextKeyContext,
     )
 }
 
 private fun BrokerOrderHistoryQuery.toKisOverseasExecutionOrderQuery(): Map<String, String> {
-    val yyyymmdd = date.format(DateTimeFormatter.BASIC_ISO_DATE)
     return mapOf(
         "isMock" to isMock.toString(),
         "pdno" to if (isMock) "" else symbol.ifBlank { "%" }.uppercase(),
-        "ordStrtDt" to yyyymmdd,
-        "ordEndDt" to yyyymmdd,
+        "ordStrtDt" to from.toKisDate(),
+        "ordEndDt" to to.toKisDate(),
         "sllBuyDvsn" to "00",
         "ccldNccsDvsn" to "00",
         "ovrsExcgCd" to if (isMock) "" else "NASD",
@@ -152,9 +178,13 @@ private fun BrokerOrderHistoryQuery.toKisOverseasExecutionOrderQuery(): Map<Stri
         "ordDt" to "",
         "ordGnoBrno" to "",
         "odno" to "",
-        "ctxAreaNk200" to "",
-        "ctxAreaFk200" to "",
+        "ctxAreaNk200" to pageCursor.nextKeyContext,
+        "ctxAreaFk200" to pageCursor.foreignKeyContext,
     )
+}
+
+private fun ZonedDateTime.toKisDate(): String {
+    return toLocalDate().format(DateTimeFormatter.BASIC_ISO_DATE)
 }
 
 private fun DailyExecutionOrdersResponseOuterClass.DailyExecutionOrdersOutput1.toBrokerHistoryItem(): BrokerOrderHistoryItem? {

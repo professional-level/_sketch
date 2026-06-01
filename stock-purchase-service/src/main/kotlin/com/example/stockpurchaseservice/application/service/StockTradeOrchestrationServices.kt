@@ -12,7 +12,9 @@ import com.example.stockpurchaseservice.application.port.`in`.SubmitOrderIntentU
 import com.example.stockpurchaseservice.application.port.out.ExecutedStockDto
 import com.example.stockpurchaseservice.application.port.out.ExecutionFillDto
 import com.example.stockpurchaseservice.application.port.out.ExecutionFillPort
+import com.example.stockpurchaseservice.application.port.out.ExecutionLookupQuery
 import com.example.stockpurchaseservice.application.port.out.ExecutionQuantityModeDto
+import com.example.stockpurchaseservice.application.port.out.ExecutionReconciliationCursorDto
 import com.example.stockpurchaseservice.application.port.out.ExecutionReconciliationResultDto
 import com.example.stockpurchaseservice.application.port.out.ExecutionReconciliationStatePort
 import com.example.stockpurchaseservice.application.port.out.ExecutionTypeDto
@@ -76,10 +78,11 @@ class ReconcileExecutionsService(
 
     override suspend fun execute() {
         val startedAt = ZonedDateTime.now()
+        val previousCursor = executionReconciliationStatePort.findCursor(RECONCILIATION_SOURCE)
         executionReconciliationStatePort.markStarted(RECONCILIATION_SOURCE, startedAt)
 
         runCatching {
-            reconcile(startedAt)
+            reconcile(startedAt, previousCursor)
         }.onFailure { exception ->
             executionReconciliationStatePort.markFailed(
                 source = RECONCILIATION_SOURCE,
@@ -89,8 +92,11 @@ class ReconcileExecutionsService(
         }.getOrThrow()
     }
 
-    private suspend fun reconcile(startedAt: ZonedDateTime) {
-        val brokerExecutionList = marketService.findExecutionListAtOneDay()
+    private suspend fun reconcile(
+        startedAt: ZonedDateTime,
+        previousCursor: ExecutionReconciliationCursorDto?,
+    ) {
+        val brokerExecutionList = marketService.findExecutionList(previousCursor.toLookupQuery(startedAt))
         val executedStockList = mutableListOf<ExecutedStock>()
         val refinedExecutedStockList = mutableListOf<ExecutedStock>()
         var unmatchedExecutionCount = 0
@@ -226,6 +232,13 @@ class ReconcileExecutionsService(
     companion object {
         private const val RECONCILIATION_SOURCE = "BROKER_EXECUTION_DAILY"
     }
+}
+
+private const val DEFAULT_RECONCILIATION_BACKFILL_DAYS = 7L
+
+private fun ExecutionReconciliationCursorDto?.toLookupQuery(startedAt: ZonedDateTime): ExecutionLookupQuery {
+    val from = this?.lastObservedExecutionAt ?: startedAt.minusDays(DEFAULT_RECONCILIATION_BACKFILL_DAYS)
+    return ExecutionLookupQuery(from = from, to = startedAt)
 }
 
 private suspend fun submitLegacySellOrder(

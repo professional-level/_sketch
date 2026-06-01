@@ -7,6 +7,7 @@ import java.util.UUID
 interface MarketServicePort {
     fun buyStock(order: PurchaseOrderDto): BrokerOrderSubmissionDto
     fun sellStock(order: SellingOrderDto): BrokerOrderSubmissionDto
+    fun findExecutionList(query: ExecutionLookupQuery): List<ExecutedStockDto> = findExecutionListAtOneDay()
     fun findExecutionListAtOneDay(): List<ExecutedStockDto>
     fun findOrderSubmissionStatus(query: BrokerOrderStatusQuery): BrokerOrderStatusDto
 }
@@ -14,6 +15,7 @@ interface MarketServicePort {
 interface DomesticStockOrderPort {
     fun buyStock(order: PurchaseOrderDto): BrokerOrderSubmissionDto
     fun sellStock(order: SellingOrderDto): BrokerOrderSubmissionDto
+    fun findExecutionList(query: ExecutionLookupQuery): List<ExecutedStockDto> = findExecutionListAtOneDay()
     fun findExecutionListAtOneDay(): List<ExecutedStockDto>
     fun findOrderSubmissionStatus(query: BrokerOrderStatusQuery): BrokerOrderStatusDto
 }
@@ -21,6 +23,7 @@ interface DomesticStockOrderPort {
 interface OverseasStockOrderPort {
     fun buyStock(order: PurchaseOrderDto): BrokerOrderSubmissionDto
     fun sellStock(order: SellingOrderDto): BrokerOrderSubmissionDto
+    fun findExecutionList(query: ExecutionLookupQuery): List<ExecutedStockDto> = findExecutionListAtOneDay()
     fun findExecutionListAtOneDay(): List<ExecutedStockDto>
     fun findOrderSubmissionStatus(query: BrokerOrderStatusQuery): BrokerOrderStatusDto
 }
@@ -85,6 +88,15 @@ enum class StockOrderType {
     LIMIT,
     LOC,
     MOC,
+}
+
+data class ExecutionLookupQuery(
+    val from: ZonedDateTime,
+    val to: ZonedDateTime,
+) {
+    init {
+        require(!from.isAfter(to)) { "execution lookup from must be before or equal to to" }
+    }
 }
 
 data class ExecutedStockDto(

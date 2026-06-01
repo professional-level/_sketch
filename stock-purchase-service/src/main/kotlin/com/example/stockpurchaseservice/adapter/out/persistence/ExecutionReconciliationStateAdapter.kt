@@ -5,6 +5,7 @@ import com.example.stockpurchaseservice.adapter.out.persistence.entity.Execution
 import com.example.stockpurchaseservice.adapter.out.persistence.entity.UnmatchedExecutionEntity
 import com.example.stockpurchaseservice.adapter.out.persistence.repository.ExecutionReconciliationCursorRepository
 import com.example.stockpurchaseservice.adapter.out.persistence.repository.UnmatchedExecutionRepository
+import com.example.stockpurchaseservice.application.port.out.ExecutionReconciliationCursorDto
 import com.example.stockpurchaseservice.application.port.out.ExecutionReconciliationResultDto
 import com.example.stockpurchaseservice.application.port.out.ExecutionReconciliationStatePort
 import com.example.stockpurchaseservice.application.port.out.UnmatchedExecutionDto
@@ -16,6 +17,16 @@ internal class ExecutionReconciliationStateAdapter(
     private val cursorRepository: ExecutionReconciliationCursorRepository,
     private val unmatchedExecutionRepository: UnmatchedExecutionRepository,
 ) : ExecutionReconciliationStatePort {
+
+    override suspend fun findCursor(source: String): ExecutionReconciliationCursorDto? {
+        return cursorRepository.findById(source).awaitSuspending()?.let { cursor ->
+            ExecutionReconciliationCursorDto(
+                source = cursor.source,
+                lastObservedExecutionId = cursor.lastObservedExecutionId,
+                lastObservedExecutionAt = cursor.lastObservedExecutionAt,
+            )
+        }
+    }
 
     override suspend fun markStarted(source: String, startedAt: ZonedDateTime) {
         val current = cursorRepository.findById(source).awaitSuspending()

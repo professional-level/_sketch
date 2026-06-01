@@ -2,6 +2,7 @@ package com.example.stockpurchaseservice.adapter.out.api
 
 import com.example.common.ExternalApiAdapter
 import com.example.stockpurchaseservice.application.port.out.DomesticStockOrderPort
+import com.example.stockpurchaseservice.application.port.out.ExecutionLookupQuery
 import com.example.stockpurchaseservice.application.port.out.ExecutedStockDto
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderSubmissionDto
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatusDto
@@ -34,6 +35,11 @@ internal class MarketServiceAdapter(
 
     override fun findExecutionListAtOneDay(): List<ExecutedStockDto> {
         return (domesticStockOrderPort.findExecutionListAtOneDay() + overseasStockOrderPort.findExecutionListAtOneDay())
+            .sortedBy { it.createdAt }
+    }
+
+    override fun findExecutionList(query: ExecutionLookupQuery): List<ExecutedStockDto> {
+        return (domesticStockOrderPort.findExecutionList(query) + overseasStockOrderPort.findExecutionList(query))
             .sortedBy { it.createdAt }
     }
 

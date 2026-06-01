@@ -34,9 +34,33 @@ internal data class BrokerOrderHistoryQuery(
     val market: StockOrderMarket,
     val symbol: String = "",
     val externalOrderId: String = "",
-    val date: ZonedDateTime = ZonedDateTime.now(BROKER_ORDER_ZONE),
+    val from: ZonedDateTime = ZonedDateTime.now(BROKER_ORDER_ZONE),
+    val to: ZonedDateTime = from,
     val isMock: Boolean,
+    val pageCursor: BrokerOrderHistoryPageCursor = BrokerOrderHistoryPageCursor.EMPTY,
+) {
+    init {
+        require(!from.isAfter(to)) { "broker history from must be before or equal to to" }
+    }
+}
+
+internal data class BrokerOrderHistoryPage(
+    val items: List<BrokerOrderHistoryItem>,
+    val nextCursor: BrokerOrderHistoryPageCursor,
 )
+
+internal data class BrokerOrderHistoryPageCursor(
+    val foreignKeyContext: String = "",
+    val nextKeyContext: String = "",
+) {
+    fun hasNext(): Boolean {
+        return foreignKeyContext.isNotBlank() || nextKeyContext.isNotBlank()
+    }
+
+    companion object {
+        val EMPTY = BrokerOrderHistoryPageCursor()
+    }
+}
 
 internal data class BrokerOrderHistoryItem(
     val externalOrderId: String,

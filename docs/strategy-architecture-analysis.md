@@ -536,7 +536,7 @@ broker API 자체가 idempotency key를 지원하지 않는다면, purchase-serv
 
 현재 남은 것:
 
-- `stock-purchase-service`의 체결 reconciliation은 cursor와 unmatched 저장, KIS wrapper 기반 1일 주문/체결 조회 매핑은 갖췄지만, 날짜 범위 기반 backfill, pagination 완료 처리, rate-limit/retry 정책은 남아 있다.
+- `stock-purchase-service`의 체결 reconciliation은 cursor와 unmatched 저장, KIS wrapper 기반 주문/체결 조회 매핑, cursor 기준 날짜 범위 backfill, KIS 조회 cursor pagination을 갖췄다. 운영 수준의 rate-limit/retry/backoff 정책은 남아 있다.
 - legacy direct sell submission은 order intent lifecycle 경로로 통일되었다.
 - `strategy-execution-service`의 `OrderIntentCreated` 발행과 `stock-purchase-service`의 주문/체결 이벤트 발행은 outbox 저장 후 scheduled publisher가 Kafka로 발행한다.
 - stock-purchase-service의 주문/조회 KIS 원문 계약은 `adapter/out/broker`의 broker gateway anti-corruption layer로 격리되었다. 별도 배포 서비스, token 관리, rate limit, retry, circuit breaker 책임 분리는 아직 남아 있다.
@@ -585,7 +585,7 @@ stock-search-service
 9. 완료: 라오어 cycle close와 auto restart 정책을 명시적으로 저장한다.
 10. 완료: active strategy state를 persistence adapter로 옮긴다.
 11. 완료: Temporal schedule로 daily execution trigger를 붙인다.
-12. 부분 완료: stock-purchase reconciliation에 durable cursor, unmatched execution 저장, KIS wrapper 기반 1일 주문/체결 조회 매핑을 추가한다. 날짜 범위 기반 backfill은 남아 있다.
+12. 부분 완료: stock-purchase reconciliation에 durable cursor, unmatched execution 저장, KIS wrapper 기반 주문/체결 조회 매핑, cursor 기준 날짜 범위 backfill, KIS 조회 cursor pagination을 추가한다. rate-limit/retry/backoff 정책은 남아 있다.
 13. 완료: 주문 lifecycle을 `SUBMISSION_UNKNOWN` 복구와 `OrderCancelled`까지 확장하고, direct sell event 경로를 order intent lifecycle로 통일한다.
 14. 완료: 발행 측 outbox 적용 범위를 strategy-execution과 stock-purchase의 publisher까지 확장한다.
 15. 부분 완료: stock-purchase-service 내부 주문/조회 KIS 계약을 broker gateway anti-corruption layer로 분리한다. 별도 broker wrapper service 배포와 token/rate-limit/retry/circuit-breaker 분리는 남아 있다.

@@ -3,6 +3,7 @@ package com.example.stockpurchaseservice.application.port.out
 import java.time.ZonedDateTime
 
 interface ExecutionReconciliationStatePort {
+    suspend fun findCursor(source: String): ExecutionReconciliationCursorDto?
     suspend fun markStarted(source: String, startedAt: ZonedDateTime)
     suspend fun markCompleted(
         source: String,
@@ -13,6 +14,12 @@ interface ExecutionReconciliationStatePort {
     suspend fun markFailed(source: String, failedAt: ZonedDateTime, reason: String?)
     suspend fun saveUnmatchedExecution(execution: UnmatchedExecutionDto)
 }
+
+data class ExecutionReconciliationCursorDto(
+    val source: String,
+    val lastObservedExecutionId: String?,
+    val lastObservedExecutionAt: ZonedDateTime?,
+)
 
 data class ExecutionReconciliationResultDto(
     val lastObservedExecutionId: String?,
