@@ -7,6 +7,7 @@ import java.util.UUID
 interface OrderExecutionEventPort {
     suspend fun publishSubmitted(event: OrderSubmittedMessage)
     suspend fun publishRejected(event: OrderRejectedMessage)
+    suspend fun publishCancelled(event: OrderCancelledMessage)
     suspend fun publishFilled(event: OrderFilledMessage)
     suspend fun publishPartiallyFilled(event: OrderPartiallyFilledMessage)
 }
@@ -26,6 +27,15 @@ data class OrderRejectedMessage(
     val brokerOrderId: String?,
     val reason: String,
     val rejectedAt: ZonedDateTime,
+)
+
+data class OrderCancelledMessage(
+    val eventId: UUID,
+    val strategyExecutionId: String,
+    val orderIntentId: String,
+    val brokerOrderId: String,
+    val reason: String,
+    val cancelledAt: ZonedDateTime,
 )
 
 data class OrderFilledMessage(

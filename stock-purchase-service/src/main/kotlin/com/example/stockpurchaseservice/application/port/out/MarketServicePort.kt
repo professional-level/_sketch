@@ -1,5 +1,6 @@
 package com.example.stockpurchaseservice.application.port.out
 
+import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
 import java.time.ZonedDateTime
 import java.util.UUID
 
@@ -7,6 +8,7 @@ interface MarketServicePort {
     fun buyStock(order: PurchaseOrderDto): BrokerOrderSubmissionDto
     fun sellStock(order: SellingOrderDto): BrokerOrderSubmissionDto
     fun findExecutionListAtOneDay(): List<ExecutedStockDto>
+    fun findOrderSubmissionStatus(query: BrokerOrderStatusQuery): BrokerOrderStatusDto
 }
 
 interface DomesticStockOrderPort {
@@ -22,6 +24,34 @@ interface OverseasStockOrderPort {
 data class BrokerOrderSubmissionDto(
     val externalOrderId: String,
 )
+
+class BrokerOrderSubmissionUnknownException(
+    message: String,
+    val externalOrderId: String? = null,
+) : RuntimeException(message)
+
+data class BrokerOrderStatusQuery(
+    val orderIntentId: UUID,
+    val internalOrderId: UUID,
+    val externalOrderId: String?,
+    val symbol: String,
+    val side: OrderIntentSide,
+    val market: StockOrderMarket,
+)
+
+data class BrokerOrderStatusDto(
+    val status: BrokerOrderStatus,
+    val externalOrderId: String? = null,
+    val reason: String? = null,
+    val checkedAt: ZonedDateTime = ZonedDateTime.now(),
+)
+
+enum class BrokerOrderStatus {
+    SUBMITTED,
+    REJECTED,
+    CANCELLED,
+    UNKNOWN,
+}
 
 data class PurchaseOrderDto(
     val orderId: UUID,

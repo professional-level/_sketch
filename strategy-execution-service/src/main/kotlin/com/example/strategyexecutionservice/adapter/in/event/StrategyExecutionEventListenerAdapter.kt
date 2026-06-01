@@ -15,6 +15,7 @@ import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategyS
 import common.ConsumerGroupId.STRATEGY_EXECUTION_SERVICE
 import common.Topic.ORDER_FILLED
 import common.Topic.ORDER_PARTIALLY_FILLED
+import common.Topic.ORDER_CANCELLED
 import common.Topic.ORDER_REJECTED
 import common.Topic.ORDER_SUBMITTED
 import common.Topic.STRATEGY_EXECUTION_START_REQUESTED
@@ -54,6 +55,12 @@ internal class StrategyExecutionEventListenerAdapter(
     @KafkaListener(topics = [ORDER_REJECTED], groupId = STRATEGY_EXECUTION_SERVICE)
     suspend fun orderRejections(message: ByteArray) {
         val event = Event.OrderRejected.parseFrom(message)
+        recordOrderExecutionEventUseCase.execute(event.toCommand())
+    }
+
+    @KafkaListener(topics = [ORDER_CANCELLED], groupId = STRATEGY_EXECUTION_SERVICE)
+    suspend fun orderCancellations(message: ByteArray) {
+        val event = Event.OrderCancelled.parseFrom(message)
         recordOrderExecutionEventUseCase.execute(event.toCommand())
     }
 }
@@ -156,6 +163,17 @@ private fun Event.OrderRejected.toCommand(): RecordOrderExecutionEventCommand.Re
         brokerOrderId = brokerOrderId.ifBlank { null },
         reason = reason,
         rejectedAt = rejectedAt.toZonedDateTime(),
+    )
+}
+
+private fun Event.OrderCancelled.toCommand(): RecordOrderExecutionEventCommand.Cancelled {
+    return RecordOrderExecutionEventCommand.Cancelled(
+        eventId = eventId,
+        strategyExecutionId = strategyExecutionId,
+        orderIntentId = orderIntentId,
+        brokerOrderId = brokerOrderId,
+        reason = reason,
+        cancelledAt = cancelledAt.toZonedDateTime(),
     )
 }
 

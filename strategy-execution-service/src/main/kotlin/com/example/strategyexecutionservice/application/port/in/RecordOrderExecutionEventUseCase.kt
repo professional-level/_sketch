@@ -50,6 +50,25 @@ sealed class RecordOrderExecutionEventCommand {
             require(reason.isNotBlank()) { "reason must not be blank" }
         }
     }
+
+    data class Cancelled(
+        override val eventId: String,
+        override val strategyExecutionId: String,
+        override val orderIntentId: String,
+        override val brokerOrderId: String,
+        val reason: String,
+        val cancelledAt: ZonedDateTime,
+    ) : RecordOrderExecutionEventCommand() {
+        override val occurredAt: ZonedDateTime = cancelledAt
+
+        init {
+            require(eventId.isNotBlank()) { "eventId must not be blank" }
+            require(strategyExecutionId.isNotBlank()) { "strategyExecutionId must not be blank" }
+            require(orderIntentId.isNotBlank()) { "orderIntentId must not be blank" }
+            require(brokerOrderId.isNotBlank()) { "brokerOrderId must not be blank" }
+            require(reason.isNotBlank()) { "reason must not be blank" }
+        }
+    }
 }
 
 data class RecordOrderExecutionEventResult(

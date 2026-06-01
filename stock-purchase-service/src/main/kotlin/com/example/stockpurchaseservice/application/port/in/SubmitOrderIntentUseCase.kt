@@ -40,6 +40,7 @@ data class SubmitOrderIntentResult(
 
 enum class OrderIntentSubmissionStatus {
     SUBMITTED,
+    SUBMISSION_UNKNOWN,
     SKIPPED_DUPLICATE,
 }
 

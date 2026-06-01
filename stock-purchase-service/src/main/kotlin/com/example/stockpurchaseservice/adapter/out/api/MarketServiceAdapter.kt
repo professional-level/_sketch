@@ -4,6 +4,9 @@ import com.example.common.ExternalApiAdapter
 import com.example.stockpurchaseservice.application.port.out.DomesticStockOrderPort
 import com.example.stockpurchaseservice.application.port.out.ExecutedStockDto
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderSubmissionDto
+import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatus
+import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatusDto
+import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatusQuery
 import com.example.stockpurchaseservice.application.port.out.MarketServicePort
 import com.example.stockpurchaseservice.application.port.out.OverseasStockOrderPort
 import com.example.stockpurchaseservice.application.port.out.PurchaseOrderDto
@@ -32,5 +35,13 @@ internal class MarketServiceAdapter(
 
     override fun findExecutionListAtOneDay(): List<ExecutedStockDto> {
         return emptyList()
+    }
+
+    override fun findOrderSubmissionStatus(query: BrokerOrderStatusQuery): BrokerOrderStatusDto {
+        return BrokerOrderStatusDto(
+            status = BrokerOrderStatus.UNKNOWN,
+            externalOrderId = query.externalOrderId,
+            reason = "broker order status lookup is not implemented",
+        )
     }
 }

@@ -3,6 +3,7 @@ package com.example.stockpurchaseservice.adapter.out.kafka
 import Event
 import com.example.common.ExternalApiAdapter
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
+import com.example.stockpurchaseservice.application.port.out.OrderCancelledMessage
 import com.example.stockpurchaseservice.application.port.out.OrderExecutionEventPort
 import com.example.stockpurchaseservice.application.port.out.OrderFilledMessage
 import com.example.stockpurchaseservice.application.port.out.OrderPartiallyFilledMessage
@@ -10,6 +11,7 @@ import com.example.stockpurchaseservice.application.port.out.OrderRejectedMessag
 import com.example.stockpurchaseservice.application.port.out.OrderSubmittedMessage
 import common.Topic.ORDER_FILLED
 import common.Topic.ORDER_PARTIALLY_FILLED
+import common.Topic.ORDER_CANCELLED
 import common.Topic.ORDER_REJECTED
 import common.Topic.ORDER_SUBMITTED
 import common.proto.ProtoUtils.toProtobufTimestamp
@@ -32,6 +34,14 @@ internal class OrderExecutionKafkaAdapter(
     override suspend fun publishRejected(event: OrderRejectedMessage) {
         kafkaProtoTypeTemplate.send(
             ORDER_REJECTED,
+            event.strategyExecutionId,
+            event.toProto().toByteArray(),
+        ).await()
+    }
+
+    override suspend fun publishCancelled(event: OrderCancelledMessage) {
+        kafkaProtoTypeTemplate.send(
+            ORDER_CANCELLED,
             event.strategyExecutionId,
             event.toProto().toByteArray(),
         ).await()
@@ -73,6 +83,18 @@ internal class OrderExecutionKafkaAdapter(
             .setReason(reason)
             .setRejectedAt(rejectedAt.toProtobufTimestamp())
             .setMeta(meta(rejectedAt))
+            .build()
+    }
+
+    private fun OrderCancelledMessage.toProto(): Event.OrderCancelled {
+        return Event.OrderCancelled.newBuilder()
+            .setEventId(eventId.toString())
+            .setStrategyExecutionId(strategyExecutionId)
+            .setOrderIntentId(orderIntentId)
+            .setBrokerOrderId(brokerOrderId)
+            .setReason(reason)
+            .setCancelledAt(cancelledAt.toProtobufTimestamp())
+            .setMeta(meta(cancelledAt))
             .build()
     }
 

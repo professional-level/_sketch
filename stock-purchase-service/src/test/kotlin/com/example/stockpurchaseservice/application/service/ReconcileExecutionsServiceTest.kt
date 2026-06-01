@@ -3,6 +3,9 @@ package com.example.stockpurchaseservice.application.service
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentType
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderSubmissionDto
+import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatus
+import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatusDto
+import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatusQuery
 import com.example.stockpurchaseservice.application.port.out.ExecutedStockDto
 import com.example.stockpurchaseservice.application.port.out.ExecutionFillDto
 import com.example.stockpurchaseservice.application.port.out.ExecutionFillPort
@@ -11,6 +14,7 @@ import com.example.stockpurchaseservice.application.port.out.ExecutionReconcilia
 import com.example.stockpurchaseservice.application.port.out.ExecutionTypeDto
 import com.example.stockpurchaseservice.application.port.out.MarketServicePort
 import com.example.stockpurchaseservice.application.port.out.OrderExecutionEventPort
+import com.example.stockpurchaseservice.application.port.out.OrderCancelledMessage
 import com.example.stockpurchaseservice.application.port.out.OrderFilledMessage
 import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionDto
 import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionPort
@@ -209,6 +213,10 @@ class ReconcileExecutionsServiceTest {
             failure?.let { throw it }
             return executions
         }
+
+        override fun findOrderSubmissionStatus(query: BrokerOrderStatusQuery): BrokerOrderStatusDto {
+            return BrokerOrderStatusDto(status = BrokerOrderStatus.UNKNOWN)
+        }
     }
 
     private class FakeExecutionFillPort(
@@ -237,9 +245,17 @@ class ReconcileExecutionsServiceTest {
 
         override suspend fun saveSubmitted(submission: OrderIntentSubmissionDto) = Unit
 
+        override suspend fun saveUnknown(submission: OrderIntentSubmissionDto) = Unit
+
+        override suspend fun saveRejected(submission: OrderIntentSubmissionDto) = Unit
+
+        override suspend fun saveCancelled(submission: OrderIntentSubmissionDto) = Unit
+
         override suspend fun findByExternalOrderId(externalOrderId: String): OrderIntentSubmissionDto? {
             return submissionsByExternalOrderId[externalOrderId]
         }
+
+        override suspend fun findUnknownSubmissions(): List<OrderIntentSubmissionDto> = emptyList()
     }
 
     private class FakeOrderExecutionEventPort : OrderExecutionEventPort {
@@ -249,6 +265,8 @@ class ReconcileExecutionsServiceTest {
         override suspend fun publishSubmitted(event: OrderSubmittedMessage) = Unit
 
         override suspend fun publishRejected(event: OrderRejectedMessage) = Unit
+
+        override suspend fun publishCancelled(event: OrderCancelledMessage) = Unit
 
         override suspend fun publishFilled(event: OrderFilledMessage) {
             filled += event

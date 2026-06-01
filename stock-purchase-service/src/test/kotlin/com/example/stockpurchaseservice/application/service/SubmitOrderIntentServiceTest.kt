@@ -6,7 +6,12 @@ import com.example.stockpurchaseservice.application.port.`in`.OrderIntentType
 import com.example.stockpurchaseservice.application.port.`in`.SubmitOrderIntentCommand
 import com.example.stockpurchaseservice.application.port.out.ExecutedStockDto
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderSubmissionDto
+import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatus
+import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatusDto
+import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatusQuery
+import com.example.stockpurchaseservice.application.port.out.BrokerOrderSubmissionUnknownException
 import com.example.stockpurchaseservice.application.port.out.MarketServicePort
+import com.example.stockpurchaseservice.application.port.out.OrderCancelledMessage
 import com.example.stockpurchaseservice.application.port.out.OrderExecutionEventPort
 import com.example.stockpurchaseservice.application.port.out.OrderFilledMessage
 import com.example.stockpurchaseservice.application.port.out.OrderPartiallyFilledMessage
@@ -128,11 +133,47 @@ class SubmitOrderIntentServiceTest {
         assertEquals(emptyList(), eventPort.submitted)
     }
 
-    private class FakeMarketServicePort : MarketServicePort {
+    @Test
+    fun `stores submission unknown without publishing rejected when broker result is unclear`() = runBlocking {
+        val marketPort = FakeMarketServicePort(
+            buyFailure = BrokerOrderSubmissionUnknownException("timeout after broker submit"),
+        )
+        val processedEventPort = FakeProcessedEventPort()
+        val submissionPort = FakeOrderIntentSubmissionPort()
+        val eventPort = FakeOrderExecutionEventPort()
+        val service = SubmitOrderIntentService(marketPort, processedEventPort, submissionPort, eventPort)
+        val eventId = UUID.randomUUID()
+
+        val result = service.execute(
+            SubmitOrderIntentCommand(
+                eventId = eventId,
+                idempotencyKey = "unknown-buy",
+                strategyExecutionId = "laor-v4-strategy:TQQQ",
+                symbol = "TQQQ",
+                side = OrderIntentSide.BUY,
+                orderType = OrderIntentType.LOC,
+                price = 112.0,
+                quantity = 3,
+                orderTag = "FIRST_BUY",
+                createdAt = ZonedDateTime.parse("2026-05-30T09:00:00+09:00"),
+            ),
+        )
+
+        assertEquals(OrderIntentSubmissionStatus.SUBMISSION_UNKNOWN, result.status)
+        assertEquals(eventId, processedEventPort.succeeded.single())
+        assertEquals(eventId, submissionPort.unknown.single().orderIntentId)
+        assertEquals(emptyList(), eventPort.submitted)
+        assertEquals(emptyList(), eventPort.rejected)
+    }
+
+    private class FakeMarketServicePort(
+        private val buyFailure: RuntimeException? = null,
+    ) : MarketServicePort {
         val buyOrders: MutableList<PurchaseOrderDto> = mutableListOf()
         val sellOrders: MutableList<SellingOrderDto> = mutableListOf()
 
         override fun buyStock(order: PurchaseOrderDto): BrokerOrderSubmissionDto {
+            buyFailure?.let { throw it }
             buyOrders += order
             return BrokerOrderSubmissionDto(externalOrderId = "broker-buy-${buyOrders.size}")
         }
@@ -144,6 +185,10 @@ class SubmitOrderIntentServiceTest {
 
         override fun findExecutionListAtOneDay(): List<ExecutedStockDto> {
             return emptyList()
+        }
+
+        override fun findOrderSubmissionStatus(query: BrokerOrderStatusQuery): BrokerOrderStatusDto {
+            return BrokerOrderStatusDto(status = BrokerOrderStatus.UNKNOWN)
         }
     }
 
@@ -165,14 +210,25 @@ class SubmitOrderIntentServiceTest {
 
     private class FakeOrderIntentSubmissionPort : OrderIntentSubmissionPort {
         val saved: MutableList<OrderIntentSubmissionDto> = mutableListOf()
+        val unknown: MutableList<OrderIntentSubmissionDto> = mutableListOf()
 
         override suspend fun saveSubmitted(submission: OrderIntentSubmissionDto) {
             saved += submission
         }
 
+        override suspend fun saveUnknown(submission: OrderIntentSubmissionDto) {
+            unknown += submission
+        }
+
+        override suspend fun saveRejected(submission: OrderIntentSubmissionDto) = Unit
+
+        override suspend fun saveCancelled(submission: OrderIntentSubmissionDto) = Unit
+
         override suspend fun findByExternalOrderId(externalOrderId: String): OrderIntentSubmissionDto? {
             return saved.firstOrNull { it.externalOrderId == externalOrderId }
         }
+
+        override suspend fun findUnknownSubmissions(): List<OrderIntentSubmissionDto> = unknown
     }
 
     private class FakeOrderExecutionEventPort : OrderExecutionEventPort {
@@ -186,6 +242,8 @@ class SubmitOrderIntentServiceTest {
         override suspend fun publishRejected(event: OrderRejectedMessage) {
             rejected += event
         }
+
+        override suspend fun publishCancelled(event: OrderCancelledMessage) = Unit
 
         override suspend fun publishFilled(event: OrderFilledMessage) = Unit
 

@@ -3,6 +3,7 @@ package com.example.stockpurchaseservice.adapter.out.persistence.entity
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentType
 import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionDto
+import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionStatusDto
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
@@ -45,10 +46,17 @@ internal class OrderIntentSubmissionEntity private constructor(
     val orderTag: String,
     @Column(nullable = false)
     val internalOrderId: UUID,
-    @Column(nullable = false)
-    val externalOrderId: String,
+    @Column
+    val externalOrderId: String?,
     @Column(nullable = false)
     val submittedAt: ZonedDateTime,
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    val status: OrderIntentSubmissionStatus,
+    @Column(length = 1000)
+    val statusReason: String?,
+    @Column
+    val lastStatusCheckedAt: ZonedDateTime?,
 ) {
     fun toDto(): OrderIntentSubmissionDto {
         return OrderIntentSubmissionDto(
@@ -64,6 +72,9 @@ internal class OrderIntentSubmissionEntity private constructor(
             internalOrderId = internalOrderId,
             externalOrderId = externalOrderId,
             submittedAt = submittedAt,
+            status = status.toDto(),
+            statusReason = statusReason,
+            lastStatusCheckedAt = lastStatusCheckedAt,
         )
     }
 
@@ -82,7 +93,38 @@ internal class OrderIntentSubmissionEntity private constructor(
                 internalOrderId = dto.internalOrderId,
                 externalOrderId = dto.externalOrderId,
                 submittedAt = dto.submittedAt,
+                status = OrderIntentSubmissionStatus.from(dto.status),
+                statusReason = dto.statusReason?.take(1000),
+                lastStatusCheckedAt = dto.lastStatusCheckedAt,
             )
+        }
+    }
+}
+
+internal enum class OrderIntentSubmissionStatus {
+    SUBMITTED,
+    SUBMISSION_UNKNOWN,
+    REJECTED,
+    CANCELLED,
+    ;
+
+    fun toDto(): OrderIntentSubmissionStatusDto {
+        return when (this) {
+            SUBMITTED -> OrderIntentSubmissionStatusDto.SUBMITTED
+            SUBMISSION_UNKNOWN -> OrderIntentSubmissionStatusDto.SUBMISSION_UNKNOWN
+            REJECTED -> OrderIntentSubmissionStatusDto.REJECTED
+            CANCELLED -> OrderIntentSubmissionStatusDto.CANCELLED
+        }
+    }
+
+    companion object {
+        fun from(dto: OrderIntentSubmissionStatusDto): OrderIntentSubmissionStatus {
+            return when (dto) {
+                OrderIntentSubmissionStatusDto.SUBMITTED -> SUBMITTED
+                OrderIntentSubmissionStatusDto.SUBMISSION_UNKNOWN -> SUBMISSION_UNKNOWN
+                OrderIntentSubmissionStatusDto.REJECTED -> REJECTED
+                OrderIntentSubmissionStatusDto.CANCELLED -> CANCELLED
+            }
         }
     }
 }

@@ -78,6 +78,7 @@ internal class StrategyExecutionOrderEventEntity private constructor(
 internal enum class StrategyExecutionOrderEventEntityType {
     SUBMITTED,
     REJECTED,
+    CANCELLED,
     FILLED,
     PARTIALLY_FILLED,
     ;
@@ -86,6 +87,7 @@ internal enum class StrategyExecutionOrderEventEntityType {
         return when (this) {
             SUBMITTED -> StrategyExecutionOrderEventType.SUBMITTED
             REJECTED -> StrategyExecutionOrderEventType.REJECTED
+            CANCELLED -> StrategyExecutionOrderEventType.CANCELLED
             FILLED -> StrategyExecutionOrderEventType.FILLED
             PARTIALLY_FILLED -> StrategyExecutionOrderEventType.PARTIALLY_FILLED
         }
@@ -96,6 +98,7 @@ internal enum class StrategyExecutionOrderEventEntityType {
             return when (type) {
                 StrategyExecutionOrderEventType.SUBMITTED -> SUBMITTED
                 StrategyExecutionOrderEventType.REJECTED -> REJECTED
+                StrategyExecutionOrderEventType.CANCELLED -> CANCELLED
                 StrategyExecutionOrderEventType.FILLED -> FILLED
                 StrategyExecutionOrderEventType.PARTIALLY_FILLED -> PARTIALLY_FILLED
             }

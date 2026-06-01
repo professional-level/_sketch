@@ -8,9 +8,11 @@ import com.example.stockpurchaseservice.application.port.`in`.SubmitOrderIntentC
 import com.example.stockpurchaseservice.application.port.`in`.SubmitOrderIntentResult
 import com.example.stockpurchaseservice.application.port.`in`.SubmitOrderIntentUseCase
 import com.example.stockpurchaseservice.application.port.out.MarketServicePort
+import com.example.stockpurchaseservice.application.port.out.BrokerOrderSubmissionUnknownException
 import com.example.stockpurchaseservice.application.port.out.OrderExecutionEventPort
 import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionDto
 import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionPort
+import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionStatusDto
 import com.example.stockpurchaseservice.application.port.out.OrderRejectedMessage
 import com.example.stockpurchaseservice.application.port.out.OrderSubmittedMessage
 import com.example.stockpurchaseservice.application.port.out.ProcessedEventPort
@@ -42,6 +44,11 @@ class SubmitOrderIntentService(
             orderExecutionEventPort.publishSubmitted(command.toSubmittedMessage(submission))
             processedEventPort.markSuccess(command.eventId)
             SubmitOrderIntentResult(OrderIntentSubmissionStatus.SUBMITTED)
+        } catch (exception: BrokerOrderSubmissionUnknownException) {
+            val unknownSubmission = command.toUnknownSubmission(exception)
+            orderIntentSubmissionPort.saveUnknown(unknownSubmission)
+            processedEventPort.markSuccess(command.eventId)
+            SubmitOrderIntentResult(OrderIntentSubmissionStatus.SUBMISSION_UNKNOWN)
         } catch (exception: Throwable) {
             runCatching {
                 orderExecutionEventPort.publishRejected(command.toRejectedMessage(exception))
@@ -93,6 +100,30 @@ class SubmitOrderIntentService(
             internalOrderId = orderId,
             externalOrderId = submission.externalOrderId,
             submittedAt = ZonedDateTime.now(),
+            status = OrderIntentSubmissionStatusDto.SUBMITTED,
+        )
+    }
+
+    private fun SubmitOrderIntentCommand.toUnknownSubmission(
+        exception: BrokerOrderSubmissionUnknownException,
+    ): OrderIntentSubmissionDto {
+        val orderId = UUID.nameUUIDFromBytes(idempotencyKey.toByteArray(StandardCharsets.UTF_8))
+        return OrderIntentSubmissionDto(
+            orderIntentId = eventId,
+            idempotencyKey = idempotencyKey,
+            strategyExecutionId = strategyExecutionId,
+            symbol = symbol,
+            side = side,
+            orderType = orderType,
+            submittedPrice = price,
+            quantity = quantity,
+            orderTag = orderTag,
+            internalOrderId = orderId,
+            externalOrderId = exception.externalOrderId,
+            submittedAt = ZonedDateTime.now(),
+            status = OrderIntentSubmissionStatusDto.SUBMISSION_UNKNOWN,
+            statusReason = exception.message,
+            lastStatusCheckedAt = null,
         )
     }
 
@@ -103,7 +134,7 @@ class SubmitOrderIntentService(
             eventId = deterministicEventId("${eventId}:SUBMITTED"),
             strategyExecutionId = strategyExecutionId,
             orderIntentId = eventId.toString(),
-            brokerOrderId = submission.externalOrderId,
+            brokerOrderId = checkNotNull(submission.externalOrderId),
             submittedAt = submission.submittedAt,
         )
     }

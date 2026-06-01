@@ -57,6 +57,29 @@ class RecordOrderExecutionEventServiceTest {
     }
 
     @Test
+    fun `records cancelled order event with reason`() = runBlocking {
+        val orderEventPort = FakeStrategyExecutionOrderEventPort()
+        val service = RecordOrderExecutionEventService(orderEventPort)
+
+        service.execute(
+            RecordOrderExecutionEventCommand.Cancelled(
+                eventId = "cancelled-1",
+                strategyExecutionId = "laor-v4:TQQQ",
+                orderIntentId = "intent-1",
+                brokerOrderId = "broker-1",
+                reason = "LOC expired",
+                cancelledAt = ZonedDateTime.parse("2026-06-02T09:00:00+09:00"),
+            ),
+        )
+
+        with(orderEventPort.saved.single()) {
+            assertEquals(StrategyExecutionOrderEventType.CANCELLED, type)
+            assertEquals("LOC expired", reason)
+            assertEquals("broker-1", brokerOrderId)
+        }
+    }
+
+    @Test
     fun `skips duplicate submitted order event`() = runBlocking {
         val orderEventPort = FakeStrategyExecutionOrderEventPort(duplicateEventIds = setOf("submitted-1"))
         val service = RecordOrderExecutionEventService(orderEventPort)

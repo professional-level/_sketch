@@ -51,5 +51,15 @@ private fun RecordOrderExecutionEventCommand.toRecord(): StrategyExecutionOrderE
             reason = reason,
             occurredAt = rejectedAt,
         )
+
+        is RecordOrderExecutionEventCommand.Cancelled -> StrategyExecutionOrderEventRecord(
+            eventId = eventId,
+            strategyExecutionId = strategyExecutionId,
+            orderIntentId = orderIntentId,
+            brokerOrderId = brokerOrderId,
+            type = StrategyExecutionOrderEventType.CANCELLED,
+            reason = reason,
+            occurredAt = cancelledAt,
+        )
     }
 }

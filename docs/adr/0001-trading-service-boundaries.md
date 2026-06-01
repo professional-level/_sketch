@@ -34,7 +34,7 @@ stock-search-service
   -> strategy-execution-service
   -> OrderIntentCreated
   -> stock-purchase-service
-  -> OrderSubmitted / OrderFilled / OrderPartiallyFilled / OrderRejected
+  -> OrderSubmitted / OrderFilled / OrderPartiallyFilled / OrderRejected / OrderCancelled
   -> strategy-execution-service
 ```
 

@@ -92,6 +92,16 @@ message OrderRejected {
   EventMeta meta = 7;
 }
 
+message OrderCancelled {
+  string event_id = 1;
+  string strategy_execution_id = 2;
+  string order_intent_id = 3;
+  string broker_order_id = 4;
+  string reason = 5;
+  google.protobuf.Timestamp cancelled_at = 6;
+  EventMeta meta = 7;
+}
+
 message OrderFilled {
   string event_id = 1;
   string strategy_execution_id = 2;

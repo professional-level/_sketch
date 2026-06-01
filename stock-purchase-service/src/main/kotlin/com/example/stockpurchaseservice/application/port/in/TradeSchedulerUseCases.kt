@@ -13,6 +13,11 @@ interface ReconcileExecutionsUseCase {
 }
 
 @UseCase
+interface RecoverUnknownOrderSubmissionsUseCase {
+    suspend fun execute()
+}
+
+@UseCase
 interface SimulateStockPurchaseUseCase {
     suspend fun execute()
 }

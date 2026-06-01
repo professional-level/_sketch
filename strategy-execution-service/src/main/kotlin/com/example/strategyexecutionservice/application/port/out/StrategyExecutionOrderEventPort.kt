@@ -35,6 +35,7 @@ data class StrategyExecutionOrderEventRecord(
 enum class StrategyExecutionOrderEventType {
     SUBMITTED,
     REJECTED,
+    CANCELLED,
     FILLED,
     PARTIALLY_FILLED,
 }
