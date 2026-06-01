@@ -35,7 +35,13 @@ data class BrokerOrderSubmissionDto(
 class BrokerOrderSubmissionUnknownException(
     message: String,
     val externalOrderId: String? = null,
-) : RuntimeException(message)
+    cause: Throwable? = null,
+) : RuntimeException(message, cause)
+
+class BrokerOrderTemporaryUnavailableException(
+    message: String,
+    cause: Throwable? = null,
+) : RuntimeException(message, cause)
 
 data class BrokerOrderStatusQuery(
     val orderIntentId: UUID,

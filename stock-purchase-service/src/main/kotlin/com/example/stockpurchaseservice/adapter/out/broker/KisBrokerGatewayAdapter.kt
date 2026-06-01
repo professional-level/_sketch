@@ -31,21 +31,24 @@ import java.time.format.DateTimeFormatter
 internal class KisBrokerGatewayAdapter(
     @Qualifier("stockApiClient") private val stockApiClient: WebClient,
     private val properties: KisBrokerGatewayProperties = KisBrokerGatewayProperties(),
+    private val guard: KisBrokerGatewayGuard = KisBrokerGatewayGuard(properties),
 ) : BrokerGateway {
 
     override fun submitOrder(command: BrokerOrderCommand): BrokerOrderSubmissionDto {
-        return when (command.market) {
-            StockOrderMarket.DOMESTIC -> stockApiClient.submitStockOrder(
-                uri = OPEN_API_PREFIX + POST_STOCK_ORDER,
-                body = command.toKisDomesticOrderRequest(),
-                callOptions = properties.toSubmitCallOptions(),
-            )
+        return guard.execute("submit-order:${command.market}") {
+            when (command.market) {
+                StockOrderMarket.DOMESTIC -> stockApiClient.submitStockOrder(
+                    uri = OPEN_API_PREFIX + POST_STOCK_ORDER,
+                    body = command.toKisDomesticOrderRequest(),
+                    callOptions = properties.toSubmitCallOptions(),
+                )
 
-            StockOrderMarket.OVERSEAS_US -> stockApiClient.submitStockOrder(
-                uri = OPEN_API_PREFIX + POST_OVERSEAS_STOCK_ORDER,
-                body = command.toKisUsOverseasOrderRequest(),
-                callOptions = properties.toSubmitCallOptions(),
-            )
+                StockOrderMarket.OVERSEAS_US -> stockApiClient.submitStockOrder(
+                    uri = OPEN_API_PREFIX + POST_OVERSEAS_STOCK_ORDER,
+                    body = command.toKisUsOverseasOrderRequest(),
+                    callOptions = properties.toSubmitCallOptions(),
+                )
+            }
         }
     }
 
@@ -69,51 +72,57 @@ internal class KisBrokerGatewayAdapter(
     }
 
     private fun fetchDomesticOrderHistoryPage(query: BrokerOrderHistoryQuery): BrokerOrderHistoryPage {
-        val response = stockApiClient.getExternalApi(
-            uri = OPEN_API_PREFIX + GET_EXECUTION_ORDERS,
-            queryParameters = query.toKisDomesticExecutionOrderQuery(),
-            responseType = DailyExecutionOrdersResponseOuterClass.DailyExecutionOrdersResponse::class.java,
-            accept = MediaType.APPLICATION_PROTOBUF,
-            callOptions = properties.toQueryCallOptions(),
-        )
-        if (response.rtCd.isNotBlank() && response.rtCd != "0") {
-            throw RuntimeException("domestic execution lookup failed: ${response.msgCd} ${response.msg1}".trim())
+        return guard.execute("domestic-order-history") {
+            val response = stockApiClient.getExternalApi(
+                uri = OPEN_API_PREFIX + GET_EXECUTION_ORDERS,
+                queryParameters = query.toKisDomesticExecutionOrderQuery(),
+                responseType = DailyExecutionOrdersResponseOuterClass.DailyExecutionOrdersResponse::class.java,
+                accept = MediaType.APPLICATION_PROTOBUF,
+                callOptions = properties.toQueryCallOptions(),
+            )
+            if (response.rtCd.isNotBlank() && response.rtCd != "0") {
+                throw RuntimeException("domestic execution lookup failed: ${response.msgCd} ${response.msg1}".trim())
+            }
+            BrokerOrderHistoryPage(
+                items = response.output1List.mapNotNull { it.toBrokerHistoryItem() },
+                nextCursor = BrokerOrderHistoryPageCursor(
+                    foreignKeyContext = response.ctxAreaFk100,
+                    nextKeyContext = response.ctxAreaNk100,
+                ),
+            )
         }
-        return BrokerOrderHistoryPage(
-            items = response.output1List.mapNotNull { it.toBrokerHistoryItem() },
-            nextCursor = BrokerOrderHistoryPageCursor(
-                foreignKeyContext = response.ctxAreaFk100,
-                nextKeyContext = response.ctxAreaNk100,
-            ),
-        )
     }
 
     private fun fetchOverseasOrderHistoryPage(query: BrokerOrderHistoryQuery): BrokerOrderHistoryPage {
-        val response = stockApiClient.getExternalApi(
-            uri = OPEN_API_PREFIX + GET_OVERSEAS_EXECUTION_ORDERS,
-            queryParameters = query.toKisOverseasExecutionOrderQuery(),
-            responseType = JsonNode::class.java,
-            callOptions = properties.toQueryCallOptions(),
-        )
-        val returnCode = response.path("rt_cd").asText("")
-        if (returnCode.isNotBlank() && returnCode != "0") {
-            throw RuntimeException(
-                "overseas execution lookup failed: ${response.path("msg_cd").asText()} ${response.path("msg1").asText()}".trim(),
+        return guard.execute("overseas-order-history") {
+            val response = stockApiClient.getExternalApi(
+                uri = OPEN_API_PREFIX + GET_OVERSEAS_EXECUTION_ORDERS,
+                queryParameters = query.toKisOverseasExecutionOrderQuery(),
+                responseType = JsonNode::class.java,
+                callOptions = properties.toQueryCallOptions(),
+            )
+            val returnCode = response.path("rt_cd").asText("")
+            if (returnCode.isNotBlank() && returnCode != "0") {
+                throw RuntimeException(
+                    "overseas execution lookup failed: ${
+                        response.path("msg_cd").asText()
+                    } ${response.path("msg1").asText()}".trim(),
+                )
+            }
+            val output = response.path("output")
+            val rows = when {
+                output.isArray -> output.toList()
+                output.isObject -> listOf(output)
+                else -> emptyList()
+            }
+            BrokerOrderHistoryPage(
+                items = rows.mapNotNull { it.toBrokerHistoryItem() },
+                nextCursor = BrokerOrderHistoryPageCursor(
+                    foreignKeyContext = response.path("ctx_area_fk200").asText(""),
+                    nextKeyContext = response.path("ctx_area_nk200").asText(""),
+                ),
             )
         }
-        val output = response.path("output")
-        val rows = when {
-            output.isArray -> output.toList()
-            output.isObject -> listOf(output)
-            else -> emptyList()
-        }
-        return BrokerOrderHistoryPage(
-            items = rows.mapNotNull { it.toBrokerHistoryItem() },
-            nextCursor = BrokerOrderHistoryPageCursor(
-                foreignKeyContext = response.path("ctx_area_fk200").asText(""),
-                nextKeyContext = response.path("ctx_area_nk200").asText(""),
-            ),
-        )
     }
 
     companion object {
@@ -279,6 +288,7 @@ private fun WebClient.submitStockOrder(
             throw BrokerOrderSubmissionUnknownException(
                 message = "stock order submission status unknown after transient broker failure: " +
                     (exception.message ?: exception::class.java.simpleName),
+                cause = exception,
             )
         }
         throw exception

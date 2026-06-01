@@ -10,6 +10,7 @@ import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatus
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatusDto
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatusQuery
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderSubmissionUnknownException
+import com.example.stockpurchaseservice.application.port.out.BrokerOrderTemporaryUnavailableException
 import com.example.stockpurchaseservice.application.port.out.MarketServicePort
 import com.example.stockpurchaseservice.application.port.out.OrderCancelledMessage
 import com.example.stockpurchaseservice.application.port.out.OrderExecutionEventPort
@@ -36,6 +37,7 @@ import java.util.UUID
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class SubmitOrderIntentServiceTest {
 
@@ -235,6 +237,47 @@ class SubmitOrderIntentServiceTest {
     }
 
     @Test
+    fun `does not publish rejected event when broker is temporarily unavailable before submission`() = runBlocking {
+        val marketPort = FakeMarketServicePort(
+            buyFailure = BrokerOrderTemporaryUnavailableException("KIS broker gateway circuit is open"),
+        )
+        val processedEventPort = FakeProcessedEventPort()
+        val eventPort = FakeOrderExecutionEventPort()
+        val alertPort = FakeOperationalAlertPort()
+        val service = SubmitOrderIntentService(
+            marketPort,
+            processedEventPort,
+            FakeOrderIntentSubmissionPort(),
+            eventPort,
+            FakeOrderRiskControlPort(),
+            alertPort,
+        )
+        val eventId = UUID.randomUUID()
+
+        assertFailsWith<BrokerOrderTemporaryUnavailableException> {
+            service.execute(
+                SubmitOrderIntentCommand(
+                    eventId = eventId,
+                    idempotencyKey = "temporarily-unavailable-buy",
+                    strategyExecutionId = "laor-v4-strategy:TQQQ",
+                    symbol = "TQQQ",
+                    side = OrderIntentSide.BUY,
+                    orderType = OrderIntentType.LOC,
+                    price = 112.0,
+                    quantity = 3,
+                    orderTag = "FIRST_BUY",
+                    createdAt = ZonedDateTime.parse("2026-05-30T09:00:00+09:00"),
+                ),
+            )
+        }
+
+        assertEquals(eventId, processedEventPort.failed.single())
+        assertEquals(eventId, alertPort.orderSubmissionFailed.single().orderIntentId)
+        assertEquals(emptyList(), eventPort.rejected)
+        assertEquals(emptyList(), eventPort.submitted)
+    }
+
+    @Test
     fun `rejects order intent by risk policy before broker submission`() = runBlocking {
         val marketPort = FakeMarketServicePort()
         val processedEventPort = FakeProcessedEventPort()
@@ -307,6 +350,7 @@ class SubmitOrderIntentServiceTest {
         private val startResult: Boolean = true,
     ) : ProcessedEventPort {
         val succeeded: MutableList<UUID> = mutableListOf()
+        val failed: MutableList<UUID> = mutableListOf()
 
         override suspend fun tryStart(eventId: UUID, idempotencyKey: String): Boolean {
             return startResult
@@ -316,7 +360,9 @@ class SubmitOrderIntentServiceTest {
             succeeded += eventId
         }
 
-        override suspend fun markFailed(eventId: UUID, reason: String?) = Unit
+        override suspend fun markFailed(eventId: UUID, reason: String?) {
+            failed += eventId
+        }
     }
 
     private class FakeOrderIntentSubmissionPort : OrderIntentSubmissionPort {

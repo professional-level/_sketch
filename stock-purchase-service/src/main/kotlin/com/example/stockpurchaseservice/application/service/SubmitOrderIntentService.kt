@@ -9,6 +9,7 @@ import com.example.stockpurchaseservice.application.port.`in`.SubmitOrderIntentR
 import com.example.stockpurchaseservice.application.port.`in`.SubmitOrderIntentUseCase
 import com.example.stockpurchaseservice.application.port.out.MarketServicePort
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderSubmissionUnknownException
+import com.example.stockpurchaseservice.application.port.out.BrokerOrderTemporaryUnavailableException
 import com.example.stockpurchaseservice.application.port.out.OrderExecutionEventPort
 import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionDto
 import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionPort
@@ -67,6 +68,12 @@ class SubmitOrderIntentService(
             }
             processedEventPort.markSuccess(command.eventId)
             SubmitOrderIntentResult(OrderIntentSubmissionStatus.SUBMISSION_UNKNOWN)
+        } catch (exception: BrokerOrderTemporaryUnavailableException) {
+            runCatching {
+                operationalAlertPort.alertOrderSubmissionFailed(command.toFailureAlert(exception))
+            }
+            processedEventPort.markFailed(command.eventId, exception.message)
+            throw exception
         } catch (exception: Throwable) {
             runCatching {
                 orderExecutionEventPort.publishRejected(command.toRejectedMessage(exception))
