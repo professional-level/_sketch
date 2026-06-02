@@ -57,7 +57,7 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
-    fun `builds real us overseas buy request using moc order division`() {
+    fun `rejects real us overseas buy moc because kis does not support it`() {
         val command = brokerCommand(
             side = OrderIntentSide.BUY,
             symbol = "TQQQ",
@@ -67,16 +67,11 @@ class KisBrokerGatewayAdapterTest {
             isMock = false,
         )
 
-        val body = command.toKisUsOverseasOrderRequest()
+        val exception = assertFailsWith<BrokerOrderRejectedException> {
+            command.toKisUsOverseasOrderRequest()
+        }
 
-        assertEquals("TQQQ", body["PDNO"])
-        assertEquals("NASD", body["OVRS_EXCG_CD"])
-        assertEquals(2, body["ORD_QTY"])
-        assertEquals("0", body["OVRS_ORD_UNPR"])
-        assertEquals("32", body["ORD_DVSN"])
-        assertEquals(null, body["SLL_TYPE"])
-        assertEquals("0", body["ORD_SVR_DVSN_CD"])
-        assertEquals(false, body["isMock"])
+        assertEquals("US overseas buy MOC is not supported by KIS", exception.message)
     }
 
     @Test
