@@ -619,7 +619,7 @@ private fun BrokerOrderHistoryQuery.toKisDomesticExecutionOrderQuery(): Map<Stri
         "inqrDvsn" to "00",
         "pdno" to symbol,
         "ccldDvsn" to "00",
-        "ordGnoBrno" to "",
+        "ordGnoBrno" to branchOrderNumber.orEmpty(),
         "odno" to externalOrderId,
         "inqrDvsn3" to "00",
         "inqrDvsn1" to "",
@@ -664,7 +664,7 @@ internal fun BrokerOrderHistoryQuery.toKisOverseasExecutionOrderQuery(): Map<Str
         "ovrsExcgCd" to if (isMock) "" else exchange.uppercase(),
         "sortSqn" to "DS",
         "ordDt" to "",
-        "ordGnoBrno" to "",
+        "ordGnoBrno" to branchOrderNumber.orEmpty(),
         // KIS overseas inquire-ccnl documents ODNO as non-searchable; match by order id client-side.
         "odno" to "",
         "ctxAreaNk200" to pageCursor.nextKeyContext,

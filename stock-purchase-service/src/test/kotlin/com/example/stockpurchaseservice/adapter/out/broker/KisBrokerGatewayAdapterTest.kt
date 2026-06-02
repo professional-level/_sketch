@@ -1431,6 +1431,7 @@ class KisBrokerGatewayAdapterTest {
                 market = StockOrderMarket.DOMESTIC,
                 symbol = "",
                 externalOrderId = "domestic-order-1",
+                branchOrderNumber = "00001",
                 from = ZonedDateTime.parse("2026-06-02T09:00:00+09:00"),
                 to = ZonedDateTime.parse("2026-06-02T09:00:00+09:00"),
                 isMock = false,
@@ -1438,6 +1439,7 @@ class KisBrokerGatewayAdapterTest {
         )
 
         assertEquals("domestic-order-1", exchangeFunction.requests.single().queryValue("odno"))
+        assertEquals("00001", exchangeFunction.requests.single().queryValue("ordGnoBrno"))
         assertEquals("", exchangeFunction.requests.single().queryValue("pdno"))
         assertEquals("20260602", exchangeFunction.requests.single().queryValue("inqrStrtDt"))
         assertEquals("20260602", exchangeFunction.requests.single().queryValue("inqrEndDt"))
@@ -1624,6 +1626,7 @@ class KisBrokerGatewayAdapterTest {
             market = StockOrderMarket.OVERSEAS_US,
             symbol = "TQQQ",
             externalOrderId = "broker-order-1",
+            branchOrderNumber = "00009",
             from = ZonedDateTime.parse("2026-06-01T09:00:00+09:00"),
             to = ZonedDateTime.parse("2026-06-01T09:00:00+09:00"),
             isMock = false,
@@ -1632,6 +1635,7 @@ class KisBrokerGatewayAdapterTest {
         val params = query.toKisOverseasExecutionOrderQuery()
 
         assertEquals("", params["odno"])
+        assertEquals("00009", params["ordGnoBrno"])
         assertEquals("TQQQ", params["pdno"])
     }
 

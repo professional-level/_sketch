@@ -61,6 +61,7 @@ internal data class BrokerOrderHistoryQuery(
     val symbol: String = "",
     val exchange: String = DEFAULT_OVERSEAS_ORDER_EXCHANGE,
     val externalOrderId: String = "",
+    val branchOrderNumber: String? = null,
     val from: ZonedDateTime = ZonedDateTime.now(BROKER_ORDER_ZONE),
     val to: ZonedDateTime = from,
     val isMock: Boolean,

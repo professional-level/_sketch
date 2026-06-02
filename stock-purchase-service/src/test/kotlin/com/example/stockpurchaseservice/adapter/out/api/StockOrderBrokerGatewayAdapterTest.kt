@@ -144,6 +144,7 @@ class StockOrderBrokerGatewayAdapterTest {
                 orderIntentId = UUID.fromString("00000000-0000-0000-0000-000000000011"),
                 internalOrderId = UUID.fromString("00000000-0000-0000-0000-000000000012"),
                 externalOrderId = "broker-order-1",
+                branchOrderNumber = "00009",
                 symbol = "TQQQ",
                 exchange = "NYSE",
                 side = OrderIntentSide.BUY,
@@ -157,6 +158,7 @@ class StockOrderBrokerGatewayAdapterTest {
             assertEquals("TQQQ", symbol)
             assertEquals("NYSE", exchange)
             assertEquals("", externalOrderId)
+            assertEquals("00009", branchOrderNumber)
             assertEquals(submittedAt.minusDays(1), from)
             assertEquals(submittedAt.plusDays(1), to)
             assertEquals(false, isMock)
@@ -179,6 +181,7 @@ class StockOrderBrokerGatewayAdapterTest {
                 orderIntentId = UUID.fromString("00000000-0000-0000-0000-000000000031"),
                 internalOrderId = UUID.fromString("00000000-0000-0000-0000-000000000032"),
                 externalOrderId = "domestic-order-1",
+                branchOrderNumber = "00001",
                 symbol = "005930",
                 side = OrderIntentSide.BUY,
                 market = StockOrderMarket.DOMESTIC,
@@ -190,6 +193,7 @@ class StockOrderBrokerGatewayAdapterTest {
             assertEquals(StockOrderMarket.DOMESTIC, market)
             assertEquals("", symbol)
             assertEquals("domestic-order-1", externalOrderId)
+            assertEquals("00001", branchOrderNumber)
             assertEquals(submittedAt.minusDays(3), from)
             assertEquals(submittedAt.plusDays(2), to)
             assertEquals(true, isMock)

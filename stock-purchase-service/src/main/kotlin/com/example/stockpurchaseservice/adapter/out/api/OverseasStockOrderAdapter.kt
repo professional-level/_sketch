@@ -75,6 +75,7 @@ internal class OverseasStockOrderAdapter(
                 market = StockOrderMarket.OVERSEAS_US,
                 symbol = query.symbol,
                 exchange = query.exchange.ifBlank { defaultExchange },
+                branchOrderNumber = query.branchOrderNumber,
                 from = lookupWindow.from,
                 to = lookupWindow.to,
                 isMock = isMockOrder,

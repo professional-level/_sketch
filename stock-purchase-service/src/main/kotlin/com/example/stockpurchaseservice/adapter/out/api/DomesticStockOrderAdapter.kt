@@ -72,6 +72,7 @@ internal class DomesticStockOrderAdapter(
                 market = StockOrderMarket.DOMESTIC,
                 symbol = query.symbol.takeIf { query.externalOrderId == null }.orEmpty(),
                 externalOrderId = query.externalOrderId.orEmpty(),
+                branchOrderNumber = query.branchOrderNumber,
                 from = lookupWindow.from,
                 to = lookupWindow.to,
                 isMock = isMockOrder,
