@@ -113,7 +113,7 @@ class OpenApiControllerMappingTest {
               "OUTPUT": [
                 {
                   "KRX_FWDG_ORD_ORGNO": "00004",
-                  "ORD_NO": "domestic-order-4",
+                  "ORDER_NO": "domestic-order-4",
                   "THCO_ORD_TMD": "103000"
                 }
               ]
