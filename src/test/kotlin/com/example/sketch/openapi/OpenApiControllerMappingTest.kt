@@ -103,6 +103,31 @@ class OpenApiControllerMappingTest {
     }
 
     @Test
+    fun `maps camel case stock order branch and time aliases`() {
+        val response = ParseJsonResponse.parseJsonString(
+            """
+            {
+              "rtCd": "0",
+              "msgCd": "APBK004",
+              "message": "accepted",
+              "output": {
+                "ordGnoBrno": "00005",
+                "orderNo": "domestic-order-5",
+                "thcoOrdTmd": "104000"
+              }
+            }
+            """.trimIndent(),
+        ).toPostStockOrderResponse()
+
+        assertEquals("0", response.rtCd)
+        assertEquals("APBK004", response.msgCd)
+        assertEquals("accepted", response.msg1)
+        assertEquals("00005", response.output.getKRXFWDGORDORGNO())
+        assertEquals("domestic-order-5", response.output.getODNO())
+        assertEquals("104000", response.output.getORDTMD())
+    }
+
+    @Test
     fun `maps stock order response output array aliases`() {
         val response = ParseJsonResponse.parseJsonString(
             """
