@@ -176,6 +176,7 @@ class OpenApiControllerMappingTest {
                   "ord_qty": "10",
                   "ord_unpr": "70000",
                   "ord_tmd": "093000",
+                  "ccld_no": "domestic-fill-1",
                   "tot_ccld_qty": "4",
                   "avg_prvs": "69900",
                   "cncl_yn": "N",
@@ -213,6 +214,7 @@ class OpenApiControllerMappingTest {
             assertEquals("005930", pdno)
             assertEquals("Samsung Electronics", prdtName)
             assertEquals("10", ordQty)
+            assertEquals("domestic-fill-1", ccldNo)
             assertEquals("4", totCcldQty)
             assertEquals("6", rmnQty)
             assertEquals("0", rjctQty)

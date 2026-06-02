@@ -892,6 +892,7 @@ private fun DailyExecutionOrdersResponseOuterClass.DailyExecutionOrdersOutput1.t
     if (orderId.isBlank()) return null
     return BrokerOrderHistoryItem(
         externalOrderId = orderId,
+        externalExecutionId = ccldNo.takeIf { it.isNotBlank() },
         originalOrderId = orgnOdno.takeIf { it.isNotBlank() },
         branchOrderNumber = ordGnoBrno.takeIf { it.isNotBlank() },
         symbol = pdno.trim(),

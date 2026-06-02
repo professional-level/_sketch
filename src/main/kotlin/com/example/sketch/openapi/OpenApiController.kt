@@ -448,6 +448,20 @@ internal fun OpenApiResponse.toDailyExecutionOrdersResponse(): DailyExecutionOrd
                 rjctRsonCn = item.text("rjct_rson_cn", "rjctRsonCn", "RJCT_RSON_CN")
                 rjctRsonCd = item.text("rjct_rson_cd", "rjctRsonCd", "RJCT_RSON_CD")
                 rjctRsonCdName = item.text("rjct_rson_cd_name", "rjctRsonCdName", "RJCT_RSON_CD_NAME")
+                ccldNo = item.text(
+                    "ccld_no",
+                    "ccldNo",
+                    "CCLD_NO",
+                    "cntr_no",
+                    "cntrNo",
+                    "CNTR_NO",
+                    "exec_no",
+                    "execNo",
+                    "EXEC_NO",
+                    "execution_no",
+                    "executionNo",
+                    "EXECUTION_NO",
+                )
             }
         }
 

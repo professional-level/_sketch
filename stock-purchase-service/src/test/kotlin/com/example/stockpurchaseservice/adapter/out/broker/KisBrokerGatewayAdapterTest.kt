@@ -1532,6 +1532,7 @@ class KisBrokerGatewayAdapterTest {
             domesticHistoryResponse(
                 domesticRow(
                     orderId = "partial-domestic-order",
+                    executionId = "domestic-fill-1",
                     orderedQuantity = "3",
                     filledQuantity = "1",
                     remainingQuantity = "2",
@@ -1553,6 +1554,7 @@ class KisBrokerGatewayAdapterTest {
         checkNotNull(execution)
         assertEquals("005930", execution.stockId)
         assertEquals("partial-domestic-order", execution.externalOrderId)
+        assertEquals("domestic-fill-1", execution.externalExecutionId)
         assertEquals(1, execution.quantity)
         assertEquals(ExecutionTypeDto.PURCHASE, execution.type)
         assertEquals(71200.5, execution.averageExecutionPrice)
@@ -2806,6 +2808,7 @@ class KisBrokerGatewayAdapterTest {
 
     private fun domesticRow(
         orderId: String = "domestic-order-1",
+        executionId: String = "",
         orderedQuantity: String = "3",
         filledQuantity: String = "0",
         remainingQuantity: String = "3",
@@ -2823,6 +2826,7 @@ class KisBrokerGatewayAdapterTest {
             .setOrdDt("20260602")
             .setOrdGnoBrno("00001")
             .setOdno(orderId)
+            .setCcldNo(executionId)
             .setSllBuyDvsnCd(side.toKisSideCode())
             .setPdno("005930")
             .setPrdtName("Samsung Electronics")
