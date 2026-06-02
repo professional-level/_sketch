@@ -1368,10 +1368,10 @@ class KisBrokerGatewayAdapterTest {
                   "THCO_ORD_TMD": "093500",
                   "ORD_QTY": "4",
                   "ORD_UNPR": "113.75",
-                  "TOT_CCLD_QTY": "2",
+                  "CCLD_QTY": "2",
                   "RMN_QTY": "2",
                   "SLL_BUY_DVSN_NAME": "BUY",
-                  "AVG_PRVS": "113.75"
+                  "FT_CCLD_UNPR": "113.75"
                 }
               ]
             }

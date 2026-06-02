@@ -873,7 +873,14 @@ private fun JsonNode.toBrokerHistoryItem(): BrokerOrderHistoryItem? {
         "ovrs_ord_unpr",
         "OVRS_ORD_UNPR",
     ).toDoubleValue()
-    val filledQuantity = longValue("ft_ccld_qty", "FT_CCLD_QTY", "tot_ccld_qty", "TOT_CCLD_QTY", "ccld_qty")
+    val filledQuantity = longValue(
+        "ft_ccld_qty",
+        "FT_CCLD_QTY",
+        "tot_ccld_qty",
+        "TOT_CCLD_QTY",
+        "ccld_qty",
+        "CCLD_QTY",
+    )
     val remainingQuantity = longValue("nccs_qty", "NCCS_QTY", "rmn_qty", "RMN_QTY")
     val statusName = textOrNull("prcs_stat_name", "PRCS_STAT_NAME", "ord_stat_name", "ORD_STAT_NAME")
     val revisionCancelCode = textOrNull(
@@ -945,8 +952,14 @@ private fun JsonNode.toBrokerHistoryItem(): BrokerOrderHistoryItem? {
         )
             .toOrderIntentSide(),
         averageExecutionPrice = textOrNull(
+            "ft_ccld_unpr",
+            "FT_CCLD_UNPR",
             "ft_ccld_unpr3",
             "FT_CCLD_UNPR3",
+            "ccld_unpr",
+            "CCLD_UNPR",
+            "ovrs_ccld_unpr",
+            "OVRS_CCLD_UNPR",
             "avg_prvs",
             "AVG_PRVS",
             "avg_ccld_pric",
