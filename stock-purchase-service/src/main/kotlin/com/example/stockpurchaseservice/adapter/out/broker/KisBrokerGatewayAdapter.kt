@@ -915,6 +915,7 @@ private fun JsonNode.toBrokerHistoryItem(): BrokerOrderHistoryItem? {
         textOrNull("rjct_rson", "RJCT_RSON"),
         textOrNull("rjct_rson_name", "RJCT_RSON_NAME"),
         textOrNull("rjct_rson_cn", "RJCT_RSON_CN"),
+        textOrNull("rjct_rson_cd", "RJCT_RSON_CD"),
         textOrNull("rjct_rson_cd_name", "RJCT_RSON_CD_NAME"),
     )
     val cancelled = statusMessage?.contains(CANCELLED_KOREAN) == true || revisionCancelCode == KIS_CANCEL_REVISION_CODE

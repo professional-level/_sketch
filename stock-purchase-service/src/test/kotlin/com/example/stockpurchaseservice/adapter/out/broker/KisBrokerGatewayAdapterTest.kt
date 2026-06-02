@@ -1365,6 +1365,38 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `maps overseas rejection reason code to rejected status`() {
+        val adapter = overseasHistoryAdapter(
+            """
+            {
+              "rt_cd": "0",
+              "ctx_area_fk200": "",
+              "ctx_area_nk200": "",
+              "output": [
+                {
+                  "ODNO": "rejected-code-order",
+                  "PDNO": "TQQQ",
+                  "ORD_DT": "20260602",
+                  "ORD_TMD": "093000",
+                  "ORD_QTY": "3",
+                  "TOT_CCLD_QTY": "0",
+                  "RMN_QTY": "0",
+                  "SLL_BUY_DVSN_NAME": "BUY",
+                  "PRCS_STAT_NAME": "Accepted",
+                  "RJCT_RSON_CD": "APBK001"
+                }
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        val status = adapter.findOrderHistory(historyQuery()).single().toStatus()
+
+        assertEquals(BrokerOrderStatus.REJECTED, status.status)
+        assertEquals("APBK001", status.reason)
+    }
+
+    @Test
     fun `maps overseas cancel status from revision cancel field`() {
         val adapter = overseasHistoryAdapter(
             """
