@@ -43,11 +43,15 @@ class KisBrokerGatewaySmokeTest {
         val history = runBrokerSmokeQueryStep("mock order history", "mock", config) {
             adapter.findOrderHistory(config.historyQuery(isMock = true))
         }
+        val cancelableOrders = runBrokerSmokeQueryStep("mock overseas unfilled orders", "mock", config) {
+            adapter.findCancelableOrders(config.cancelableQuery(isMock = true))
+        }
 
         assertEquals(StockOrderMarket.OVERSEAS_US, snapshot.market)
         assertEquals(config.exchange, snapshot.exchange)
         assertEquals(config.currency, snapshot.currency)
         assertTrue(history.all { it.externalOrderId.isNotBlank() })
+        assertTrue(cancelableOrders.all { it.orderId.isNotBlank() })
     }
 
     @Test
@@ -70,11 +74,15 @@ class KisBrokerGatewaySmokeTest {
         val history = runBrokerSmokeQueryStep("real order history", "real", config) {
             adapter.findOrderHistory(config.historyQuery(isMock = false))
         }
+        val cancelableOrders = runBrokerSmokeQueryStep("real overseas unfilled orders", "real", config) {
+            adapter.findCancelableOrders(config.cancelableQuery(isMock = false))
+        }
 
         assertEquals(StockOrderMarket.OVERSEAS_US, snapshot.market)
         assertEquals(config.exchange, snapshot.exchange)
         assertEquals(config.currency, snapshot.currency)
         assertTrue(history.all { it.externalOrderId.isNotBlank() })
+        assertTrue(cancelableOrders.all { it.orderId.isNotBlank() })
     }
 
     @Test
@@ -97,11 +105,15 @@ class KisBrokerGatewaySmokeTest {
         val history = runBrokerSmokeQueryStep("mock domestic order history", "mock-domestic", config) {
             adapter.findOrderHistory(config.domesticHistoryQuery(isMock = true))
         }
+        val cancelableOrders = runBrokerSmokeQueryStep("mock domestic cancelable orders", "mock-domestic", config) {
+            adapter.findCancelableOrders(config.domesticCancelableQuery(isMock = true))
+        }
 
         assertEquals(StockOrderMarket.DOMESTIC, snapshot.market)
         assertEquals(config.domesticExchange, snapshot.exchange)
         assertEquals(config.domesticCurrency, snapshot.currency)
         assertTrue(history.all { it.externalOrderId.isNotBlank() })
+        assertTrue(cancelableOrders.all { it.orderId.isNotBlank() })
     }
 
     @Test
@@ -124,11 +136,15 @@ class KisBrokerGatewaySmokeTest {
         val history = runBrokerSmokeQueryStep("real domestic order history", "real-domestic", config) {
             adapter.findOrderHistory(config.domesticHistoryQuery(isMock = false))
         }
+        val cancelableOrders = runBrokerSmokeQueryStep("real domestic cancelable orders", "real-domestic", config) {
+            adapter.findCancelableOrders(config.domesticCancelableQuery(isMock = false))
+        }
 
         assertEquals(StockOrderMarket.DOMESTIC, snapshot.market)
         assertEquals(config.domesticExchange, snapshot.exchange)
         assertEquals(config.domesticCurrency, snapshot.currency)
         assertTrue(history.all { it.externalOrderId.isNotBlank() })
+        assertTrue(cancelableOrders.all { it.orderId.isNotBlank() })
     }
 
     @Test
@@ -437,6 +453,14 @@ class KisBrokerGatewaySmokeTest {
             )
         }
 
+        fun cancelableQuery(isMock: Boolean): BrokerOrderCancelableQuery {
+            return BrokerOrderCancelableQuery(
+                market = StockOrderMarket.OVERSEAS_US,
+                exchange = exchange,
+                isMock = isMock,
+            )
+        }
+
         fun domesticHistoryQuery(isMock: Boolean): BrokerOrderHistoryQuery {
             val now = ZonedDateTime.now(BROKER_ORDER_ZONE)
             return BrokerOrderHistoryQuery(
@@ -445,6 +469,14 @@ class KisBrokerGatewaySmokeTest {
                 exchange = domesticExchange,
                 from = now.minusDays(1),
                 to = now.plusDays(1),
+                isMock = isMock,
+            )
+        }
+
+        fun domesticCancelableQuery(isMock: Boolean): BrokerOrderCancelableQuery {
+            return BrokerOrderCancelableQuery(
+                market = StockOrderMarket.DOMESTIC,
+                exchange = domesticExchange,
                 isMock = isMock,
             )
         }

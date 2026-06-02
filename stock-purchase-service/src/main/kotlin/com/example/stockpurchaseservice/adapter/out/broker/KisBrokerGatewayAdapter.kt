@@ -88,8 +88,8 @@ internal class KisBrokerGatewayAdapter(
     }
 
     private fun ensureDomesticOrderCancelable(command: BrokerOrderCancelCommand) {
-        val cancelableOrder = findDomesticCancelableOrders(command)
-            .firstOrNull { it.matches(command) }
+        val cancelableOrder = findCancelableOrders(command.toCancelableQuery())
+            .firstOrNull()
             ?: throw BrokerOrderRejectedException(
                 message = "domestic order is not cancelable: ${command.originalOrderId}",
             )
@@ -101,27 +101,51 @@ internal class KisBrokerGatewayAdapter(
         }
     }
 
-    private fun findDomesticCancelableOrders(command: BrokerOrderCancelCommand): List<KisCancelableOrderItem> {
-        val items = mutableListOf<KisCancelableOrderItem>()
-        var cursor = BrokerOrderHistoryPageCursor.EMPTY
+    override fun findCancelableOrders(query: BrokerOrderCancelableQuery): List<BrokerCancelableOrderItem> {
+        val items = mutableListOf<BrokerCancelableOrderItem>()
+        var cursor = query.pageCursor
         val seenCursors = mutableSetOf<BrokerOrderHistoryPageCursor>()
         var pageCount = 0
         do {
             if (!seenCursors.add(cursor)) break
-            val page = guard.executeQuery("domestic-cancelable-order") {
-                stockApiClient.fetchDomesticCancelableOrderPage(command, cursor, properties.toQueryCallOptions())
+            val page = when (query.market) {
+                StockOrderMarket.DOMESTIC -> fetchDomesticCancelableOrderPage(query.copy(pageCursor = cursor))
+                StockOrderMarket.OVERSEAS_US -> fetchOverseasCancelableOrderPage(query.copy(pageCursor = cursor))
             }
             items += page.items
             cursor = page.nextCursor
             pageCount += 1
         } while (cursor.hasNext() && pageCount < MAX_CANCELABLE_ORDER_PAGES)
 
-        return items
+        return items.filter { it.matches(query) }
+    }
+
+    private fun fetchDomesticCancelableOrderPage(query: BrokerOrderCancelableQuery): KisCancelableOrderPage {
+        return guard.executeQuery("domestic-cancelable-order") {
+            stockApiClient.fetchDomesticCancelableOrderPage(query, properties.toQueryCallOptions())
+        }
+    }
+
+    private fun fetchOverseasCancelableOrderPage(query: BrokerOrderCancelableQuery): KisCancelableOrderPage {
+        return guard.executeQuery("overseas-unfilled-order") {
+            stockApiClient.fetchOverseasCancelableOrderPage(query, properties.toQueryCallOptions())
+        }
+    }
+
+    private fun BrokerOrderCancelCommand.toCancelableQuery(): BrokerOrderCancelableQuery {
+        return BrokerOrderCancelableQuery(
+            market = market,
+            symbol = symbol,
+            exchange = exchange,
+            originalOrderId = originalOrderId,
+            branchOrderNumber = branchOrderNumber,
+            isMock = isMock,
+        )
     }
 
     private fun ensureOverseasOrderCancelable(command: BrokerOrderCancelCommand) {
-        val cancelableOrder = findOverseasCancelableOrders(command)
-            .firstOrNull { it.matches(command) }
+        val cancelableOrder = findCancelableOrders(command.toCancelableQuery())
+            .firstOrNull()
             ?: throw BrokerOrderRejectedException(
                 message = "overseas order is not cancelable: ${command.originalOrderId}",
             )
@@ -137,24 +161,6 @@ internal class KisBrokerGatewayAdapter(
                     "requested=${command.quantity} remaining=${cancelableOrder.possibleQuantity}",
             )
         }
-    }
-
-    private fun findOverseasCancelableOrders(command: BrokerOrderCancelCommand): List<KisCancelableOrderItem> {
-        val items = mutableListOf<KisCancelableOrderItem>()
-        var cursor = BrokerOrderHistoryPageCursor.EMPTY
-        val seenCursors = mutableSetOf<BrokerOrderHistoryPageCursor>()
-        var pageCount = 0
-        do {
-            if (!seenCursors.add(cursor)) break
-            val page = guard.executeQuery("overseas-unfilled-order") {
-                stockApiClient.fetchOverseasCancelableOrderPage(command, cursor, properties.toQueryCallOptions())
-            }
-            items += page.items
-            cursor = page.nextCursor
-            pageCount += 1
-        } while (cursor.hasNext() && pageCount < MAX_CANCELABLE_ORDER_PAGES)
-
-        return items
     }
 
     override fun findOrderHistory(query: BrokerOrderHistoryQuery): List<BrokerOrderHistoryItem> {
@@ -424,26 +430,23 @@ internal fun BrokerOrderCancelCommand.toKisUsOverseasCancelRequest(): Map<String
     )
 }
 
-private fun BrokerOrderCancelCommand.toKisDomesticCancelableOrderQuery(
-    cursor: BrokerOrderHistoryPageCursor = BrokerOrderHistoryPageCursor.EMPTY,
-): Map<String, String> {
+private fun BrokerOrderCancelableQuery.toKisDomesticCancelableOrderQuery(): Map<String, String> {
     return mapOf(
         "isMock" to isMock.toString(),
         "inqrDvsn1" to "1",
         "inqrDvsn2" to "0",
-        "ctxAreaFk100" to cursor.foreignKeyContext,
-        "ctxAreaNk100" to cursor.nextKeyContext,
+        "ctxAreaFk100" to pageCursor.foreignKeyContext,
+        "ctxAreaNk100" to pageCursor.nextKeyContext,
     )
 }
 
 private fun WebClient.fetchDomesticCancelableOrderPage(
-    command: BrokerOrderCancelCommand,
-    cursor: BrokerOrderHistoryPageCursor,
+    query: BrokerOrderCancelableQuery,
     callOptions: ExternalApiCallOptions,
 ): KisCancelableOrderPage {
     val response = getExternalApi(
         uri = OPEN_API_PREFIX + GET_STOCK_ORDER_CANCELABLE,
-        queryParameters = command.toKisDomesticCancelableOrderQuery(cursor),
+        queryParameters = query.toKisDomesticCancelableOrderQuery(),
         responseType = JsonNode::class.java,
         callOptions = callOptions,
     )
@@ -466,26 +469,23 @@ private fun WebClient.fetchDomesticCancelableOrderPage(
     )
 }
 
-private fun BrokerOrderCancelCommand.toKisOverseasCancelableOrderQuery(
-    cursor: BrokerOrderHistoryPageCursor = BrokerOrderHistoryPageCursor.EMPTY,
-): Map<String, String> {
+private fun BrokerOrderCancelableQuery.toKisOverseasCancelableOrderQuery(): Map<String, String> {
     return mapOf(
         "isMock" to isMock.toString(),
         "ovrsExcgCd" to exchange.uppercase(),
         "sortSqn" to "DS",
-        "ctxAreaFk200" to cursor.foreignKeyContext,
-        "ctxAreaNk200" to cursor.nextKeyContext,
+        "ctxAreaFk200" to pageCursor.foreignKeyContext,
+        "ctxAreaNk200" to pageCursor.nextKeyContext,
     )
 }
 
 private fun WebClient.fetchOverseasCancelableOrderPage(
-    command: BrokerOrderCancelCommand,
-    cursor: BrokerOrderHistoryPageCursor,
+    query: BrokerOrderCancelableQuery,
     callOptions: ExternalApiCallOptions,
 ): KisCancelableOrderPage {
     val response = getExternalApi(
         uri = OPEN_API_PREFIX + GET_OVERSEAS_STOCK_ORDER_UNFILLED,
-        queryParameters = command.toKisOverseasCancelableOrderQuery(cursor),
+        queryParameters = query.toKisOverseasCancelableOrderQuery(),
         responseType = JsonNode::class.java,
         callOptions = callOptions,
     )
@@ -509,7 +509,7 @@ private fun WebClient.fetchOverseasCancelableOrderPage(
 }
 
 private data class KisCancelableOrderPage(
-    val items: List<KisCancelableOrderItem>,
+    val items: List<BrokerCancelableOrderItem>,
     val nextCursor: BrokerOrderHistoryPageCursor,
 )
 
@@ -560,29 +560,13 @@ private data class BrokerAccountSnapshotPage(
     val nextCursor: BrokerOrderHistoryPageCursor,
 )
 
-private data class KisCancelableOrderItem(
-    val branchOrderNumber: String?,
-    val orderId: String,
-    val originalOrderId: String?,
-    val symbol: String,
-    val possibleQuantity: Long,
-) {
-    fun matches(command: BrokerOrderCancelCommand): Boolean {
-        val sameOrder = orderId == command.originalOrderId || originalOrderId == command.originalOrderId
-        val requestedBranch = command.branchOrderNumber?.trim()
-        val sameBranch = requestedBranch.isNullOrBlank() || branchOrderNumber?.trim() == requestedBranch
-        val sameSymbol = symbol.isBlank() || symbol.equals(command.symbol, ignoreCase = true)
-        return sameOrder && sameBranch && sameSymbol
-    }
-}
-
-private fun JsonNode.toKisCancelableOrderItem(): KisCancelableOrderItem? {
+private fun JsonNode.toKisCancelableOrderItem(): BrokerCancelableOrderItem? {
     val orderId = textOrNull("odno", "ODNO", "ordNo", "ord_no", "ORD_NO", "orderNo", "order_no", "ORDER_NO")
         .orEmpty()
     val originalOrderId = textOrNull("orgn_odno", "ORGN_ODNO", "orgnOdno")
     val matchableOrderId = orderId.ifBlank { originalOrderId.orEmpty() }
     if (matchableOrderId.isBlank()) return null
-    return KisCancelableOrderItem(
+    return BrokerCancelableOrderItem(
         branchOrderNumber = textOrNull(
             "ord_gno_brno",
             "ordGnoBrno",
@@ -624,19 +608,6 @@ private fun JsonNode.toKisCancelableOrderItem(): KisCancelableOrderItem? {
             "PSBL_RVSE_CNCL_QTY",
         ),
     )
-}
-
-private fun BrokerOrderHistoryItem.matches(command: BrokerOrderCancelCommand): Boolean {
-    val sameOrder = externalOrderId == command.originalOrderId || originalOrderId == command.originalOrderId
-    val sameBranch = matchesBranchOrderNumber(command.branchOrderNumber)
-    val sameSymbol = symbol.isBlank() || symbol.equals(command.symbol, ignoreCase = true)
-    return sameOrder && sameBranch && sameSymbol
-}
-
-private fun BrokerOrderHistoryItem.matchesBranchOrderNumber(branchOrderNumber: String?): Boolean {
-    val requested = branchOrderNumber?.trim()?.takeIf { it.isNotBlank() } ?: return true
-    val actual = this.branchOrderNumber?.trim()?.takeIf { it.isNotBlank() } ?: return true
-    return actual == requested
 }
 
 private fun BrokerOrderHistoryQuery.toKisDomesticExecutionOrderQuery(): Map<String, String> {

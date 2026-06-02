@@ -2,8 +2,10 @@ package com.example.stockpurchaseservice.adapter.out.api
 
 import com.example.stockpurchaseservice.adapter.out.broker.BrokerAccountSnapshot
 import com.example.stockpurchaseservice.adapter.out.broker.BrokerAccountSnapshotQuery
+import com.example.stockpurchaseservice.adapter.out.broker.BrokerCancelableOrderItem
 import com.example.stockpurchaseservice.adapter.out.broker.BrokerGateway
 import com.example.stockpurchaseservice.adapter.out.broker.BrokerOrderCancelCommand
+import com.example.stockpurchaseservice.adapter.out.broker.BrokerOrderCancelableQuery
 import com.example.stockpurchaseservice.adapter.out.broker.BrokerOrderCommand
 import com.example.stockpurchaseservice.adapter.out.broker.BrokerOrderHistoryItem
 import com.example.stockpurchaseservice.adapter.out.broker.BrokerOrderHistoryQuery
@@ -124,6 +126,10 @@ class StockOrderAdapterExecutionIdentityTest {
         }
 
         override fun cancelOrder(command: BrokerOrderCancelCommand): BrokerOrderSubmissionDto {
+            error("not used")
+        }
+
+        override fun findCancelableOrders(query: BrokerOrderCancelableQuery): List<BrokerCancelableOrderItem> {
             error("not used")
         }
 

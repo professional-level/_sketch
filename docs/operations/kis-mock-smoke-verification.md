@@ -239,7 +239,14 @@ Expected coverage:
 
 - real overseas account snapshot through `/open-api/overseas/trading/inquire-balance`
 - real overseas order history through `/open-api/overseas/trading/inquire-ccnl`
+- real overseas unfilled/cancelable orders through `/open-api/overseas/trading/inquire-nccs`
 - same `KisBrokerGatewayAdapter` mapping path used by `stock-purchase-service`
+
+Domestic query-only smoke uses `KIS_BROKER_REAL_DOMESTIC_QUERY_SMOKE_ENABLED=true` and covers:
+
+- real domestic account snapshot through `/open-api/trading/inquire-balance`
+- real domestic order history through `/open-api/trading/inquire-daily-ccld`
+- real domestic cancelable orders through `/open-api/trading/inquire-psbl-rvsecncl`
 
 Recording rule:
 

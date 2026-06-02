@@ -468,6 +468,62 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `finds overseas cancelable orders from unfilled lookup without submitting cancel`() {
+        val exchangeFunction = ResponseExchangeFunction(
+            responses = listOf(
+                jsonResponse(
+                    """
+                    {
+                      "rt_cd": "0",
+                      "ctx_area_fk200": "",
+                      "ctx_area_nk200": "",
+                      "output": [
+                        {
+                          "ODNO": "other-order",
+                          "OVRS_PDNO": "SOXL",
+                          "NCCS_QTY": "1"
+                        },
+                        {
+                          "ODNO": "overseas-order-1",
+                          "ORD_GNO_BRNO": "00001",
+                          "OVRS_PDNO": "TQQQ",
+                          "NCCS_QTY": "2"
+                        }
+                      ]
+                    }
+                    """.trimIndent(),
+                ),
+            ),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        val items = adapter.findCancelableOrders(
+            BrokerOrderCancelableQuery(
+                market = StockOrderMarket.OVERSEAS_US,
+                symbol = "TQQQ",
+                exchange = "NASD",
+                originalOrderId = "overseas-order-1",
+                branchOrderNumber = "00001",
+                isMock = false,
+            ),
+        )
+
+        assertEquals(1, items.size)
+        with(items.single()) {
+            assertEquals("overseas-order-1", orderId)
+            assertEquals("00001", branchOrderNumber)
+            assertEquals("TQQQ", symbol)
+            assertEquals(2L, possibleQuantity)
+        }
+        assertEquals(1, exchangeFunction.requests.size)
+        assertEquals("/open-api/overseas/trading/inquire-nccs", exchangeFunction.requests.single().url().path)
+    }
+
+    @Test
     fun `overseas cancel rejects when explicit branch order number does not match unfilled order`() {
         val exchangeFunction = ResponseExchangeFunction(
             responses = listOf(
@@ -2258,6 +2314,62 @@ class KisBrokerGatewayAdapterTest {
         assertEquals("1", exchangeFunction.requests[0].queryValue("inqrDvsn1"))
         assertEquals("0", exchangeFunction.requests[0].queryValue("inqrDvsn2"))
         assertEquals("/open-api/trading/order-rvsecncl", exchangeFunction.requests[1].url().path)
+    }
+
+    @Test
+    fun `finds domestic cancelable orders without submitting cancel`() {
+        val exchangeFunction = ResponseExchangeFunction(
+            responses = listOf(
+                jsonResponse(
+                    """
+                    {
+                      "rt_cd": "0",
+                      "ctx_area_fk100": "",
+                      "ctx_area_nk100": "",
+                      "output": [
+                        {
+                          "ord_gno_brno": "00002",
+                          "odno": "other-domestic-order",
+                          "pdno": "000660",
+                          "psbl_qty": "1"
+                        },
+                        {
+                          "ord_gno_brno": "00001",
+                          "odno": "domestic-order-1",
+                          "pdno": "005930",
+                          "psbl_qty": "3"
+                        }
+                      ]
+                    }
+                    """.trimIndent(),
+                ),
+            ),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        val items = adapter.findCancelableOrders(
+            BrokerOrderCancelableQuery(
+                market = StockOrderMarket.DOMESTIC,
+                symbol = "005930",
+                originalOrderId = "domestic-order-1",
+                branchOrderNumber = "00001",
+                isMock = false,
+            ),
+        )
+
+        assertEquals(1, items.size)
+        with(items.single()) {
+            assertEquals("domestic-order-1", orderId)
+            assertEquals("00001", branchOrderNumber)
+            assertEquals("005930", symbol)
+            assertEquals(3L, possibleQuantity)
+        }
+        assertEquals(1, exchangeFunction.requests.size)
+        assertEquals("/open-api/trading/inquire-psbl-rvsecncl", exchangeFunction.requests.single().url().path)
     }
 
     @Test

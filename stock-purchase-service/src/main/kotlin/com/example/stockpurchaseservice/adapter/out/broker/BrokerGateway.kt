@@ -19,6 +19,7 @@ import kotlin.math.abs
 internal interface BrokerGateway {
     fun submitOrder(command: BrokerOrderCommand): BrokerOrderSubmissionDto
     fun cancelOrder(command: BrokerOrderCancelCommand): BrokerOrderSubmissionDto
+    fun findCancelableOrders(query: BrokerOrderCancelableQuery): List<BrokerCancelableOrderItem>
     fun findOrderHistory(query: BrokerOrderHistoryQuery): List<BrokerOrderHistoryItem>
     fun findAccountSnapshot(query: BrokerAccountSnapshotQuery): BrokerAccountSnapshot
 }
@@ -67,6 +68,33 @@ internal data class BrokerOrderHistoryQuery(
 ) {
     init {
         require(!from.isAfter(to)) { "broker history from must be before or equal to to" }
+    }
+}
+
+internal data class BrokerOrderCancelableQuery(
+    val market: StockOrderMarket,
+    val symbol: String = "",
+    val exchange: String = DEFAULT_OVERSEAS_ORDER_EXCHANGE,
+    val originalOrderId: String = "",
+    val branchOrderNumber: String? = null,
+    val isMock: Boolean,
+    val pageCursor: BrokerOrderHistoryPageCursor = BrokerOrderHistoryPageCursor.EMPTY,
+)
+
+internal data class BrokerCancelableOrderItem(
+    val branchOrderNumber: String?,
+    val orderId: String,
+    val originalOrderId: String?,
+    val symbol: String,
+    val possibleQuantity: Long,
+) {
+    fun matches(query: BrokerOrderCancelableQuery): Boolean {
+        val requestedOrderId = query.originalOrderId.trim()
+        val sameOrder = requestedOrderId.isBlank() || orderId == requestedOrderId || originalOrderId == requestedOrderId
+        val requestedBranch = query.branchOrderNumber?.trim()
+        val sameBranch = requestedBranch.isNullOrBlank() || branchOrderNumber?.trim() == requestedBranch
+        val sameSymbol = query.symbol.isBlank() || symbol.isBlank() || symbol.equals(query.symbol, ignoreCase = true)
+        return sameOrder && sameBranch && sameSymbol
     }
 }
 
