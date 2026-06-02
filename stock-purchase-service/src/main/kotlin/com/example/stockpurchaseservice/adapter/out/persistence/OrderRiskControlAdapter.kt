@@ -244,7 +244,10 @@ internal class OrderRiskControlAdapter(
     }
 
     private fun OrderRiskAssessmentCommand.symbolMaxOrderNotional(): Double? {
-        return properties.symbolMaxOrderNotional[symbol] ?: properties.symbolMaxOrderNotional[symbol.uppercase()]
+        val normalizedSymbol = symbol.normalizedSymbol()
+        return properties.symbolMaxOrderNotional.entries
+            .firstOrNull { (configuredSymbol, _) -> configuredSymbol.normalizedSymbol() == normalizedSymbol }
+            ?.value
     }
 
     private fun OrderRiskAssessmentCommand.toAccountSnapshotQuery(): AccountSnapshotQuery {
@@ -340,6 +343,10 @@ internal class OrderRiskControlAdapter(
     }
 
     private fun String.normalizedCurrency(): String {
+        return trim().uppercase()
+    }
+
+    private fun String.normalizedSymbol(): String {
         return trim().uppercase()
     }
 

@@ -241,6 +241,7 @@ akra.order.risk.max-account-pending-buy-notional=5000
 akra.order.risk.max-account-exposure-notional=20000
 akra.order.risk.max-daily-order-count=20
 akra.order.risk.enabled-strategy-prefixes[0]=laor-v4-live
+akra.order.risk.symbol-max-order-notional.TQQQ=1000
 akra.order.risk.strategy-trading-environments[laor-v4-live]=LIVE
 akra.order.risk.strategy-trading-environments[laor-v4-paper]=MOCK
 akra.order.risk.account-exposure.overseas-exchange=NASD
@@ -282,6 +283,8 @@ akra.order.risk.trading-hours.overseas-us.early-close-times[2026-11-27]=13:00
 akra.order.risk.trading-hours.overseas-us.loc-cutoff=15:50
 akra.order.risk.trading-hours.overseas-us.moc-cutoff=15:50
 ```
+
+`symbol-max-order-notional` keys are matched after trimming and uppercasing, so operator configuration remains stable across ticker casing differences.
 
 ## Observability Checks
 
