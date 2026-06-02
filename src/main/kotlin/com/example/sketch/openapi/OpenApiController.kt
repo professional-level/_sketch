@@ -247,7 +247,7 @@ internal fun OpenApiResponse.toPostStockOrderResponse(): ApiResponse.StockOrder 
                 "ORD_GNO_BRNO",
                 "ord_gno_brno",
             )
-            oDNO = outputNode.text("ODNO", "odno", "ORD_NO", "ord_no", "order_no", "ORDER_NO")
+            oDNO = outputNode.text("ODNO", "odno", "ordNo", "ORD_NO", "ord_no", "orderNo", "order_no", "ORDER_NO")
             oRDTMD = outputNode.text("ORD_TMD", "ord_tmd", "ordTmd", "THCO_ORD_TMD", "thco_ord_tmd")
         }
     }
@@ -358,78 +358,97 @@ internal fun OpenApiResponse.toDailyExecutionOrdersResponse(): DailyExecutionOrd
 
         this@toDailyExecutionOrdersResponse.elements("output1", "OUTPUT1", "output", "OUTPUT").forEach { item ->
             output1 += dailyExecutionOrdersOutput1 {
-                ordDt = item.text("ord_dt", "ORD_DT")
+                ordDt = item.text("ord_dt", "ordDt", "ORD_DT")
                 ordGnoBrno = item.text(
                     "ord_gno_brno",
+                    "ordGnoBrno",
                     "ORD_GNO_BRNO",
                     "krx_fwdg_ord_orgno",
                     "KRX_FWDG_ORD_ORGNO",
                     "krxFwdgOrdOrgno",
                 )
-                odno = item.text("odno", "ODNO", "ord_no", "ORD_NO", "order_no", "ORDER_NO")
+                odno = item.text("odno", "ODNO", "ordNo", "ord_no", "ORD_NO", "orderNo", "order_no", "ORDER_NO")
                 orgnOdno = item.text("orgn_odno", "ORGN_ODNO", "orgnOdno")
-                ordDvsnName = item.text("ord_dvsn_name", "ORD_DVSN_NAME")
-                sllBuyDvsnCd = item.text("sll_buy_dvsn_cd", "SLL_BUY_DVSN_CD")
+                ordDvsnName = item.text("ord_dvsn_name", "ordDvsnName", "ORD_DVSN_NAME")
+                sllBuyDvsnCd = item.text("sll_buy_dvsn_cd", "sllBuyDvsnCd", "SLL_BUY_DVSN_CD")
                 sllBuyDvsnCdName = item.text(
                     "sll_buy_dvsn_cd_name",
+                    "sllBuyDvsnCdName",
                     "SLL_BUY_DVSN_CD_NAME",
                     "sll_buy_dvsn_name",
+                    "sllBuyDvsnName",
                     "SLL_BUY_DVSN_NAME",
                 )
-                pdno = item.text("pdno", "PDNO", "prdt_code", "PRDT_CODE")
-                prdtName = item.text("prdt_name", "PRDT_NAME")
-                ordQty = item.text("ord_qty", "ORD_QTY")
-                ordUnpr = item.text("ord_unpr", "ORD_UNPR")
-                ordTmd = item.text("ord_tmd", "ORD_TMD", "thco_ord_tmd", "THCO_ORD_TMD", "ordTmd")
-                totCcldQty = item.text("tot_ccld_qty", "TOT_CCLD_QTY")
+                pdno = item.text("pdno", "PDNO", "prdt_code", "prdtCode", "PRDT_CODE")
+                prdtName = item.text("prdt_name", "prdtName", "PRDT_NAME")
+                ordQty = item.text("ord_qty", "ordQty", "ORD_QTY")
+                ordUnpr = item.text("ord_unpr", "ordUnpr", "ORD_UNPR")
+                ordTmd = item.text("ord_tmd", "ORD_TMD", "thco_ord_tmd", "thcoOrdTmd", "THCO_ORD_TMD", "ordTmd")
+                totCcldQty = item.text("tot_ccld_qty", "totCcldQty", "TOT_CCLD_QTY")
                 avgPrvs = item.text(
                     "avg_prvs",
+                    "avgPrvs",
                     "AVG_PRVS",
                     "ccld_unpr",
+                    "ccldUnpr",
                     "CCLD_UNPR",
                     "avg_ccld_pric",
+                    "avgCcldPric",
                     "AVG_CCLD_PRIC",
                 )
-                cnclYn = item.text("cncl_yn", "CNCL_YN")
-                totCcldAmt = item.text("tot_ccld_amt", "TOT_CCLD_AMT")
-                loanDt = item.text("loan_dt", "LOAN_DT")
-                ordrEmpno = item.text("ordr_empno", "ORDR_EMPNO")
-                ordDvsnCd = item.text("ord_dvsn_cd", "ORD_DVSN_CD")
-                cnclCfrmQty = item.text("cncl_cfrm_qty", "CNCL_CFRM_QTY")
-                rmnQty = item.text("rmn_qty", "RMN_QTY")
-                rjctQty = item.text("rjct_qty", "RJCT_QTY")
-                ccldCndtName = item.text("ccld_cndt_name", "CCLD_CNDT_NAME")
-                inqrIpAddr = item.text("inqr_ip_addr", "INQR_IP_ADDR")
-                cpbcOrdpOrdRcitDvsnCd = item.text("cpbc_ordp_ord_rcit_dvsn_cd", "CPBC_ORDP_ORD_RCIT_DVSN_CD")
+                cnclYn = item.text("cncl_yn", "cnclYn", "CNCL_YN")
+                totCcldAmt = item.text("tot_ccld_amt", "totCcldAmt", "TOT_CCLD_AMT")
+                loanDt = item.text("loan_dt", "loanDt", "LOAN_DT")
+                ordrEmpno = item.text("ordr_empno", "ordrEmpno", "ORDR_EMPNO")
+                ordDvsnCd = item.text("ord_dvsn_cd", "ordDvsnCd", "ORD_DVSN_CD")
+                cnclCfrmQty = item.text("cncl_cfrm_qty", "cnclCfrmQty", "CNCL_CFRM_QTY")
+                rmnQty = item.text("rmn_qty", "rmnQty", "RMN_QTY")
+                rjctQty = item.text("rjct_qty", "rjctQty", "RJCT_QTY")
+                ccldCndtName = item.text("ccld_cndt_name", "ccldCndtName", "CCLD_CNDT_NAME")
+                inqrIpAddr = item.text("inqr_ip_addr", "inqrIpAddr", "INQR_IP_ADDR")
+                cpbcOrdpOrdRcitDvsnCd = item.text(
+                    "cpbc_ordp_ord_rcit_dvsn_cd",
+                    "cpbcOrdpOrdRcitDvsnCd",
+                    "CPBC_ORDP_ORD_RCIT_DVSN_CD",
+                )
                 cpbcOrdpInfmMthdDvsnCd = item.text(
                     "cpbc_ordp_infm_mthd_dvsn_cd",
+                    "cpbcOrdpInfmMthdDvsnCd",
                     "CPBC_ORDP_INFM_MTHD_DVSN_CD",
                 )
-                infmTmd = item.text("infm_tmd", "INFM_TMD")
-                ctacTlno = item.text("ctac_tlno", "CTAC_TLNO")
-                prdtTypeCd = item.text("prdt_type_cd", "PRDT_TYPE_CD")
-                excgDvsnCd = item.text("excg_dvsn_cd", "EXCG_DVSN_CD")
-                cpbcOrdpMtrlDvsnCd = item.text("cpbc_ordp_mtrl_dvsn_cd", "CPBC_ORDP_MTRL_DVSN_CD")
-                ordOrgno = item.text("ord_orgno", "ORD_ORGNO")
-                rsvnOrdEndDt = item.text("rsvn_ord_end_dt", "RSVN_ORD_END_DT")
-                prcsStatName = item.text("prcs_stat_name", "PRCS_STAT_NAME")
-                ordStatName = item.text("ord_stat_name", "ORD_STAT_NAME")
-                rvseCnclDvsnName = item.text("rvse_cncl_dvsn_name", "RVSE_CNCL_DVSN_NAME")
-                rjctRson = item.text("rjct_rson", "RJCT_RSON")
-                rjctRsonName = item.text("rjct_rson_name", "RJCT_RSON_NAME")
-                rjctRsonCn = item.text("rjct_rson_cn", "RJCT_RSON_CN")
-                rjctRsonCd = item.text("rjct_rson_cd", "RJCT_RSON_CD")
-                rjctRsonCdName = item.text("rjct_rson_cd_name", "RJCT_RSON_CD_NAME")
+                infmTmd = item.text("infm_tmd", "infmTmd", "INFM_TMD")
+                ctacTlno = item.text("ctac_tlno", "ctacTlno", "CTAC_TLNO")
+                prdtTypeCd = item.text("prdt_type_cd", "prdtTypeCd", "PRDT_TYPE_CD")
+                excgDvsnCd = item.text("excg_dvsn_cd", "excgDvsnCd", "EXCG_DVSN_CD")
+                cpbcOrdpMtrlDvsnCd = item.text(
+                    "cpbc_ordp_mtrl_dvsn_cd",
+                    "cpbcOrdpMtrlDvsnCd",
+                    "CPBC_ORDP_MTRL_DVSN_CD",
+                )
+                ordOrgno = item.text("ord_orgno", "ordOrgno", "ORD_ORGNO")
+                rsvnOrdEndDt = item.text("rsvn_ord_end_dt", "rsvnOrdEndDt", "RSVN_ORD_END_DT")
+                prcsStatName = item.text("prcs_stat_name", "prcsStatName", "PRCS_STAT_NAME")
+                ordStatName = item.text("ord_stat_name", "ordStatName", "ORD_STAT_NAME")
+                rvseCnclDvsnName = item.text(
+                    "rvse_cncl_dvsn_name",
+                    "rvseCnclDvsnName",
+                    "RVSE_CNCL_DVSN_NAME",
+                )
+                rjctRson = item.text("rjct_rson", "rjctRson", "RJCT_RSON")
+                rjctRsonName = item.text("rjct_rson_name", "rjctRsonName", "RJCT_RSON_NAME")
+                rjctRsonCn = item.text("rjct_rson_cn", "rjctRsonCn", "RJCT_RSON_CN")
+                rjctRsonCd = item.text("rjct_rson_cd", "rjctRsonCd", "RJCT_RSON_CD")
+                rjctRsonCdName = item.text("rjct_rson_cd_name", "rjctRsonCdName", "RJCT_RSON_CD_NAME")
             }
         }
 
         val output2Object = this@toDailyExecutionOrdersResponse.summaryObjectNode("output2", "OUTPUT2")
         output2 = dailyExecutionOrdersOutput2 {
-            totOrdQty = output2Object?.text("tot_ord_qty", "TOT_ORD_QTY").orEmpty()
-            totCcldQty = output2Object?.text("tot_ccld_qty", "TOT_CCLD_QTY").orEmpty()
-            totCcldAmt = output2Object?.text("tot_ccld_amt", "TOT_CCLD_AMT").orEmpty()
-            prsmTlexSmtl = output2Object?.text("prsm_tlex_smtl", "PRSM_TLEX_SMTL").orEmpty()
-            pchsAvgPric = output2Object?.text("pchs_avg_pric", "PCHS_AVG_PRIC").orEmpty()
+            totOrdQty = output2Object?.text("tot_ord_qty", "totOrdQty", "TOT_ORD_QTY").orEmpty()
+            totCcldQty = output2Object?.text("tot_ccld_qty", "totCcldQty", "TOT_CCLD_QTY").orEmpty()
+            totCcldAmt = output2Object?.text("tot_ccld_amt", "totCcldAmt", "TOT_CCLD_AMT").orEmpty()
+            prsmTlexSmtl = output2Object?.text("prsm_tlex_smtl", "prsmTlexSmtl", "PRSM_TLEX_SMTL").orEmpty()
+            pchsAvgPric = output2Object?.text("pchs_avg_pric", "pchsAvgPric", "PCHS_AVG_PRIC").orEmpty()
         }
     }
 }

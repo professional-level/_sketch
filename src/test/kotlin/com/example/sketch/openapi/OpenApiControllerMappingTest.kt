@@ -87,7 +87,7 @@ class OpenApiControllerMappingTest {
               "msg1": "accepted",
               "output1": {
                 "krxFwdgOrdOrgno": "00003",
-                "order_no": "domestic-order-3",
+                "ordNo": "domestic-order-3",
                 "ordTmd": "102000"
               }
             }
@@ -252,6 +252,96 @@ class OpenApiControllerMappingTest {
         }
         assertEquals("", response.output2.totOrdQty)
         assertEquals("", response.output2.totCcldQty)
+    }
+
+    @Test
+    fun `maps camel case domestic daily execution aliases`() {
+        val response = ParseJsonResponse.parseJsonString(
+            """
+            {
+              "rtCd": "0",
+              "msgCd": "MCA00000",
+              "message": "ok",
+              "ctxAreaFk100": "FK_CAMEL",
+              "ctxAreaNk100": "NK_CAMEL",
+              "output1": {
+                "ordDt": "20260602",
+                "ordGnoBrno": "00003",
+                "ordNo": "camel-order",
+                "orgnOdno": "original-camel-order",
+                "ordDvsnName": "LIMIT",
+                "sllBuyDvsnCd": "02",
+                "sllBuyDvsnCdName": "BUY",
+                "prdtCode": "005930",
+                "prdtName": "Samsung Electronics",
+                "ordQty": "10",
+                "ordUnpr": "70000",
+                "ordTmd": "093000",
+                "totCcldQty": "4",
+                "avgPrvs": "69900",
+                "cnclYn": "Y",
+                "totCcldAmt": "279600",
+                "ordDvsnCd": "00",
+                "cnclCfrmQty": "6",
+                "rmnQty": "0",
+                "rjctQty": "0",
+                "ccldCndtName": "processed",
+                "prcsStatName": "Processed",
+                "ordStatName": "Accepted",
+                "rvseCnclDvsnName": "Cancel",
+                "rjctRson": "",
+                "rjctRsonCd": "APBK001",
+                "rjctRsonCdName": "not rejected"
+              },
+              "output2": {
+                "totOrdQty": "10",
+                "totCcldQty": "4",
+                "totCcldAmt": "279600",
+                "prsmTlexSmtl": "0",
+                "pchsAvgPric": "69900"
+              }
+            }
+            """.trimIndent(),
+        ).toDailyExecutionOrdersResponse()
+
+        assertEquals("0", response.rtCd)
+        assertEquals("MCA00000", response.msgCd)
+        assertEquals("ok", response.msg1)
+        assertEquals("FK_CAMEL", response.ctxAreaFk100)
+        assertEquals("NK_CAMEL", response.ctxAreaNk100)
+        with(response.output1List.single()) {
+            assertEquals("20260602", ordDt)
+            assertEquals("00003", ordGnoBrno)
+            assertEquals("camel-order", odno)
+            assertEquals("original-camel-order", orgnOdno)
+            assertEquals("LIMIT", ordDvsnName)
+            assertEquals("02", sllBuyDvsnCd)
+            assertEquals("BUY", sllBuyDvsnCdName)
+            assertEquals("005930", pdno)
+            assertEquals("Samsung Electronics", prdtName)
+            assertEquals("10", ordQty)
+            assertEquals("70000", ordUnpr)
+            assertEquals("093000", ordTmd)
+            assertEquals("4", totCcldQty)
+            assertEquals("69900", avgPrvs)
+            assertEquals("Y", cnclYn)
+            assertEquals("279600", totCcldAmt)
+            assertEquals("00", ordDvsnCd)
+            assertEquals("6", cnclCfrmQty)
+            assertEquals("0", rmnQty)
+            assertEquals("0", rjctQty)
+            assertEquals("processed", ccldCndtName)
+            assertEquals("Processed", prcsStatName)
+            assertEquals("Accepted", ordStatName)
+            assertEquals("Cancel", rvseCnclDvsnName)
+            assertEquals("APBK001", rjctRsonCd)
+            assertEquals("not rejected", rjctRsonCdName)
+        }
+        assertEquals("10", response.output2.totOrdQty)
+        assertEquals("4", response.output2.totCcldQty)
+        assertEquals("279600", response.output2.totCcldAmt)
+        assertEquals("0", response.output2.prsmTlexSmtl)
+        assertEquals("69900", response.output2.pchsAvgPric)
     }
 
     @Test
