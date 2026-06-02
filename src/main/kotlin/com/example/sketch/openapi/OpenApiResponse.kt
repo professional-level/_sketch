@@ -38,6 +38,28 @@ data class GetStockOrderCancelableRequest(
     }
 }
 
+data class GetStockBalanceRequest(
+    val isMock: Boolean = true,
+    val afhrFlprYn: String = "N",
+    val oflYn: String = "",
+    val inqrDvsn: String = "02",
+    val unprDvsn: String = "01",
+    val fundSttlIcldYn: String = "N",
+    val fncgAmtAutoRdptYn: String = "N",
+    val prcsDvsn: String = "00",
+    val ctxAreaFk100: String = "",
+    val ctxAreaNk100: String = "",
+) {
+    init {
+        require(afhrFlprYn in setOf("Y", "N")) { "afhrFlprYn must be Y or N" }
+        require(inqrDvsn.isNotBlank()) { "inqrDvsn must not be blank" }
+        require(unprDvsn.isNotBlank()) { "unprDvsn must not be blank" }
+        require(fundSttlIcldYn in setOf("Y", "N")) { "fundSttlIcldYn must be Y or N" }
+        require(fncgAmtAutoRdptYn in setOf("Y", "N")) { "fncgAmtAutoRdptYn must be Y or N" }
+        require(prcsDvsn.isNotBlank()) { "prcsDvsn must not be blank" }
+    }
+}
+
 data class GetOverseasExecutionOrdersRequest(
     val isMock: Boolean = true,
     val pdno: String = "",

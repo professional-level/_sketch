@@ -226,6 +226,34 @@ class OpenApiServiceHttpResponseTest {
         }
     }
 
+    @Test
+    fun `sends official tr id and query fields for mock domestic balance`() = runTest {
+        val exchangeFunction = SingleResponseExchangeFunction.success()
+        val service = openApiService(exchangeFunction)
+
+        service.getStockBalance(
+            GetStockBalanceRequest(
+                inqrDvsn = "02",
+                ctxAreaFk100 = "FK1",
+                ctxAreaNk100 = "NK1",
+                isMock = true,
+            ),
+        )
+
+        with(exchangeFunction.requests.single()) {
+            assertEquals("/uapi/domestic-stock/v1/trading/inquire-balance", url().path)
+            assertEquals("VTTC8434R", headers().getFirst("tr_id"))
+            assertEquals("N", url().queryValue("AFHR_FLPR_YN"))
+            assertEquals("02", url().queryValue("INQR_DVSN"))
+            assertEquals("01", url().queryValue("UNPR_DVSN"))
+            assertEquals("N", url().queryValue("FUND_STTL_ICLD_YN"))
+            assertEquals("N", url().queryValue("FNCG_AMT_AUTO_RDPT_YN"))
+            assertEquals("00", url().queryValue("PRCS_DVSN"))
+            assertEquals("FK1", url().queryValue("CTX_AREA_FK100"))
+            assertEquals("NK1", url().queryValue("CTX_AREA_NK100"))
+        }
+    }
+
     private fun openApiService(exchangeFunction: SingleResponseExchangeFunction): OpenApiService {
         val webClient = WebClient.builder()
             .baseUrl("https://mock.kis.test")

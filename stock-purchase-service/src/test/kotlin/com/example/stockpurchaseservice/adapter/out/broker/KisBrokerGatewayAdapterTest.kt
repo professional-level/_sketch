@@ -529,6 +529,73 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `domestic account snapshot maps balance positions and summary`() {
+        val exchangeFunction = StubExchangeFunction(
+            responses = listOf(
+                """
+                {
+                  "rt_cd": "0",
+                  "ctx_area_fk100": "",
+                  "ctx_area_nk100": "",
+                  "output1": [
+                    {
+                      "pdno": "005930",
+                      "prdt_name": "Samsung Electronics",
+                      "hldg_qty": "3",
+                      "pchs_avg_pric": "70000",
+                      "prpr": "72000",
+                      "pchs_amt": "210000",
+                      "evlu_amt": "216000",
+                      "evlu_pfls_amt": "6000"
+                    }
+                  ],
+                  "output2": {
+                    "dnca_tot_amt": "1250000",
+                    "pchs_amt_smtl": "210000",
+                    "tot_evlu_amt": "216000",
+                    "evlu_pfls_smtl": "6000"
+                  }
+                }
+                """.trimIndent(),
+            ),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        val snapshot = adapter.findAccountSnapshot(
+            BrokerAccountSnapshotQuery(
+                market = StockOrderMarket.DOMESTIC,
+                isMock = true,
+            ),
+        )
+
+        assertEquals(StockOrderMarket.DOMESTIC, snapshot.market)
+        assertEquals("KRX", snapshot.exchange)
+        assertEquals("KRW", snapshot.currency)
+        assertEquals(1_250_000.0, snapshot.availableCashAmount)
+        assertEquals(210_000.0, snapshot.totalPurchaseAmount)
+        assertEquals(216_000.0, snapshot.totalEvaluationAmount)
+        assertEquals(6_000.0, snapshot.totalProfitLossAmount)
+        with(snapshot.positions.single()) {
+            assertEquals("005930", symbol)
+            assertEquals("Samsung Electronics", stockName)
+            assertEquals(3, quantity)
+            assertEquals(70_000.0, averagePurchasePrice)
+            assertEquals(72_000.0, currentPrice)
+            assertEquals(210_000.0, purchaseAmount)
+            assertEquals(216_000.0, evaluationAmount)
+            assertEquals(6_000.0, profitLossAmount)
+        }
+        assertEquals("/open-api/trading/inquire-balance", exchangeFunction.requests.single().url().path)
+        assertEquals("true", exchangeFunction.requests.single().queryValue("isMock"))
+        assertEquals("02", exchangeFunction.requests.single().queryValue("inqrDvsn"))
+        assertEquals("01", exchangeFunction.requests.single().queryValue("unprDvsn"))
+    }
+
+    @Test
     fun `overseas account snapshot maps uppercase top level balance aliases`() {
         val exchangeFunction = StubExchangeFunction(
             responses = listOf(

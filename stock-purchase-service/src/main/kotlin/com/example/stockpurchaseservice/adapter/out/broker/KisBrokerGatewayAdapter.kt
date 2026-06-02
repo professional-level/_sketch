@@ -6,6 +6,7 @@ import com.example.common.ExternalApiAdapter
 import com.example.common.endpoint.Endpoint.GET_EXECUTION_ORDERS
 import com.example.common.endpoint.Endpoint.GET_OVERSEAS_EXECUTION_ORDERS
 import com.example.common.endpoint.Endpoint.GET_OVERSEAS_STOCK_BALANCE
+import com.example.common.endpoint.Endpoint.GET_STOCK_BALANCE
 import com.example.common.endpoint.Endpoint.GET_STOCK_ORDER_CANCELABLE
 import com.example.common.endpoint.Endpoint.POST_OVERSEAS_STOCK_ORDER_CANCEL
 import com.example.common.endpoint.Endpoint.POST_OVERSEAS_STOCK_ORDER
@@ -180,12 +181,32 @@ internal class KisBrokerGatewayAdapter(
 
     override fun findAccountSnapshot(query: BrokerAccountSnapshotQuery): BrokerAccountSnapshot {
         return when (query.market) {
-            StockOrderMarket.DOMESTIC -> throw UnsupportedOperationException(
-                "domestic account snapshot is not supported",
-            )
-
+            StockOrderMarket.DOMESTIC -> findDomesticAccountSnapshot(query)
             StockOrderMarket.OVERSEAS_US -> findOverseasAccountSnapshot(query)
         }
+    }
+
+    private fun findDomesticAccountSnapshot(query: BrokerAccountSnapshotQuery): BrokerAccountSnapshot {
+        val positions = mutableListOf<BrokerPositionSnapshot>()
+        var summary = BrokerAccountSnapshot(
+            market = StockOrderMarket.DOMESTIC,
+            exchange = DOMESTIC_EXCHANGE,
+            currency = DOMESTIC_CURRENCY,
+            positions = emptyList(),
+        )
+        var cursor = query.pageCursor
+        val seenCursors = mutableSetOf<BrokerOrderHistoryPageCursor>()
+        var pageCount = 0
+        do {
+            if (!seenCursors.add(cursor)) break
+            val page = fetchDomesticAccountSnapshotPage(query.copy(pageCursor = cursor))
+            positions += page.snapshot.positions
+            summary = summary.mergeSummaryFrom(page.snapshot)
+            cursor = page.nextCursor
+            pageCount += 1
+        } while (cursor.hasNext() && pageCount < MAX_ACCOUNT_BALANCE_PAGES)
+
+        return summary.copy(positions = positions)
     }
 
     private fun findOverseasAccountSnapshot(query: BrokerAccountSnapshotQuery): BrokerAccountSnapshot {
@@ -265,6 +286,33 @@ internal class KisBrokerGatewayAdapter(
         }
     }
 
+    private fun fetchDomesticAccountSnapshotPage(query: BrokerAccountSnapshotQuery): BrokerAccountSnapshotPage {
+        return guard.executeQuery("domestic-account-balance") {
+            val response = stockApiClient.getExternalApi(
+                uri = OPEN_API_PREFIX + GET_STOCK_BALANCE,
+                queryParameters = query.toKisDomesticBalanceQuery(),
+                responseType = JsonNode::class.java,
+                callOptions = properties.toQueryCallOptions(),
+            )
+            val returnCode = response.textOrNull("rt_cd", "rtCd", "RT_CD").orEmpty()
+            if (returnCode.isNotBlank() && returnCode != "0") {
+                throwKisBrokerBusinessFailure(
+                    operation = "domestic balance lookup",
+                    returnCode = returnCode,
+                    messageCode = response.textOrNull("msg_cd", "msgCd", "MSG_CD"),
+                    brokerMessage = response.textOrNull("msg1", "msg_1", "MSG1"),
+                )
+            }
+            BrokerAccountSnapshotPage(
+                snapshot = response.toDomesticBrokerAccountSnapshot(),
+                nextCursor = BrokerOrderHistoryPageCursor(
+                    foreignKeyContext = response.textOrNull("ctx_area_fk100", "CTX_AREA_FK100").orEmpty(),
+                    nextKeyContext = response.textOrNull("ctx_area_nk100", "CTX_AREA_NK100").orEmpty(),
+                ),
+            )
+        }
+    }
+
     private fun fetchOverseasAccountSnapshotPage(query: BrokerAccountSnapshotQuery): BrokerAccountSnapshotPage {
         return guard.executeQuery("overseas-account-balance") {
             val response = stockApiClient.getExternalApi(
@@ -300,6 +348,8 @@ internal class KisBrokerGatewayAdapter(
 }
 
 internal const val OPEN_API_PREFIX = "/open-api"
+private const val DOMESTIC_EXCHANGE = "KRX"
+private const val DOMESTIC_CURRENCY = "KRW"
 
 private val TEMPORARY_KIS_MESSAGE_CODES = setOf(
     "EGW00201",
@@ -530,6 +580,21 @@ private fun BrokerAccountSnapshotQuery.toKisOverseasBalanceQuery(): Map<String, 
     )
 }
 
+private fun BrokerAccountSnapshotQuery.toKisDomesticBalanceQuery(): Map<String, String> {
+    return mapOf(
+        "isMock" to isMock.toString(),
+        "afhrFlprYn" to "N",
+        "oflYn" to "",
+        "inqrDvsn" to "02",
+        "unprDvsn" to "01",
+        "fundSttlIcldYn" to "N",
+        "fncgAmtAutoRdptYn" to "N",
+        "prcsDvsn" to "00",
+        "ctxAreaFk100" to pageCursor.foreignKeyContext,
+        "ctxAreaNk100" to pageCursor.nextKeyContext,
+    )
+}
+
 internal fun BrokerOrderHistoryQuery.toKisOverseasExecutionOrderQuery(): Map<String, String> {
     return mapOf(
         "isMock" to isMock.toString(),
@@ -620,6 +685,50 @@ private fun JsonNode.toBrokerAccountSnapshot(query: BrokerAccountSnapshotQuery):
     )
 }
 
+private fun JsonNode.toDomesticBrokerAccountSnapshot(): BrokerAccountSnapshot {
+    val rows = rows("output1", "OUTPUT1", "output", "OUTPUT")
+    val summary = nodeOrNull("output2", "OUTPUT2")
+
+    return BrokerAccountSnapshot(
+        market = StockOrderMarket.DOMESTIC,
+        exchange = DOMESTIC_EXCHANGE,
+        currency = DOMESTIC_CURRENCY,
+        positions = rows.mapNotNull { it.toBrokerPositionSnapshot() },
+        availableCashAmount = summary?.textOrNull(
+            "ord_psbl_cash",
+            "ORD_PSBL_CASH",
+            "dnca_tot_amt",
+            "DNCA_TOT_AMT",
+            "nxdy_excc_amt",
+            "NXDY_EXCC_AMT",
+            "prvs_rcdl_excc_amt",
+            "PRVS_RCDL_EXCC_AMT",
+        ).toDoubleValue(),
+        totalPurchaseAmount = summary?.textOrNull(
+            "pchs_amt_smtl",
+            "PCHS_AMT_SMTL",
+            "tot_pchs_amt",
+            "TOT_PCHS_AMT",
+        ).toDoubleValue(),
+        totalEvaluationAmount = summary?.textOrNull(
+            "tot_evlu_amt",
+            "TOT_EVLU_AMT",
+            "scts_evlu_amt",
+            "SCTS_EVLU_AMT",
+            "evlu_amt_smtl",
+            "EVLU_AMT_SMTL",
+            "nass_amt",
+            "NASS_AMT",
+        ).toDoubleValue(),
+        totalProfitLossAmount = summary?.textOrNull(
+            "evlu_pfls_smtl",
+            "EVLU_PFLS_SMTL",
+            "tot_evlu_pfls_amt",
+            "TOT_EVLU_PFLS_AMT",
+        ).toDoubleValue(),
+    )
+}
+
 private fun JsonNode.rows(vararg fieldNames: String): List<JsonNode> {
     val node = nodeOrNull(*fieldNames) ?: return emptyList()
     return when {
@@ -651,7 +760,7 @@ private fun BrokerAccountSnapshot.mergeSummaryFrom(next: BrokerAccountSnapshot):
 
 private fun JsonNode.toBrokerPositionSnapshot(): BrokerPositionSnapshot? {
     val symbol = textOrNull("ovrs_pdno", "OVRS_PDNO", "pdno", "PDNO") ?: return null
-    val quantity = textOrNull("ovrs_cblc_qty", "OVRS_CBLC_QTY", "cblc_qty", "CBLC_QTY")
+    val quantity = textOrNull("ovrs_cblc_qty", "OVRS_CBLC_QTY", "hldg_qty", "HLDG_QTY", "cblc_qty", "CBLC_QTY")
         .toLongValue()
     if (quantity <= 0) return null
     return BrokerPositionSnapshot(
@@ -660,7 +769,7 @@ private fun JsonNode.toBrokerPositionSnapshot(): BrokerPositionSnapshot? {
         quantity = quantity,
         averagePurchasePrice = textOrNull("pchs_avg_pric", "PCHS_AVG_PRIC", "avg_prvs", "AVG_PRVS")
             .toDoubleValue(),
-        currentPrice = textOrNull("now_pric2", "NOW_PRIC2", "ovrs_now_pric1", "OVRS_NOW_PRIC1")
+        currentPrice = textOrNull("now_pric2", "NOW_PRIC2", "ovrs_now_pric1", "OVRS_NOW_PRIC1", "prpr", "PRPR")
             .toDoubleValue(),
         purchaseAmount = textOrNull("frcr_pchs_amt1", "FRCR_PCHS_AMT1", "pchs_amt", "PCHS_AMT")
             .toDoubleValue(),
@@ -669,6 +778,8 @@ private fun JsonNode.toBrokerPositionSnapshot(): BrokerPositionSnapshot? {
             "OVRS_STCK_EVLU_AMT",
             "frcr_evlu_amt2",
             "FRCR_EVLU_AMT2",
+            "evlu_amt",
+            "EVLU_AMT",
         ).toDoubleValue(),
         profitLossAmount = textOrNull(
             "frcr_evlu_pfls_amt",

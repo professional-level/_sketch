@@ -12,6 +12,7 @@ object Endpoint {
     const val POST_STOCK_ORDER ="/trading/order-cash"
     const val POST_STOCK_ORDER_CANCEL = "/trading/order-rvsecncl"
     const val GET_STOCK_ORDER_CANCELABLE = "/trading/inquire-psbl-rvsecncl"
+    const val GET_STOCK_BALANCE = "/trading/inquire-balance"
     const val POST_OVERSEAS_STOCK_ORDER = "/overseas/trading/order"
     const val POST_OVERSEAS_STOCK_ORDER_CANCEL = "/overseas/trading/order-rvsecncl"
     const val GET_OVERSEAS_STOCK_BALANCE = "/overseas/trading/inquire-balance"

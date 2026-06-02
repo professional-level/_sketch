@@ -15,6 +15,7 @@ import com.example.common.endpoint.Endpoint.GET_PROGRAM_TRADE_INFO_PER_INDIVIDUA
 import com.example.common.endpoint.Endpoint.GET_PROGRAM_TRADE_INFO_PER_INDIVIDUAL_AT_ONE_DAY
 import com.example.common.endpoint.Endpoint.GET_QUOTATIONS_OF_VOLUME_RANK
 import com.example.common.endpoint.Endpoint.GET_STOCK_ORDER_CANCELABLE
+import com.example.common.endpoint.Endpoint.GET_STOCK_BALANCE
 import com.example.common.endpoint.Endpoint.POST_OVERSEAS_STOCK_ORDER
 import com.example.common.endpoint.Endpoint.POST_OVERSEAS_STOCK_ORDER_CANCEL
 import com.example.common.endpoint.Endpoint.POST_STOCK_ORDER
@@ -183,6 +184,13 @@ class OpenApiController(
         @ModelAttribute request: GetStockOrderCancelableRequest,
     ): OpenApiResponse {
         return service.getStockOrderCancelable(request)
+    }
+
+    @GetMapping(GET_STOCK_BALANCE)
+    suspend fun getStockBalance(
+        @ModelAttribute request: GetStockBalanceRequest,
+    ): OpenApiResponse {
+        return service.getStockBalance(request)
     }
 
     @PostMapping(POST_OVERSEAS_STOCK_ORDER_CANCEL)

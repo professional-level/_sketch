@@ -6,14 +6,21 @@ import com.example.sketch.configure.Property.Companion.APP_SECRET
 import com.example.sketch.configure.Property.Companion.MOCK_APP_KEY
 import com.example.sketch.configure.Property.Companion.MOCK_APP_SECRET
 import com.example.sketch.configure.QueryParameter
+import com.example.sketch.configure.QueryParameter.AFHR_FLPR_YN
 import com.example.sketch.configure.QueryParameter.BYMD
 import com.example.sketch.configure.QueryParameter.CANO
 import com.example.sketch.configure.QueryParameter.EXCD
+import com.example.sketch.configure.QueryParameter.FNCG_AMT_AUTO_RDPT_YN
 import com.example.sketch.configure.QueryParameter.FID_INPUT_DATE_1
 import com.example.sketch.configure.QueryParameter.FID_INPUT_ISCD
+import com.example.sketch.configure.QueryParameter.FUND_STTL_ICLD_YN
 import com.example.sketch.configure.QueryParameter.GUBN
+import com.example.sketch.configure.QueryParameter.INQR_DVSN
 import com.example.sketch.configure.QueryParameter.MODP
+import com.example.sketch.configure.QueryParameter.OFL_YN
+import com.example.sketch.configure.QueryParameter.PRCS_DVSN
 import com.example.sketch.configure.QueryParameter.SYMB
+import com.example.sketch.configure.QueryParameter.UNPR_DVSN
 import com.example.sketch.configure.RequestType
 import com.example.sketch.configure.requestInfo
 import com.example.sketch.openapi.HeaderBuilder.Companion.addHeader
@@ -377,6 +384,39 @@ class OpenApiService(
                     QueryParameter.CTX_AREA_NK100 to request.ctxAreaNk100,
                 ),
             )
+
+        return executeHttpRequest(
+            info = info,
+            headers = headers,
+            queryParameters = queryParameters,
+            isMockApi = request.isMock,
+        )
+    }
+
+    suspend fun getStockBalance(request: GetStockBalanceRequest): OpenApiResponse {
+        val token = getToken(isMock = request.isMock)
+        val info = RequestType.GET_STOCK_BALANCE
+        val headers = build(token = token, trId = if (request.isMock) "VTTC8434R" else "TTTC8434R")
+            .addHeader(HeaderBuilder.HeaderKey.CUSTOMER_TYPE, "P")
+            .build()
+            .withMockCredentialIfNeeded(request.isMock)
+        val (cano, acntPrdtCd) = stockAccount(request.isMock)
+        val queryParameters = QueryParameter.forType(
+            info,
+            mapOf(
+                CANO to cano,
+                QueryParameter.ACNT_PRDT_CD to acntPrdtCd,
+                AFHR_FLPR_YN to request.afhrFlprYn,
+                OFL_YN to request.oflYn,
+                INQR_DVSN to request.inqrDvsn,
+                UNPR_DVSN to request.unprDvsn,
+                FUND_STTL_ICLD_YN to request.fundSttlIcldYn,
+                FNCG_AMT_AUTO_RDPT_YN to request.fncgAmtAutoRdptYn,
+                PRCS_DVSN to request.prcsDvsn,
+                QueryParameter.CTX_AREA_FK100 to request.ctxAreaFk100,
+                QueryParameter.CTX_AREA_NK100 to request.ctxAreaNk100,
+            ),
+        )
 
         return executeHttpRequest(
             info = info,

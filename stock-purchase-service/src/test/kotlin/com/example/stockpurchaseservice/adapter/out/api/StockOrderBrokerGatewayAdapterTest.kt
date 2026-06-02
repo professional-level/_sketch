@@ -180,6 +180,29 @@ class StockOrderBrokerGatewayAdapterTest {
         }
     }
 
+    @Test
+    fun `domestic account snapshot uses krx krw broker query`() {
+        val brokerGateway = FakeBrokerGateway()
+        val adapter = DomesticStockOrderAdapter(brokerGateway, isMockOrder = true)
+
+        val snapshot = adapter.findAccountSnapshot(
+            AccountSnapshotQuery(
+                market = StockOrderMarket.DOMESTIC,
+            ),
+        )
+
+        assertEquals(StockOrderMarket.DOMESTIC, snapshot.market)
+        assertEquals("KRX", snapshot.exchange)
+        assertEquals("KRW", snapshot.currency)
+        assertEquals(1250.25, snapshot.availableCashAmount)
+        with(brokerGateway.accountSnapshotQueries.single()) {
+            assertEquals(StockOrderMarket.DOMESTIC, market)
+            assertEquals("KRX", exchange)
+            assertEquals("KRW", currency)
+            assertEquals(true, isMock)
+        }
+    }
+
     private class FakeBrokerGateway : BrokerGateway {
         val submitted: MutableList<BrokerOrderCommand> = mutableListOf()
         val cancelled: MutableList<BrokerOrderCancelCommand> = mutableListOf()

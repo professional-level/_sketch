@@ -279,11 +279,12 @@ For live broker position checks, `stock-purchase-service` exposes:
 
 ```text
 GET /operations/trading/account-snapshot?market=OVERSEAS_US&exchange=NASD&currency=USD
+GET /operations/trading/account-snapshot?market=DOMESTIC&exchange=KRX&currency=KRW
 ```
 
-This calls the broker wrapper's overseas balance lookup and returns current overseas positions with quantity, average purchase price, current price, purchase amount, evaluation amount, profit/loss, and available cash amount when KIS provides those fields. Domestic balance, strict settled-cash classification, multi-currency conversion, and broader account cash/exposure modeling still require additional hardening.
+This calls the broker wrapper's domestic or overseas balance lookup and returns current positions with quantity, average purchase price, current price, purchase amount, evaluation amount, profit/loss, and available cash amount when KIS provides those fields. Strict settled-cash classification, multi-currency conversion, and broader account cash/exposure modeling still require additional hardening.
 
-When `akra.order.risk.max-account-exposure-notional` is set, buy order risk checks use the overseas account snapshot to reject orders whose projected exposure would exceed the configured limit:
+When `akra.order.risk.max-account-exposure-notional` is set, buy order risk checks use the market-specific account snapshot to reject orders whose projected exposure would exceed the configured limit:
 
 ```text
 current broker evaluation amount + active pending buy notional + new order notional

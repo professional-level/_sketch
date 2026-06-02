@@ -56,6 +56,10 @@ enum class RequestType(
         requestURI = "/uapi/domestic-stock/v1/trading/inquire-psbl-rvsecncl",
         type = HttpMethod.GET,
     ),
+    GET_STOCK_BALANCE(
+        requestURI = "/uapi/domestic-stock/v1/trading/inquire-balance",
+        type = HttpMethod.GET,
+    ),
     POST_OVERSEAS_STOCK_ORDER(
         requestURI = "/uapi/overseas-stock/v1/trading/order",
         type = HttpMethod.POST,
@@ -122,6 +126,12 @@ enum class QueryParameter(
     INQR_DVSN_3(emptyQueryParam),
     INQR_DVSN_2(emptyQueryParam),
     INQR_DVSN_1(emptyQueryParam),
+    AFHR_FLPR_YN("N"),
+    OFL_YN(""),
+    UNPR_DVSN("01"),
+    FUND_STTL_ICLD_YN("N"),
+    FNCG_AMT_AUTO_RDPT_YN("N"),
+    PRCS_DVSN("00"),
     EXCG_ID_DVSN_CD("KRX"),
     CTX_AREA_FK100(emptyQueryParam),
     CTX_AREA_NK100(emptyQueryParam),
@@ -214,6 +224,11 @@ enum class QueryParameter(
                 RequestType.GET_STOCK_ORDER_CANCELABLE -> listOf(
                     CANO, ACNT_PRDT_CD, INQR_DVSN_1, INQR_DVSN_2,
                     CTX_AREA_FK100, CTX_AREA_NK100,
+                )
+                RequestType.GET_STOCK_BALANCE -> listOf(
+                    CANO, ACNT_PRDT_CD, AFHR_FLPR_YN, OFL_YN, INQR_DVSN,
+                    UNPR_DVSN, FUND_STTL_ICLD_YN, FNCG_AMT_AUTO_RDPT_YN,
+                    PRCS_DVSN, CTX_AREA_FK100, CTX_AREA_NK100,
                 )
                 RequestType.POST_OVERSEAS_STOCK_ORDER -> emptyList()
                 RequestType.POST_OVERSEAS_STOCK_ORDER_CANCEL -> emptyList()
