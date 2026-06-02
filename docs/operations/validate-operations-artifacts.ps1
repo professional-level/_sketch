@@ -85,6 +85,7 @@ function Assert-KubernetesDocumentShape {
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 $kubernetesDir = Join-Path $PSScriptRoot "kubernetes"
 $vaultDir = Join-Path $PSScriptRoot "vault"
+$githubOperationsDir = Join-Path $PSScriptRoot "github"
 $githubDir = Join-Path $repoRoot ".github"
 $workflowDir = Join-Path $githubDir "workflows"
 $workflowPath = Join-Path $workflowDir "operations-validation.yml"
@@ -96,6 +97,7 @@ $files = @{
     DeployScript = Join-Path $kubernetesDir "deploy-trading-runtime.ps1"
     VerifyScript = Join-Path $kubernetesDir "verify-trading-runtime.ps1"
     VaultScript = Join-Path $vaultDir "bootstrap-akra-vault.ps1"
+    GitHubDeliveryScript = Join-Path $githubOperationsDir "verify-github-delivery.ps1"
     VaultPolicy = Join-Path $vaultDir "akra-trading-external-secrets-policy.hcl"
     VaultReadme = Join-Path $vaultDir "README.md"
     KubernetesReadme = Join-Path $kubernetesDir "README.md"
@@ -110,11 +112,17 @@ foreach ($path in $files.Values) {
 Assert-PowerShellParses $files.DeployScript
 Assert-PowerShellParses $files.VerifyScript
 Assert-PowerShellParses $files.VaultScript
+Assert-PowerShellParses $files.GitHubDeliveryScript
 
 $vaultDryRun = & $files.VaultScript -DryRun *>&1 | Out-String
 Assert-Contains "Vault dry-run" $vaultDryRun "path `"secret/data/akra/trading/kis-broker`""
 Assert-Contains "Vault dry-run" $vaultDryRun "vault policy write akra-trading-external-secrets <rendered-policy-file>"
 Assert-Contains "Vault dry-run" $vaultDryRun "bound_service_account_names=akra-secret-sync"
+
+$githubDryRun = & $files.GitHubDeliveryScript -CommitSha "ae80c31584b78eeb7361184f84dc240c2bbcba81" -DryRun *>&1 | Out-String
+Assert-Contains "GitHub delivery dry-run" $githubDryRun "Expected workflow: Container Images"
+Assert-Contains "GitHub delivery dry-run" $githubDryRun "Expected workflow: Operations Validation"
+Assert-Contains "GitHub delivery dry-run" $githubDryRun "ghcr.io/professional-level/sketch-stock-purchase-service:ae80c31584b78eeb7361184f84dc240c2bbcba81"
 
 $runtime = Get-Content -LiteralPath $files.RuntimeManifest -Raw
 $infra = Get-Content -LiteralPath $files.InfraManifest -Raw

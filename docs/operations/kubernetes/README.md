@@ -65,6 +65,10 @@ placeholder replacement coverage, Kafka topic bootstrap coverage, and the
 expected runtime Secret/image references before the branch can rely on the
 checked-in templates.
 
+Before rollout, use `docs/operations/github/verify-github-delivery.ps1` to check
+that `Container Images` and `Operations Validation` succeeded for the exact Git
+SHA and that the immutable GHCR image tags exist.
+
 To validate the checked-in template without applying it:
 
 ```powershell
