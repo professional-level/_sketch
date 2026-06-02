@@ -200,6 +200,22 @@ Run the submit/cancel smoke only during a KIS mock overseas order window. Use a 
 
 After the cancel response, the smoke polls order history again and requires the submitted broker order to map to internal `CANCELLED` status through `KisBrokerGatewayAdapter.findStatusFor`. This verifies the submit response id, order-history row identity, and cancellation status mapping together instead of only checking that the cancel endpoint returned an order id.
 
+Domestic submit/query/cancel smoke is also opt-in because it places a mock domestic order:
+
+```powershell
+$env:KIS_BROKER_DOMESTIC_SUBMIT_SMOKE_ENABLED='true'
+$env:KIS_BROKER_SMOKE_DOMESTIC_SYMBOL='005930'
+$env:KIS_BROKER_SMOKE_DOMESTIC_EXCHANGE='KRX'
+$env:KIS_BROKER_SMOKE_DOMESTIC_CURRENCY='KRW'
+$env:KIS_BROKER_SMOKE_DOMESTIC_PRICE='1'
+$env:KIS_BROKER_SMOKE_DOMESTIC_QUANTITY='1'
+$env:KIS_BROKER_SMOKE_HISTORY_ATTEMPTS='6'
+$env:KIS_BROKER_SMOKE_HISTORY_POLL_SECONDS='5'
+.\gradlew.bat --no-daemon :stock-purchase-service:test --tests "com.example.stockpurchaseservice.adapter.out.broker.KisBrokerGatewaySmokeTest" --rerun-tasks
+```
+
+Run the domestic submit/cancel smoke only during a KIS mock domestic order window. Configure a valid but deliberately low limit price and a small quantity so the mock order remains cancelable. The smoke requires the domestic submit response to include a branch/order-org number, waits for the submitted order in daily execution history, submits a domestic cancel with that branch/order-org number, then polls history until the submitted broker order maps to internal `CANCELLED` status.
+
 The root KIS wrapper must preserve KIS order and cancel business responses as a successful HTTP response body, even when `rt_cd != 0`. `stock-purchase-service` classifies that body as `BrokerOrderRejectedException`. A wrapper HTTP 5xx during submit remains a submission-unknown candidate because the broker order id may not be known.
 When the submit/cancel smoke is rejected by KIS, the failure message includes the broker return code, message code, `msg1`, the smoke configuration, and the submitted broker command so the operator can distinguish account/window/product rejection from wrapper mapping failures.
 

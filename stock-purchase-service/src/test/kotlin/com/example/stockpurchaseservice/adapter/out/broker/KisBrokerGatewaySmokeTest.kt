@@ -192,6 +192,71 @@ class KisBrokerGatewaySmokeTest {
         )
     }
 
+    @Test
+    @EnabledIfEnvironmentVariable(named = "KIS_BROKER_DOMESTIC_SUBMIT_SMOKE_ENABLED", matches = "true")
+    fun `mock domestic submit query and cancel smoke`() {
+        val config = SmokeConfig.fromEnvironment()
+        val adapter = brokerGateway(config)
+
+        val submitCommand = BrokerOrderCommand(
+            internalOrderId = UUID.randomUUID(),
+            market = StockOrderMarket.DOMESTIC,
+            side = OrderIntentSide.BUY,
+            symbol = config.domesticSymbol,
+            orderType = StockOrderType.LIMIT,
+            price = config.domesticPrice,
+            quantity = config.domesticQuantity,
+            isMock = true,
+        )
+        val submitted = runBrokerSmokeStep("mock domestic submit", config, submitCommand) {
+            adapter.submitOrder(submitCommand)
+        }
+        assertTrue(submitted.externalOrderId.isNotBlank())
+        val branchOrderNumber = submitted.branchOrderNumber
+            ?: fail("Domestic mock order response did not include branch order number: orderId=${submitted.externalOrderId}")
+        assertTrue(branchOrderNumber.isNotBlank())
+
+        val submittedHistory = awaitDomesticOrderHistory(adapter, config, submitted.externalOrderId)
+        assertNotNull(
+            submittedHistory,
+            "Submitted domestic mock order did not appear in broker history " +
+                "after attempts=${config.historyAttempts}, " +
+                "pollSeconds=${config.historyPollInterval.seconds}, " +
+                "symbol=${config.domesticSymbol}, orderId=${submitted.externalOrderId}, " +
+                "branchOrderNumber=$branchOrderNumber",
+        )
+        assertTrue(submittedHistory.remainingQuantity >= config.domesticQuantity)
+
+        val cancelCommand = BrokerOrderCancelCommand(
+            internalOrderId = UUID.randomUUID(),
+            market = StockOrderMarket.DOMESTIC,
+            symbol = config.domesticSymbol,
+            originalOrderId = submitted.externalOrderId,
+            branchOrderNumber = branchOrderNumber,
+            orderType = StockOrderType.LIMIT,
+            price = config.domesticPrice,
+            quantity = config.domesticQuantity,
+            cancelAll = true,
+            isMock = true,
+        )
+        val cancelled = runBrokerSmokeStep("mock domestic cancel", config, cancelCommand) {
+            adapter.cancelOrder(cancelCommand)
+        }
+
+        assertTrue(cancelled.externalOrderId.isNotBlank())
+
+        val cancelledStatus = awaitDomesticOrderStatus(adapter, config, submitted.externalOrderId, branchOrderNumber)
+        assertEquals(
+            BrokerOrderStatus.CANCELLED,
+            cancelledStatus.status,
+            "Cancelled domestic mock order did not map to broker CANCELLED status " +
+                "after attempts=${config.historyAttempts}, " +
+                "pollSeconds=${config.historyPollInterval.seconds}, " +
+                "symbol=${config.domesticSymbol}, orderId=${submitted.externalOrderId}, " +
+                "branchOrderNumber=$branchOrderNumber, latestStatus=$cancelledStatus",
+        )
+    }
+
     private fun <T> runBrokerSmokeStep(
         step: String,
         config: SmokeConfig,
@@ -253,6 +318,20 @@ class KisBrokerGatewaySmokeTest {
         return null
     }
 
+    private fun awaitDomesticOrderHistory(
+        adapter: KisBrokerGatewayAdapter,
+        config: SmokeConfig,
+        externalOrderId: String,
+    ): BrokerOrderHistoryItem? {
+        repeat(config.historyAttempts) {
+            val match = adapter.findOrderHistory(config.domesticHistoryQuery(isMock = true))
+                .firstOrNull { it.externalOrderId == externalOrderId }
+            if (match != null) return match
+            Thread.sleep(config.historyPollInterval.toMillis())
+        }
+        return null
+    }
+
     private fun awaitOrderStatus(
         adapter: KisBrokerGatewayAdapter,
         config: SmokeConfig,
@@ -282,6 +361,35 @@ class KisBrokerGatewaySmokeTest {
         return latestStatus ?: fail("Broker status polling did not run for orderId=$externalOrderId")
     }
 
+    private fun awaitDomesticOrderStatus(
+        adapter: KisBrokerGatewayAdapter,
+        config: SmokeConfig,
+        externalOrderId: String,
+        branchOrderNumber: String?,
+    ): BrokerOrderStatusDto {
+        var latestStatus: BrokerOrderStatusDto? = null
+        repeat(config.historyAttempts) {
+            latestStatus = adapter.findOrderHistory(config.domesticHistoryQuery(isMock = true)).findStatusFor(
+                BrokerOrderStatusQuery(
+                    orderIntentId = UUID.randomUUID(),
+                    internalOrderId = UUID.randomUUID(),
+                    externalOrderId = externalOrderId,
+                    branchOrderNumber = branchOrderNumber,
+                    symbol = config.domesticSymbol,
+                    exchange = config.domesticExchange,
+                    side = OrderIntentSide.BUY,
+                    orderedQuantity = config.domesticQuantity.toLong(),
+                    submittedPrice = config.domesticPrice,
+                    market = StockOrderMarket.DOMESTIC,
+                    submittedAt = ZonedDateTime.now(BROKER_ORDER_ZONE),
+                ),
+            )
+            if (latestStatus?.status == BrokerOrderStatus.CANCELLED) return latestStatus!!
+            Thread.sleep(config.historyPollInterval.toMillis())
+        }
+        return latestStatus ?: fail("Broker status polling did not run for domestic orderId=$externalOrderId")
+    }
+
     private data class SmokeConfig(
         val baseUrl: String,
         val symbol: String,
@@ -290,6 +398,8 @@ class KisBrokerGatewaySmokeTest {
         val domesticSymbol: String,
         val domesticExchange: String,
         val domesticCurrency: String,
+        val domesticPrice: Double,
+        val domesticQuantity: Int,
         val price: Double,
         val quantity: Int,
         val submitEnabled: Boolean,
@@ -305,6 +415,8 @@ class KisBrokerGatewaySmokeTest {
                 "domesticSymbol=$domesticSymbol, " +
                 "domesticExchange=$domesticExchange, " +
                 "domesticCurrency=$domesticCurrency, " +
+                "domesticPrice=$domesticPrice, " +
+                "domesticQuantity=$domesticQuantity, " +
                 "price=$price, " +
                 "quantity=$quantity, " +
                 "submitEnabled=$submitEnabled, " +
@@ -347,6 +459,8 @@ class KisBrokerGatewaySmokeTest {
                     domesticSymbol = setting("KIS_BROKER_SMOKE_DOMESTIC_SYMBOL", "005930"),
                     domesticExchange = setting("KIS_BROKER_SMOKE_DOMESTIC_EXCHANGE", "KRX").uppercase(),
                     domesticCurrency = setting("KIS_BROKER_SMOKE_DOMESTIC_CURRENCY", "KRW").uppercase(),
+                    domesticPrice = setting("KIS_BROKER_SMOKE_DOMESTIC_PRICE", "1").toDouble(),
+                    domesticQuantity = setting("KIS_BROKER_SMOKE_DOMESTIC_QUANTITY", "1").toInt(),
                     price = setting("KIS_BROKER_SMOKE_PRICE", "1").toDouble(),
                     quantity = setting("KIS_BROKER_SMOKE_QUANTITY", "1").toInt(),
                     submitEnabled = setting("KIS_BROKER_SMOKE_SUBMIT_ENABLED", "false").toBooleanStrictOrNull()
