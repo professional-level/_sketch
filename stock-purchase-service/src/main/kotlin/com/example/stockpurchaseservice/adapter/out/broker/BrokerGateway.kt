@@ -156,7 +156,7 @@ internal data class BrokerOrderHistoryItem(
             quantity = cumulativeFilledQuantity.toInt(),
             type = executionType,
             externalOrderId = externalOrderId,
-            externalExecutionId = externalExecutionId ?: "$externalOrderId:${cumulativeFilledQuantity}:$executionType",
+            externalExecutionId = checkNotNull(effectiveExternalExecutionId(executionType)),
             averageExecutionPrice = averageExecutionPrice,
             quantityMode = ExecutionQuantityModeDto.CUMULATIVE,
         )
@@ -180,7 +180,7 @@ internal data class BrokerOrderHistoryItem(
         return BrokerOrderStatusDto(
             status = status,
             externalOrderId = externalOrderId,
-            externalExecutionId = externalExecutionId,
+            externalExecutionId = effectiveExternalExecutionId(),
             reason = statusReason(status),
             checkedAt = checkedAt,
             orderedQuantity = orderedQuantity,
@@ -208,6 +208,17 @@ internal data class BrokerOrderHistoryItem(
             BrokerOrderStatus.SUBMITTED,
             BrokerOrderStatus.UNKNOWN -> null
         }
+    }
+
+    private fun effectiveExternalExecutionId(executionType: ExecutionTypeDto? = null): String? {
+        if (!externalExecutionId.isNullOrBlank()) return externalExecutionId
+        if (cumulativeFilledQuantity <= 0) return null
+        val normalizedExecutionType = executionType ?: when (side) {
+            OrderIntentSide.SELL -> ExecutionTypeDto.SELLING
+            OrderIntentSide.BUY,
+            null -> ExecutionTypeDto.PURCHASE
+        }
+        return "$externalOrderId:${cumulativeFilledQuantity}:$normalizedExecutionType"
     }
 }
 

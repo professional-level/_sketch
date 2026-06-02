@@ -74,7 +74,27 @@ class StockOrderAdapterExecutionIdentityTest {
         assertEquals("OVERSEAS_US:fill-1", status.externalExecutionId)
     }
 
-    private fun historyItem(externalExecutionId: String): BrokerOrderHistoryItem {
+    @Test
+    fun `status lookup qualifies deterministic fallback execution id with market`() {
+        val gateway = FakeBrokerGateway(listOf(historyItem(externalExecutionId = null)))
+        val adapter = DomesticStockOrderAdapter(gateway, isMockOrder = true)
+
+        val status = adapter.findOrderSubmissionStatus(
+            BrokerOrderStatusQuery(
+                orderIntentId = UUID.randomUUID(),
+                internalOrderId = UUID.randomUUID(),
+                externalOrderId = "broker-1",
+                symbol = "005930",
+                side = OrderIntentSide.BUY,
+                market = StockOrderMarket.DOMESTIC,
+            ),
+        )
+
+        assertEquals(BrokerOrderStatus.FILLED, status.status)
+        assertEquals("DOMESTIC:broker-1:1:PURCHASE", status.externalExecutionId)
+    }
+
+    private fun historyItem(externalExecutionId: String?): BrokerOrderHistoryItem {
         return BrokerOrderHistoryItem(
             externalOrderId = "broker-1",
             externalExecutionId = externalExecutionId,

@@ -198,7 +198,11 @@ class RecoverUnknownOrderSubmissionsService(
 
         val executionType = submission.side.toExecutionType()
         val externalExecutionId = status.externalExecutionId
-            ?: "$externalOrderId:$cumulativeFilledQuantity:$executionType"
+            ?: submission.fallbackExternalExecutionId(
+                externalOrderId = externalOrderId,
+                cumulativeFilledQuantity = cumulativeFilledQuantity,
+                executionType = executionType,
+            )
         val fullyFilled = status.status == BrokerOrderStatus.FILLED ||
             cumulativeFilledQuantity >= submission.quantity
         if (fillPort.exists(externalExecutionId)) {
@@ -401,6 +405,16 @@ class RecoverUnknownOrderSubmissionsService(
             ageSeconds = ageSeconds,
             persistent = ageSeconds >= persistentSubmissionUnknownThreshold.seconds,
         )
+    }
+
+    private fun OrderIntentSubmissionDto.fallbackExternalExecutionId(
+        externalOrderId: String,
+        cumulativeFilledQuantity: Long,
+        executionType: ExecutionTypeDto,
+    ): String {
+        val fallback = "$externalOrderId:$cumulativeFilledQuantity:$executionType"
+        val marketPrefix = "${(market ?: symbol.toStockOrderMarket()).name}:"
+        return if (fallback.startsWith(marketPrefix)) fallback else "$marketPrefix$fallback"
     }
 
     private fun deterministicEventId(seed: String): UUID {

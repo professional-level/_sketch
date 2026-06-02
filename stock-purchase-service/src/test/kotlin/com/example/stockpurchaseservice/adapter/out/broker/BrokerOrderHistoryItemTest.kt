@@ -78,6 +78,7 @@ class BrokerOrderHistoryItemTest {
         ).findStatusFor(query(externalOrderId = "broker-1"))
 
         assertEquals(BrokerOrderStatus.FILLED, status.status)
+        assertEquals("broker-1:3:PURCHASE", status.externalExecutionId)
         assertEquals(3L, status.orderedQuantity)
         assertEquals(3L, status.cumulativeFilledQuantity)
         assertEquals(0L, status.remainingQuantity)

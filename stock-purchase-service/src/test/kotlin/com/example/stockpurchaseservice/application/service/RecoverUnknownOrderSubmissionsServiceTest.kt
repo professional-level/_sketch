@@ -26,6 +26,7 @@ import com.example.stockpurchaseservice.application.port.out.PurchaseOrderDto
 import com.example.stockpurchaseservice.application.port.out.ReconciliationFailureAlert
 import com.example.stockpurchaseservice.application.port.out.SellingOrderDto
 import com.example.stockpurchaseservice.application.port.out.StockOrderPort
+import com.example.stockpurchaseservice.application.port.out.StockOrderMarket
 import com.example.stockpurchaseservice.application.port.out.SubmissionUnknownAlert
 import com.example.stockpurchaseservice.application.repository.OrderDto
 import com.example.stockpurchaseservice.application.repository.OrderStateDto
@@ -200,6 +201,38 @@ class RecoverUnknownOrderSubmissionsServiceTest {
         assertEquals(emptyList(), eventPort.rejected)
         assertEquals(emptyList(), eventPort.cancelled)
         assertEquals(emptyList(), eventPort.filled)
+    }
+
+    @Test
+    fun `recovers fill with market qualified fallback execution id when broker omits execution id`() = runBlocking {
+        val submissionPort = FakeOrderIntentSubmissionPort(
+            listOf(submission(market = StockOrderMarket.OVERSEAS_US)),
+        )
+        val eventPort = FakeOrderExecutionEventPort()
+        val executionFillPort = FakeExecutionFillPort()
+        val service = RecoverUnknownOrderSubmissionsService(
+            marketService = FakeMarketServicePort(
+                status = BrokerOrderStatusDto(
+                    status = BrokerOrderStatus.PARTIALLY_FILLED,
+                    externalOrderId = "broker-1",
+                    checkedAt = CHECKED_AT,
+                    orderedQuantity = 3,
+                    cumulativeFilledQuantity = 1,
+                    remainingQuantity = 2,
+                    averageExecutionPrice = 112.5,
+                    brokerReportedAt = BROKER_REPORTED_AT,
+                ),
+            ),
+            orderIntentSubmissionPort = submissionPort,
+            orderExecutionEventPort = eventPort,
+            operationalAlertPort = FakeOperationalAlertPort(),
+            executionFillPort = executionFillPort,
+        )
+
+        service.execute()
+
+        assertEquals("OVERSEAS_US:broker-1:1:PURCHASE", executionFillPort.saved.single().externalExecutionId)
+        assertEquals("broker-1", eventPort.partiallyFilled.single().brokerOrderId)
     }
 
     @Test
@@ -601,6 +634,7 @@ class RecoverUnknownOrderSubmissionsServiceTest {
         side: OrderIntentSide = OrderIntentSide.BUY,
         orderTag: String = "FIRST_BUY",
         branchOrderNumber: String? = null,
+        market: StockOrderMarket? = null,
     ): OrderIntentSubmissionDto {
         return OrderIntentSubmissionDto(
             orderIntentId = ORDER_INTENT_ID,
@@ -608,6 +642,7 @@ class RecoverUnknownOrderSubmissionsServiceTest {
             strategyExecutionId = "laor-v4-strategy:TQQQ",
             symbol = "TQQQ",
             exchange = exchange,
+            market = market,
             side = side,
             orderType = OrderIntentType.LOC,
             submittedPrice = 112.0,
