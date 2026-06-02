@@ -326,6 +326,7 @@ Local sketch profiles currently use Hibernate `ddl-auto=update`, but production-
 
 ```text
 docs/operations/sql/20260602_create_final_price_bating_v1_strategy_execution.mysql.sql
+docs/operations/sql/20260602_create_stock_purchase_reconciliation_tables.mysql.sql
 docs/operations/sql/20260602_add_outbox_trace_columns.mysql.sql
 docs/operations/sql/20260602_add_outbox_next_attempt_at.mysql.sql
 docs/operations/sql/20260602_add_outbox_claim_lease.mysql.sql
@@ -335,7 +336,7 @@ docs/operations/sql/20260602_add_order_intent_submission_trading_environment.mys
 docs/operations/sql/20260602_add_order_intent_submission_market.mysql.sql
 ```
 
-These migrations create `strategy-execution-service` `final_price_bating_v1_strategy_execution` so single-shot final-price strategy starts and fill completion state can survive restarts. They also add nullable `traceId`, `spanId`, `traceParent`, `nextAttemptAt`, `claimOwner`, and `claimExpiresAt` columns to both outbox tables:
+These migrations create `strategy-execution-service` `final_price_bating_v1_strategy_execution` so single-shot final-price strategy starts and fill completion state can survive restarts. They also create `stock-purchase-service` `execution_fill`, `execution_reconciliation_cursor`, and `unmatched_execution` so broker fill deduplication, reconciliation cursor recovery, and unmatched execution operations state survive restarts. They also add nullable `traceId`, `spanId`, `traceParent`, `nextAttemptAt`, `claimOwner`, and `claimExpiresAt` columns to both outbox tables:
 
 - `strategy-execution-service`: `order_intent_outbox_event`
 - `stock-purchase-service`: `order_execution_outbox_event`
@@ -347,7 +348,7 @@ Operational sequence:
 1. Stop outbox publishers or drain traffic so new outbox rows are not being written during the schema change.
 2. Run the preflight query in the SQL file and confirm the target columns do not already exist.
 3. Apply the `CREATE TABLE` and `ALTER TABLE` statements in the migration files.
-4. Run the post-apply verification queries and confirm `final_price_bating_v1_strategy_execution` has its primary key and lifecycle columns, six nullable `VARCHAR(255)` trace columns, two nullable `DATETIME(6)` retry-scheduling columns, two nullable `VARCHAR(255)` claim owner columns, two nullable `DATETIME(6)` claim expiry columns, one nullable `VARCHAR(255)` branch order number column, one nullable `VARCHAR(16)` exchange column, one nullable `VARCHAR(16)` trading environment column, and one nullable `VARCHAR(32)` market column.
+4. Run the post-apply verification queries and confirm `final_price_bating_v1_strategy_execution` has its primary key and lifecycle columns, `execution_fill`/`execution_reconciliation_cursor`/`unmatched_execution` have their primary keys and operations indexes, six nullable `VARCHAR(255)` trace columns, two nullable `DATETIME(6)` retry-scheduling columns, two nullable `VARCHAR(255)` claim owner columns, two nullable `DATETIME(6)` claim expiry columns, one nullable `VARCHAR(255)` branch order number column, one nullable `VARCHAR(16)` exchange column, one nullable `VARCHAR(16)` trading environment column, and one nullable `VARCHAR(32)` market column.
 5. Start `strategy-execution-service` and `stock-purchase-service`.
 
 Outbox publishers use `akra.outbox.publish-retry-initial-delay-ms` and `akra.outbox.publish-retry-max-delay-ms` to calculate exponential backoff after Kafka publish failures. Failed rows are republished only after `nextAttemptAt`, so repeated Kafka outages should not produce tight retry loops. Before publishing, each instance claims rows with `PROCESSING`, `claimOwner`, and `claimExpiresAt`; expired claims are eligible for another instance to reclaim.
