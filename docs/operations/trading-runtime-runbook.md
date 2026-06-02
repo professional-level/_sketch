@@ -156,7 +156,28 @@ akra.observability.operational-alerts.pager-duty.source=stock-purchase-service
 
 Keep real webhook URLs and PagerDuty routing keys outside Git, because many alert platforms embed routing tokens in the URL. The generic webhook payload contains `type`, `severity`, `title`, `occurredAt`, an `attributes` object with alert-specific fields, and a `trace` object when MDC contains `traceId`/`spanId` or `traceparent`. Slack uses an incoming-webhook attachment payload, and PagerDuty uses an Events API v2 `trigger` payload with deterministic dedup keys. Slack fields and PagerDuty `custom_details` also include `traceId`, `spanId`, and `traceparent` when available.
 
-Kafka event boundaries carry the same trace fields through outbox rows and Kafka headers. Before deploying the current schema, add nullable `traceId`, `spanId`, and `traceParent` columns to the strategy-execution and stock-purchase outbox tables. Listener-side MDC restoration lets subsequent logs and operational alerts retain the upstream trace context. Temporal schedule/activity propagation is still a separate hardening task.
+Kafka event boundaries carry the same trace fields through outbox rows and Kafka headers. Listener-side MDC restoration lets subsequent logs and operational alerts retain the upstream trace context. Temporal schedule/activity propagation is still a separate hardening task.
+
+## DB Schema Migration
+
+Local sketch profiles currently use Hibernate `ddl-auto=update`, but production-like environments should not rely on automatic DDL. Before deploying the Kafka trace propagation build, apply:
+
+```text
+docs/operations/sql/20260602_add_outbox_trace_columns.mysql.sql
+```
+
+This adds nullable `traceId`, `spanId`, and `traceParent` columns to both outbox tables:
+
+- `strategy-execution-service`: `order_intent_outbox_event`
+- `stock-purchase-service`: `order_execution_outbox_event`
+
+Operational sequence:
+
+1. Stop outbox publishers or drain traffic so new outbox rows are not being written during the schema change.
+2. Run the preflight query in the SQL file and confirm the target columns do not already exist.
+3. Apply the two `ALTER TABLE` statements.
+4. Run the post-apply verification query and confirm six nullable `VARCHAR(255)` columns.
+5. Start `strategy-execution-service` and `stock-purchase-service`.
 
 `stock-purchase-service` also exposes an operator status endpoint for dashboard polling or manual checks:
 

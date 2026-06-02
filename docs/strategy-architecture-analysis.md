@@ -627,10 +627,10 @@ stock-search-service
 
 ### Kafka Trace Propagation
 
-- `strategy-execution-service` and `stock-purchase-service` now persist `traceId`, `spanId`, and `traceparent` with outbox rows.
-- Outbox Kafka publishers copy the stored trace values into Kafka headers before sending the event.
+- `strategy-execution-service` and `stock-purchase-service` now persist `traceId`, `spanId`, and `traceParent` with outbox rows.
+- Outbox Kafka publishers copy the stored trace values into Kafka `traceId`, `spanId`, and `traceparent` headers before sending the event.
 - Kafka listeners restore those headers into MDC before invoking use cases, so downstream logs and operational alerts can keep the same trace context.
-- Production DB migrations must add the outbox trace columns before deployment.
+- Production DB migrations must add the outbox trace columns before deployment. The current manual MySQL migration is `docs/operations/sql/20260602_add_outbox_trace_columns.mysql.sql`.
 - Temporal schedule/activity trace propagation, OpenTelemetry exporter wiring, and dashboard UI correlation remain production hardening work.
 
 ### Broker Account Snapshot API

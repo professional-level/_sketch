@@ -27,11 +27,11 @@ internal class OrderIntentOutboxEventEntity private constructor(
     @Lob
     @Column(nullable = false)
     val payload: ByteArray,
-    @Column
+    @Column(name = "traceId")
     val traceId: String?,
-    @Column
+    @Column(name = "spanId")
     val spanId: String?,
-    @Column
+    @Column(name = "traceParent")
     val traceParent: String?,
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
