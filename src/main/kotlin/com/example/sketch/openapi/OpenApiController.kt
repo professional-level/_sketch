@@ -356,7 +356,7 @@ internal fun OpenApiResponse.toDailyExecutionOrdersResponse(): DailyExecutionOrd
         msgCd = this@toDailyExecutionOrdersResponse.text("msg_cd", "msgCd", "msgCode", "MSG_CD", "MSG_CODE")
         msg1 = this@toDailyExecutionOrdersResponse.text("msg1", "msg_1", "msg", "message", "MSG1", "MSG")
 
-        this@toDailyExecutionOrdersResponse.elements("output1", "OUTPUT1").forEach { item ->
+        this@toDailyExecutionOrdersResponse.elements("output1", "OUTPUT1", "output", "OUTPUT").forEach { item ->
             output1 += dailyExecutionOrdersOutput1 {
                 ordDt = item.text("ord_dt", "ORD_DT")
                 ordGnoBrno = item.text(
@@ -370,8 +370,13 @@ internal fun OpenApiResponse.toDailyExecutionOrdersResponse(): DailyExecutionOrd
                 orgnOdno = item.text("orgn_odno", "ORGN_ODNO", "orgnOdno")
                 ordDvsnName = item.text("ord_dvsn_name", "ORD_DVSN_NAME")
                 sllBuyDvsnCd = item.text("sll_buy_dvsn_cd", "SLL_BUY_DVSN_CD")
-                sllBuyDvsnCdName = item.text("sll_buy_dvsn_cd_name", "SLL_BUY_DVSN_CD_NAME")
-                pdno = item.text("pdno", "PDNO")
+                sllBuyDvsnCdName = item.text(
+                    "sll_buy_dvsn_cd_name",
+                    "SLL_BUY_DVSN_CD_NAME",
+                    "sll_buy_dvsn_name",
+                    "SLL_BUY_DVSN_NAME",
+                )
+                pdno = item.text("pdno", "PDNO", "prdt_code", "PRDT_CODE")
                 prdtName = item.text("prdt_name", "PRDT_NAME")
                 ordQty = item.text("ord_qty", "ORD_QTY")
                 ordUnpr = item.text("ord_unpr", "ORD_UNPR")

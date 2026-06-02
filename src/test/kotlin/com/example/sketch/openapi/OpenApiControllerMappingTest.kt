@@ -213,13 +213,13 @@ class OpenApiControllerMappingTest {
               "msg_1": "ok",
               "ctxAreaFk100": "FK_CAMEL",
               "ctxAreaNk100": "NK_CAMEL",
-              "OUTPUT1": {
+              "OUTPUT": {
                 "ORD_DT": "20260602",
                 "KRX_FWDG_ORD_ORGNO": "00002",
                 "ORDER_NO": "upper-order",
                 "ORGN_ODNO": "original-order",
-                "SLL_BUY_DVSN_CD": "01",
-                "PDNO": "005930",
+                "SLL_BUY_DVSN_NAME": "SELL",
+                "PRDT_CODE": "005930",
                 "PRDT_NAME": "Samsung Electronics",
                 "ORD_QTY": "3",
                 "THCO_ORD_TMD": "100000",
@@ -241,7 +241,8 @@ class OpenApiControllerMappingTest {
             assertEquals("upper-order", odno)
             assertEquals("original-order", orgnOdno)
             assertEquals("00002", ordGnoBrno)
-            assertEquals("01", sllBuyDvsnCd)
+            assertEquals("SELL", sllBuyDvsnCdName)
+            assertEquals("005930", pdno)
             assertEquals("3", ordQty)
             assertEquals("100000", ordTmd)
             assertEquals("71200.5", avgPrvs)
