@@ -316,6 +316,8 @@ class RecoverUnknownOrderSubmissionsServiceTest {
         assertEquals(emptyList(), eventPort.cancelled)
         assertEquals(ORDER_INTENT_ID, alertPort.submissionUnknown.single().orderIntentId)
         assertEquals("not found yet", alertPort.submissionUnknown.single().reason)
+        assertEquals(259_200L, alertPort.submissionUnknown.single().ageSeconds)
+        assertEquals(true, alertPort.submissionUnknown.single().persistent)
     }
 
     @Test

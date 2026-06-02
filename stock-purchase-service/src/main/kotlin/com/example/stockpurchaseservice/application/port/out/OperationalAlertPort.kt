@@ -38,6 +38,8 @@ data class SubmissionUnknownAlert(
     val reason: String?,
     val submittedAt: ZonedDateTime,
     val checkedAt: ZonedDateTime,
+    val ageSeconds: Long? = null,
+    val persistent: Boolean = false,
 )
 
 data class ReconciliationFailureAlert(

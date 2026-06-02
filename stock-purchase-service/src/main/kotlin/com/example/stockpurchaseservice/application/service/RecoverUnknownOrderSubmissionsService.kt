@@ -23,8 +23,10 @@ import com.example.stockpurchaseservice.application.port.out.SubmissionUnknownAl
 import com.example.stockpurchaseservice.application.port.out.StockOrderPort
 import com.example.stockpurchaseservice.application.port.out.StockOrderMarket
 import com.example.stockpurchaseservice.application.repository.OrderStateDto
+import org.springframework.beans.factory.annotation.Value
 import java.nio.charset.StandardCharsets
 import java.time.Clock
+import java.time.Duration
 import java.time.ZonedDateTime
 import java.util.UUID
 
@@ -36,6 +38,8 @@ class RecoverUnknownOrderSubmissionsService(
     private val operationalAlertPort: OperationalAlertPort,
     private val stockOrderPort: StockOrderPort? = null,
     private val executionFillPort: ExecutionFillPort? = null,
+    @Value("\${akra.operations.trading.persistent-submission-unknown-threshold:15m}")
+    private val persistentSubmissionUnknownThreshold: Duration = Duration.ofMinutes(15),
 ) : RecoverUnknownOrderSubmissionsUseCase {
     internal var clock: Clock = Clock.systemDefaultZone()
 
@@ -366,6 +370,7 @@ class RecoverUnknownOrderSubmissionsService(
     private fun OrderIntentSubmissionDto.toSubmissionUnknownAlert(
         status: BrokerOrderStatusDto,
     ): SubmissionUnknownAlert {
+        val ageSeconds = Duration.between(submittedAt, status.checkedAt).seconds.coerceAtLeast(0)
         return SubmissionUnknownAlert(
             orderIntentId = orderIntentId,
             idempotencyKey = idempotencyKey,
@@ -378,6 +383,8 @@ class RecoverUnknownOrderSubmissionsService(
             reason = status.reason,
             submittedAt = submittedAt,
             checkedAt = status.checkedAt,
+            ageSeconds = ageSeconds,
+            persistent = ageSeconds >= persistentSubmissionUnknownThreshold.seconds,
         )
     }
 

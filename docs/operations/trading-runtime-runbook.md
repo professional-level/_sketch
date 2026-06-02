@@ -305,6 +305,8 @@ Operational alert counters are emitted through Micrometer as `stock.purchase.ope
 - `type`: `order_submission_failed`, `submission_unknown`, `reconciliation_failed`, `unmatched_execution`, `order_cancellation_submission_failed`, or `order_cancellation_submission_unknown`
 - `severity`: `error` or `warning`
 
+`submission_unknown` alerts include `ageSeconds` and `persistent`. Recovery alerts become persistent when the order has stayed unknown longer than `akra.operations.trading.persistent-submission-unknown-threshold`; persistent unknown alerts are emitted with `severity=error`.
+
 Optional outbound alert routes:
 
 ```properties

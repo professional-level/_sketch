@@ -49,11 +49,16 @@ internal class LoggingOperationalAlertAdapter(
     }
 
     override suspend fun alertSubmissionUnknown(alert: SubmissionUnknownAlert) {
+        val severity = if (alert.persistent) "error" else "warning"
         emitAlert(
             OperationalAlertNotification(
                 type = "submission_unknown",
-                severity = "warning",
-                title = "Order submission remains unknown",
+                severity = severity,
+                title = if (alert.persistent) {
+                    "Order submission persistently unknown"
+                } else {
+                    "Order submission remains unknown"
+                },
                 occurredAt = alert.checkedAt,
                 attributes = mapOf(
                     "orderIntentId" to alert.orderIntentId.toString(),
@@ -64,23 +69,49 @@ internal class LoggingOperationalAlertAdapter(
                     "orderTag" to alert.orderTag,
                     "externalOrderId" to alert.externalOrderId,
                     "submittedAt" to alert.submittedAt.toString(),
+                    "ageSeconds" to alert.ageSeconds?.toString(),
+                    "persistent" to alert.persistent.toString(),
                     "reason" to alert.reason,
                 ),
             ),
         )
-        log.warn(
-            "Order submission remains unknown: orderIntentId={} strategyExecutionId={} symbol={} side={} orderType={} orderTag={} externalOrderId={} submittedAt={} checkedAt={} reason={}",
-            alert.orderIntentId,
-            alert.strategyExecutionId,
-            alert.symbol,
-            alert.side,
-            alert.orderType,
-            alert.orderTag,
-            alert.externalOrderId,
-            alert.submittedAt,
-            alert.checkedAt,
-            alert.reason,
-        )
+        val message =
+            "Order submission remains unknown: orderIntentId={} strategyExecutionId={} symbol={} side={} " +
+                "orderType={} orderTag={} externalOrderId={} submittedAt={} checkedAt={} ageSeconds={} " +
+                "persistent={} reason={}"
+        if (alert.persistent) {
+            log.error(
+                message,
+                alert.orderIntentId,
+                alert.strategyExecutionId,
+                alert.symbol,
+                alert.side,
+                alert.orderType,
+                alert.orderTag,
+                alert.externalOrderId,
+                alert.submittedAt,
+                alert.checkedAt,
+                alert.ageSeconds,
+                alert.persistent,
+                alert.reason,
+            )
+        } else {
+            log.warn(
+                message,
+                alert.orderIntentId,
+                alert.strategyExecutionId,
+                alert.symbol,
+                alert.side,
+                alert.orderType,
+                alert.orderTag,
+                alert.externalOrderId,
+                alert.submittedAt,
+                alert.checkedAt,
+                alert.ageSeconds,
+                alert.persistent,
+                alert.reason,
+            )
+        }
     }
 
     override suspend fun alertReconciliationFailed(alert: ReconciliationFailureAlert) {

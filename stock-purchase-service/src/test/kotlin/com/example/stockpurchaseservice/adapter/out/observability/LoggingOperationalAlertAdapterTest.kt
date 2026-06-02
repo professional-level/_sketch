@@ -33,6 +33,24 @@ class LoggingOperationalAlertAdapterTest {
     }
 
     @Test
+    fun `routes persistent submission unknown alerts as errors`() = runBlocking {
+        val meterRegistry = SimpleMeterRegistry()
+        val sink = FakeOperationalAlertNotificationSink()
+        val adapter = LoggingOperationalAlertAdapter(meterRegistry, sink)
+
+        adapter.alertSubmissionUnknown(
+            submissionUnknownAlert(ageSeconds = 1_800, persistent = true),
+        )
+
+        assertEquals(1.0, meterRegistry.alertCount("submission_unknown", "error"))
+        val notification = sink.sent.single()
+        assertEquals("error", notification.severity)
+        assertEquals("Order submission persistently unknown", notification.title)
+        assertEquals("1800", notification.attributes["ageSeconds"])
+        assertEquals("true", notification.attributes["persistent"])
+    }
+
+    @Test
     fun `records reconciliation and cancellation alert counters`() = runBlocking {
         val meterRegistry = SimpleMeterRegistry()
         val sink = FakeOperationalAlertNotificationSink()
@@ -114,7 +132,10 @@ class LoggingOperationalAlertAdapterTest {
         )
     }
 
-    private fun submissionUnknownAlert(): SubmissionUnknownAlert {
+    private fun submissionUnknownAlert(
+        ageSeconds: Long? = null,
+        persistent: Boolean = false,
+    ): SubmissionUnknownAlert {
         return SubmissionUnknownAlert(
             orderIntentId = UUID.randomUUID(),
             idempotencyKey = "submit-unknown",
@@ -127,6 +148,8 @@ class LoggingOperationalAlertAdapterTest {
             reason = "timeout after broker submit",
             submittedAt = ALERT_TIME.minusMinutes(5),
             checkedAt = ALERT_TIME,
+            ageSeconds = ageSeconds,
+            persistent = persistent,
         )
     }
 
