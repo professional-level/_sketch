@@ -865,6 +865,7 @@ private fun DailyExecutionOrdersResponseOuterClass.DailyExecutionOrdersOutput1.t
             rjctRson,
             rjctRsonName,
             rjctRsonCn,
+            rjctRsonCd,
             rjctRsonCdName,
         ),
     )

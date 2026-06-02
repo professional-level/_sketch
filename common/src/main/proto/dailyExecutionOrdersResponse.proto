@@ -42,6 +42,7 @@ message DailyExecutionOrdersOutput1 {
   string rjct_rson_name = 38;
   string rjct_rson_cn = 39;
   string rjct_rson_cd_name = 40;
+  string rjct_rson_cd = 41;
 }
 
 message DailyExecutionOrdersOutput2 {

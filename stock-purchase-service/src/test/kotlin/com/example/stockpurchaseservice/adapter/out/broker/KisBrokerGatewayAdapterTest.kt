@@ -1230,6 +1230,27 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `maps domestic rejection reason code to rejected status`() {
+        val adapter = domesticHistoryAdapter(
+            domesticHistoryResponse(
+                domesticRow(
+                    orderId = "code-rejected-domestic-order",
+                    orderedQuantity = "3",
+                    filledQuantity = "0",
+                    remainingQuantity = "0",
+                    statusName = "Accepted",
+                    rejectionReasonCode = "APBK001",
+                ),
+            ),
+        )
+
+        val status = adapter.findOrderHistory(domesticHistoryQuery()).single().toStatus()
+
+        assertEquals(BrokerOrderStatus.REJECTED, status.status)
+        assertEquals("APBK001", status.reason)
+    }
+
+    @Test
     fun `maps domestic cancel fields to cancelled status`() {
         val adapter = domesticHistoryAdapter(
             domesticHistoryResponse(
@@ -2190,6 +2211,7 @@ class KisBrokerGatewayAdapterTest {
         orderedPrice: String = "",
         statusName: String = "",
         rejectionReason: String = "",
+        rejectionReasonCode: String = "",
     ): DailyExecutionOrdersResponseOuterClass.DailyExecutionOrdersOutput1 {
         return DailyExecutionOrdersResponseOuterClass.DailyExecutionOrdersOutput1.newBuilder()
             .setOrdDt("20260602")
@@ -2209,6 +2231,7 @@ class KisBrokerGatewayAdapterTest {
             .setRjctQty(rejectedQuantity)
             .setPrcsStatName(statusName)
             .setRjctRsonName(rejectionReason)
+            .setRjctRsonCd(rejectionReasonCode)
             .build()
     }
 
