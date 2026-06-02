@@ -65,6 +65,43 @@ class KisSecretPropertyResolverTest {
     }
 
     @Test
+    fun `resolves runtime injected file source property names`() {
+        val properties = mapOf(
+            "KIS_BASE_URL" to "https://openapi.koreainvestment.com:9443",
+            "KIS_APP_KEY_FILE" to "/vault/kis/app-key",
+            "KIS_APP_SECRET_FILE" to "/vault/kis/app-secret",
+            "KIS_MOCK_BASE_URL" to "https://openapivts.koreainvestment.com:29443",
+            "KIS_MOCK_APP_KEY_FILE" to "/vault/kis/mock-app-key",
+            "KIS_MOCK_APP_SECRET_FILE" to "/vault/kis/mock-app-secret",
+            "KIS_MOCK_ACCOUNT_FILE" to "/vault/kis/mock-account",
+            "KIS_MOCK_ACCOUNT_TAIL_FILE" to "/vault/kis/mock-account-tail",
+            "KIS_ACCOUNT_FILE" to "/vault/kis/account",
+            "KIS_ACCOUNT_TAIL_FILE" to "/vault/kis/account-tail",
+        )
+        val secretFiles = mapOf(
+            "/vault/kis/app-key" to "real-app-key\n",
+            "/vault/kis/app-secret" to "real-app-secret\n",
+            "/vault/kis/mock-app-key" to "mock-app-key\n",
+            "/vault/kis/mock-app-secret" to "mock-app-secret\n",
+            "/vault/kis/mock-account" to "00000000\n",
+            "/vault/kis/mock-account-tail" to "01\n",
+            "/vault/kis/account" to "11111111\n",
+            "/vault/kis/account-tail" to "01\n",
+        )
+
+        val resolved = KisSecretPropertyResolver.resolve(properties::get, secretFiles::getValue)
+
+        assertEquals("real-app-key", resolved.appKey)
+        assertEquals("real-app-secret", resolved.appSecret)
+        assertEquals("mock-app-key", resolved.mockAppKey)
+        assertEquals("mock-app-secret", resolved.mockAppSecret)
+        assertEquals("00000000", resolved.mockAccount)
+        assertEquals("01", resolved.mockAccountTail)
+        assertEquals("11111111", resolved.account)
+        assertEquals("01", resolved.accountTail)
+    }
+
+    @Test
     fun `allows real account properties to be omitted`() {
         val properties = mapOf(
             "base_url" to "https://openapi.koreainvestment.com:9443",

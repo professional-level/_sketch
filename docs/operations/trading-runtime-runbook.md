@@ -46,6 +46,17 @@ KIS_ACCOUNT=
 KIS_ACCOUNT_TAIL=
 ```
 
+For Kubernetes/Vault-style mounted secrets, set the matching `_FILE` variable to a file path. The wrapper reads the file content, trims whitespace, and applies the same placeholder validation:
+
+```properties
+KIS_APP_KEY_FILE=/run/secrets/kis/app-key
+KIS_APP_SECRET_FILE=/run/secrets/kis/app-secret
+KIS_MOCK_APP_KEY_FILE=/run/secrets/kis/mock-app-key
+KIS_MOCK_APP_SECRET_FILE=/run/secrets/kis/mock-app-secret
+KIS_ACCOUNT_FILE=/run/secrets/kis/account
+KIS_ACCOUNT_TAIL_FILE=/run/secrets/kis/account-tail
+```
+
 The root KIS wrapper keeps real and mock access tokens in separate in-memory cache scopes. Token cache entries are refreshed before the KIS expiry timestamp, or by `expires_in` when the explicit expiry field is absent.
 
 Token cache knobs:

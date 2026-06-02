@@ -3,6 +3,8 @@ package com.example.sketch.configure
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.PropertySource
 import org.springframework.core.env.Environment
+import java.nio.file.Files
+import java.nio.file.Path
 
 @Configuration
 @PropertySource(value = ["classpath:application-secret.properties"], ignoreResourceNotFound = true)
@@ -56,9 +58,13 @@ data class KisSecretProperties(
 )
 
 object KisSecretPropertyResolver {
-    fun resolve(getProperty: (String) -> String?): KisSecretProperties {
-        val account = getProperty.optional("account", "kis.account", "KIS_ACCOUNT")
-        val accountTail = getProperty.optional(
+    fun resolve(
+        getProperty: (String) -> String?,
+        readSecretFile: (String) -> String = { filePath -> Files.readString(Path.of(filePath)) },
+    ): KisSecretProperties {
+        val source = SecretSource(getProperty, readSecretFile)
+        val account = source.optional("account", "kis.account", "KIS_ACCOUNT")
+        val accountTail = source.optional(
             "account_tail",
             "kis.account-tail",
             "kis.account.tail",
@@ -67,33 +73,33 @@ object KisSecretPropertyResolver {
         validateRealAccountPair(account, accountTail)
 
         return KisSecretProperties(
-            baseUrl = getProperty.required("base_url", "kis.base-url", "kis.base.url", "KIS_BASE_URL"),
-            appKey = getProperty.required("app_key", "kis.app-key", "kis.app.key", "KIS_APP_KEY"),
-            appSecret = getProperty.required("app_secret", "kis.app-secret", "kis.app.secret", "KIS_APP_SECRET"),
-            mockBaseUrl = getProperty.required(
+            baseUrl = source.required("base_url", "kis.base-url", "kis.base.url", "KIS_BASE_URL"),
+            appKey = source.required("app_key", "kis.app-key", "kis.app.key", "KIS_APP_KEY"),
+            appSecret = source.required("app_secret", "kis.app-secret", "kis.app.secret", "KIS_APP_SECRET"),
+            mockBaseUrl = source.required(
                 "mock_base_url",
                 "kis.mock.base-url",
                 "kis.mock.base.url",
                 "KIS_MOCK_BASE_URL",
             ),
-            mockAppKey = getProperty.required(
+            mockAppKey = source.required(
                 "mock_app_key",
                 "kis.mock.app-key",
                 "kis.mock.app.key",
                 "KIS_MOCK_APP_KEY",
             ),
-            mockAppSecret = getProperty.required(
+            mockAppSecret = source.required(
                 "mock_app_secret",
                 "kis.mock.app-secret",
                 "kis.mock.app.secret",
                 "KIS_MOCK_APP_SECRET",
             ),
-            mockAccount = getProperty.required(
+            mockAccount = source.required(
                 "mock_account",
                 "kis.mock.account",
                 "KIS_MOCK_ACCOUNT",
             ),
-            mockAccountTail = getProperty.required(
+            mockAccountTail = source.required(
                 "mock_account_tail",
                 "kis.mock.account-tail",
                 "kis.mock.account.tail",
@@ -104,22 +110,43 @@ object KisSecretPropertyResolver {
         )
     }
 
-    private fun ((String) -> String?).required(vararg keys: String): String {
-        val configured = keys.firstNotNullOfOrNull { key ->
-            this(key).configuredOrNull()
+    private class SecretSource(
+        private val getProperty: (String) -> String?,
+        private val readSecretFile: (String) -> String,
+    ) {
+        fun required(vararg keys: String): String {
+            val configured = resolveValue(*keys)
+            require(!configured.isNullOrBlank()) {
+                "Missing required KIS secret property. Provide one of: ${keys.joinToString()}"
+            }
+            require(!configured.isPlaceholderSecret()) {
+                "KIS secret property is still a placeholder. Provide a real value for one of: ${keys.joinToString()}"
+            }
+            return configured
         }
-        require(!configured.isNullOrBlank()) {
-            "Missing required KIS secret property. Provide one of: ${keys.joinToString()}"
-        }
-        require(!configured.isPlaceholderSecret()) {
-            "KIS secret property is still a placeholder. Provide a real value for one of: ${keys.joinToString()}"
-        }
-        return configured
-    }
 
-    private fun ((String) -> String?).optional(vararg keys: String): String? {
-        return keys.firstNotNullOfOrNull { key ->
-            this(key).configuredOrNull()
+        fun optional(vararg keys: String): String? {
+            return resolveValue(*keys)
+        }
+
+        private fun resolveValue(vararg keys: String): String? {
+            keys.firstNotNullOfOrNull { key ->
+                getProperty(key).configuredOrNull()
+            }?.let { return it }
+
+            return keys.firstNotNullOfOrNull { key ->
+                fileAliases(key).firstNotNullOfOrNull { fileKey ->
+                    getProperty(fileKey).configuredOrNull()
+                }?.let { filePath -> readSecretFile(filePath).configuredOrNull() }
+            }
+        }
+
+        private fun fileAliases(key: String): List<String> {
+            return if (key.all { it.isUpperCase() || it == '_' }) {
+                listOf("${key}_FILE")
+            } else {
+                listOf("${key}_file", "$key.file", "$key-file")
+            }
         }
     }
 
