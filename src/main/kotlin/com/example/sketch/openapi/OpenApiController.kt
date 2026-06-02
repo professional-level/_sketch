@@ -26,7 +26,6 @@ import com.fasterxml.jackson.databind.JsonNode
 import dailyExecutionOrdersOutput1
 import dailyExecutionOrdersOutput2
 import dailyExecutionOrdersResponse
-import org.springframework.http.HttpStatus
 import org.springframework.http.server.reactive.ServerHttpResponse
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.ModelAttribute
@@ -151,7 +150,6 @@ class OpenApiController(
     @PostMapping(POST_STOCK_ORDER)
     suspend fun postStockOrder(
         @RequestBody request: StockOrderRequest,
-        response: ServerHttpResponse,
     ): ApiResponse.StockOrder {
         /**
          국내주식주문(현금) API 입니다.
@@ -163,38 +161,21 @@ class OpenApiController(
          (EX. "CANO" : "12345678", "ACNT_PRDT_CD": "01",...)
          종목코드 마스터파일 파이썬 정제코드는 한국투자증권 Github 참고 부탁드립니다.
          **/
-        return service.postStockOrder(request = request).toPostStockOrderResponse().apply {
-            response.statusCode = when (rtCd == "0") {
-                true -> HttpStatus.OK
-                false -> HttpStatus.INTERNAL_SERVER_ERROR
-            }
-        }
+        return service.postStockOrder(request = request).toPostStockOrderResponse()
     }
 
     @PostMapping(POST_OVERSEAS_STOCK_ORDER)
     suspend fun postOverseasStockOrder(
         @RequestBody request: OverseasStockOrderRequest,
-        response: ServerHttpResponse,
     ): ApiResponse.StockOrder {
-        val result = service.postOverseasStockOrder(request).toPostStockOrderResponse()
-        response.statusCode = when (result.rtCd == "0") {
-            true -> HttpStatus.OK
-            false -> HttpStatus.INTERNAL_SERVER_ERROR
-        }
-        return result
+        return service.postOverseasStockOrder(request).toPostStockOrderResponse()
     }
 
     @PostMapping(POST_STOCK_ORDER_CANCEL)
     suspend fun postStockOrderCancel(
         @RequestBody request: StockOrderCancelRequest,
-        response: ServerHttpResponse,
     ): ApiResponse.StockOrder {
-        val result = service.postStockOrderCancel(request).toPostStockOrderResponse()
-        response.statusCode = when (result.rtCd == "0") {
-            true -> HttpStatus.OK
-            false -> HttpStatus.INTERNAL_SERVER_ERROR
-        }
-        return result
+        return service.postStockOrderCancel(request).toPostStockOrderResponse()
     }
 
     @GetMapping(GET_STOCK_ORDER_CANCELABLE)
@@ -207,14 +188,8 @@ class OpenApiController(
     @PostMapping(POST_OVERSEAS_STOCK_ORDER_CANCEL)
     suspend fun postOverseasStockOrderCancel(
         @RequestBody request: OverseasStockOrderCancelRequest,
-        response: ServerHttpResponse,
     ): ApiResponse.StockOrder {
-        val result = service.postOverseasStockOrderCancel(request).toPostStockOrderResponse()
-        response.statusCode = when (result.rtCd == "0") {
-            true -> HttpStatus.OK
-            false -> HttpStatus.INTERNAL_SERVER_ERROR
-        }
-        return result
+        return service.postOverseasStockOrderCancel(request).toPostStockOrderResponse()
     }
 
     @GetMapping(GET_EXECUTION_ORDERS)

@@ -114,6 +114,8 @@ $env:KIS_BROKER_SMOKE_HISTORY_POLL_SECONDS='5'
 
 Run the submit/cancel smoke only during a KIS mock overseas order window. Use a small quantity and a deliberately low buy limit price so the mock order is likely to remain cancelable. If KIS rejects the order, fills it immediately, or does not expose it in history within the polling window, treat the smoke as failed and inspect the wrapper logs plus KIS response payload before retrying.
 
+The root KIS wrapper must preserve KIS order and cancel business responses as a successful HTTP response body, even when `rt_cd != 0`. `stock-purchase-service` classifies that body as `BrokerOrderRejectedException`. A wrapper HTTP 5xx during submit remains a submission-unknown candidate because the broker order id may not be known.
+
 Use `--no-daemon` so the test JVM sees the current smoke-test environment variables, and use `--rerun-tasks` so Gradle does not report a stale up-to-date result.
 
 ## Startup Safety Checks
