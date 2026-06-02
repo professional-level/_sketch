@@ -370,6 +370,33 @@ class ReconcileExecutionsServiceTest {
     }
 
     @Test
+    fun `broker execution lookup uses configured rolling backfill days`() = runBlocking {
+        val previousExecutionAt = ZonedDateTime.parse("2026-06-01T09:00:00+09:00")
+        val marketPort = FakeMarketServicePort()
+        val service = service(
+            marketPort = marketPort,
+            executionFillPort = FakeExecutionFillPort(),
+            submissionPort = FakeOrderIntentSubmissionPort(submissions = emptyList()),
+            eventPort = FakeOrderExecutionEventPort(),
+            reconciliationStatePort = FakeExecutionReconciliationStatePort(
+                cursor = ExecutionReconciliationCursorDto(
+                    source = "BROKER_EXECUTION_DAILY",
+                    lastObservedExecutionId = "exec-prev",
+                    lastObservedExecutionAt = previousExecutionAt,
+                ),
+            ),
+            reconciliationBackfillDays = 2,
+        )
+
+        service.execute()
+
+        with(marketPort.lookupQueries.single()) {
+            assertEquals(previousExecutionAt.minusDays(2), from)
+            assertTrue(to >= previousExecutionAt)
+        }
+    }
+
+    @Test
     fun `broker execution lookup backfills seven days when cursor is empty`() = runBlocking {
         val marketPort = FakeMarketServicePort()
         val service = service(
@@ -547,6 +574,7 @@ class ReconcileExecutionsServiceTest {
         eventPort: OrderExecutionEventPort,
         reconciliationStatePort: ExecutionReconciliationStatePort = FakeExecutionReconciliationStatePort(),
         operationalAlertPort: OperationalAlertPort = FakeOperationalAlertPort(),
+        reconciliationBackfillDays: Long = 7,
     ): ReconcileExecutionsService {
         return ReconcileExecutionsService(
             stockOrderRepository = stockOrderRepository,
@@ -557,6 +585,7 @@ class ReconcileExecutionsServiceTest {
             orderExecutionEventPort = eventPort,
             executionReconciliationStatePort = reconciliationStatePort,
             operationalAlertPort = operationalAlertPort,
+            reconciliationBackfillDays = reconciliationBackfillDays,
         )
     }
 

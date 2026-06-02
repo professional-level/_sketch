@@ -42,6 +42,7 @@ import com.example.stockpurchaseservice.domain.Stock
 import com.example.stockpurchaseservice.domain.StockId
 import com.example.stockpurchaseservice.domain.StrategyType
 import com.example.stockpurchaseservice.domain.repository.StockOrderRepository
+import org.springframework.beans.factory.annotation.Value
 import java.nio.charset.StandardCharsets
 import java.time.ZonedDateTime
 import java.util.UUID
@@ -79,6 +80,8 @@ class ReconcileExecutionsService(
     private val orderExecutionEventPort: OrderExecutionEventPort,
     private val executionReconciliationStatePort: ExecutionReconciliationStatePort,
     private val operationalAlertPort: OperationalAlertPort,
+    @Value("\${akra.order.execution-reconciliation.backfill-days:7}")
+    private val reconciliationBackfillDays: Long = DEFAULT_RECONCILIATION_BACKFILL_DAYS,
 ) : ReconcileExecutionsUseCase {
 
     override suspend fun execute() {
@@ -111,7 +114,9 @@ class ReconcileExecutionsService(
         startedAt: ZonedDateTime,
         previousCursor: ExecutionReconciliationCursorDto?,
     ) {
-        val brokerExecutionList = marketService.findExecutionList(previousCursor.toLookupQuery(startedAt))
+        val brokerExecutionList = marketService.findExecutionList(
+            previousCursor.toLookupQuery(startedAt, reconciliationBackfillDays),
+        )
         val executedStockList = mutableListOf<ExecutedStock>()
         val refinedExecutedStockList = mutableListOf<ExecutedStock>()
         var unmatchedExecutionCount = 0
@@ -299,10 +304,14 @@ class ReconcileExecutionsService(
 
 private const val DEFAULT_RECONCILIATION_BACKFILL_DAYS = 7L
 
-private fun ExecutionReconciliationCursorDto?.toLookupQuery(startedAt: ZonedDateTime): ExecutionLookupQuery {
+private fun ExecutionReconciliationCursorDto?.toLookupQuery(
+    startedAt: ZonedDateTime,
+    backfillDays: Long,
+): ExecutionLookupQuery {
+    val normalizedBackfillDays = backfillDays.coerceAtLeast(0)
     val from = this?.lastObservedExecutionAt
-        ?.minusDays(DEFAULT_RECONCILIATION_BACKFILL_DAYS)
-        ?: startedAt.minusDays(DEFAULT_RECONCILIATION_BACKFILL_DAYS)
+        ?.minusDays(normalizedBackfillDays)
+        ?: startedAt.minusDays(normalizedBackfillDays)
     return ExecutionLookupQuery(from = from, to = startedAt)
 }
 

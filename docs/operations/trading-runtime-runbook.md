@@ -228,6 +228,7 @@ akra.order-intent.strategy-trading-environments[laor-v4-paper]=MOCK
 akra.order.overseas.default-exchange=NASD
 akra.order.status-lookup.backfill-days=1
 akra.order.status-lookup.forward-days=1
+akra.order.execution-reconciliation.backfill-days=7
 akra.order.risk.max-order-notional=1000
 akra.order.risk.max-account-pending-buy-notional=5000
 akra.order.risk.max-account-exposure-notional=20000
@@ -455,6 +456,6 @@ Manual recovery checks:
 
 - Re-run reconciliation from the durable cursor if broker executions may have been missed.
 - When `SUBMISSION_UNKNOWN` or `CANCEL_PENDING` rows recover to broker fill statuses, verify both `order_execution_outbox_event` and `execution_fill` before manually adjusting strategy state.
-- Keep `akra.order.status-lookup.backfill-days` and `akra.order.status-lookup.forward-days` aligned with KIS order-history retention and the operational delay expected before unknown/cancel-pending recovery runs.
+- Keep `akra.order.status-lookup.backfill-days`, `akra.order.status-lookup.forward-days`, and `akra.order.execution-reconciliation.backfill-days` aligned with KIS order-history retention and the operational delay expected before unknown/cancel-pending recovery or broker execution reconciliation runs.
 - Inspect unmatched executions before manually adjusting strategy state.
 - Do not clear outbox, processed-event, order submission, reconciliation cursor, fill, or unmatched-execution records unless the replay and duplicate impact is understood.
