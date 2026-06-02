@@ -1533,6 +1533,57 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `uses domestic order org number when branch order number is all zero placeholder`() {
+        val adapter = domesticHistoryAdapter(
+            domesticHistoryResponse(
+                DailyExecutionOrdersResponseOuterClass.DailyExecutionOrdersOutput1.newBuilder()
+                    .setOrdDt("20260602")
+                    .setOrdGnoBrno("0000000000")
+                    .setOrdOrgno("00007")
+                    .setOdno("domestic-zero-branch")
+                    .setSllBuyDvsnCd("02")
+                    .setPdno("005930")
+                    .setPrdtName("Samsung Electronics")
+                    .setOrdQty("3")
+                    .setOrdTmd("093000")
+                    .setTotCcldQty("0")
+                    .setRmnQty("3")
+                    .build(),
+            ),
+        )
+
+        val item = adapter.findOrderHistory(domesticHistoryQuery()).single()
+
+        assertEquals("00007", item.branchOrderNumber)
+        assertEquals(BrokerOrderStatus.SUBMITTED, item.toStatus().status)
+    }
+
+    @Test
+    fun `ignores domestic all zero branch order number placeholder`() {
+        val adapter = domesticHistoryAdapter(
+            domesticHistoryResponse(
+                DailyExecutionOrdersResponseOuterClass.DailyExecutionOrdersOutput1.newBuilder()
+                    .setOrdDt("20260602")
+                    .setOrdGnoBrno("0000000000")
+                    .setOdno("domestic-zero-branch")
+                    .setSllBuyDvsnCd("02")
+                    .setPdno("005930")
+                    .setPrdtName("Samsung Electronics")
+                    .setOrdQty("3")
+                    .setOrdTmd("093000")
+                    .setTotCcldQty("0")
+                    .setRmnQty("3")
+                    .build(),
+            ),
+        )
+
+        val item = adapter.findOrderHistory(domesticHistoryQuery()).single()
+
+        assertEquals(null, item.branchOrderNumber)
+        assertEquals(BrokerOrderStatus.SUBMITTED, item.toStatus().status)
+    }
+
+    @Test
     fun `ignores domestic all zero original order id placeholder`() {
         val adapter = domesticHistoryAdapter(
             domesticHistoryResponse(
@@ -2653,6 +2704,46 @@ class KisBrokerGatewayAdapterTest {
 
         assertEquals("domestic-order-1", submission.externalOrderId)
         assertEquals("00001", submission.branchOrderNumber)
+    }
+
+    @Test
+    fun `ignores all zero submitted stock order branch order number`() {
+        val exchangeFunction = ResponseExchangeFunction(
+            responses = listOf(
+                protobufResponse(
+                    ApiResponse.StockOrder.newBuilder()
+                        .setRtCd("0")
+                        .setOutput(
+                            ApiResponse.Output.newBuilder()
+                                .setKRXFWDGORDORGNO("0000000000")
+                                .setODNO("domestic-order-zero-branch")
+                                .build(),
+                        )
+                        .build(),
+                ),
+            ),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        val submission = adapter.submitOrder(
+            BrokerOrderCommand(
+                internalOrderId = UUID.randomUUID(),
+                market = StockOrderMarket.DOMESTIC,
+                side = OrderIntentSide.BUY,
+                symbol = "005930",
+                orderType = StockOrderType.LIMIT,
+                price = 70_000.0,
+                quantity = 1,
+                isMock = false,
+            ),
+        )
+
+        assertEquals("domestic-order-zero-branch", submission.externalOrderId)
+        assertEquals(null, submission.branchOrderNumber)
     }
 
     @Test

@@ -582,7 +582,7 @@ private fun JsonNode.toKisCancelableOrderItem(): BrokerCancelableOrderItem? {
             "ord_orgno",
             "ORD_ORGNO",
             "ordOrgno",
-        ),
+        ).toBrokerBranchOrderNumberOrNull(),
         orderId = orderId,
         originalOrderId = originalOrderId,
         symbol = textOrNull(
@@ -901,8 +901,8 @@ private fun DailyExecutionOrdersResponseOuterClass.DailyExecutionOrdersOutput1.t
         externalOrderId = orderId,
         externalExecutionId = ccldNo.toBrokerExecutionIdOrNull(),
         originalOrderId = orgnOdno.toBrokerOrderIdOrNull(),
-        branchOrderNumber = ordGnoBrno.takeIf { it.isNotBlank() }
-            ?: ordOrgno.takeIf { it.isNotBlank() },
+        branchOrderNumber = ordGnoBrno.toBrokerBranchOrderNumberOrNull()
+            ?: ordOrgno.toBrokerBranchOrderNumberOrNull(),
         symbol = pdno.trim(),
         stockName = prdtName.trim(),
         orderedAt = parseKisOrderDateTime(ordDt, ordTmd),
@@ -1082,7 +1082,7 @@ private fun JsonNode.toBrokerHistoryItem(): BrokerOrderHistoryItem? {
             "ord_orgno",
             "ORD_ORGNO",
             "ordOrgno",
-        ),
+        ).toBrokerBranchOrderNumberOrNull(),
         symbol = textOrNull("pdno", "PDNO", "ovrs_pdno", "ovrsPdno", "OVRS_PDNO").orEmpty(),
         stockName = textOrNull(
             "prdt_name",
@@ -1176,6 +1176,10 @@ private fun String?.toBrokerExecutionIdOrNull(): String? {
     return toBrokerOrderIdOrNull()
 }
 
+private fun String?.toBrokerBranchOrderNumberOrNull(): String? {
+    return toBrokerOrderIdOrNull()
+}
+
 private fun joinedText(vararg values: String?): String? {
     return values
         .mapNotNull { it?.trim()?.takeIf(String::isNotBlank) }
@@ -1261,7 +1265,7 @@ private fun WebClient.submitStockOrder(
         )
     return BrokerOrderSubmissionDto(
         externalOrderId = externalOrderId,
-        branchOrderNumber = order.output.getKRXFWDGORDORGNO().takeIf { it.isNotBlank() },
+        branchOrderNumber = order.output.getKRXFWDGORDORGNO().toBrokerBranchOrderNumberOrNull(),
     )
 }
 
