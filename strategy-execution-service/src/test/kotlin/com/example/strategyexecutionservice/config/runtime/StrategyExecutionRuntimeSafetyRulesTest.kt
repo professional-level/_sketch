@@ -134,6 +134,36 @@ class StrategyExecutionRuntimeSafetyRulesTest {
     }
 
     @Test
+    fun `blocks application secret property source in production profile`() {
+        val violations = StrategyExecutionRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                temporalTarget = "temporal.example.com:7233",
+                marketDataBaseUrl = "https://broker-wrapper.example.com",
+                applicationSecretPropertySources = listOf("class path resource [application-secret.properties]"),
+            ),
+        )
+
+        assertEquals(1, violations.size)
+        assertTrue(violations.single().contains("application-secret.properties"))
+    }
+
+    @Test
+    fun `allows explicitly waived application secret property source in production profile`() {
+        val violations = StrategyExecutionRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                temporalTarget = "temporal.example.com:7233",
+                marketDataBaseUrl = "https://broker-wrapper.example.com",
+                applicationSecretPropertySources = listOf("class path resource [application-secret.properties]"),
+                allowApplicationSecretPropertySourceInProduction = true,
+            ),
+        )
+
+        assertTrue(violations.isEmpty())
+    }
+
+    @Test
     fun `blocks non live default order intent environment in production profile`() {
         val violations = StrategyExecutionRuntimeSafetyRules.validate(
             input(
@@ -297,10 +327,12 @@ class StrategyExecutionRuntimeSafetyRulesTest {
         usTradingCalendarEarlyCloseDays: List<String> = emptyList(),
         usTradingCalendarEarlyCloseTime: String? = null,
         usTradingCalendarEarlyCloseTimes: Map<String, String> = emptyMap(),
+        applicationSecretPropertySources: List<String> = emptyList(),
         allowLocalTemporalTargetInProduction: Boolean = false,
         allowLocalMarketDataEndpointInProduction: Boolean = false,
         allowMockOrderIntentInProduction: Boolean = false,
         allowDisabledTradingCalendarInProduction: Boolean = false,
+        allowApplicationSecretPropertySourceInProduction: Boolean = false,
     ) = StrategyExecutionRuntimeSafetyRules.Input(
         activeProfiles = activeProfiles,
         enabled = true,
@@ -319,9 +351,11 @@ class StrategyExecutionRuntimeSafetyRulesTest {
         usTradingCalendarEarlyCloseDays = usTradingCalendarEarlyCloseDays,
         usTradingCalendarEarlyCloseTime = usTradingCalendarEarlyCloseTime,
         usTradingCalendarEarlyCloseTimes = usTradingCalendarEarlyCloseTimes,
+        applicationSecretPropertySources = applicationSecretPropertySources,
         allowLocalTemporalTargetInProduction = allowLocalTemporalTargetInProduction,
         allowLocalMarketDataEndpointInProduction = allowLocalMarketDataEndpointInProduction,
         allowMockOrderIntentInProduction = allowMockOrderIntentInProduction,
         allowDisabledTradingCalendarInProduction = allowDisabledTradingCalendarInProduction,
+        allowApplicationSecretPropertySourceInProduction = allowApplicationSecretPropertySourceInProduction,
     )
 }

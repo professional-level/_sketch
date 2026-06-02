@@ -8,6 +8,7 @@ import java.time.ZoneId
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.ApplicationArguments
 import org.springframework.boot.ApplicationRunner
+import org.springframework.core.env.ConfigurableEnvironment
 import org.springframework.core.env.Environment
 import org.springframework.stereotype.Component
 
@@ -52,6 +53,7 @@ class StockPurchaseRuntimeSafetyValidator(
                 overseasUsCurrency = orderRiskProperties.currencyConversion.overseasUsCurrency,
                 staticRatesToBase = orderRiskProperties.currencyConversion.ratesToBase,
                 httpFxRateBaseUrl = orderRiskProperties.currencyConversion.http.baseUrl,
+                applicationSecretPropertySources = environment.applicationSecretPropertySourceNames(),
                 tradingHoursWindows = listOf(
                     orderRiskProperties.tradingHours.domestic.toRuntimeSafetyInput("DOMESTIC"),
                     orderRiskProperties.tradingHours.overseasUs.toRuntimeSafetyInput("OVERSEAS_US"),
@@ -62,6 +64,8 @@ class StockPurchaseRuntimeSafetyValidator(
                 allowLocalBrokerEndpointInProduction = properties.allowLocalBrokerEndpointInProduction,
                 allowMockTradingInProduction = properties.allowMockTradingInProduction,
                 allowDisabledRiskControlsInProduction = properties.allowDisabledRiskControlsInProduction,
+                allowApplicationSecretPropertySourceInProduction =
+                    properties.allowApplicationSecretPropertySourceInProduction,
             ),
         )
 
@@ -74,6 +78,16 @@ class StockPurchaseRuntimeSafetyValidator(
                 ),
             )
         }
+    }
+
+    private fun Environment.applicationSecretPropertySourceNames(): List<String> {
+        return (this as? ConfigurableEnvironment)
+            ?.propertySources
+            ?.asSequence()
+            ?.map { it.name }
+            ?.filter { it.contains("application-secret.properties", ignoreCase = true) }
+            ?.toList()
+            ?: emptyList()
     }
 
     private fun OrderRiskProperties.MarketTradingHours.toRuntimeSafetyInput(
@@ -136,11 +150,13 @@ object StockPurchaseRuntimeSafetyRules {
         val overseasUsCurrency: String,
         val staticRatesToBase: Map<String, Double>,
         val httpFxRateBaseUrl: String,
+        val applicationSecretPropertySources: List<String>,
         val tradingHoursWindows: List<TradingHoursWindowInput>,
         val kisWrapperFxPairKeysWithSymbol: Collection<String>,
         val allowLocalBrokerEndpointInProduction: Boolean,
         val allowMockTradingInProduction: Boolean,
         val allowDisabledRiskControlsInProduction: Boolean,
+        val allowApplicationSecretPropertySourceInProduction: Boolean,
     )
 
     fun validate(input: Input): List<String> {
@@ -166,6 +182,15 @@ object StockPurchaseRuntimeSafetyRules {
         if (!isSafeHibernateDdlAuto(input.hibernateDdlAuto)) {
             violations += "prod/live profile cannot use Hibernate automatic DDL " +
                 "(spring.jpa.hibernate.ddl-auto=${input.hibernateDdlAuto}); apply migrations explicitly and use none or validate"
+        }
+
+        if (
+            input.applicationSecretPropertySources.isNotEmpty() &&
+            !input.allowApplicationSecretPropertySourceInProduction
+        ) {
+            violations += "prod/live profile cannot load local application-secret.properties property sources " +
+                "(${input.applicationSecretPropertySources.joinToString()}); provide secrets through environment " +
+                "variables, *_FILE secret mounts, or a managed secret source"
         }
 
         if (!input.allowDisabledRiskControlsInProduction) {

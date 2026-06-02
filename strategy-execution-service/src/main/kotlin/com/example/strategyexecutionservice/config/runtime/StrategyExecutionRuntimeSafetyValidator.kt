@@ -7,6 +7,7 @@ import java.time.ZoneId
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.ApplicationArguments
 import org.springframework.boot.ApplicationRunner
+import org.springframework.core.env.ConfigurableEnvironment
 import org.springframework.core.env.Environment
 import org.springframework.stereotype.Component
 
@@ -46,10 +47,13 @@ class StrategyExecutionRuntimeSafetyValidator(
                 usTradingCalendarEarlyCloseDays = usCalendar.earlyCloseDays,
                 usTradingCalendarEarlyCloseTime = usCalendar.earlyCloseTime,
                 usTradingCalendarEarlyCloseTimes = usCalendar.earlyCloseTimes.toMap(),
+                applicationSecretPropertySources = environment.applicationSecretPropertySourceNames(),
                 allowLocalTemporalTargetInProduction = properties.allowLocalTemporalTargetInProduction,
                 allowLocalMarketDataEndpointInProduction = properties.allowLocalMarketDataEndpointInProduction,
                 allowMockOrderIntentInProduction = properties.allowMockOrderIntentInProduction,
                 allowDisabledTradingCalendarInProduction = properties.allowDisabledTradingCalendarInProduction,
+                allowApplicationSecretPropertySourceInProduction =
+                    properties.allowApplicationSecretPropertySourceInProduction,
             ),
         )
 
@@ -62,6 +66,16 @@ class StrategyExecutionRuntimeSafetyValidator(
                 ),
             )
         }
+    }
+
+    private fun Environment.applicationSecretPropertySourceNames(): List<String> {
+        return (this as? ConfigurableEnvironment)
+            ?.propertySources
+            ?.asSequence()
+            ?.map { it.name }
+            ?.filter { it.contains("application-secret.properties", ignoreCase = true) }
+            ?.toList()
+            ?: emptyList()
     }
 }
 
@@ -84,10 +98,12 @@ object StrategyExecutionRuntimeSafetyRules {
         val usTradingCalendarEarlyCloseDays: List<String>,
         val usTradingCalendarEarlyCloseTime: String?,
         val usTradingCalendarEarlyCloseTimes: Map<String, String>,
+        val applicationSecretPropertySources: List<String>,
         val allowLocalTemporalTargetInProduction: Boolean,
         val allowLocalMarketDataEndpointInProduction: Boolean,
         val allowMockOrderIntentInProduction: Boolean,
         val allowDisabledTradingCalendarInProduction: Boolean,
+        val allowApplicationSecretPropertySourceInProduction: Boolean,
     )
 
     fun validate(input: Input): List<String> {
@@ -121,6 +137,15 @@ object StrategyExecutionRuntimeSafetyRules {
         if (!isSafeHibernateDdlAuto(input.hibernateDdlAuto)) {
             violations += "prod/live profile cannot use Hibernate automatic DDL " +
                 "(spring.jpa.hibernate.ddl-auto=${input.hibernateDdlAuto}); apply migrations explicitly and use none or validate"
+        }
+
+        if (
+            input.applicationSecretPropertySources.isNotEmpty() &&
+            !input.allowApplicationSecretPropertySourceInProduction
+        ) {
+            violations += "prod/live profile cannot load local application-secret.properties property sources " +
+                "(${input.applicationSecretPropertySources.joinToString()}); provide secrets through environment " +
+                "variables, *_FILE secret mounts, or a managed secret source"
         }
 
         if (

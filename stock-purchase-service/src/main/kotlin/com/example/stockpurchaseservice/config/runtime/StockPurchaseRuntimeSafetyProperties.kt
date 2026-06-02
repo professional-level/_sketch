@@ -9,4 +9,5 @@ class StockPurchaseRuntimeSafetyProperties {
     var allowLocalBrokerEndpointInProduction: Boolean = false
     var allowMockTradingInProduction: Boolean = false
     var allowDisabledRiskControlsInProduction: Boolean = false
+    var allowApplicationSecretPropertySourceInProduction: Boolean = false
 }

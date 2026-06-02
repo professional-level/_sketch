@@ -113,6 +113,38 @@ class StockPurchaseRuntimeSafetyRulesTest {
     }
 
     @Test
+    fun `blocks application secret property source in production profile`() {
+        val violations = StockPurchaseRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                brokerBaseUrl = "https://broker-wrapper.example.com",
+                domesticMockOrder = false,
+                overseasMockOrder = false,
+                applicationSecretPropertySources = listOf("class path resource [application-secret.properties]"),
+            ),
+        )
+
+        assertEquals(1, violations.size)
+        assertTrue(violations.single().contains("application-secret.properties"))
+    }
+
+    @Test
+    fun `allows explicitly waived application secret property source in production profile`() {
+        val violations = StockPurchaseRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                brokerBaseUrl = "https://broker-wrapper.example.com",
+                domesticMockOrder = false,
+                overseasMockOrder = false,
+                applicationSecretPropertySources = listOf("class path resource [application-secret.properties]"),
+                allowApplicationSecretPropertySourceInProduction = true,
+            ),
+        )
+
+        assertTrue(violations.isEmpty())
+    }
+
+    @Test
     fun `blocks disabled order risk controls in production profile`() {
         val violations = StockPurchaseRuntimeSafetyRules.validate(
             input(
@@ -441,6 +473,7 @@ class StockPurchaseRuntimeSafetyRulesTest {
         overseasUsCurrency: String = "USD",
         staticRatesToBase: Map<String, Double> = mapOf("KRW" to 0.001),
         httpFxRateBaseUrl: String = "https://fx.example.com",
+        applicationSecretPropertySources: List<String> = emptyList(),
         tradingHoursWindows: List<StockPurchaseRuntimeSafetyRules.TradingHoursWindowInput> = listOf(
             tradingHoursWindow("DOMESTIC", zoneId = "Asia/Seoul", regularOpen = "09:00", regularClose = "15:30"),
             tradingHoursWindow(
@@ -457,6 +490,7 @@ class StockPurchaseRuntimeSafetyRulesTest {
         allowLocalBrokerEndpointInProduction: Boolean = false,
         allowMockTradingInProduction: Boolean = false,
         allowDisabledRiskControlsInProduction: Boolean = false,
+        allowApplicationSecretPropertySourceInProduction: Boolean = false,
     ) = StockPurchaseRuntimeSafetyRules.Input(
         activeProfiles = activeProfiles,
         enabled = true,
@@ -483,11 +517,13 @@ class StockPurchaseRuntimeSafetyRulesTest {
         overseasUsCurrency = overseasUsCurrency,
         staticRatesToBase = staticRatesToBase,
         httpFxRateBaseUrl = httpFxRateBaseUrl,
+        applicationSecretPropertySources = applicationSecretPropertySources,
         tradingHoursWindows = tradingHoursWindows,
         kisWrapperFxPairKeysWithSymbol = kisWrapperFxPairKeysWithSymbol,
         allowLocalBrokerEndpointInProduction = allowLocalBrokerEndpointInProduction,
         allowMockTradingInProduction = allowMockTradingInProduction,
         allowDisabledRiskControlsInProduction = allowDisabledRiskControlsInProduction,
+        allowApplicationSecretPropertySourceInProduction = allowApplicationSecretPropertySourceInProduction,
     )
 
     private fun tradingHoursWindow(

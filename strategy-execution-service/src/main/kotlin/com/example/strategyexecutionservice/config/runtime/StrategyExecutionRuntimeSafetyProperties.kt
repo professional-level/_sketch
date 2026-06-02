@@ -10,4 +10,5 @@ class StrategyExecutionRuntimeSafetyProperties {
     var allowLocalMarketDataEndpointInProduction: Boolean = false
     var allowMockOrderIntentInProduction: Boolean = false
     var allowDisabledTradingCalendarInProduction: Boolean = false
+    var allowApplicationSecretPropertySourceInProduction: Boolean = false
 }

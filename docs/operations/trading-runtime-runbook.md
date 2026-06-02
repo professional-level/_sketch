@@ -282,6 +282,7 @@ Blocked by default:
 - `provider=static` with a missing or non-positive `rates-to-base.<currency>` entry for any configured market currency that differs from the risk base currency.
 - `provider=http` with blank `akra.order.risk.currency-conversion.http.base-url`.
 - `provider=kis-wrapper` with no configured pair symbol such as `akra.order.risk.currency-conversion.kis-wrapper.pairs.KRW-USD.symbol` for a required market-currency-to-base-currency pair.
+- A local `application-secret.properties` property source is loaded.
 
 Temporary waiver properties exist for controlled tests only:
 
@@ -289,6 +290,7 @@ Temporary waiver properties exist for controlled tests only:
 akra.runtime.safety.allow-local-broker-endpoint-in-production=true
 akra.runtime.safety.allow-mock-trading-in-production=true
 akra.runtime.safety.allow-disabled-risk-controls-in-production=true
+akra.runtime.safety.allow-application-secret-property-source-in-production=true
 ```
 
 `strategy-execution-service` fails startup under a production-like profile when:
@@ -302,6 +304,7 @@ akra.runtime.safety.allow-disabled-risk-controls-in-production=true
 - `akra.trading-calendar.us.enabled=false`.
 - `akra.trading-calendar.us.default-us-equity-calendar-enabled=false`.
 - `akra.trading-calendar.us.zone-id`, `regular-open`, `regular-close`, `holidays[]`, `early-close-days[]`, or `early-close-times[...]` contain malformed values, or an early-close time falls outside the regular session.
+- A local `application-secret.properties` property source is loaded.
 
 Temporary waiver properties:
 
@@ -310,6 +313,7 @@ akra.runtime.safety.allow-local-temporal-target-in-production=true
 akra.runtime.safety.allow-local-market-data-endpoint-in-production=true
 akra.runtime.safety.allow-mock-order-intent-in-production=true
 akra.runtime.safety.allow-disabled-trading-calendar-in-production=true
+akra.runtime.safety.allow-application-secret-property-source-in-production=true
 ```
 
 The root KIS wrapper fails startup under a production-like profile when `spring.jpa.hibernate.ddl-auto` is an automatic schema mutation mode. It also fails when `akra.kis.token.persistence.enabled=true` and `akra.kis.token.persistence.type=file`, or when a local `application-secret.properties` property source is loaded. Use JDBC token persistence, environment variables, `*_FILE` secret mounts, a managed token/secret store, or a controlled temporary waiver:
