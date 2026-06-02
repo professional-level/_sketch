@@ -744,6 +744,7 @@ private fun WebClient.submitStockOrder(
             message = "stock order rejected by broker: ${order.msgCd} ${order.msg1}".trim(),
             brokerReturnCode = order.rtCd,
             brokerMessageCode = order.msgCd.takeIf { it.isNotBlank() },
+            brokerMessage = order.msg1.takeIf { it.isNotBlank() },
         )
     }
 

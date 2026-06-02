@@ -56,6 +56,7 @@ class BrokerOrderRejectedException(
     message: String,
     val brokerReturnCode: String? = null,
     val brokerMessageCode: String? = null,
+    val brokerMessage: String? = null,
     cause: Throwable? = null,
 ) : RuntimeException(message, cause)
 

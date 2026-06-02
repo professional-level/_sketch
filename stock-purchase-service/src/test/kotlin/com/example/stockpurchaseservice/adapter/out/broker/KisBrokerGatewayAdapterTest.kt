@@ -1096,6 +1096,7 @@ class KisBrokerGatewayAdapterTest {
 
         assertEquals("1", exception.brokerReturnCode)
         assertEquals("APBK001", exception.brokerMessageCode)
+        assertEquals("insufficient buying power", exception.brokerMessage)
         assertEquals("stock order rejected by broker: APBK001 insufficient buying power", exception.message)
         assertEquals(1, exchangeFunction.requests.size)
     }

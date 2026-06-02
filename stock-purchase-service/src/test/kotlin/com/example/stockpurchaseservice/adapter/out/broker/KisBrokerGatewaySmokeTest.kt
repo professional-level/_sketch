@@ -1,6 +1,7 @@
 package com.example.stockpurchaseservice.adapter.out.broker
 
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
+import com.example.stockpurchaseservice.application.port.out.BrokerOrderRejectedException
 import com.example.stockpurchaseservice.application.port.out.StockOrderMarket
 import com.example.stockpurchaseservice.application.port.out.StockOrderType
 import org.junit.jupiter.api.Assumptions.assumeTrue
@@ -14,6 +15,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.test.fail
 
 @Tag("kis-smoke")
 @EnabledIfEnvironmentVariable(named = "KIS_BROKER_SMOKE_ENABLED", matches = "true")
@@ -46,40 +48,67 @@ class KisBrokerGatewaySmokeTest {
         assumeTrue(config.submitEnabled, "Set KIS_BROKER_SMOKE_SUBMIT_ENABLED=true to place a mock order")
         val adapter = brokerGateway(config)
 
-        val submitted = adapter.submitOrder(
-            BrokerOrderCommand(
-                internalOrderId = UUID.randomUUID(),
-                market = StockOrderMarket.OVERSEAS_US,
-                side = OrderIntentSide.BUY,
-                symbol = config.symbol,
-                orderType = StockOrderType.LIMIT,
-                price = config.price,
-                quantity = config.quantity,
-                isMock = true,
-            ),
+        val submitCommand = BrokerOrderCommand(
+            internalOrderId = UUID.randomUUID(),
+            market = StockOrderMarket.OVERSEAS_US,
+            side = OrderIntentSide.BUY,
+            symbol = config.symbol,
+            orderType = StockOrderType.LIMIT,
+            price = config.price,
+            quantity = config.quantity,
+            isMock = true,
         )
+        val submitted = runBrokerSmokeStep("mock submit", config, submitCommand) {
+            adapter.submitOrder(submitCommand)
+        }
         assertTrue(submitted.externalOrderId.isNotBlank())
 
         val submittedHistory = awaitOrderHistory(adapter, config, submitted.externalOrderId)
-        assertNotNull(submittedHistory, "Submitted mock order did not appear in broker history")
+        assertNotNull(
+            submittedHistory,
+            "Submitted mock order did not appear in broker history " +
+                "after attempts=${config.historyAttempts}, " +
+                "pollSeconds=${config.historyPollInterval.seconds}, " +
+                "symbol=${config.symbol}, orderId=${submitted.externalOrderId}",
+        )
         assertTrue(submittedHistory.remainingQuantity >= config.quantity)
 
-        val cancelled = adapter.cancelOrder(
-            BrokerOrderCancelCommand(
-                internalOrderId = UUID.randomUUID(),
-                market = StockOrderMarket.OVERSEAS_US,
-                symbol = config.symbol,
-                originalOrderId = submitted.externalOrderId,
-                branchOrderNumber = null,
-                orderType = StockOrderType.LIMIT,
-                price = config.price,
-                quantity = config.quantity,
-                cancelAll = true,
-                isMock = true,
-            ),
+        val cancelCommand = BrokerOrderCancelCommand(
+            internalOrderId = UUID.randomUUID(),
+            market = StockOrderMarket.OVERSEAS_US,
+            symbol = config.symbol,
+            originalOrderId = submitted.externalOrderId,
+            branchOrderNumber = null,
+            orderType = StockOrderType.LIMIT,
+            price = config.price,
+            quantity = config.quantity,
+            cancelAll = true,
+            isMock = true,
         )
+        val cancelled = runBrokerSmokeStep("mock cancel", config, cancelCommand) {
+            adapter.cancelOrder(cancelCommand)
+        }
 
         assertTrue(cancelled.externalOrderId.isNotBlank())
+    }
+
+    private fun <T> runBrokerSmokeStep(
+        step: String,
+        config: SmokeConfig,
+        command: Any,
+        block: () -> T,
+    ): T {
+        return try {
+            block()
+        } catch (exception: BrokerOrderRejectedException) {
+            fail(
+                "$step rejected by KIS mock broker: " +
+                    "returnCode=${exception.brokerReturnCode}, " +
+                    "messageCode=${exception.brokerMessageCode}, " +
+                    "brokerMessage=${exception.brokerMessage}, " +
+                    "config=${config.redacted()}, command=$command",
+            )
+        }
     }
 
     private fun brokerGateway(config: SmokeConfig): KisBrokerGatewayAdapter {
@@ -115,6 +144,20 @@ class KisBrokerGatewaySmokeTest {
         val historyAttempts: Int,
         val historyPollInterval: Duration,
     ) {
+        fun redacted(): String {
+            return "SmokeConfig(" +
+                "baseUrl=$baseUrl, " +
+                "symbol=$symbol, " +
+                "exchange=$exchange, " +
+                "currency=$currency, " +
+                "price=$price, " +
+                "quantity=$quantity, " +
+                "submitEnabled=$submitEnabled, " +
+                "historyAttempts=$historyAttempts, " +
+                "historyPollInterval=$historyPollInterval" +
+                ")"
+        }
+
         fun historyQuery(): BrokerOrderHistoryQuery {
             val now = ZonedDateTime.now(BROKER_ORDER_ZONE)
             return BrokerOrderHistoryQuery(

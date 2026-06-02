@@ -115,6 +115,7 @@ $env:KIS_BROKER_SMOKE_HISTORY_POLL_SECONDS='5'
 Run the submit/cancel smoke only during a KIS mock overseas order window. Use a small quantity and a deliberately low buy limit price so the mock order is likely to remain cancelable. If KIS rejects the order, fills it immediately, or does not expose it in history within the polling window, treat the smoke as failed and inspect the wrapper logs plus KIS response payload before retrying.
 
 The root KIS wrapper must preserve KIS order and cancel business responses as a successful HTTP response body, even when `rt_cd != 0`. `stock-purchase-service` classifies that body as `BrokerOrderRejectedException`. A wrapper HTTP 5xx during submit remains a submission-unknown candidate because the broker order id may not be known.
+When the submit/cancel smoke is rejected by KIS, the failure message includes the broker return code, message code, `msg1`, the smoke configuration, and the submitted broker command so the operator can distinguish account/window/product rejection from wrapper mapping failures.
 
 For KIS query endpoints, the wrapper also preserves non-2xx JSON business responses when the body contains `rt_cd`. Non-KIS transport failures still remain HTTP failures. This distinction is important during smoke tests because it lets the downstream adapter report a broker return code instead of losing the diagnostic body behind a generic wrapper 500.
 
