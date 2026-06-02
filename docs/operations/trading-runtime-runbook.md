@@ -232,13 +232,14 @@ Kafka event boundaries carry the same trace fields through outbox rows and Kafka
 
 ## DB Schema Migration
 
-Local sketch profiles currently use Hibernate `ddl-auto=update`, but production-like environments should not rely on automatic DDL. `stock-purchase-service` and `strategy-execution-service` now fail startup under production-like profiles unless `spring.jpa.hibernate.ddl-auto` is empty, `none`, or `validate`. Before deploying the Kafka trace propagation build, apply:
+Local sketch profiles currently use Hibernate `ddl-auto=update`, but production-like environments should not rely on automatic DDL. `stock-purchase-service` and `strategy-execution-service` now fail startup under production-like profiles unless `spring.jpa.hibernate.ddl-auto` is empty, `none`, or `validate`. Before deploying the Kafka trace propagation and outbox retry scheduling build, apply:
 
 ```text
 docs/operations/sql/20260602_add_outbox_trace_columns.mysql.sql
+docs/operations/sql/20260602_add_outbox_next_attempt_at.mysql.sql
 ```
 
-This adds nullable `traceId`, `spanId`, and `traceParent` columns to both outbox tables:
+These migrations add nullable `traceId`, `spanId`, `traceParent`, and `nextAttemptAt` columns to both outbox tables:
 
 - `strategy-execution-service`: `order_intent_outbox_event`
 - `stock-purchase-service`: `order_execution_outbox_event`
@@ -247,9 +248,11 @@ Operational sequence:
 
 1. Stop outbox publishers or drain traffic so new outbox rows are not being written during the schema change.
 2. Run the preflight query in the SQL file and confirm the target columns do not already exist.
-3. Apply the two `ALTER TABLE` statements.
-4. Run the post-apply verification query and confirm six nullable `VARCHAR(255)` columns.
+3. Apply the `ALTER TABLE` statements in both migration files.
+4. Run the post-apply verification queries and confirm six nullable `VARCHAR(255)` trace columns plus two nullable `DATETIME(6)` retry-scheduling columns.
 5. Start `strategy-execution-service` and `stock-purchase-service`.
+
+Outbox publishers use `akra.outbox.publish-retry-initial-delay-ms` and `akra.outbox.publish-retry-max-delay-ms` to calculate exponential backoff after Kafka publish failures. Failed rows are republished only after `nextAttemptAt`, so repeated Kafka outages should not produce tight retry loops.
 
 `stock-purchase-service` also exposes an operator status endpoint for dashboard polling or manual checks:
 

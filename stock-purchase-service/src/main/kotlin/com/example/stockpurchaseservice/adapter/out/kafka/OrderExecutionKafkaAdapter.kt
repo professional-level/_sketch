@@ -8,7 +8,11 @@ import kotlinx.coroutines.future.await
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.kafka.core.KafkaTemplate
+import org.springframework.beans.factory.annotation.Value
 import java.nio.charset.StandardCharsets
+import java.time.Clock
+import java.time.Duration
+import java.time.ZonedDateTime
 
 @ExternalApiAdapter
 internal class OrderExecutionKafkaAdapter(
@@ -52,7 +56,13 @@ internal interface OrderExecutionOutboxMessageSender {
 internal class OrderExecutionOutboxPublisher(
     private val outboxEventPort: OrderExecutionOutboxPort,
     private val messageSender: OrderExecutionOutboxMessageSender,
+    @Value("\${akra.outbox.publish-retry-initial-delay-ms:5000}")
+    private val retryInitialDelayMs: Long = DEFAULT_RETRY_INITIAL_DELAY_MS,
+    @Value("\${akra.outbox.publish-retry-max-delay-ms:300000}")
+    private val retryMaxDelayMs: Long = DEFAULT_RETRY_MAX_DELAY_MS,
 ) {
+    internal var clock: Clock = Clock.systemDefaultZone()
+
     @Scheduled(fixedDelayString = "\${akra.outbox.publish-fixed-delay-ms:5000}")
     suspend fun publishPendingEvents() {
         outboxEventPort.findUnpublished(limit = 50).forEach { event ->
@@ -61,8 +71,25 @@ internal class OrderExecutionOutboxPublisher(
             }.onSuccess {
                 outboxEventPort.markPublished(event.id)
             }.onFailure { exception ->
-                outboxEventPort.markFailed(event.id, exception.message)
+                outboxEventPort.markFailed(event.id, exception.message, nextAttemptAt(event))
             }
         }
+    }
+
+    private fun nextAttemptAt(event: OrderExecutionOutboxMessage): ZonedDateTime {
+        return ZonedDateTime.now(clock).plus(retryDelay(event.retryCount))
+    }
+
+    private fun retryDelay(retryCount: Int): Duration {
+        val initialDelay = retryInitialDelayMs.coerceAtLeast(0)
+        val maxDelay = retryMaxDelayMs.coerceAtLeast(initialDelay)
+        val multiplier = 1L shl retryCount.coerceIn(0, MAX_RETRY_SHIFT)
+        return Duration.ofMillis((initialDelay * multiplier).coerceAtMost(maxDelay))
+    }
+
+    companion object {
+        private const val DEFAULT_RETRY_INITIAL_DELAY_MS = 5_000L
+        private const val DEFAULT_RETRY_MAX_DELAY_MS = 300_000L
+        private const val MAX_RETRY_SHIFT = 30
     }
 }

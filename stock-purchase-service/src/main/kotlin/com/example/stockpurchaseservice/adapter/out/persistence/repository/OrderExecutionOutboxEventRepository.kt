@@ -5,17 +5,26 @@ import common.AbstractReactiveRepository
 import io.smallrye.mutiny.coroutines.awaitSuspending
 import jakarta.enterprise.context.ApplicationScoped
 import org.springframework.stereotype.Repository
+import java.time.ZonedDateTime
 import java.util.UUID
 
 @ApplicationScoped
 @Repository
 internal class OrderExecutionOutboxEventRepository : AbstractReactiveRepository<OrderExecutionOutboxEventEntity, UUID>() {
     suspend fun findUnpublished(limit: Int): List<OrderExecutionOutboxEventEntity> {
+        val now = ZonedDateTime.now()
         return sessionFactory.withSession { session ->
             session.createQuery(
-                "FROM OrderExecutionOutboxEventEntity e WHERE e.status IN ('PENDING', 'FAILED') ORDER BY e.createdAt ASC",
+                """
+                FROM OrderExecutionOutboxEventEntity e
+                WHERE e.status = 'PENDING'
+                   OR (e.status = 'FAILED' AND (e.nextAttemptAt IS NULL OR e.nextAttemptAt <= :now))
+                ORDER BY e.createdAt ASC
+                """.trimIndent(),
                 OrderExecutionOutboxEventEntity::class.java,
-            ).setMaxResults(limit).resultList
+            ).setParameter("now", now)
+                .setMaxResults(limit)
+                .resultList
         }.awaitSuspending()
     }
 

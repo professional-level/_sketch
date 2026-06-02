@@ -44,17 +44,21 @@ internal class OrderIntentOutboxEventEntity private constructor(
     var publishedAt: ZonedDateTime?,
     @Column
     var failureReason: String?,
+    @Column(name = "nextAttemptAt")
+    var nextAttemptAt: ZonedDateTime?,
 ) {
     fun published() {
         status = OrderIntentOutboxEventStatus.PUBLISHED
         publishedAt = ZonedDateTime.now()
         failureReason = null
+        nextAttemptAt = null
     }
 
-    fun failed(reason: String?) {
+    fun failed(reason: String?, nextAttemptAt: ZonedDateTime) {
         status = OrderIntentOutboxEventStatus.FAILED
         retryCount += 1
         failureReason = reason
+        this.nextAttemptAt = nextAttemptAt
     }
 
     companion object {
@@ -82,6 +86,7 @@ internal class OrderIntentOutboxEventEntity private constructor(
                 createdAt = ZonedDateTime.now(),
                 publishedAt = null,
                 failureReason = null,
+                nextAttemptAt = null,
             )
         }
     }

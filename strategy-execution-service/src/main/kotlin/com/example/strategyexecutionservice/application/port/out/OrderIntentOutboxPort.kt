@@ -1,12 +1,13 @@
 package com.example.strategyexecutionservice.application.port.out
 
 import common.MessageTopic
+import java.time.ZonedDateTime
 import java.util.UUID
 
 interface OrderIntentOutboxPort {
     suspend fun findUnpublished(limit: Int): List<OrderIntentOutboxMessage>
     suspend fun markPublished(id: UUID)
-    suspend fun markFailed(id: UUID, reason: String?)
+    suspend fun markFailed(id: UUID, reason: String?, nextAttemptAt: ZonedDateTime)
 }
 
 data class OrderIntentOutboxMessage(

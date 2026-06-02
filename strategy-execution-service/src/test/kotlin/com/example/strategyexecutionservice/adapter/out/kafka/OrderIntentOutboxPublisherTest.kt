@@ -6,6 +6,10 @@ import common.MessageTopic
 import common.observability.TraceContext
 import kotlinx.coroutines.runBlocking
 import java.nio.charset.StandardCharsets
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneId
+import java.time.ZonedDateTime
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -33,11 +37,36 @@ class OrderIntentOutboxPublisherTest {
         val outboxPort = FakeOrderIntentOutboxPort(events = listOf(event))
         val sender = FakeOrderIntentOutboxMessageSender(failure = IllegalStateException("kafka down"))
         val publisher = OrderIntentOutboxPublisher(outboxPort, sender)
+        publisher.clock = FIXED_CLOCK
 
         publisher.publishPendingEvents()
 
         assertEquals(emptyList(), outboxPort.publishedIds)
-        assertEquals(listOf<Pair<UUID, String?>>(event.id to "kafka down"), outboxPort.failed)
+        assertEquals(
+            listOf(FailedOutboxEvent(event.id, "kafka down", FIXED_NOW.plusSeconds(5))),
+            outboxPort.failed,
+        )
+    }
+
+    @Test
+    fun `caps outbox publish retry delay`() = runBlocking {
+        val event = outboxMessage(retryCount = 10)
+        val outboxPort = FakeOrderIntentOutboxPort(events = listOf(event))
+        val sender = FakeOrderIntentOutboxMessageSender(failure = IllegalStateException("kafka down"))
+        val publisher = OrderIntentOutboxPublisher(
+            outboxPort,
+            sender,
+            retryInitialDelayMs = 1_000,
+            retryMaxDelayMs = 60_000,
+        )
+        publisher.clock = FIXED_CLOCK
+
+        publisher.publishPendingEvents()
+
+        assertEquals(
+            listOf(FailedOutboxEvent(event.id, "kafka down", FIXED_NOW.plusSeconds(60))),
+            outboxPort.failed,
+        )
     }
 
     @Test
@@ -57,6 +86,7 @@ class OrderIntentOutboxPublisherTest {
     }
 
     private fun outboxMessage(
+        retryCount: Int = 0,
         traceId: String? = null,
         spanId: String? = null,
         traceParent: String? = null,
@@ -66,7 +96,7 @@ class OrderIntentOutboxPublisherTest {
             topic = MessageTopic.ORDER_INTENT_CREATED,
             messageKey = "laor-v4:TQQQ",
             payload = byteArrayOf(1, 2, 3),
-            retryCount = 0,
+            retryCount = retryCount,
             traceId = traceId,
             spanId = spanId,
             traceParent = traceParent,
@@ -81,7 +111,7 @@ class OrderIntentOutboxPublisherTest {
         private val events: List<OrderIntentOutboxMessage>,
     ) : OrderIntentOutboxPort {
         val publishedIds: MutableList<UUID> = mutableListOf()
-        val failed: MutableList<Pair<UUID, String?>> = mutableListOf()
+        val failed: MutableList<FailedOutboxEvent> = mutableListOf()
 
         override suspend fun findUnpublished(limit: Int): List<OrderIntentOutboxMessage> {
             return events.take(limit)
@@ -91,10 +121,16 @@ class OrderIntentOutboxPublisherTest {
             publishedIds += id
         }
 
-        override suspend fun markFailed(id: UUID, reason: String?) {
-            failed += id to reason
+        override suspend fun markFailed(id: UUID, reason: String?, nextAttemptAt: ZonedDateTime) {
+            failed += FailedOutboxEvent(id, reason, nextAttemptAt)
         }
     }
+
+    private data class FailedOutboxEvent(
+        val id: UUID,
+        val reason: String?,
+        val nextAttemptAt: ZonedDateTime,
+    )
 
     private class FakeOrderIntentOutboxMessageSender(
         private val failure: RuntimeException? = null,
@@ -111,5 +147,8 @@ class OrderIntentOutboxPublisherTest {
         const val TRACE_ID = "4bf92f3577b34da6a3ce929d0e0e4736"
         const val SPAN_ID = "00f067aa0ba902b7"
         const val TRACE_PARENT = "00-$TRACE_ID-$SPAN_ID-01"
+        val FIXED_ZONE: ZoneId = ZoneId.of("Asia/Seoul")
+        val FIXED_CLOCK: Clock = Clock.fixed(Instant.parse("2026-06-02T01:00:00Z"), FIXED_ZONE)
+        val FIXED_NOW: ZonedDateTime = ZonedDateTime.now(FIXED_CLOCK)
     }
 }

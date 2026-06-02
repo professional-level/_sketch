@@ -15,6 +15,7 @@ import com.example.stockpurchaseservice.application.port.out.OrderSubmittedMessa
 import common.MessageTopic
 import common.observability.TraceContext
 import io.smallrye.mutiny.coroutines.awaitSuspending
+import java.time.ZonedDateTime
 import java.util.UUID
 
 @PersistenceAdapter
@@ -94,9 +95,9 @@ internal class OrderExecutionOutboxAdapter(
         outboxEventRepository.update(event)
     }
 
-    override suspend fun markFailed(id: UUID, reason: String?) {
+    override suspend fun markFailed(id: UUID, reason: String?, nextAttemptAt: ZonedDateTime) {
         val event = outboxEventRepository.findById(id).awaitSuspending() ?: return
-        event.failed(reason)
+        event.failed(reason, nextAttemptAt)
         outboxEventRepository.update(event)
     }
 
