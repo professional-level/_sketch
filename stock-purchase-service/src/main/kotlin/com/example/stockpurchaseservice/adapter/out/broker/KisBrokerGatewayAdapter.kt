@@ -277,10 +277,18 @@ internal class KisBrokerGatewayAdapter(
                 )
             }
             BrokerOrderHistoryPage(
-                items = response.rows("output", "OUTPUT").mapNotNull { it.toBrokerHistoryItem() },
+                items = response.rows("output", "OUTPUT", "output1", "OUTPUT1").mapNotNull { it.toBrokerHistoryItem() },
                 nextCursor = BrokerOrderHistoryPageCursor(
-                    foreignKeyContext = response.textOrNull("ctx_area_fk200", "CTX_AREA_FK200").orEmpty(),
-                    nextKeyContext = response.textOrNull("ctx_area_nk200", "CTX_AREA_NK200").orEmpty(),
+                    foreignKeyContext = response.textOrNull(
+                        "ctx_area_fk200",
+                        "ctxAreaFk200",
+                        "CTX_AREA_FK200",
+                    ).orEmpty(),
+                    nextKeyContext = response.textOrNull(
+                        "ctx_area_nk200",
+                        "ctxAreaNk200",
+                        "CTX_AREA_NK200",
+                    ).orEmpty(),
                 ),
             )
         }
@@ -872,7 +880,14 @@ private fun JsonNode.toBrokerHistoryItem(): BrokerOrderHistoryItem? {
         rejectedQuantity = if (rejectionReason != null) orderedQuantity else 0,
         cancelledQuantity = explicitCancelledQuantity.takeIf { it > 0 } ?: if (cancelled) remainingQuantity else 0,
         cancelled = cancelled,
-        side = textOrNull("sll_buy_dvsn_cd", "SLL_BUY_DVSN_CD", "sll_buy_dvsn_name", "SLL_BUY_DVSN_NAME")
+        side = textOrNull(
+            "sll_buy_dvsn_cd",
+            "SLL_BUY_DVSN_CD",
+            "sll_buy_dvsn_cd_name",
+            "SLL_BUY_DVSN_CD_NAME",
+            "sll_buy_dvsn_name",
+            "SLL_BUY_DVSN_NAME",
+        )
             .toOrderIntentSide(),
         averageExecutionPrice = textOrNull(
             "ft_ccld_unpr3",

@@ -461,6 +461,69 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `overseas order history maps output1 and official side name alias`() {
+        val exchangeFunction = StubExchangeFunction(
+            responses = listOf(
+                """
+                {
+                  "rt_cd": "0",
+                  "ctxAreaFk200": "FK_CAMEL",
+                  "ctxAreaNk200": "NK_CAMEL",
+                  "output1": {
+                    "odno": "output1-order-1",
+                    "pdno": "TQQQ",
+                    "prdt_name": "ProShares UltraPro QQQ",
+                    "ord_dt": "20260601",
+                    "ord_tmd": "093000",
+                    "ft_ord_qty": "3",
+                    "ft_ccld_qty": "1",
+                    "nccs_qty": "2",
+                    "sll_buy_dvsn_cd_name": "매도",
+                    "ft_ccld_unpr3": "112.5"
+                  }
+                }
+                """.trimIndent(),
+                """
+                {
+                  "rt_cd": "0",
+                  "ctxAreaFk200": "",
+                  "ctxAreaNk200": "",
+                  "output1": [
+                    {
+                      "odno": "output1-order-2",
+                      "pdno": "TQQQ",
+                      "prdt_name": "ProShares UltraPro QQQ",
+                      "ord_dt": "20260602",
+                      "ord_tmd": "093100",
+                      "ft_ord_qty": "3",
+                      "ft_ccld_qty": "3",
+                      "nccs_qty": "0",
+                      "sll_buy_dvsn_cd_name": "매수",
+                      "ft_ccld_unpr3": "111.0"
+                    }
+                  ]
+                }
+                """.trimIndent(),
+            ),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        val items = adapter.findOrderHistory(historyQuery())
+
+        assertEquals(listOf("output1-order-1", "output1-order-2"), items.map { it.externalOrderId })
+        assertEquals(listOf(OrderIntentSide.SELL, OrderIntentSide.BUY), items.map { it.side })
+        assertEquals(ExecutionTypeDto.SELLING, items.first().toExecutionDto()?.type)
+        assertEquals(ExecutionTypeDto.PURCHASE, items.last().toExecutionDto()?.type)
+        assertEquals(2, exchangeFunction.requests.size)
+        assertEquals("FK_CAMEL", exchangeFunction.requests[1].queryValue("ctxAreaFk200"))
+        assertEquals("NK_CAMEL", exchangeFunction.requests[1].queryValue("ctxAreaNk200"))
+    }
+
+    @Test
     fun `overseas account snapshot maps balance positions and summary`() {
         val exchangeFunction = StubExchangeFunction(
             responses = listOf(
