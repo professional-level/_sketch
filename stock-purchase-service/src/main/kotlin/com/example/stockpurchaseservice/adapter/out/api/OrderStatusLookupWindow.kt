@@ -14,7 +14,7 @@ internal fun BrokerOrderStatusQuery.toBrokerOrderHistoryLookupWindow(
     forwardDays: Long,
     fallbackNow: ZonedDateTime = ZonedDateTime.now(BROKER_ORDER_ZONE),
 ): BrokerOrderHistoryLookupWindow {
-    val anchor = submittedAt ?: fallbackNow
+    val anchor = (submittedAt ?: fallbackNow).withZoneSameInstant(BROKER_ORDER_ZONE)
     return BrokerOrderHistoryLookupWindow(
         from = anchor.minusDays(backfillDays.coerceAtLeast(0)),
         to = anchor.plusDays(forwardDays.coerceAtLeast(0)),

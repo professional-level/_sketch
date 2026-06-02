@@ -259,7 +259,7 @@ internal fun List<BrokerOrderHistoryItem>.findStatusFor(query: BrokerOrderStatus
             query.externalOrderId != null -> row.matchesExternalOrderId(query.externalOrderId)
             else -> row.symbol.equals(query.symbol, ignoreCase = true) &&
                 (row.side == null || row.side == query.side) &&
-                (query.submittedAt?.toLocalDate()?.let { row.orderedAt.toLocalDate() == it } ?: true)
+                (query.submittedAt?.toBrokerOrderDate()?.let { row.orderedAt.toBrokerOrderDate() == it } ?: true)
         }
     }
     val candidates = baseCandidates
@@ -376,6 +376,8 @@ private fun Double.matchesSubmittedPrice(submittedPrice: Double): Boolean {
 private fun BrokerOrderHistoryItem.matchesExternalOrderId(externalOrderId: String): Boolean {
     return this.externalOrderId == externalOrderId || originalOrderId == externalOrderId
 }
+
+private fun ZonedDateTime.toBrokerOrderDate() = withZoneSameInstant(BROKER_ORDER_ZONE).toLocalDate()
 
 private fun BrokerOrderStatusDto.normalizeExternalOrderId(queriedExternalOrderId: String?): BrokerOrderStatusDto {
     return when {

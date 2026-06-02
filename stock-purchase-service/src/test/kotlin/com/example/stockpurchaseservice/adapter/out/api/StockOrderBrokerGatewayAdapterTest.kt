@@ -17,6 +17,7 @@ import com.example.stockpurchaseservice.application.port.out.CancelOrderDto
 import com.example.stockpurchaseservice.application.port.out.PurchaseOrderDto
 import com.example.stockpurchaseservice.application.port.out.StockOrderMarket
 import com.example.stockpurchaseservice.application.port.out.StockOrderType
+import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.util.UUID
 import kotlin.test.Test
@@ -153,14 +154,15 @@ class StockOrderBrokerGatewayAdapterTest {
             ),
         )
 
+        val brokerSubmittedAt = submittedAt.withZoneSameInstant(BROKER_ZONE)
         with(brokerGateway.historyQueries.single()) {
             assertEquals(StockOrderMarket.OVERSEAS_US, market)
             assertEquals("TQQQ", symbol)
             assertEquals("NYSE", exchange)
             assertEquals("", externalOrderId)
             assertEquals("00009", branchOrderNumber)
-            assertEquals(submittedAt.minusDays(1), from)
-            assertEquals(submittedAt.plusDays(1), to)
+            assertEquals(brokerSubmittedAt.minusDays(1), from)
+            assertEquals(brokerSubmittedAt.plusDays(1), to)
             assertEquals(false, isMock)
         }
     }
@@ -189,13 +191,14 @@ class StockOrderBrokerGatewayAdapterTest {
             ),
         )
 
+        val brokerSubmittedAt = submittedAt.withZoneSameInstant(BROKER_ZONE)
         with(brokerGateway.historyQueries.single()) {
             assertEquals(StockOrderMarket.DOMESTIC, market)
             assertEquals("", symbol)
             assertEquals("domestic-order-1", externalOrderId)
             assertEquals("00001", branchOrderNumber)
-            assertEquals(submittedAt.minusDays(3), from)
-            assertEquals(submittedAt.plusDays(2), to)
+            assertEquals(brokerSubmittedAt.minusDays(3), from)
+            assertEquals(brokerSubmittedAt.plusDays(2), to)
             assertEquals(true, isMock)
         }
     }
@@ -295,5 +298,9 @@ class StockOrderBrokerGatewayAdapterTest {
                 withdrawableCashAmount = 1200.0,
             )
         }
+    }
+
+    companion object {
+        private val BROKER_ZONE = ZoneId.of("Asia/Seoul")
     }
 }

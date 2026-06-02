@@ -277,11 +277,34 @@ class BrokerOrderHistoryItemTest {
         assertEquals("broker-1", status.externalOrderId)
     }
 
+    @Test
+    fun `matches broker date when submitted timestamp uses another timezone`() {
+        val status = listOf(
+            row(
+                externalOrderId = "broker-1",
+                orderedAt = ZonedDateTime.parse("2026-06-02T00:10:00+09:00"),
+                orderedQuantity = 3,
+                orderedPrice = 112.5,
+            ),
+        ).findStatusFor(
+            query(
+                externalOrderId = null,
+                orderedQuantity = 3,
+                submittedPrice = 112.5,
+                submittedAt = ZonedDateTime.parse("2026-06-01T15:10:00Z"),
+            ),
+        )
+
+        assertEquals(BrokerOrderStatus.SUBMITTED, status.status)
+        assertEquals("broker-1", status.externalOrderId)
+    }
+
     private fun query(
         externalOrderId: String?,
         branchOrderNumber: String? = null,
         orderedQuantity: Long? = null,
         submittedPrice: Double? = null,
+        submittedAt: ZonedDateTime = ORDERED_AT,
     ): BrokerOrderStatusQuery {
         return BrokerOrderStatusQuery(
             orderIntentId = UUID.randomUUID(),
@@ -293,7 +316,7 @@ class BrokerOrderHistoryItemTest {
             orderedQuantity = orderedQuantity,
             submittedPrice = submittedPrice,
             market = StockOrderMarket.OVERSEAS_US,
-            submittedAt = ORDERED_AT,
+            submittedAt = submittedAt,
         )
     }
 
@@ -312,6 +335,7 @@ class BrokerOrderHistoryItemTest {
         rejectedQuantity: Long = 0,
         rejectionReason: String? = null,
         statusMessage: String? = null,
+        orderedAt: ZonedDateTime = ORDERED_AT,
     ): BrokerOrderHistoryItem {
         return BrokerOrderHistoryItem(
             externalOrderId = externalOrderId,
@@ -320,7 +344,7 @@ class BrokerOrderHistoryItemTest {
             branchOrderNumber = branchOrderNumber,
             symbol = "TQQQ",
             stockName = "TQQQ",
-            orderedAt = ORDERED_AT,
+            orderedAt = orderedAt,
             orderedQuantity = orderedQuantity,
             orderedPrice = orderedPrice,
             cumulativeFilledQuantity = cumulativeFilledQuantity,
