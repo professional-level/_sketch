@@ -233,7 +233,7 @@ class OpenApiController(
 // TODO: 해당 to~로직을 다른 interface로 변경
 internal fun OpenApiResponse.toPostStockOrderResponse(): ApiResponse.StockOrder {
     val responseNode = normalizedKisResponseNode() ?: return stockOrder {}
-    val outputNode = responseNode.objectNode("output", "OUTPUT", "output1", "OUTPUT1") ?: responseNode
+    val outputNode = responseNode.summaryObjectNode("output", "OUTPUT", "output1", "OUTPUT1") ?: responseNode
 
     return stockOrder {
         rtCd = responseNode.text("rt_cd", "rtCd", "RT_CD")

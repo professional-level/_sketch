@@ -103,6 +103,33 @@ class OpenApiControllerMappingTest {
     }
 
     @Test
+    fun `maps stock order response output array aliases`() {
+        val response = ParseJsonResponse.parseJsonString(
+            """
+            {
+              "rt_cd": "0",
+              "msg_cd": "APBK003",
+              "msg1": "accepted",
+              "OUTPUT": [
+                {
+                  "KRX_FWDG_ORD_ORGNO": "00004",
+                  "ORD_NO": "domestic-order-4",
+                  "THCO_ORD_TMD": "103000"
+                }
+              ]
+            }
+            """.trimIndent(),
+        ).toPostStockOrderResponse()
+
+        assertEquals("0", response.rtCd)
+        assertEquals("APBK003", response.msgCd)
+        assertEquals("accepted", response.msg1)
+        assertEquals("00004", response.output.getKRXFWDGORDORGNO())
+        assertEquals("domestic-order-4", response.output.getODNO())
+        assertEquals("103000", response.output.getORDTMD())
+    }
+
+    @Test
     fun `maps standard kis domestic daily execution order response`() {
         val response = ParseJsonResponse.parseJsonString(
             """
