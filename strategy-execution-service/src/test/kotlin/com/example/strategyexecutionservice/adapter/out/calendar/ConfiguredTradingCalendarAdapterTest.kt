@@ -87,7 +87,7 @@ class ConfiguredTradingCalendarAdapterTest {
     }
 
     @Test
-    fun `resolves order session date after regular close to next local date`() {
+    fun `resolves order session date after regular close to next trading day`() {
         val adapter = ConfiguredTradingCalendarAdapter(TradingCalendarProperties())
 
         val date = adapter.orderSessionDate(
@@ -95,7 +95,7 @@ class ConfiguredTradingCalendarAdapterTest {
             ZonedDateTime.parse("2026-07-03T09:00:00+09:00[Asia/Seoul]"),
         )
 
-        assertEquals(LocalDate.parse("2026-07-03"), date)
+        assertEquals(LocalDate.parse("2026-07-06"), date)
     }
 
     @Test
@@ -112,7 +112,7 @@ class ConfiguredTradingCalendarAdapterTest {
         )
 
         assertEquals(LocalDate.parse("2026-11-27"), beforeEarlyClose)
-        assertEquals(LocalDate.parse("2026-11-28"), afterEarlyClose)
+        assertEquals(LocalDate.parse("2026-11-30"), afterEarlyClose)
     }
 
     @Test
@@ -128,7 +128,7 @@ class ConfiguredTradingCalendarAdapterTest {
             ZonedDateTime.parse("2026-11-27T12:45:00-05:00[America/New_York]"),
         )
 
-        assertEquals(LocalDate.parse("2026-11-28"), date)
+        assertEquals(LocalDate.parse("2026-11-30"), date)
     }
 
     @Test

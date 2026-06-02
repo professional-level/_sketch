@@ -68,11 +68,20 @@ internal class ConfiguredTradingCalendarAdapter(
         val marketDateTime = requestedAt.withZoneSameInstant(zone())
         val localDate = marketDateTime.toLocalDate()
         val sessionClose = earlyCloseTime(localDate) ?: UsEquityMarketCalendar.regularClose
-        return if (!isTradingDay(localDate) || !marketDateTime.toLocalTime().isBefore(sessionClose)) {
+        val candidate = if (!isTradingDay(localDate) || !marketDateTime.toLocalTime().isBefore(sessionClose)) {
             localDate.plusDays(1)
         } else {
             localDate
         }
+        return nextTradingDay(candidate)
+    }
+
+    private fun TradingCalendarProperties.MarketCalendar.nextTradingDay(startDate: LocalDate): LocalDate {
+        var date = startDate
+        while (!isTradingDay(date)) {
+            date = date.plusDays(1)
+        }
+        return date
     }
 
     private fun TradingCalendarProperties.MarketCalendar.zone(): ZoneId {
