@@ -201,6 +201,12 @@ akra.runtime.safety.allow-mock-order-intent-in-production=true
 akra.runtime.safety.allow-disabled-trading-calendar-in-production=true
 ```
 
+The root KIS wrapper fails startup under a production-like profile when `akra.kis.token.persistence.enabled=true` and `akra.kis.token.persistence.type=file`. Use JDBC token persistence, a managed token/secret store, or a controlled temporary waiver:
+
+```properties
+akra.runtime.safety.allow-file-token-persistence-in-production=true
+```
+
 These waivers should not be enabled for real capital.
 
 ## Production Profile Checklist
@@ -211,6 +217,7 @@ Before enabling real orders:
 - Apply required DB migrations explicitly and set `spring.jpa.hibernate.ddl-auto=validate` or `none`; do not use `update` in production.
 - Point `akra.order.kis-open-api.base-url` and `akra.market-data.kis-open-api.base-url` to the deployed broker wrapper.
 - Point `akra.temporal.target` to the managed Temporal frontend.
+- Use JDBC or managed external storage for shared KIS tokens; do not use local-file token persistence for multi-instance production deployments.
 - Set real-vs-mock trading flags intentionally for the account being operated.
 - Confirm `strategy-execution-service` order-intent trading environment settings and `stock-purchase-service` broker mock/live flags agree for each strategy prefix.
 - Confirm risk guard limits are set for order notional, account pending buy notional, broker account exposure/cash, symbol notional, daily order count, disabled strategies, and strategy trading environments.
