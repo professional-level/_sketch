@@ -1165,6 +1165,7 @@ class KisBrokerGatewayAdapterTest {
                     orderedQuantity = "3",
                     filledQuantity = "1",
                     remainingQuantity = "2",
+                    orderedPrice = "71000",
                     averagePrice = "71200.5",
                 ),
             ),
@@ -1176,6 +1177,7 @@ class KisBrokerGatewayAdapterTest {
 
         assertEquals(BrokerOrderStatus.PARTIALLY_FILLED, status.status)
         assertEquals(3L, status.orderedQuantity)
+        assertEquals(71000.0, status.orderedPrice)
         assertEquals(1L, status.cumulativeFilledQuantity)
         assertEquals(2L, status.remainingQuantity)
         checkNotNull(execution)
@@ -1318,6 +1320,7 @@ class KisBrokerGatewayAdapterTest {
                   "ord_dt": "20260602",
                   "ord_tmd": "093000",
                   "ft_ord_qty": "3",
+                  "ft_ord_unpr": "112.5",
                   "ft_ccld_qty": "1",
                   "nccs_qty": "2",
                   "sll_buy_dvsn_cd": "02",
@@ -1335,6 +1338,7 @@ class KisBrokerGatewayAdapterTest {
 
         assertEquals(BrokerOrderStatus.PARTIALLY_FILLED, status.status)
         assertEquals(3L, status.orderedQuantity)
+        assertEquals(112.5, status.orderedPrice)
         assertEquals(1L, status.cumulativeFilledQuantity)
         assertEquals(2L, status.remainingQuantity)
         checkNotNull(execution)
@@ -1361,6 +1365,7 @@ class KisBrokerGatewayAdapterTest {
                   "ORD_DT": "20260602",
                   "THCO_ORD_TMD": "093500",
                   "ORD_QTY": "4",
+                  "ORD_UNPR": "113.75",
                   "TOT_CCLD_QTY": "2",
                   "RMN_QTY": "2",
                   "SLL_BUY_DVSN_NAME": "BUY",
@@ -1377,6 +1382,7 @@ class KisBrokerGatewayAdapterTest {
         assertEquals("alias-order", item.externalOrderId)
         assertEquals("00002", item.branchOrderNumber)
         assertEquals(4, item.orderedQuantity)
+        assertEquals(113.75, item.orderedPrice)
         assertEquals(2, item.cumulativeFilledQuantity)
         assertEquals(2, item.remainingQuantity)
         assertEquals(OrderIntentSide.BUY, item.side)
@@ -1974,6 +1980,7 @@ class KisBrokerGatewayAdapterTest {
         cancelled: Boolean = false,
         side: OrderIntentSide = OrderIntentSide.BUY,
         averagePrice: String = "",
+        orderedPrice: String = "",
         statusName: String = "",
         rejectionReason: String = "",
     ): DailyExecutionOrdersResponseOuterClass.DailyExecutionOrdersOutput1 {
@@ -1985,6 +1992,7 @@ class KisBrokerGatewayAdapterTest {
             .setPdno("005930")
             .setPrdtName("Samsung Electronics")
             .setOrdQty(orderedQuantity)
+            .setOrdUnpr(orderedPrice)
             .setOrdTmd("093000")
             .setTotCcldQty(filledQuantity)
             .setAvgPrvs(averagePrice)

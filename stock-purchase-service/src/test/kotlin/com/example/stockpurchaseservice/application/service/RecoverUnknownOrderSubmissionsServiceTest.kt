@@ -57,6 +57,7 @@ class RecoverUnknownOrderSubmissionsServiceTest {
         assertEquals("broker-1", submissionPort.submitted.single().externalOrderId)
         assertEquals("NYSE", marketService.queries.single().exchange)
         assertEquals(3L, marketService.queries.single().orderedQuantity)
+        assertEquals(112.0, marketService.queries.single().submittedPrice)
         assertEquals("broker-1", eventPort.submitted.single().brokerOrderId)
         assertEquals(emptyList(), eventPort.rejected)
         assertEquals(emptyList(), eventPort.cancelled)

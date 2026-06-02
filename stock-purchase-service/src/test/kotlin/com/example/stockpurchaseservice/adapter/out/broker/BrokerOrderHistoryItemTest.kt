@@ -42,11 +42,12 @@ class BrokerOrderHistoryItemTest {
     @Test
     fun `maps partially filled row to partially filled status`() {
         val status = listOf(
-            row(cumulativeFilledQuantity = 1),
+            row(cumulativeFilledQuantity = 1, orderedPrice = 112.5),
         ).findStatusFor(query(externalOrderId = "broker-1"))
 
         assertEquals(BrokerOrderStatus.PARTIALLY_FILLED, status.status)
         assertEquals(3L, status.orderedQuantity)
+        assertEquals(112.5, status.orderedPrice)
         assertEquals(1L, status.cumulativeFilledQuantity)
         assertEquals(2L, status.remainingQuantity)
         assertEquals(ORDERED_AT, status.brokerReportedAt)
@@ -113,9 +114,32 @@ class BrokerOrderHistoryItemTest {
         assertEquals("broker-1", status.externalOrderId)
     }
 
+    @Test
+    fun `uses submitted price to disambiguate lookup without broker order id`() {
+        val status = listOf(
+            row(externalOrderId = "broker-1", orderedPrice = 111.0),
+            row(externalOrderId = "broker-2", orderedPrice = 112.5),
+        ).findStatusFor(query(externalOrderId = null, orderedQuantity = 3, submittedPrice = 112.5))
+
+        assertEquals(BrokerOrderStatus.SUBMITTED, status.status)
+        assertEquals("broker-2", status.externalOrderId)
+        assertEquals(112.5, status.orderedPrice)
+    }
+
+    @Test
+    fun `keeps quantity candidates when broker rows do not expose matching ordered price`() {
+        val status = listOf(
+            row(externalOrderId = "broker-1", orderedPrice = null),
+        ).findStatusFor(query(externalOrderId = null, orderedQuantity = 3, submittedPrice = 112.5))
+
+        assertEquals(BrokerOrderStatus.SUBMITTED, status.status)
+        assertEquals("broker-1", status.externalOrderId)
+    }
+
     private fun query(
         externalOrderId: String?,
         orderedQuantity: Long? = null,
+        submittedPrice: Double? = null,
     ): BrokerOrderStatusQuery {
         return BrokerOrderStatusQuery(
             orderIntentId = UUID.randomUUID(),
@@ -124,6 +148,7 @@ class BrokerOrderHistoryItemTest {
             symbol = "TQQQ",
             side = OrderIntentSide.BUY,
             orderedQuantity = orderedQuantity,
+            submittedPrice = submittedPrice,
             market = StockOrderMarket.OVERSEAS_US,
             submittedAt = ORDERED_AT,
         )
@@ -138,6 +163,7 @@ class BrokerOrderHistoryItemTest {
         side: OrderIntentSide? = OrderIntentSide.BUY,
         averageExecutionPrice: Double? = null,
         orderedQuantity: Long = 3,
+        orderedPrice: Double? = null,
     ): BrokerOrderHistoryItem {
         return BrokerOrderHistoryItem(
             externalOrderId = externalOrderId,
@@ -147,6 +173,7 @@ class BrokerOrderHistoryItemTest {
             stockName = "TQQQ",
             orderedAt = ORDERED_AT,
             orderedQuantity = orderedQuantity,
+            orderedPrice = orderedPrice,
             cumulativeFilledQuantity = cumulativeFilledQuantity,
             remainingQuantity = orderedQuantity - cumulativeFilledQuantity,
             rejectedQuantity = 0,

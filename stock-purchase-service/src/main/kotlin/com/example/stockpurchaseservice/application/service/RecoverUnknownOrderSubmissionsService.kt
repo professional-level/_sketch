@@ -184,6 +184,7 @@ class RecoverUnknownOrderSubmissionsService(
             exchange = exchange,
             side = side,
             orderedQuantity = quantity,
+            submittedPrice = submittedPrice,
             market = market ?: symbol.toStockOrderMarket(),
             submittedAt = submittedAt,
         )

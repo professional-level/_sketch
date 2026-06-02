@@ -86,6 +86,7 @@ data class BrokerOrderStatusQuery(
     val exchange: String = DEFAULT_OVERSEAS_ORDER_EXCHANGE,
     val side: OrderIntentSide,
     val orderedQuantity: Long? = null,
+    val submittedPrice: Double? = null,
     val market: StockOrderMarket,
     val submittedAt: ZonedDateTime? = null,
 )
@@ -96,6 +97,7 @@ data class BrokerOrderStatusDto(
     val reason: String? = null,
     val checkedAt: ZonedDateTime = ZonedDateTime.now(),
     val orderedQuantity: Long? = null,
+    val orderedPrice: Double? = null,
     val cumulativeFilledQuantity: Long? = null,
     val remainingQuantity: Long? = null,
     val averageExecutionPrice: Double? = null,

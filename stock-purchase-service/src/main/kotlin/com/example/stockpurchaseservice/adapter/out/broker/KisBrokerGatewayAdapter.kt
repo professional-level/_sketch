@@ -838,6 +838,7 @@ private fun DailyExecutionOrdersResponseOuterClass.DailyExecutionOrdersOutput1.t
         stockName = prdtName.trim(),
         orderedAt = parseKisOrderDateTime(ordDt, ordTmd),
         orderedQuantity = ordQty.toLongValue(),
+        orderedPrice = ordUnpr.toDoubleValue(),
         cumulativeFilledQuantity = totCcldQty.toLongValue(),
         remainingQuantity = rmnQty.toLongValue(),
         rejectedQuantity = rjctQty.toLongValue(),
@@ -864,6 +865,14 @@ private fun JsonNode.toBrokerHistoryItem(): BrokerOrderHistoryItem? {
     val orderId = textOrNull("odno", "ODNO", "ord_no", "ORD_NO", "order_no", "ORDER_NO") ?: ""
     if (orderId.isBlank()) return null
     val orderedQuantity = longValue("ft_ord_qty", "FT_ORD_QTY", "ord_qty", "ORD_QTY")
+    val orderedPrice = textOrNull(
+        "ft_ord_unpr",
+        "FT_ORD_UNPR",
+        "ord_unpr",
+        "ORD_UNPR",
+        "ovrs_ord_unpr",
+        "OVRS_ORD_UNPR",
+    ).toDoubleValue()
     val filledQuantity = longValue("ft_ccld_qty", "FT_CCLD_QTY", "tot_ccld_qty", "TOT_CCLD_QTY", "ccld_qty")
     val remainingQuantity = longValue("nccs_qty", "NCCS_QTY", "rmn_qty", "RMN_QTY")
     val statusName = textOrNull("prcs_stat_name", "PRCS_STAT_NAME", "ord_stat_name", "ORD_STAT_NAME")
@@ -905,6 +914,7 @@ private fun JsonNode.toBrokerHistoryItem(): BrokerOrderHistoryItem? {
             textOrNull("ord_tmd", "ORD_TMD", "thco_ord_tmd", "THCO_ORD_TMD").orEmpty(),
         ),
         orderedQuantity = orderedQuantity,
+        orderedPrice = orderedPrice,
         cumulativeFilledQuantity = filledQuantity,
         remainingQuantity = remainingQuantity,
         rejectedQuantity = if (rejectionReason != null) orderedQuantity else 0,

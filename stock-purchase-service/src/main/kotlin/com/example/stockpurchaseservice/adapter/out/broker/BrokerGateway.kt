@@ -14,6 +14,7 @@ import com.example.stockpurchaseservice.application.port.out.StockOrderType
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.util.UUID
+import kotlin.math.abs
 
 internal interface BrokerGateway {
     fun submitOrder(command: BrokerOrderCommand): BrokerOrderSubmissionDto
@@ -129,6 +130,7 @@ internal data class BrokerOrderHistoryItem(
     val stockName: String,
     val orderedAt: ZonedDateTime,
     val orderedQuantity: Long,
+    val orderedPrice: Double? = null,
     val cumulativeFilledQuantity: Long,
     val remainingQuantity: Long,
     val rejectedQuantity: Long,
@@ -180,6 +182,7 @@ internal data class BrokerOrderHistoryItem(
             reason = statusReason(status),
             checkedAt = checkedAt,
             orderedQuantity = orderedQuantity,
+            orderedPrice = orderedPrice,
             cumulativeFilledQuantity = cumulativeFilledQuantity,
             remainingQuantity = remainingQuantity,
             averageExecutionPrice = averageExecutionPrice,
@@ -215,7 +218,9 @@ internal fun List<BrokerOrderHistoryItem>.findStatusFor(query: BrokerOrderStatus
                 (query.submittedAt?.toLocalDate()?.let { row.orderedAt.toLocalDate() == it } ?: true)
         }
     }
-    val candidates = baseCandidates.narrowByOrderedQuantity(query)
+    val candidates = baseCandidates
+        .narrowByOrderedQuantity(query)
+        .narrowBySubmittedPrice(query)
     val terminalCandidates = candidates.filter { row ->
         when (row.toStatus().status) {
             BrokerOrderStatus.REJECTED,
@@ -262,6 +267,24 @@ private fun List<BrokerOrderHistoryItem>.narrowByOrderedQuantity(
         ?: this
 }
 
+private fun List<BrokerOrderHistoryItem>.narrowBySubmittedPrice(
+    query: BrokerOrderStatusQuery,
+): List<BrokerOrderHistoryItem> {
+    if (query.externalOrderId != null) return this
+    val submittedPrice = query.submittedPrice?.takeIf { it > 0.0 } ?: return this
+    return filter { row ->
+        row.orderedPrice
+            ?.takeIf { it > 0.0 }
+            ?.matchesSubmittedPrice(submittedPrice) == true
+    }
+        .takeIf { it.isNotEmpty() }
+        ?: this
+}
+
+private fun Double.matchesSubmittedPrice(submittedPrice: Double): Boolean {
+    return abs(this - submittedPrice) <= PRICE_MATCH_TOLERANCE
+}
+
 private fun BrokerOrderHistoryItem.matchesExternalOrderId(externalOrderId: String): Boolean {
     return this.externalOrderId == externalOrderId || originalOrderId == externalOrderId
 }
@@ -286,3 +309,4 @@ private const val REJECTED_ENGLISH = "rejected"
 private const val CANCELLED_ENGLISH_US = "canceled"
 private const val CANCELLED_ENGLISH_UK = "cancelled"
 internal const val CANCELLED_KOREAN = "\uCDE8\uC18C"
+private const val PRICE_MATCH_TOLERANCE = 0.000001

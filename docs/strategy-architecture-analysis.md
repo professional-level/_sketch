@@ -694,6 +694,6 @@ Broker integration phase
     -> KIS token / TR ID / raw API contract
 ```
 
-Implementation note: `SUBMISSION_UNKNOWN` recovery now passes the stored order quantity into broker status lookup. When broker order id is absent, stock-purchase-service first matches broker history by symbol, side, and submitted date, then narrows candidates by ordered quantity when a matching quantity is available.
+Implementation note: `SUBMISSION_UNKNOWN` recovery now passes the stored order quantity and submitted price into broker status lookup. When broker order id is absent, stock-purchase-service first matches broker history by symbol, side, and submitted date, then narrows candidates by ordered quantity and submitted price when matching broker row fields are available.
 
 이 구조에서는 모든 전략이 같은 출발점을 가진다. 전략마다 실행 기간만 다르다. 단발성 전략은 execution-service에서 짧게 종료되고, 라오어 같은 장기 전략은 같은 execution-service 안에서 여러 거래일 동안 상태를 이어간다. purchase-service는 전략을 모르는 주문/체결 서비스로 유지된다.
