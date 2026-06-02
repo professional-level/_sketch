@@ -14,7 +14,9 @@ param(
 
     [switch] $SkipExternalSecrets,
 
-    [switch] $SkipKafkaTopics
+    [switch] $SkipKafkaTopics,
+
+    [switch] $DryRun
 )
 
 Set-StrictMode -Version 3.0
@@ -68,7 +70,11 @@ function Assert-KubernetesObjectExists {
     Invoke-Kubectl "-n" $ObjectNamespace "get" "$Kind/$Name"
 }
 
-Require-Command "kubectl"
+function Write-DryRunCheck {
+    param([string] $Message)
+
+    Write-Host "Would verify: $Message"
+}
 
 $applicationDeployments = @(
     "kis-wrapper",
@@ -76,6 +82,62 @@ $applicationDeployments = @(
     "strategy-execution-service",
     "stock-purchase-service"
 )
+
+if ($DryRun) {
+    Write-Host "Would verify trading runtime in namespace $Namespace with image tag $ImageTag"
+    foreach ($secret in @("kis-broker-secrets", "trading-database-secrets")) {
+        Write-DryRunCheck "secret/$secret exists in namespace $Namespace"
+    }
+
+    if (-not $SkipExternalSecrets) {
+        Write-DryRunCheck "secretstore/akra-vault-secret-store exists in namespace $Namespace"
+        foreach ($externalSecret in @("kis-broker-secrets", "trading-database-secrets")) {
+            Write-DryRunCheck "externalsecret/$externalSecret exists in namespace $Namespace"
+        }
+    }
+
+    Write-DryRunCheck "configmap/akra-trading-runtime-config exists in namespace $Namespace"
+    Write-DryRunCheck "configmap/akra-sql-migrations exists in namespace $Namespace"
+    Write-DryRunCheck "job/akra-trading-schema-migration completed in namespace $Namespace"
+
+    foreach ($deployment in $applicationDeployments) {
+        Write-DryRunCheck "deployment/$deployment uses image tag $ImageTag and rollout is complete in namespace $Namespace"
+    }
+
+    if (-not $SkipInfra) {
+        foreach ($statefulSet in @("mysql", "zookeeper", "kafka", "temporal-postgresql")) {
+            Write-DryRunCheck "statefulset/$statefulSet rollout is complete in namespace $InfraNamespace"
+        }
+
+        foreach ($deployment in @("temporal", "temporal-ui")) {
+            Write-DryRunCheck "deployment/$deployment rollout is complete in namespace $InfraNamespace"
+        }
+
+        foreach ($service in @("mysql", "kafka", "temporal-frontend", "temporal-ui")) {
+            Write-DryRunCheck "service/$service exists in namespace $InfraNamespace"
+        }
+
+        if (-not $SkipKafkaTopics) {
+            foreach ($topic in @(
+                "strategy-saved",
+                "strategy-execution-start-requested",
+                "order-intent-created",
+                "order-submitted",
+                "order-filled",
+                "order-partially-filled",
+                "order-rejected",
+                "order-cancelled"
+            )) {
+                Write-DryRunCheck "Kafka topic exists: $topic"
+            }
+        }
+    }
+
+    Write-Host "Dry run complete. Skipping kubectl runtime checks."
+    return
+}
+
+Require-Command "kubectl"
 
 foreach ($secret in @("kis-broker-secrets", "trading-database-secrets")) {
     Assert-KubernetesObjectExists "secret" $secret $Namespace

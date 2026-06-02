@@ -107,6 +107,12 @@ After rollout, verify the applied cluster state without printing secret values:
 .\verify-trading-runtime.ps1 -ImageTag <git-sha>
 ```
 
+To validate the verification checklist itself without a Kubernetes context:
+
+```powershell
+.\verify-trading-runtime.ps1 -ImageTag <git-sha> -DryRun
+```
+
 For managed MySQL/Kafka/Temporal deployments outside `trading-infra`, skip the
 checked-in infra checks:
 

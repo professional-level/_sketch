@@ -125,6 +125,11 @@ Assert-Contains "GitHub delivery dry-run" $githubDryRun "Expected workflow: Oper
 Assert-Contains "GitHub delivery dry-run" $githubDryRun "ghcr.io/professional-level/sketch-stock-purchase-service:ae80c31584b78eeb7361184f84dc240c2bbcba81"
 Assert-Contains "GitHub delivery dry-run" $githubDryRun "Registry check mode: Auto"
 
+$runtimeVerifyDryRun = & $files.VerifyScript -ImageTag "ae80c31584b78eeb7361184f84dc240c2bbcba81" -DryRun *>&1 | Out-String
+Assert-Contains "runtime verify dry-run" $runtimeVerifyDryRun "Would verify trading runtime in namespace akra-trading with image tag ae80c31584b78eeb7361184f84dc240c2bbcba81"
+Assert-Contains "runtime verify dry-run" $runtimeVerifyDryRun "deployment/stock-purchase-service uses image tag ae80c31584b78eeb7361184f84dc240c2bbcba81"
+Assert-Contains "runtime verify dry-run" $runtimeVerifyDryRun "Kafka topic exists: order-cancelled"
+
 $runtime = Get-Content -LiteralPath $files.RuntimeManifest -Raw
 $infra = Get-Content -LiteralPath $files.InfraManifest -Raw
 $externalSecrets = Get-Content -LiteralPath $files.ExternalSecretsManifest -Raw
