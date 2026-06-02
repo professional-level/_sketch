@@ -2854,6 +2854,48 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `throws temporary unavailable when stock order response has temporary business code`() {
+        val exchangeFunction = ResponseExchangeFunction(
+            responses = listOf(
+                protobufResponse(
+                    ApiResponse.StockOrder.newBuilder()
+                        .setRtCd("1")
+                        .setMsgCd("EGW00201")
+                        .setMsg1("per-second transaction limit exceeded")
+                        .build(),
+                ),
+            ),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        val exception = assertFailsWith<BrokerOrderTemporaryUnavailableException> {
+            adapter.submitOrder(
+                brokerCommand(
+                    side = OrderIntentSide.BUY,
+                    symbol = "TQQQ",
+                    price = 112.5,
+                    quantity = 3,
+                    orderType = StockOrderType.LOC,
+                    isMock = false,
+                ),
+            )
+        }
+
+        assertEquals("1", exception.brokerReturnCode)
+        assertEquals("EGW00201", exception.brokerMessageCode)
+        assertEquals("per-second transaction limit exceeded", exception.brokerMessage)
+        assertEquals(
+            "stock order temporarily unavailable by broker: EGW00201 per-second transaction limit exceeded",
+            exception.message,
+        )
+        assertEquals(1, exchangeFunction.requests.size)
+    }
+
+    @Test
     fun `maps submitted stock order response branch order number`() {
         val exchangeFunction = ResponseExchangeFunction(
             responses = listOf(

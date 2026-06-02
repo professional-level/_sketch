@@ -1282,12 +1282,7 @@ private fun WebClient.submitStockOrder(
 
     val order = response.body ?: throw BrokerOrderSubmissionUnknownException("stock order body is empty")
     if (order.rtCd != "0") {
-        throw BrokerOrderRejectedException(
-            message = "stock order rejected by broker: ${order.msgCd} ${order.msg1}".trim(),
-            brokerReturnCode = order.rtCd,
-            brokerMessageCode = order.msgCd.takeIf { it.isNotBlank() },
-            brokerMessage = order.msg1.takeIf { it.isNotBlank() },
-        )
+        throw order.toSubmitFailureException()
     }
 
     val externalOrderId = order.output.getODNO().toBrokerOrderIdOrNull()
@@ -1298,6 +1293,32 @@ private fun WebClient.submitStockOrder(
         externalOrderId = externalOrderId,
         branchOrderNumber = order.output.getKRXFWDGORDORGNO().toBrokerBranchOrderNumberOrNull(),
     )
+}
+
+private fun ApiResponse.StockOrder.toSubmitFailureException(): RuntimeException {
+    val messageCode = msgCd.takeIf { it.isNotBlank() }
+    val brokerMessage = msg1.takeIf { it.isNotBlank() }
+    val detail = listOfNotNull(messageCode, brokerMessage).joinToString(" ")
+
+    if (messageCode in TEMPORARY_KIS_MESSAGE_CODES) {
+        return BrokerOrderTemporaryUnavailableException(
+            message = "stock order temporarily unavailable by broker".withBrokerFailureDetail(detail),
+            brokerReturnCode = rtCd,
+            brokerMessageCode = messageCode,
+            brokerMessage = brokerMessage,
+        )
+    }
+
+    return BrokerOrderRejectedException(
+        message = "stock order rejected by broker".withBrokerFailureDetail(detail),
+        brokerReturnCode = rtCd,
+        brokerMessageCode = messageCode,
+        brokerMessage = brokerMessage,
+    )
+}
+
+private fun String.withBrokerFailureDetail(detail: String): String {
+    return if (detail.isBlank()) this else "$this: $detail"
 }
 
 internal fun parseKisOrderDateTime(date: String, time: String): ZonedDateTime {
