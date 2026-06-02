@@ -37,6 +37,21 @@ class StockPurchaseRuntimeSafetyRulesTest {
     }
 
     @Test
+    fun `blocks host docker broker endpoint in production profile`() {
+        val violations = StockPurchaseRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                brokerBaseUrl = "http://host.docker.internal:8079",
+                domesticMockOrder = false,
+                overseasMockOrder = false,
+            ),
+        )
+
+        assertEquals(1, violations.size)
+        assertTrue(violations.single().contains("local KIS wrapper endpoint"))
+    }
+
+    @Test
     fun `blocks mock order flags in production profile`() {
         val violations = StockPurchaseRuntimeSafetyRules.validate(
             input(

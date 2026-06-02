@@ -127,6 +127,7 @@ object StockPurchaseRuntimeSafetyRules {
     private fun isLocalEndpoint(value: String): Boolean {
         val normalized = value.trim().lowercase()
         return normalized.contains("localhost") ||
+            normalized.contains("host.docker.internal") ||
             normalized.contains("127.0.0.1") ||
             normalized.contains("0.0.0.0") ||
             normalized.contains("[::1]") ||

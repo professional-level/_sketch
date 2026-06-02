@@ -35,12 +35,40 @@ class StrategyExecutionRuntimeSafetyRulesTest {
     }
 
     @Test
+    fun `blocks host docker temporal target in production profile`() {
+        val violations = StrategyExecutionRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                temporalTarget = "host.docker.internal:7233",
+                marketDataBaseUrl = "https://broker-wrapper.example.com",
+            ),
+        )
+
+        assertEquals(1, violations.size)
+        assertTrue(violations.single().contains("local Temporal target"))
+    }
+
+    @Test
     fun `blocks local market data endpoint in production profile`() {
         val violations = StrategyExecutionRuntimeSafetyRules.validate(
             input(
                 activeProfiles = listOf("live"),
                 temporalTarget = "temporal.example.com:7233",
                 marketDataBaseUrl = "http://localhost:8079",
+            ),
+        )
+
+        assertEquals(1, violations.size)
+        assertTrue(violations.single().contains("local market-data KIS wrapper endpoint"))
+    }
+
+    @Test
+    fun `blocks host docker market data endpoint in production profile`() {
+        val violations = StrategyExecutionRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("live"),
+                temporalTarget = "temporal.example.com:7233",
+                marketDataBaseUrl = "http://host.docker.internal:8079",
             ),
         )
 
