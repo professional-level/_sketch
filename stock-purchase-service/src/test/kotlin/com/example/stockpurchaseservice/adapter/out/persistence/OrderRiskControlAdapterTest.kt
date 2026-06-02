@@ -1,6 +1,7 @@
 package com.example.stockpurchaseservice.adapter.out.persistence
 
 import com.example.stockpurchaseservice.adapter.out.persistence.entity.OrderIntentSubmissionSide
+import com.example.stockpurchaseservice.adapter.out.persistence.entity.OrderIntentSubmissionMarket
 import com.example.stockpurchaseservice.adapter.out.persistence.repository.OrderRiskSubmissionReader
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentType
@@ -118,6 +119,48 @@ class OrderRiskControlAdapterTest {
     }
 
     @Test
+    fun `converts domestic order notional to risk base currency before applying order limit`() = runBlocking {
+        val properties = OrderRiskProperties().apply {
+            tradingHours.enabled = false
+            maxOrderNotional = 1_000.0
+            currencyConversion.ratesToBase["KRW"] = 0.001
+        }
+
+        val result = adapter(properties).assess(
+            command(
+                symbol = "005930",
+                market = StockOrderMarket.DOMESTIC,
+                quantity = 1,
+                limitPrice = 1_500_000.0,
+            ),
+        )
+
+        assertFalse(result.accepted)
+        assertContains(result.reason ?: "", "order notional 1500.0 USD exceeds limit 1000.0 USD")
+        assertContains(result.reason ?: "", "(raw=1500000.0 KRW rate=0.001)")
+    }
+
+    @Test
+    fun `rejects domestic order risk check when required FX rate is absent`() = runBlocking {
+        val properties = OrderRiskProperties().apply {
+            tradingHours.enabled = false
+            maxOrderNotional = 1_000.0
+        }
+
+        val result = adapter(properties).assess(
+            command(
+                symbol = "005930",
+                market = StockOrderMarket.DOMESTIC,
+                quantity = 1,
+                limitPrice = 100_000.0,
+            ),
+        )
+
+        assertFalse(result.accepted)
+        assertContains(result.reason ?: "", "missing FX rate from KRW to USD")
+    }
+
+    @Test
     fun `accepts buy when projected pending buy notional equals account limit`() = runBlocking {
         val properties = OrderRiskProperties().apply {
             maxAccountPendingBuyNotional = 1_000.0
@@ -129,6 +172,30 @@ class OrderRiskControlAdapterTest {
         )
 
         assertTrue(result.accepted)
+    }
+
+    @Test
+    fun `converts domestic pending buy notional to risk base currency`() = runBlocking {
+        val properties = OrderRiskProperties().apply {
+            tradingHours.enabled = false
+            maxAccountPendingBuyNotional = 1_000.0
+            currencyConversion.ratesToBase["KRW"] = 0.001
+        }
+        val reader = FakeOrderRiskSubmissionReader(activeBuyNotional = 800_000.0)
+
+        val result = adapter(properties, reader).assess(
+            command(
+                symbol = "005930",
+                market = StockOrderMarket.DOMESTIC,
+                quantity = 1,
+                limitPrice = 300_000.0,
+            ),
+        )
+
+        assertFalse(result.accepted)
+        assertEquals(OrderIntentSubmissionMarket.DOMESTIC, reader.activeBuyNotionalMarkets.single())
+        assertContains(result.reason ?: "", "account pending buy notional 1100.0 exceeds limit 1000.0 USD")
+        assertContains(result.reason ?: "", "(active=800.0 USD order=300.0 USD)")
     }
 
     @Test
@@ -176,6 +243,38 @@ class OrderRiskControlAdapterTest {
     }
 
     @Test
+    fun `converts broker account exposure to risk base currency`() = runBlocking {
+        val properties = OrderRiskProperties().apply {
+            tradingHours.enabled = false
+            maxAccountExposureNotional = 1_000.0
+            currencyConversion.ratesToBase["KRW"] = 0.001
+        }
+        val reader = FakeOrderRiskSubmissionReader(activeBuyNotional = 150_000.0)
+        val marketService = FakeMarketServicePort(
+            snapshot = AccountSnapshotDto(
+                market = StockOrderMarket.DOMESTIC,
+                exchange = "KRX",
+                currency = "KRW",
+                positions = emptyList(),
+                totalEvaluationAmount = 800_000.0,
+            ),
+        )
+
+        val result = adapter(properties, reader, marketService).assess(
+            command(
+                symbol = "005930",
+                market = StockOrderMarket.DOMESTIC,
+                quantity = 1,
+                limitPrice = 100_000.0,
+            ),
+        )
+
+        assertFalse(result.accepted)
+        assertContains(result.reason ?: "", "account exposure notional 1050.0 exceeds limit 1000.0 USD")
+        assertContains(result.reason ?: "", "(current=800.0 USD active=150.0 USD order=100.0 USD)")
+    }
+
+    @Test
     fun `rejects buy when active orders plus reserve exceed broker orderable cash`() = runBlocking {
         val properties = OrderRiskProperties().apply {
             accountCash.enabled = true
@@ -200,6 +299,40 @@ class OrderRiskControlAdapterTest {
         assertFalse(result.accepted)
         assertContains(result.reason ?: "", "account cash usage 1075.0 exceeds orderable cash 1000.0")
         assertContains(result.reason ?: "", "(active=850.0 order=200.0 reserve=25.0)")
+    }
+
+    @Test
+    fun `converts broker orderable cash to risk base currency`() = runBlocking {
+        val properties = OrderRiskProperties().apply {
+            tradingHours.enabled = false
+            accountCash.enabled = true
+            accountCash.reserveNotional = 10.0
+            currencyConversion.ratesToBase["KRW"] = 0.001
+        }
+        val reader = FakeOrderRiskSubmissionReader(activeBuyNotional = 100_000.0)
+        val marketService = FakeMarketServicePort(
+            snapshot = AccountSnapshotDto(
+                market = StockOrderMarket.DOMESTIC,
+                exchange = "KRX",
+                currency = "KRW",
+                positions = emptyList(),
+                cashCurrency = "KRW",
+                orderableCashAmount = 200_000.0,
+            ),
+        )
+
+        val result = adapter(properties, reader, marketService).assess(
+            command(
+                symbol = "005930",
+                market = StockOrderMarket.DOMESTIC,
+                quantity = 1,
+                limitPrice = 100_000.0,
+            ),
+        )
+
+        assertFalse(result.accepted)
+        assertContains(result.reason ?: "", "account cash usage 210.0 exceeds orderable cash 200.0 USD")
+        assertContains(result.reason ?: "", "(active=100.0 USD order=100.0 USD reserve=10.0)")
     }
 
     @Test
@@ -404,6 +537,7 @@ class OrderRiskControlAdapterTest {
 
     private fun command(
         strategyExecutionId: String = "laor-v4:TQQQ",
+        symbol: String = "TQQQ",
         side: OrderIntentSide = OrderIntentSide.BUY,
         orderType: OrderIntentType = OrderIntentType.LOC,
         market: StockOrderMarket = StockOrderMarket.OVERSEAS_US,
@@ -417,7 +551,7 @@ class OrderRiskControlAdapterTest {
             internalOrderId = UUID.randomUUID(),
             idempotencyKey = UUID.randomUUID().toString(),
             strategyExecutionId = strategyExecutionId,
-            symbol = "TQQQ",
+            symbol = symbol,
             side = side,
             orderType = orderType,
             quantity = quantity,
@@ -433,6 +567,8 @@ class OrderRiskControlAdapterTest {
     private class FakeOrderRiskSubmissionReader(
         private val activeBuyNotional: Double = 0.0,
     ) : OrderRiskSubmissionReader {
+        val activeBuyNotionalMarkets: MutableList<OrderIntentSubmissionMarket> = mutableListOf()
+
         override suspend fun countBrokerSubmittedBetween(
             from: ZonedDateTime,
             to: ZonedDateTime,
@@ -447,7 +583,10 @@ class OrderRiskControlAdapterTest {
             to: ZonedDateTime,
         ): Boolean = false
 
-        override suspend fun sumActiveBuyNotional(): Double = activeBuyNotional
+        override suspend fun sumActiveBuyNotional(market: OrderIntentSubmissionMarket): Double {
+            activeBuyNotionalMarkets += market
+            return activeBuyNotional
+        }
     }
 
     private class FakeMarketServicePort(

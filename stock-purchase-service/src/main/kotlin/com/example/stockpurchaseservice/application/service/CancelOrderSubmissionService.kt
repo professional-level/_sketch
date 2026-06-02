@@ -80,7 +80,7 @@ class CancelOrderSubmissionService(
     private fun CancelOrderSubmissionCommand.toCancelOrderDto(
         originalSubmission: OrderIntentSubmissionDto?,
     ): CancelOrderDto {
-        val market = symbol.toStockOrderMarket()
+        val market = originalSubmission?.market ?: symbol.toStockOrderMarket()
         val resolvedBranchOrderNumber = branchOrderNumber ?: originalSubmission?.branchOrderNumber
         if (market == StockOrderMarket.DOMESTIC) {
             require(!resolvedBranchOrderNumber.isNullOrBlank()) {

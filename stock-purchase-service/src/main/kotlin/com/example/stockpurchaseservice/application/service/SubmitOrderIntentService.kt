@@ -62,7 +62,11 @@ class SubmitOrderIntentService(
             processedEventPort.markSuccess(command.eventId)
             SubmitOrderIntentResult(OrderIntentSubmissionStatus.SUBMITTED)
         } catch (exception: BrokerOrderSubmissionUnknownException) {
-            val unknownSubmission = command.toUnknownSubmission(exception, command.toInternalOrderId())
+            val unknownSubmission = command.toUnknownSubmission(
+                exception = exception,
+                orderId = command.toInternalOrderId(),
+                market = command.symbol.toStockOrderMarket(),
+            )
             orderIntentSubmissionPort.saveUnknown(unknownSubmission)
             runCatching {
                 operationalAlertPort.alertSubmissionUnknown(command.toSubmissionUnknownAlert(unknownSubmission, exception.message))
@@ -71,7 +75,11 @@ class SubmitOrderIntentService(
             SubmitOrderIntentResult(OrderIntentSubmissionStatus.SUBMISSION_UNKNOWN)
         } catch (exception: BrokerOrderRejectedException) {
             val reason = exception.message ?: "broker order rejected"
-            val rejectedSubmission = command.toRejectedSubmission(command.toInternalOrderId(), reason)
+            val rejectedSubmission = command.toRejectedSubmission(
+                orderId = command.toInternalOrderId(),
+                reason = reason,
+                market = command.symbol.toStockOrderMarket(),
+            )
             orderIntentSubmissionPort.saveRejected(rejectedSubmission)
             orderExecutionEventPort.publishRejected(command.toRejectedMessage(reason))
             runCatching {
@@ -133,6 +141,7 @@ class SubmitOrderIntentService(
             idempotencyKey = command.idempotencyKey,
             strategyExecutionId = command.strategyExecutionId,
             symbol = command.symbol,
+            market = market,
             side = command.side,
             orderType = command.orderType,
             submittedPrice = command.price,
@@ -161,12 +170,14 @@ class SubmitOrderIntentService(
     private fun SubmitOrderIntentCommand.toUnknownSubmission(
         exception: BrokerOrderSubmissionUnknownException,
         orderId: UUID,
+        market: StockOrderMarket,
     ): OrderIntentSubmissionDto {
         return OrderIntentSubmissionDto(
             orderIntentId = eventId,
             idempotencyKey = idempotencyKey,
             strategyExecutionId = strategyExecutionId,
             symbol = symbol,
+            market = market,
             side = side,
             orderType = orderType,
             submittedPrice = price,
@@ -185,12 +196,14 @@ class SubmitOrderIntentService(
     private fun SubmitOrderIntentCommand.toRejectedSubmission(
         orderId: UUID,
         reason: String,
+        market: StockOrderMarket = symbol.toStockOrderMarket(),
     ): OrderIntentSubmissionDto {
         return OrderIntentSubmissionDto(
             orderIntentId = eventId,
             idempotencyKey = idempotencyKey,
             strategyExecutionId = strategyExecutionId,
             symbol = symbol,
+            market = market,
             side = side,
             orderType = orderType,
             submittedPrice = price,

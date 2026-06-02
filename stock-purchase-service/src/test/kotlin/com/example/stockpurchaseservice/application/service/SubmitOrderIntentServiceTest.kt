@@ -77,6 +77,7 @@ class SubmitOrderIntentServiceTest {
         assertEquals(OrderIntentSubmissionStatus.SUBMITTED, result.status)
         assertEquals(eventId, processedEventPort.succeeded.single())
         assertEquals(eventId, submissionPort.saved.single().orderIntentId)
+        assertEquals(StockOrderMarket.OVERSEAS_US, submissionPort.saved.single().market)
         assertEquals("branch-buy-1", submissionPort.saved.single().branchOrderNumber)
         assertEquals("broker-buy-1", eventPort.submitted.single().brokerOrderId)
         with(marketPort.buyOrders.single()) {
@@ -92,10 +93,11 @@ class SubmitOrderIntentServiceTest {
     fun `routes six digit symbols to domestic market`() = runBlocking {
         val marketPort = FakeMarketServicePort()
         val processedEventPort = FakeProcessedEventPort()
+        val submissionPort = FakeOrderIntentSubmissionPort()
         val service = SubmitOrderIntentService(
             marketPort,
             processedEventPort,
-            FakeOrderIntentSubmissionPort(),
+            submissionPort,
             FakeOrderExecutionEventPort(),
             FakeOrderRiskControlPort(),
             FakeOperationalAlertPort(),
@@ -120,6 +122,7 @@ class SubmitOrderIntentServiceTest {
             assertEquals(StockOrderMarket.DOMESTIC, market)
             assertEquals(StockOrderType.LIMIT, orderType)
         }
+        assertEquals(StockOrderMarket.DOMESTIC, submissionPort.saved.single().market)
     }
 
     @Test
@@ -193,6 +196,7 @@ class SubmitOrderIntentServiceTest {
         assertEquals(OrderIntentSubmissionStatus.SUBMISSION_UNKNOWN, result.status)
         assertEquals(eventId, processedEventPort.succeeded.single())
         assertEquals(eventId, submissionPort.unknown.single().orderIntentId)
+        assertEquals(StockOrderMarket.OVERSEAS_US, submissionPort.unknown.single().market)
         assertEquals(eventId, alertPort.submissionUnknown.single().orderIntentId)
         assertEquals("timeout after broker submit", alertPort.submissionUnknown.single().reason)
         assertEquals(emptyList(), eventPort.submitted)
@@ -239,6 +243,7 @@ class SubmitOrderIntentServiceTest {
         assertEquals(OrderIntentSubmissionStatus.REJECTED, result.status)
         assertEquals(eventId, processedEventPort.succeeded.single())
         assertEquals(emptyList(), processedEventPort.failed)
+        assertEquals(StockOrderMarket.OVERSEAS_US, submissionPort.rejected.single().market)
         assertEquals("stock order rejected by broker: APBK001 insufficient buying power", submissionPort.rejected.single().statusReason)
         assertEquals("stock order rejected by broker: APBK001 insufficient buying power", eventPort.rejected.single().reason)
         assertEquals(eventId, alertPort.orderSubmissionFailed.single().orderIntentId)
@@ -364,6 +369,7 @@ class SubmitOrderIntentServiceTest {
         assertEquals(OrderIntentSubmissionStatus.REJECTED, result.status)
         assertEquals(336.0, riskPort.assessed.single().estimatedNotional)
         assertEquals(OrderTradingEnvironment.LIVE, riskPort.assessed.single().expectedTradingEnvironment)
+        assertEquals(StockOrderMarket.OVERSEAS_US, submissionPort.rejected.single().market)
         assertEquals(OrderTradingEnvironment.LIVE, submissionPort.rejected.single().tradingEnvironment)
         assertEquals(emptyList(), marketPort.buyOrders)
         assertEquals(eventId, processedEventPort.succeeded.single())

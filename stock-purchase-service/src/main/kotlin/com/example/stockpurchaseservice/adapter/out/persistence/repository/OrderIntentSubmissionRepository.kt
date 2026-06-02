@@ -1,6 +1,7 @@
 package com.example.stockpurchaseservice.adapter.out.persistence.repository
 
 import com.example.stockpurchaseservice.adapter.out.persistence.entity.OrderIntentSubmissionEntity
+import com.example.stockpurchaseservice.adapter.out.persistence.entity.OrderIntentSubmissionMarket
 import com.example.stockpurchaseservice.adapter.out.persistence.entity.OrderIntentSubmissionSide
 import com.example.stockpurchaseservice.adapter.out.persistence.entity.OrderIntentSubmissionStatus
 import common.AbstractReactiveRepository
@@ -110,7 +111,7 @@ internal class OrderIntentSubmissionRepository :
         return count > 0
     }
 
-    override suspend fun sumActiveBuyNotional(): Double {
+    override suspend fun sumActiveBuyNotional(market: OrderIntentSubmissionMarket): Double {
         val notional = sessionFactory.withSession { session ->
             session.createQuery(
                 """
@@ -118,11 +119,13 @@ internal class OrderIntentSubmissionRepository :
                 FROM OrderIntentSubmissionEntity o
                 WHERE o.side = :side
                   AND o.submittedPrice IS NOT NULL
+                  AND (o.market = :market OR o.market IS NULL)
                   AND o.status IN (:statuses)
                 """.trimIndent(),
                 java.lang.Number::class.java,
             )
                 .setParameter("side", OrderIntentSubmissionSide.BUY)
+                .setParameter("market", market)
                 .setParameter("statuses", ACTIVE_EXPOSURE_STATUSES)
                 .singleResult
         }.awaitSuspending()

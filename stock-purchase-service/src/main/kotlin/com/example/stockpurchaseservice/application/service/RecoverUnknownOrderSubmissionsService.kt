@@ -165,7 +165,7 @@ class RecoverUnknownOrderSubmissionsService(
             externalOrderId = externalOrderId,
             symbol = symbol,
             side = side,
-            market = symbol.toStockOrderMarket(),
+            market = market ?: symbol.toStockOrderMarket(),
             submittedAt = submittedAt,
         )
     }

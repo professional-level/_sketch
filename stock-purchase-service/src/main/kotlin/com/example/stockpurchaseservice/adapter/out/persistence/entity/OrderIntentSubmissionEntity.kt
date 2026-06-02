@@ -5,6 +5,7 @@ import com.example.stockpurchaseservice.application.port.`in`.OrderIntentType
 import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionDto
 import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionStatusDto
 import com.example.stockpurchaseservice.application.port.out.OrderTradingEnvironment
+import com.example.stockpurchaseservice.application.port.out.StockOrderMarket
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
@@ -33,6 +34,9 @@ internal class OrderIntentSubmissionEntity private constructor(
     val strategyExecutionId: String,
     @Column(nullable = false)
     val symbol: String,
+    @Enumerated(EnumType.STRING)
+    @Column
+    val market: OrderIntentSubmissionMarket?,
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     val side: OrderIntentSubmissionSide,
@@ -70,6 +74,7 @@ internal class OrderIntentSubmissionEntity private constructor(
             idempotencyKey = idempotencyKey,
             strategyExecutionId = strategyExecutionId,
             symbol = symbol,
+            market = market?.toDto(),
             side = side.toDto(),
             orderType = orderType.toDto(),
             submittedPrice = submittedPrice,
@@ -93,6 +98,7 @@ internal class OrderIntentSubmissionEntity private constructor(
                 idempotencyKey = dto.idempotencyKey,
                 strategyExecutionId = dto.strategyExecutionId,
                 symbol = dto.symbol,
+                market = dto.market?.let(OrderIntentSubmissionMarket::from),
                 side = OrderIntentSubmissionSide.from(dto.side),
                 orderType = OrderIntentSubmissionType.from(dto.orderType),
                 submittedPrice = dto.submittedPrice,
@@ -107,6 +113,28 @@ internal class OrderIntentSubmissionEntity private constructor(
                 statusReason = dto.statusReason?.take(1000),
                 lastStatusCheckedAt = dto.lastStatusCheckedAt,
             )
+        }
+    }
+}
+
+internal enum class OrderIntentSubmissionMarket {
+    DOMESTIC,
+    OVERSEAS_US,
+    ;
+
+    fun toDto(): StockOrderMarket {
+        return when (this) {
+            DOMESTIC -> StockOrderMarket.DOMESTIC
+            OVERSEAS_US -> StockOrderMarket.OVERSEAS_US
+        }
+    }
+
+    companion object {
+        fun from(market: StockOrderMarket): OrderIntentSubmissionMarket {
+            return when (market) {
+                StockOrderMarket.DOMESTIC -> DOMESTIC
+                StockOrderMarket.OVERSEAS_US -> OVERSEAS_US
+            }
         }
     }
 }

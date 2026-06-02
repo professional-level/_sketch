@@ -1,6 +1,7 @@
 package com.example.stockpurchaseservice.adapter.out.persistence.repository
 
 import com.example.stockpurchaseservice.adapter.out.persistence.entity.OrderIntentSubmissionSide
+import com.example.stockpurchaseservice.adapter.out.persistence.entity.OrderIntentSubmissionMarket
 import java.time.ZonedDateTime
 
 internal interface OrderRiskSubmissionReader {
@@ -18,5 +19,5 @@ internal interface OrderRiskSubmissionReader {
         to: ZonedDateTime,
     ): Boolean
 
-    suspend fun sumActiveBuyNotional(): Double
+    suspend fun sumActiveBuyNotional(market: OrderIntentSubmissionMarket): Double
 }

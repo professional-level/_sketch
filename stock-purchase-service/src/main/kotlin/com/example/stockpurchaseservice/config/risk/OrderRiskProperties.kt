@@ -16,6 +16,7 @@ class OrderRiskProperties {
     var strategyTradingEnvironments: MutableMap<String, OrderTradingEnvironment> = mutableMapOf()
     var accountExposure: AccountExposureProperties = AccountExposureProperties()
     var accountCash: AccountCashProperties = AccountCashProperties()
+    var currencyConversion: CurrencyConversionProperties = CurrencyConversionProperties()
     var tradingHours: TradingHoursProperties = TradingHoursProperties()
 
     class AccountExposureProperties {
@@ -26,6 +27,13 @@ class OrderRiskProperties {
     class AccountCashProperties {
         var enabled: Boolean = false
         var reserveNotional: Double = 0.0
+    }
+
+    class CurrencyConversionProperties {
+        var baseCurrency: String = "USD"
+        var domesticCurrency: String = "KRW"
+        var overseasUsCurrency: String = "USD"
+        var ratesToBase: MutableMap<String, Double> = mutableMapOf()
     }
 
     class TradingHoursProperties {

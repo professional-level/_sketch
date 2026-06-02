@@ -1,6 +1,7 @@
 package com.example.stockpurchaseservice.adapter.out.persistence
 
 import com.example.common.PersistenceAdapter
+import com.example.stockpurchaseservice.adapter.out.persistence.entity.OrderIntentSubmissionMarket
 import com.example.stockpurchaseservice.adapter.out.persistence.entity.OrderIntentSubmissionSide
 import com.example.stockpurchaseservice.adapter.out.persistence.repository.OrderRiskSubmissionReader
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
@@ -66,9 +67,14 @@ internal class OrderRiskControlAdapter(
     private fun orderNotionalReason(command: OrderRiskAssessmentCommand): String? {
         val limit = command.symbolMaxOrderNotional() ?: properties.maxOrderNotional
         if (limit == null || limit <= 0.0) return null
-        val notional = command.estimatedNotional ?: return null
-        return if (notional > limit) {
-            "order notional $notional exceeds limit $limit for symbol ${command.symbol}"
+        val rawNotional = command.estimatedNotional ?: return null
+        val notional = rawNotional
+            .toRiskCurrency(command.market.notionalCurrency())
+            ?: return "order notional cannot be assessed: missing FX rate from " +
+                "${command.market.notionalCurrency()} to ${properties.baseCurrency()}"
+        return if (notional.amount > limit) {
+            "order notional ${notional.forMessage()} exceeds limit ${limit.forLimitMessage(notional)} " +
+                "for symbol ${command.symbol}${notional.detailSuffix()}"
         } else {
             null
         }
@@ -91,12 +97,21 @@ internal class OrderRiskControlAdapter(
         val limit = properties.maxAccountPendingBuyNotional ?: return null
         if (limit <= 0.0 || command.side != OrderIntentSide.BUY) return null
 
-        val orderNotional = command.estimatedNotional ?: return null
-        val activeBuyNotional = orderRiskSubmissionReader.sumActiveBuyNotional()
-        val projectedNotional = activeBuyNotional + orderNotional
+        val sourceCurrency = command.market.notionalCurrency()
+        val rawOrderNotional = command.estimatedNotional ?: return null
+        val orderNotional = rawOrderNotional
+            .toRiskCurrency(sourceCurrency)
+            ?: return "account pending buy notional cannot be assessed: missing FX rate from " +
+                "$sourceCurrency to ${properties.baseCurrency()}"
+        val activeBuyNotional = orderRiskSubmissionReader
+            .sumActiveBuyNotional(command.market.toEntity())
+            .toRiskCurrency(sourceCurrency)
+            ?: return "account pending buy notional cannot be assessed: missing FX rate from " +
+                "$sourceCurrency to ${properties.baseCurrency()}"
+        val projectedNotional = activeBuyNotional.amount + orderNotional.amount
         return if (projectedNotional > limit) {
-            "account pending buy notional $projectedNotional exceeds limit $limit " +
-                "(active=$activeBuyNotional order=$orderNotional)"
+            "account pending buy notional $projectedNotional exceeds limit ${limit.forLimitMessage(orderNotional)} " +
+                "(active=${activeBuyNotional.forMessage()} order=${orderNotional.forMessage()})"
         } else {
             null
         }
@@ -108,7 +123,12 @@ internal class OrderRiskControlAdapter(
         val orderNotional = command.estimatedNotional
             ?: return "account cash cannot be assessed: order notional is missing for ${command.symbol}"
         val reserveNotional = properties.accountCash.reserveNotional.coerceAtLeast(0.0)
-        val activeBuyNotional = orderRiskSubmissionReader.sumActiveBuyNotional()
+        val sourceCurrency = command.market.notionalCurrency()
+        val orderNotionalInBase = orderNotional.toRiskCurrency(sourceCurrency)
+            ?: return "account cash cannot be assessed: missing FX rate from $sourceCurrency to ${properties.baseCurrency()}"
+        val activeBuyNotional = orderRiskSubmissionReader.sumActiveBuyNotional(command.market.toEntity())
+        val activeBuyNotionalInBase = activeBuyNotional.toRiskCurrency(sourceCurrency)
+            ?: return "account cash cannot be assessed: missing FX rate from $sourceCurrency to ${properties.baseCurrency()}"
         val snapshot = runCatching {
             marketServicePort.findAccountSnapshot(command.toAccountSnapshotQuery())
         }.getOrElse { exception ->
@@ -116,11 +136,15 @@ internal class OrderRiskControlAdapter(
         }
         val orderableCash = snapshot.orderableCashForRisk()
             ?: return "account cash cannot be assessed: broker snapshot has no orderable cash amount"
+        val cashCurrency = snapshot.cashCurrency ?: snapshot.currency
+        val orderableCashInBase = orderableCash.toRiskCurrency(cashCurrency)
+            ?: return "account cash cannot be assessed: missing FX rate from $cashCurrency to ${properties.baseCurrency()}"
 
-        val projectedCashUsage = activeBuyNotional + orderNotional + reserveNotional
-        return if (projectedCashUsage > orderableCash) {
-            "account cash usage $projectedCashUsage exceeds orderable cash $orderableCash " +
-                "(active=$activeBuyNotional order=$orderNotional reserve=$reserveNotional)"
+        val projectedCashUsage = activeBuyNotionalInBase.amount + orderNotionalInBase.amount + reserveNotional
+        return if (projectedCashUsage > orderableCashInBase.amount) {
+            "account cash usage $projectedCashUsage exceeds orderable cash ${orderableCashInBase.forMessage()} " +
+                "(active=${activeBuyNotionalInBase.forMessage()} order=${orderNotionalInBase.forMessage()} " +
+                "reserve=${reserveNotional.forReserveMessage()})"
         } else {
             null
         }
@@ -132,17 +156,27 @@ internal class OrderRiskControlAdapter(
 
         val orderNotional = command.estimatedNotional
             ?: return "account exposure cannot be assessed: order notional is missing for ${command.symbol}"
-        val activeBuyNotional = orderRiskSubmissionReader.sumActiveBuyNotional()
-        val currentExposure = runCatching {
-            marketServicePort.findAccountSnapshot(command.toAccountSnapshotQuery()).exposureNotional()
+        val sourceCurrency = command.market.notionalCurrency()
+        val orderNotionalInBase = orderNotional.toRiskCurrency(sourceCurrency)
+            ?: return "account exposure cannot be assessed: missing FX rate from $sourceCurrency to ${properties.baseCurrency()}"
+        val activeBuyNotional = orderRiskSubmissionReader.sumActiveBuyNotional(command.market.toEntity())
+        val activeBuyNotionalInBase = activeBuyNotional.toRiskCurrency(sourceCurrency)
+            ?: return "account exposure cannot be assessed: missing FX rate from $sourceCurrency to ${properties.baseCurrency()}"
+        val snapshot = runCatching {
+            marketServicePort.findAccountSnapshot(command.toAccountSnapshotQuery())
         }.getOrElse { exception ->
             return "account exposure cannot be assessed: ${exception.message ?: exception::class.java.simpleName}"
-        } ?: return "account exposure cannot be assessed: broker snapshot has no evaluation amount"
+        }
+        val currentExposure = snapshot.exposureNotional()
+            ?: return "account exposure cannot be assessed: broker snapshot has no evaluation amount"
+        val currentExposureInBase = currentExposure.toRiskCurrency(snapshot.currency)
+            ?: return "account exposure cannot be assessed: missing FX rate from ${snapshot.currency} to ${properties.baseCurrency()}"
 
-        val projectedExposure = currentExposure + activeBuyNotional + orderNotional
+        val projectedExposure = currentExposureInBase.amount + activeBuyNotionalInBase.amount + orderNotionalInBase.amount
         return if (projectedExposure > limit) {
-            "account exposure notional $projectedExposure exceeds limit $limit " +
-                "(current=$currentExposure active=$activeBuyNotional order=$orderNotional)"
+            "account exposure notional $projectedExposure exceeds limit ${limit.forLimitMessage(orderNotionalInBase)} " +
+                "(current=${currentExposureInBase.forMessage()} active=${activeBuyNotionalInBase.forMessage()} " +
+                "order=${orderNotionalInBase.forMessage()})"
         } else {
             null
         }
@@ -198,6 +232,94 @@ internal class OrderRiskControlAdapter(
 
     private fun AccountSnapshotDto.orderableCashForRisk(): Double? {
         return orderableCashAmount ?: availableCashAmount
+    }
+
+    private fun Double.toRiskCurrency(sourceCurrency: String): RiskCurrencyAmount? {
+        val source = sourceCurrency.normalizedCurrency()
+        val base = properties.baseCurrency()
+        if (source.isBlank() || base.isBlank()) return null
+        if (source == base) {
+            return RiskCurrencyAmount(
+                amount = this,
+                currency = base,
+                sourceAmount = this,
+                sourceCurrency = source,
+                rateToBase = 1.0,
+            )
+        }
+        val rate = properties.currencyConversion.ratesToBase[source]
+            ?: properties.currencyConversion.ratesToBase[source.lowercase()]
+            ?: properties.currencyConversion.ratesToBase[source.uppercase()]
+            ?: return null
+        if (rate <= 0.0) return null
+        return RiskCurrencyAmount(
+            amount = this * rate,
+            currency = base,
+            sourceAmount = this,
+            sourceCurrency = source,
+            rateToBase = rate,
+        )
+    }
+
+    private fun Double.forLimitMessage(reference: RiskCurrencyAmount): String {
+        return if (reference.isConverted) {
+            "$this ${reference.currency}"
+        } else {
+            toString()
+        }
+    }
+
+    private fun Double.forReserveMessage(): String {
+        return toString()
+    }
+
+    private fun OrderRiskProperties.baseCurrency(): String {
+        return currencyConversion.baseCurrency.normalizedCurrency()
+    }
+
+    private fun StockOrderMarket.notionalCurrency(): String {
+        return when (this) {
+            StockOrderMarket.DOMESTIC -> properties.currencyConversion.domesticCurrency
+            StockOrderMarket.OVERSEAS_US -> properties.currencyConversion.overseasUsCurrency
+        }.normalizedCurrency()
+    }
+
+    private fun StockOrderMarket.toEntity(): OrderIntentSubmissionMarket {
+        return when (this) {
+            StockOrderMarket.DOMESTIC -> OrderIntentSubmissionMarket.DOMESTIC
+            StockOrderMarket.OVERSEAS_US -> OrderIntentSubmissionMarket.OVERSEAS_US
+        }
+    }
+
+    private fun String.normalizedCurrency(): String {
+        return trim().uppercase()
+    }
+
+    private data class RiskCurrencyAmount(
+        val amount: Double,
+        val currency: String,
+        val sourceAmount: Double,
+        val sourceCurrency: String,
+        val rateToBase: Double,
+    ) {
+        val isConverted: Boolean
+            get() = sourceCurrency != currency
+
+        fun forMessage(): String {
+            return if (isConverted) {
+                "$amount $currency"
+            } else {
+                amount.toString()
+            }
+        }
+
+        fun detailSuffix(): String {
+            return if (isConverted) {
+                " (raw=$sourceAmount $sourceCurrency rate=$rateToBase)"
+            } else {
+                ""
+            }
+        }
     }
 
     private fun OrderRiskAssessmentCommand.orderIntentTradingEnvironmentPolicy(): StrategyTradingEnvironmentPolicy? {

@@ -188,6 +188,10 @@ akra.order.risk.account-exposure.overseas-exchange=NASD
 akra.order.risk.account-exposure.overseas-currency=USD
 akra.order.risk.account-cash.enabled=true
 akra.order.risk.account-cash.reserve-notional=100
+akra.order.risk.currency-conversion.base-currency=USD
+akra.order.risk.currency-conversion.domestic-currency=KRW
+akra.order.risk.currency-conversion.overseas-us-currency=USD
+akra.order.risk.currency-conversion.rates-to-base.KRW=0.00075
 akra.order.risk.trading-hours.enabled=true
 akra.order.risk.trading-hours.domestic.regular-open=09:00
 akra.order.risk.trading-hours.domestic.regular-close=15:30
@@ -247,6 +251,7 @@ docs/operations/sql/20260602_add_outbox_next_attempt_at.mysql.sql
 docs/operations/sql/20260602_add_outbox_claim_lease.mysql.sql
 docs/operations/sql/20260602_add_order_intent_submission_branch_order_number.mysql.sql
 docs/operations/sql/20260602_add_order_intent_submission_trading_environment.mysql.sql
+docs/operations/sql/20260602_add_order_intent_submission_market.mysql.sql
 ```
 
 These migrations add nullable `traceId`, `spanId`, `traceParent`, `nextAttemptAt`, `claimOwner`, and `claimExpiresAt` columns to both outbox tables:
@@ -254,14 +259,14 @@ These migrations add nullable `traceId`, `spanId`, `traceParent`, `nextAttemptAt
 - `strategy-execution-service`: `order_intent_outbox_event`
 - `stock-purchase-service`: `order_execution_outbox_event`
 
-They also add nullable `branchOrderNumber` and `tradingEnvironment` to `stock-purchase-service` `order_intent_submission`, so KIS domestic `KRX_FWDG_ORD_ORGNO` values can be reused for later cancel/recovery requests and the expected mock/live route remains auditable from stored order intent submissions.
+They also add nullable `branchOrderNumber`, `tradingEnvironment`, and `market` to `stock-purchase-service` `order_intent_submission`, so KIS domestic `KRX_FWDG_ORD_ORGNO` values can be reused for later cancel/recovery requests, the expected mock/live route remains auditable from stored order intent submissions, and active pending buy notional can be summed per market currency.
 
 Operational sequence:
 
 1. Stop outbox publishers or drain traffic so new outbox rows are not being written during the schema change.
 2. Run the preflight query in the SQL file and confirm the target columns do not already exist.
 3. Apply the `ALTER TABLE` statements in the migration files.
-4. Run the post-apply verification queries and confirm six nullable `VARCHAR(255)` trace columns, two nullable `DATETIME(6)` retry-scheduling columns, two nullable `VARCHAR(255)` claim owner columns, two nullable `DATETIME(6)` claim expiry columns, one nullable `VARCHAR(255)` branch order number column, and one nullable `VARCHAR(16)` trading environment column.
+4. Run the post-apply verification queries and confirm six nullable `VARCHAR(255)` trace columns, two nullable `DATETIME(6)` retry-scheduling columns, two nullable `VARCHAR(255)` claim owner columns, two nullable `DATETIME(6)` claim expiry columns, one nullable `VARCHAR(255)` branch order number column, one nullable `VARCHAR(16)` trading environment column, and one nullable `VARCHAR(32)` market column.
 5. Start `strategy-execution-service` and `stock-purchase-service`.
 
 Outbox publishers use `akra.outbox.publish-retry-initial-delay-ms` and `akra.outbox.publish-retry-max-delay-ms` to calculate exponential backoff after Kafka publish failures. Failed rows are republished only after `nextAttemptAt`, so repeated Kafka outages should not produce tight retry loops. Before publishing, each instance claims rows with `PROCESSING`, `claimOwner`, and `claimExpiresAt`; expired claims are eligible for another instance to reclaim.
@@ -291,13 +296,15 @@ GET /operations/trading/account-snapshot?market=DOMESTIC&exchange=KRX&currency=K
 ```
 
 This calls the broker wrapper's domestic or overseas balance lookup and returns current positions with quantity, average purchase price, current price, purchase amount, evaluation amount, profit/loss, and legacy `availableCashAmount` when KIS provides those fields.
-The response also includes `cashCurrency`, `orderableCashAmount`, `settledCashAmount`, and `withdrawableCashAmount` when those KIS summary aliases are present. `availableCashAmount` remains as a legacy compatibility field and is derived from the first available broker cash bucket. Strict multi-currency conversion, FX-rate normalization, and broader account cash/exposure modeling still require additional hardening.
+The response also includes `cashCurrency`, `orderableCashAmount`, `settledCashAmount`, and `withdrawableCashAmount` when those KIS summary aliases are present. `availableCashAmount` remains as a legacy compatibility field and is derived from the first available broker cash bucket. Risk checks can normalize configured domestic and overseas currencies with static `rates-to-base` settings; live FX sourcing and broader account cash/exposure modeling still require additional hardening.
 
 When `akra.order.risk.max-account-exposure-notional` is set, buy order risk checks use the market-specific account snapshot to reject orders whose projected exposure would exceed the configured limit:
 
 ```text
 current broker evaluation amount + active pending buy notional + new order notional
 ```
+
+The configured exposure limit is interpreted in `akra.order.risk.currency-conversion.base-currency`. Domestic and overseas order/cash/exposure amounts are converted with `akra.order.risk.currency-conversion.rates-to-base.*` when the market currency differs from the base currency. If a required FX rate is missing, the guard rejects the buy order instead of comparing unlike currencies.
 
 If the broker snapshot does not contain enough valuation data to calculate current exposure, the guard rejects the buy order instead of assuming zero exposure.
 
@@ -308,6 +315,7 @@ active pending buy notional + new order notional + configured cash reserve
 ```
 
 If the broker snapshot does not contain `orderableCashAmount`, the guard falls back to legacy `availableCashAmount` for older snapshot providers. If neither amount exists, the guard rejects the buy order instead of assuming cash is available.
+`akra.order.risk.account-cash.reserve-notional`, `max-order-notional`, `max-account-pending-buy-notional`, and `max-account-exposure-notional` are all interpreted in the configured risk base currency.
 
 ## Kafka And Temporal Restart Procedure
 

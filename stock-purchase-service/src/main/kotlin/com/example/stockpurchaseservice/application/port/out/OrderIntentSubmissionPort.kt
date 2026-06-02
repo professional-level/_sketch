@@ -21,6 +21,7 @@ data class OrderIntentSubmissionDto(
     val idempotencyKey: String,
     val strategyExecutionId: String,
     val symbol: String,
+    val market: StockOrderMarket? = null,
     val side: OrderIntentSide,
     val orderType: OrderIntentType,
     val submittedPrice: Double?,
