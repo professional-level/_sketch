@@ -62,6 +62,7 @@ Blocked by default:
 
 - `akra.order.kis-open-api.base-url` points at `localhost`, `127.0.0.1`, `0.0.0.0`, or `::1`.
 - `akra.order.domestic.mock=true` or `akra.order.overseas.mock=true`.
+- `spring.jpa.hibernate.ddl-auto` is set to an automatic schema mutation mode such as `update`, `create`, or `create-drop`.
 
 Temporary waiver properties exist for controlled tests only:
 
@@ -74,6 +75,7 @@ akra.runtime.safety.allow-mock-trading-in-production=true
 
 - `akra.temporal.enabled=true` and `akra.temporal.target` points at a local endpoint.
 - `akra.market-data.kis-open-api.base-url` points at a local endpoint.
+- `spring.jpa.hibernate.ddl-auto` is set to an automatic schema mutation mode such as `update`, `create`, or `create-drop`.
 
 Temporary waiver properties:
 
@@ -89,6 +91,7 @@ These waivers should not be enabled for real capital.
 Before enabling real orders:
 
 - Set `spring.profiles.active=prod` or another configured production profile.
+- Apply required DB migrations explicitly and set `spring.jpa.hibernate.ddl-auto=validate` or `none`; do not use `update` in production.
 - Point `akra.order.kis-open-api.base-url` and `akra.market-data.kis-open-api.base-url` to the deployed broker wrapper.
 - Point `akra.temporal.target` to the managed Temporal frontend.
 - Set real-vs-mock trading flags intentionally for the account being operated.
@@ -160,7 +163,7 @@ Kafka event boundaries carry the same trace fields through outbox rows and Kafka
 
 ## DB Schema Migration
 
-Local sketch profiles currently use Hibernate `ddl-auto=update`, but production-like environments should not rely on automatic DDL. Before deploying the Kafka trace propagation build, apply:
+Local sketch profiles currently use Hibernate `ddl-auto=update`, but production-like environments should not rely on automatic DDL. `stock-purchase-service` and `strategy-execution-service` now fail startup under production-like profiles unless `spring.jpa.hibernate.ddl-auto` is empty, `none`, or `validate`. Before deploying the Kafka trace propagation build, apply:
 
 ```text
 docs/operations/sql/20260602_add_outbox_trace_columns.mysql.sql

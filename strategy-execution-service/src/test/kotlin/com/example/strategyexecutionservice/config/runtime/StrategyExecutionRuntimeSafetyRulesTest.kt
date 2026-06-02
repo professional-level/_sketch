@@ -13,6 +13,7 @@ class StrategyExecutionRuntimeSafetyRulesTest {
                 activeProfiles = listOf("local"),
                 temporalTarget = "127.0.0.1:7233",
                 marketDataBaseUrl = "http://localhost:8079",
+                hibernateDdlAuto = "update",
             ),
         )
 
@@ -48,12 +49,42 @@ class StrategyExecutionRuntimeSafetyRulesTest {
     }
 
     @Test
+    fun `blocks Hibernate automatic DDL in production profile`() {
+        val violations = StrategyExecutionRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("production"),
+                temporalTarget = "temporal.example.com:7233",
+                marketDataBaseUrl = "https://broker-wrapper.example.com",
+                hibernateDdlAuto = "create-drop",
+            ),
+        )
+
+        assertEquals(1, violations.size)
+        assertTrue(violations.single().contains("Hibernate automatic DDL"))
+    }
+
+    @Test
+    fun `allows schema validation DDL mode in production profile`() {
+        val violations = StrategyExecutionRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                temporalTarget = "temporal.example.com:7233",
+                marketDataBaseUrl = "https://broker-wrapper.example.com",
+                hibernateDdlAuto = "validate",
+            ),
+        )
+
+        assertTrue(violations.isEmpty())
+    }
+
+    @Test
     fun `allows explicitly waived production checks`() {
         val violations = StrategyExecutionRuntimeSafetyRules.validate(
             input(
                 activeProfiles = listOf("prod"),
                 temporalTarget = "127.0.0.1:7233",
                 marketDataBaseUrl = "http://localhost:8079",
+                hibernateDdlAuto = "validate",
                 allowLocalTemporalTargetInProduction = true,
                 allowLocalMarketDataEndpointInProduction = true,
             ),
@@ -66,6 +97,7 @@ class StrategyExecutionRuntimeSafetyRulesTest {
         activeProfiles: List<String>,
         temporalTarget: String,
         marketDataBaseUrl: String,
+        hibernateDdlAuto: String? = "validate",
         allowLocalTemporalTargetInProduction: Boolean = false,
         allowLocalMarketDataEndpointInProduction: Boolean = false,
     ) = StrategyExecutionRuntimeSafetyRules.Input(
@@ -75,6 +107,7 @@ class StrategyExecutionRuntimeSafetyRulesTest {
         temporalEnabled = true,
         temporalTarget = temporalTarget,
         marketDataBaseUrl = marketDataBaseUrl,
+        hibernateDdlAuto = hibernateDdlAuto,
         allowLocalTemporalTargetInProduction = allowLocalTemporalTargetInProduction,
         allowLocalMarketDataEndpointInProduction = allowLocalMarketDataEndpointInProduction,
     )

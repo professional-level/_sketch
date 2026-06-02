@@ -27,6 +27,7 @@ class StockPurchaseRuntimeSafetyValidator(
                 brokerBaseUrl = brokerBaseUrl,
                 domesticMockOrder = domesticMockOrder,
                 overseasMockOrder = overseasMockOrder,
+                hibernateDdlAuto = environment.getProperty("spring.jpa.hibernate.ddl-auto"),
                 allowLocalBrokerEndpointInProduction = properties.allowLocalBrokerEndpointInProduction,
                 allowMockTradingInProduction = properties.allowMockTradingInProduction,
             ),
@@ -52,6 +53,7 @@ object StockPurchaseRuntimeSafetyRules {
         val brokerBaseUrl: String,
         val domesticMockOrder: Boolean,
         val overseasMockOrder: Boolean,
+        val hibernateDdlAuto: String?,
         val allowLocalBrokerEndpointInProduction: Boolean,
         val allowMockTradingInProduction: Boolean,
     )
@@ -72,7 +74,17 @@ object StockPurchaseRuntimeSafetyRules {
                 "akra.runtime.safety.allow-mock-trading-in-production=true"
         }
 
+        if (!isSafeHibernateDdlAuto(input.hibernateDdlAuto)) {
+            violations += "prod/live profile cannot use Hibernate automatic DDL " +
+                "(spring.jpa.hibernate.ddl-auto=${input.hibernateDdlAuto}); apply migrations explicitly and use none or validate"
+        }
+
         return violations
+    }
+
+    private fun isSafeHibernateDdlAuto(value: String?): Boolean {
+        val normalized = value?.trim()?.lowercase().orEmpty()
+        return normalized.isEmpty() || normalized == "none" || normalized == "validate"
     }
 
     private fun isProduction(activeProfiles: List<String>, productionProfiles: List<String>): Boolean {

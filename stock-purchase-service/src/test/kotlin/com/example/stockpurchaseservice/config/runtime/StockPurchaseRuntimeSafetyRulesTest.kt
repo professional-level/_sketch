@@ -14,6 +14,7 @@ class StockPurchaseRuntimeSafetyRulesTest {
                 brokerBaseUrl = "http://localhost:8079",
                 domesticMockOrder = true,
                 overseasMockOrder = true,
+                hibernateDdlAuto = "update",
             ),
         )
 
@@ -51,6 +52,37 @@ class StockPurchaseRuntimeSafetyRulesTest {
     }
 
     @Test
+    fun `blocks Hibernate automatic DDL in production profile`() {
+        val violations = StockPurchaseRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("production"),
+                brokerBaseUrl = "https://broker-wrapper.example.com",
+                domesticMockOrder = false,
+                overseasMockOrder = false,
+                hibernateDdlAuto = "update",
+            ),
+        )
+
+        assertEquals(1, violations.size)
+        assertTrue(violations.single().contains("Hibernate automatic DDL"))
+    }
+
+    @Test
+    fun `allows schema validation DDL mode in production profile`() {
+        val violations = StockPurchaseRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                brokerBaseUrl = "https://broker-wrapper.example.com",
+                domesticMockOrder = false,
+                overseasMockOrder = false,
+                hibernateDdlAuto = "validate",
+            ),
+        )
+
+        assertTrue(violations.isEmpty())
+    }
+
+    @Test
     fun `allows explicitly waived production checks`() {
         val violations = StockPurchaseRuntimeSafetyRules.validate(
             input(
@@ -58,6 +90,7 @@ class StockPurchaseRuntimeSafetyRulesTest {
                 brokerBaseUrl = "http://localhost:8079",
                 domesticMockOrder = true,
                 overseasMockOrder = true,
+                hibernateDdlAuto = "validate",
                 allowLocalBrokerEndpointInProduction = true,
                 allowMockTradingInProduction = true,
             ),
@@ -71,6 +104,7 @@ class StockPurchaseRuntimeSafetyRulesTest {
         brokerBaseUrl: String,
         domesticMockOrder: Boolean,
         overseasMockOrder: Boolean,
+        hibernateDdlAuto: String? = "validate",
         allowLocalBrokerEndpointInProduction: Boolean = false,
         allowMockTradingInProduction: Boolean = false,
     ) = StockPurchaseRuntimeSafetyRules.Input(
@@ -80,6 +114,7 @@ class StockPurchaseRuntimeSafetyRulesTest {
         brokerBaseUrl = brokerBaseUrl,
         domesticMockOrder = domesticMockOrder,
         overseasMockOrder = overseasMockOrder,
+        hibernateDdlAuto = hibernateDdlAuto,
         allowLocalBrokerEndpointInProduction = allowLocalBrokerEndpointInProduction,
         allowMockTradingInProduction = allowMockTradingInProduction,
     )

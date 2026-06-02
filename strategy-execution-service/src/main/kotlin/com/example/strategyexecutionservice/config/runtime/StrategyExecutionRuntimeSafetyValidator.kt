@@ -27,6 +27,7 @@ class StrategyExecutionRuntimeSafetyValidator(
                 temporalEnabled = temporalEnabled,
                 temporalTarget = temporalTarget,
                 marketDataBaseUrl = marketDataBaseUrl,
+                hibernateDdlAuto = environment.getProperty("spring.jpa.hibernate.ddl-auto"),
                 allowLocalTemporalTargetInProduction = properties.allowLocalTemporalTargetInProduction,
                 allowLocalMarketDataEndpointInProduction = properties.allowLocalMarketDataEndpointInProduction,
             ),
@@ -52,6 +53,7 @@ object StrategyExecutionRuntimeSafetyRules {
         val temporalEnabled: Boolean,
         val temporalTarget: String,
         val marketDataBaseUrl: String,
+        val hibernateDdlAuto: String?,
         val allowLocalTemporalTargetInProduction: Boolean,
         val allowLocalMarketDataEndpointInProduction: Boolean,
     )
@@ -76,7 +78,17 @@ object StrategyExecutionRuntimeSafetyRules {
                 "(akra.market-data.kis-open-api.base-url=${input.marketDataBaseUrl})"
         }
 
+        if (!isSafeHibernateDdlAuto(input.hibernateDdlAuto)) {
+            violations += "prod/live profile cannot use Hibernate automatic DDL " +
+                "(spring.jpa.hibernate.ddl-auto=${input.hibernateDdlAuto}); apply migrations explicitly and use none or validate"
+        }
+
         return violations
+    }
+
+    private fun isSafeHibernateDdlAuto(value: String?): Boolean {
+        val normalized = value?.trim()?.lowercase().orEmpty()
+        return normalized.isEmpty() || normalized == "none" || normalized == "validate"
     }
 
     private fun isProduction(activeProfiles: List<String>, productionProfiles: List<String>): Boolean {
