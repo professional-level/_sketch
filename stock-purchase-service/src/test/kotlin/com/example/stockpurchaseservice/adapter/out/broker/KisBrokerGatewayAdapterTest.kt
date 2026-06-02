@@ -1533,6 +1533,32 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `ignores domestic all zero original order id placeholder`() {
+        val adapter = domesticHistoryAdapter(
+            domesticHistoryResponse(
+                DailyExecutionOrdersResponseOuterClass.DailyExecutionOrdersOutput1.newBuilder()
+                    .setOrdDt("20260602")
+                    .setOrdGnoBrno("00001")
+                    .setOdno("domestic-order-zero-original")
+                    .setOrgnOdno("0000000000")
+                    .setSllBuyDvsnCd("02")
+                    .setPdno("005930")
+                    .setPrdtName("Samsung Electronics")
+                    .setOrdQty("3")
+                    .setOrdTmd("093000")
+                    .setTotCcldQty("0")
+                    .setRmnQty("3")
+                    .build(),
+            ),
+        )
+
+        val item = adapter.findOrderHistory(domesticHistoryQuery()).single()
+
+        assertEquals(null, item.originalOrderId)
+        assertEquals(BrokerOrderStatus.SUBMITTED, item.toStatus().status)
+    }
+
+    @Test
     fun `maps domestic rejected quantity to rejected status`() {
         val adapter = domesticHistoryAdapter(
             domesticHistoryResponse(
@@ -1978,6 +2004,37 @@ class KisBrokerGatewayAdapterTest {
         assertEquals(2, execution.quantity)
         assertEquals(113.75, execution.averageExecutionPrice)
         assertEquals(ExecutionTypeDto.PURCHASE, execution.type)
+    }
+
+    @Test
+    fun `ignores overseas all zero original order id placeholder`() {
+        val adapter = overseasHistoryAdapter(
+            """
+            {
+              "rt_cd": "0",
+              "ctx_area_fk200": "",
+              "ctx_area_nk200": "",
+              "output": [
+                {
+                  "ODNO": "overseas-order-zero-original",
+                  "ORGN_ODNO": "0000000000",
+                  "PDNO": "TQQQ",
+                  "ORD_DT": "20260602",
+                  "ORD_TMD": "093000",
+                  "ORD_QTY": "3",
+                  "TOT_CCLD_QTY": "0",
+                  "RMN_QTY": "3",
+                  "SLL_BUY_DVSN_NAME": "BUY"
+                }
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        val item = adapter.findOrderHistory(historyQuery()).single()
+
+        assertEquals(null, item.originalOrderId)
+        assertEquals(BrokerOrderStatus.SUBMITTED, item.toStatus().status)
     }
 
     @Test

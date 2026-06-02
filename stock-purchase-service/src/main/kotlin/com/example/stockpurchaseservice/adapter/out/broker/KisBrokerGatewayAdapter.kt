@@ -567,7 +567,7 @@ private data class BrokerAccountSnapshotPage(
 private fun JsonNode.toKisCancelableOrderItem(): BrokerCancelableOrderItem? {
     val orderId = textOrNull("odno", "ODNO", "ordNo", "ord_no", "ORD_NO", "orderNo", "order_no", "ORDER_NO")
         .orEmpty()
-    val originalOrderId = textOrNull("orgn_odno", "ORGN_ODNO", "orgnOdno")
+    val originalOrderId = textOrNull("orgn_odno", "ORGN_ODNO", "orgnOdno").toBrokerOrderIdOrNull()
     val matchableOrderId = orderId.ifBlank { originalOrderId.orEmpty() }
     if (matchableOrderId.isBlank()) return null
     return BrokerCancelableOrderItem(
@@ -900,7 +900,7 @@ private fun DailyExecutionOrdersResponseOuterClass.DailyExecutionOrdersOutput1.t
     return BrokerOrderHistoryItem(
         externalOrderId = orderId,
         externalExecutionId = ccldNo.takeIf { it.isNotBlank() },
-        originalOrderId = orgnOdno.takeIf { it.isNotBlank() },
+        originalOrderId = orgnOdno.toBrokerOrderIdOrNull(),
         branchOrderNumber = ordGnoBrno.takeIf { it.isNotBlank() }
             ?: ordOrgno.takeIf { it.isNotBlank() },
         symbol = pdno.trim(),
@@ -1056,7 +1056,7 @@ private fun JsonNode.toBrokerHistoryItem(): BrokerOrderHistoryItem? {
             "cntrNo",
             "CNTR_NO",
         ),
-        originalOrderId = textOrNull("orgn_odno", "orgnOdno", "ORGN_ODNO"),
+        originalOrderId = textOrNull("orgn_odno", "orgnOdno", "ORGN_ODNO").toBrokerOrderIdOrNull(),
         branchOrderNumber = textOrNull(
             "ord_gno_brno",
             "ordGnoBrno",
@@ -1150,6 +1150,11 @@ private fun JsonNode.longValue(vararg fieldNames: String): Long {
 
 private fun JsonNode.textOrNull(): String? {
     return asText("").trim().takeIf { it.isNotBlank() }
+}
+
+private fun String?.toBrokerOrderIdOrNull(): String? {
+    val value = this?.trim()?.takeIf(String::isNotBlank) ?: return null
+    return value.takeUnless { it.all { character -> character == '0' } }
 }
 
 private fun joinedText(vararg values: String?): String? {
