@@ -117,43 +117,42 @@ class ReconcileExecutionsService(
         val brokerExecutionList = marketService.findExecutionList(
             previousCursor.toLookupQuery(startedAt, reconciliationBackfillDays),
         )
+            .sortedWith(compareBy<ExecutedStockDto> { it.createdAt }.thenBy { it.externalExecutionId })
         val executedStockList = mutableListOf<ExecutedStock>()
         val refinedExecutedStockList = mutableListOf<ExecutedStock>()
         var unmatchedExecutionCount = 0
-        brokerExecutionList
-            .sortedWith(compareBy<ExecutedStockDto> { it.createdAt }.thenBy { it.externalExecutionId })
-            .forEach { brokerExecution ->
-                val execution = brokerExecution.toDomainForReconciliation() ?: return@forEach
-                executedStockList += execution
-                when (val publishPlan = resolveFillPublishPlan(execution)) {
-                    is FillPublishPlan.Unmatched -> {
-                        unmatchedExecutionCount += 1
-                        recordUnmatchedExecution(
-                            execution = execution,
-                            reason = publishPlan.reason,
-                            observedAt = startedAt,
-                        )
+        brokerExecutionList.forEach { brokerExecution ->
+            val execution = brokerExecution.toDomainForReconciliation() ?: return@forEach
+            executedStockList += execution
+            when (val publishPlan = resolveFillPublishPlan(execution)) {
+                is FillPublishPlan.Unmatched -> {
+                    unmatchedExecutionCount += 1
+                    recordUnmatchedExecution(
+                        execution = execution,
+                        reason = publishPlan.reason,
+                        observedAt = startedAt,
+                    )
+                }
+
+                is FillPublishPlan.Publish -> {
+                    val fill = ExecutionFillDto.from(ExecutionFill.from(execution))
+                    if (executionFillPort.exists(fill.externalExecutionId)) {
+                        executionReconciliationStatePort.markUnmatchedExecutionResolved(fill.externalExecutionId)
+                        return@forEach
                     }
 
-                    is FillPublishPlan.Publish -> {
-                        val fill = ExecutionFillDto.from(ExecutionFill.from(execution))
-                        if (executionFillPort.exists(fill.externalExecutionId)) {
-                            executionReconciliationStatePort.markUnmatchedExecutionResolved(fill.externalExecutionId)
-                            return@forEach
-                        }
-
-                        publishOrderFillEvent(execution, publishPlan)
-                        if (executionFillPort.saveIfNew(fill)) {
-                            executionReconciliationStatePort.markUnmatchedExecutionResolved(fill.externalExecutionId)
-                            refinedExecutedStockList += execution
-                        } else if (executionFillPort.exists(fill.externalExecutionId)) {
-                            executionReconciliationStatePort.markUnmatchedExecutionResolved(fill.externalExecutionId)
-                        }
+                    publishOrderFillEvent(execution, publishPlan)
+                    if (executionFillPort.saveIfNew(fill)) {
+                        executionReconciliationStatePort.markUnmatchedExecutionResolved(fill.externalExecutionId)
+                        refinedExecutedStockList += execution
+                    } else if (executionFillPort.exists(fill.externalExecutionId)) {
+                        executionReconciliationStatePort.markUnmatchedExecutionResolved(fill.externalExecutionId)
                     }
                 }
             }
+        }
         markCompleted(
-            observedExecutions = executedStockList,
+            observedBrokerExecutions = brokerExecutionList,
             savedFillCount = refinedExecutedStockList.size,
             unmatchedExecutionCount = unmatchedExecutionCount,
         )
@@ -270,20 +269,20 @@ class ReconcileExecutionsService(
     }
 
     private suspend fun markCompleted(
-        observedExecutions: List<ExecutedStock>,
+        observedBrokerExecutions: List<ExecutedStockDto>,
         savedFillCount: Int,
         unmatchedExecutionCount: Int,
     ) {
-        val lastObserved = observedExecutions.maxWithOrNull(
-            compareBy<ExecutedStock> { it.createdAt }.thenBy { it.externalExecutionId.value },
+        val lastObserved = observedBrokerExecutions.maxWithOrNull(
+            compareBy<ExecutedStockDto> { it.createdAt }.thenBy { it.externalExecutionId },
         )
         executionReconciliationStatePort.markCompleted(
             source = RECONCILIATION_SOURCE,
             completedAt = ZonedDateTime.now(),
             result = ExecutionReconciliationResultDto(
-                lastObservedExecutionId = lastObserved?.externalExecutionId?.value,
+                lastObservedExecutionId = lastObserved?.externalExecutionId,
                 lastObservedExecutionAt = lastObserved?.createdAt,
-                observedExecutionCount = observedExecutions.size,
+                observedExecutionCount = observedBrokerExecutions.size,
                 savedFillCount = savedFillCount,
                 unmatchedExecutionCount = unmatchedExecutionCount,
             ),

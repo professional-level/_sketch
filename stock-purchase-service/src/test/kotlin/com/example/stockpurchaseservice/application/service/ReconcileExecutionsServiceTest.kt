@@ -296,6 +296,42 @@ class ReconcileExecutionsServiceTest {
     }
 
     @Test
+    fun `records broker observed cursor when cumulative execution has no new delta`() = runBlocking {
+        val reconciliationStatePort = FakeExecutionReconciliationStatePort()
+        val eventPort = FakeOrderExecutionEventPort()
+        val service = service(
+            marketPort = FakeMarketServicePort(
+                executions = listOf(
+                    execution(
+                        externalExecutionId = "broker-1:100:PURCHASE",
+                        quantity = 100,
+                        quantityMode = ExecutionQuantityModeDto.CUMULATIVE,
+                    ),
+                ),
+            ),
+            executionFillPort = FakeExecutionFillPort(
+                initialQuantitiesByExternalOrderId = mapOf("broker-1" to 100),
+            ),
+            submissionPort = FakeOrderIntentSubmissionPort(
+                submissions = listOf(submission(quantity = 100)),
+            ),
+            eventPort = eventPort,
+            reconciliationStatePort = reconciliationStatePort,
+        )
+
+        service.execute()
+
+        assertEquals(emptyList(), eventPort.partiallyFilled)
+        assertEquals(emptyList(), eventPort.filled)
+        with(reconciliationStatePort.completed.single()) {
+            assertEquals("broker-1:100:PURCHASE", lastObservedExecutionId)
+            assertEquals(1, observedExecutionCount)
+            assertEquals(0, savedFillCount)
+            assertEquals(0, unmatchedExecutionCount)
+        }
+    }
+
+    @Test
     fun `records reconciliation cursor and unmatched executions`() = runBlocking {
         val reconciliationStatePort = FakeExecutionReconciliationStatePort()
         val alertPort = FakeOperationalAlertPort()

@@ -702,6 +702,6 @@ Implementation note: `SUBMISSION_UNKNOWN` recovery now passes the stored order q
 
 KIS overseas order history mapping includes `ft_ord_unpr3`/`FT_ORD_UNPR3` as submitted order price aliases, so broker-order-id-free recovery can still use the submitted price to disambiguate matching rows.
 
-Reconciliation note: unmatched broker executions are removed from `unmatched_execution` after the corresponding fill is successfully persisted or already exists, so the operations status API reports only still-unresolved broker executions. Broker execution rows are processed in deterministic `createdAt`/execution-id order before fill event publication, so out-of-order wrapper responses do not reorder partial/final fill progression.
+Reconciliation note: unmatched broker executions are removed from `unmatched_execution` after the corresponding fill is successfully persisted or already exists, so the operations status API reports only still-unresolved broker executions. Broker execution rows are processed in deterministic `createdAt`/execution-id order before fill event publication, so out-of-order wrapper responses do not reorder partial/final fill progression. The reconciliation cursor records the last raw broker execution row observed even when a cumulative row has no new fill delta, keeping operations visibility aligned with broker lookup results instead of only newly saved fills.
 
 이 구조에서는 모든 전략이 같은 출발점을 가진다. 전략마다 실행 기간만 다르다. 단발성 전략은 execution-service에서 짧게 종료되고, 라오어 같은 장기 전략은 같은 execution-service 안에서 여러 거래일 동안 상태를 이어간다. purchase-service는 전략을 모르는 주문/체결 서비스로 유지된다.
