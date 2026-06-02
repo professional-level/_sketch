@@ -80,14 +80,38 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ${{ matrix.dockerfile }}
-          push: ${{ github.event_name != 'pull_request' }}
-          build-args: |
-            JAR_FILE=.docker/${{ matrix.image }}/app.jar
-            APP_PORT=${{ matrix.port }}
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/sketch-${{ matrix.image }}:${{ github.sha }}
-            ghcr.io/${{ github.repository_owner }}/sketch-${{ matrix.image }}:latest
+        shell: bash
+        env:
+          APP_PORT: ${{ matrix.port }}
+          DOCKERFILE: ${{ matrix.dockerfile }}
+          EVENT_NAME: ${{ github.event_name }}
+          IMAGE: ${{ matrix.image }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          output_args=(--push)
+          if [[ "${EVENT_NAME}" == "pull_request" ]]; then
+            output_args=(--load)
+          fi
+
+          for attempt in 1 2 3; do
+            if docker buildx build \
+              --build-arg "JAR_FILE=.docker/${IMAGE}/app.jar" \
+              --build-arg "APP_PORT=${APP_PORT}" \
+              --file "${DOCKERFILE}" \
+              --tag "ghcr.io/${REPOSITORY_OWNER}/sketch-${IMAGE}:${SHA}" \
+              --tag "ghcr.io/${REPOSITORY_OWNER}/sketch-${IMAGE}:latest" \
+              "${output_args[@]}" \
+              .; then
+              exit 0
+            fi
+
+            if [[ "${attempt}" == "3" ]]; then
+              exit 1
+            fi
+
+            docker buildx prune --force || true
+            sleep $((attempt * 10))
+          done
