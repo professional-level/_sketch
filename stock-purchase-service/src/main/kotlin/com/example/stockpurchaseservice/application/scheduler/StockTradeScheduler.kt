@@ -99,33 +99,45 @@ internal class TradingHoursStockTradeScheduleGate(
         val tradingHours = properties.tradingHours
         if (!tradingHours.enabled) return true
 
-        val overseasUs = tradingHours.overseasUs
-        if (!overseasUs.enabled) return true
+        val markets = tradingHours.enabledMarkets()
+        if (markets.isEmpty()) return true
 
-        val zone = overseasUs.zoneId.toZoneIdOrNull() ?: return false
-        val localDateTime = now.withZoneSameInstant(zone)
-        val localDate = localDateTime.toLocalDate()
-        if (!overseasUs.isTradingDate(localDate)) return false
-
-        val open = overseasUs.regularOpen.toLocalTimeOrNull() ?: return false
-        val regularClose = overseasUs.regularClose.toLocalTimeOrNull() ?: return false
-        val close = overseasUs.effectiveClose(localDate, regularClose) ?: return false
-        if (!close.isAfter(open)) return false
-
-        val localTime = localDateTime.toLocalTime()
-        return !localTime.isBefore(open) && localTime.isBefore(close)
+        return markets.any { market -> market.shouldRunOrderSubmissionAt(now) }
     }
 
     internal fun shouldRunRecoveryAt(now: ZonedDateTime): Boolean {
         val tradingHours = properties.tradingHours
         if (!tradingHours.enabled) return true
 
-        val overseasUs = tradingHours.overseasUs
-        if (!overseasUs.enabled) return true
+        val markets = tradingHours.enabledMarkets()
+        if (markets.isEmpty()) return true
 
-        val zone = overseasUs.zoneId.toZoneIdOrNull() ?: return false
+        return markets.any { market -> market.shouldRunRecoveryAt(now) }
+    }
+
+    private fun OrderRiskProperties.TradingHoursProperties.enabledMarkets(): List<OrderRiskProperties.MarketTradingHours> {
+        return listOf(domestic, overseasUs).filter { it.enabled }
+    }
+
+    private fun OrderRiskProperties.MarketTradingHours.shouldRunOrderSubmissionAt(now: ZonedDateTime): Boolean {
+        val zone = zoneId.toZoneIdOrNull() ?: return false
+        val localDateTime = now.withZoneSameInstant(zone)
+        val localDate = localDateTime.toLocalDate()
+        if (!isTradingDate(localDate)) return false
+
+        val open = regularOpen.toLocalTimeOrNull() ?: return false
+        val regularClose = regularClose.toLocalTimeOrNull() ?: return false
+        val close = effectiveClose(localDate, regularClose) ?: return false
+        if (!close.isAfter(open)) return false
+
+        val localTime = localDateTime.toLocalTime()
+        return !localTime.isBefore(open) && localTime.isBefore(close)
+    }
+
+    private fun OrderRiskProperties.MarketTradingHours.shouldRunRecoveryAt(now: ZonedDateTime): Boolean {
+        val zone = zoneId.toZoneIdOrNull() ?: return false
         val localDate = now.withZoneSameInstant(zone).toLocalDate()
-        return overseasUs.isTradingDate(localDate)
+        return isTradingDate(localDate)
     }
 
     private fun OrderRiskProperties.MarketTradingHours.isTradingDate(localDate: LocalDate): Boolean {

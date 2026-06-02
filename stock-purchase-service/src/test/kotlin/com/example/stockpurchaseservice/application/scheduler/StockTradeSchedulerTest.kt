@@ -33,6 +33,36 @@ class StockTradeSchedulerTest {
     }
 
     @Test
+    fun `trading gate allows domestic order window when overseas us market is closed`() {
+        val gate = TradingHoursStockTradeScheduleGate(OrderRiskProperties())
+
+        val shouldRun = gate.shouldRunAt(ZonedDateTime.parse("2026-07-03T10:00:00+09:00[Asia/Seoul]"))
+
+        assertTrue(shouldRun)
+    }
+
+    @Test
+    fun `trading gate blocks when domestic holiday and overseas us market is closed`() {
+        val properties = OrderRiskProperties().apply {
+            tradingHours.domestic.holidays = listOf("2026-07-03")
+        }
+        val gate = TradingHoursStockTradeScheduleGate(properties)
+
+        val shouldRun = gate.shouldRunAt(ZonedDateTime.parse("2026-07-03T10:00:00+09:00[Asia/Seoul]"))
+
+        assertFalse(shouldRun)
+    }
+
+    @Test
+    fun `trading gate allows recovery on domestic trading date after domestic close`() {
+        val gate = TradingHoursStockTradeScheduleGate(OrderRiskProperties())
+
+        val shouldRun = gate.shouldRunRecoveryAt(ZonedDateTime.parse("2026-07-03T20:00:00+09:00[Asia/Seoul]"))
+
+        assertTrue(shouldRun)
+    }
+
+    @Test
     fun `trading gate blocks before overseas us market open`() {
         val gate = TradingHoursStockTradeScheduleGate(OrderRiskProperties())
 
