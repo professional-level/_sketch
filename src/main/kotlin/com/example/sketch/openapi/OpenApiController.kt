@@ -377,7 +377,14 @@ internal fun OpenApiResponse.toDailyExecutionOrdersResponse(): DailyExecutionOrd
                 ordUnpr = item.text("ord_unpr", "ORD_UNPR")
                 ordTmd = item.text("ord_tmd", "ORD_TMD", "thco_ord_tmd", "THCO_ORD_TMD", "ordTmd")
                 totCcldQty = item.text("tot_ccld_qty", "TOT_CCLD_QTY")
-                avgPrvs = item.text("avg_prvs", "AVG_PRVS")
+                avgPrvs = item.text(
+                    "avg_prvs",
+                    "AVG_PRVS",
+                    "ccld_unpr",
+                    "CCLD_UNPR",
+                    "avg_ccld_pric",
+                    "AVG_CCLD_PRIC",
+                )
                 cnclYn = item.text("cncl_yn", "CNCL_YN")
                 totCcldAmt = item.text("tot_ccld_amt", "TOT_CCLD_AMT")
                 loanDt = item.text("loan_dt", "LOAN_DT")

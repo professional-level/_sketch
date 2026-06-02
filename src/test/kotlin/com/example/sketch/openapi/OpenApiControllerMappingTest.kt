@@ -197,6 +197,7 @@ class OpenApiControllerMappingTest {
                 "ORD_QTY": "3",
                 "THCO_ORD_TMD": "100000",
                 "TOT_CCLD_QTY": "0",
+                "CCLD_UNPR": "71200.5",
                 "CNCL_YN": "Y",
                 "CNCL_CFRM_QTY": "3",
                 "RMN_QTY": "0",
@@ -216,6 +217,7 @@ class OpenApiControllerMappingTest {
             assertEquals("01", sllBuyDvsnCd)
             assertEquals("3", ordQty)
             assertEquals("100000", ordTmd)
+            assertEquals("71200.5", avgPrvs)
             assertEquals("Y", cnclYn)
             assertEquals("3", cnclCfrmQty)
             assertEquals("0", rmnQty)
