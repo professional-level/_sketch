@@ -404,19 +404,51 @@ If the broker snapshot does not contain `orderableCashAmount`, the guard falls b
 
 ## Kafka And Temporal Restart Procedure
 
-When Kafka, Temporal, or an application service restarts:
+When Kafka, Temporal, the broker wrapper, or an application service restarts, treat the first pass as state recovery, not as a new trading start.
 
-1. Start infrastructure first: Kafka/ZooKeeper, Temporal database, Temporal frontend, and Temporal UI.
-2. Verify Kafka topics and Temporal namespace are reachable.
-3. Start broker wrapper before trading services.
-4. Start `strategy-execution-service`; schedule registration is idempotent and should recreate or reuse the active-strategy schedule.
-5. Start `stock-purchase-service`; outbox publishers and reconciliation cursors should resume from stored state.
-6. Start `stock-search-service` last so new discovery events do not arrive before execution/order services are ready.
-7. Check logs for startup safety violations, outbox publish failures, `SUBMISSION_UNKNOWN` alerts, and reconciliation failures.
+Restart order:
+
+1. Pause discretionary strategy starts and stock discovery triggers if the operator has that control.
+2. Start infrastructure first: Kafka/ZooKeeper, Temporal database, Temporal frontend, and Temporal UI.
+3. Verify Kafka topics and Temporal namespace are reachable.
+4. Start the root KIS broker wrapper before trading services and confirm token persistence is healthy.
+5. Start `strategy-execution-service`; schedule registration is idempotent and should recreate or reuse the active-strategy schedule.
+6. Start `stock-purchase-service`; outbox publishers, unknown-submission recovery, cancel-pending recovery, and reconciliation cursors should resume from stored state.
+7. Start `stock-search-service` last so new discovery events do not arrive before execution/order services are ready.
+8. Check logs for startup safety violations, outbox publish failures, `SUBMISSION_UNKNOWN` alerts, cancellation recovery alerts, and reconciliation failures.
+
+Kafka outage recovery:
+
+- Keep outbox rows intact. `PENDING` and retry-eligible `FAILED` rows are republished after Kafka returns.
+- If an application instance crashed while publishing, `PROCESSING` rows become claimable only after `claimExpiresAt`; wait at least the configured outbox claim lease before declaring them stuck.
+- Use the operations endpoint and SQL counts to confirm both outboxes drain:
+
+```sql
+SELECT status, COUNT(*) FROM order_intent_outbox_event GROUP BY status;
+SELECT status, COUNT(*) FROM order_execution_outbox_event GROUP BY status;
+```
+
+Temporal outage recovery:
+
+- Confirm the Temporal namespace, task queue, and active-execution schedule are reachable before manually triggering missed work.
+- Check the strategy state APIs for the intended execution id before starting a replacement run. Deterministic idempotency keys protect known paths, but manual duplicate starts can still confuse operator analysis.
+- If a daily schedule was missed, run one controlled catch-up and then verify resulting order-intent outbox counts before re-enabling discovery.
+
+Broker wrapper or KIS outage recovery:
+
+- Expect `SUBMISSION_UNKNOWN`, `CANCEL_PENDING`, and reconciliation failure alerts while the wrapper or KIS is unavailable.
+- After the wrapper is healthy, verify order submission and reconciliation state before creating new broker orders:
+
+```sql
+SELECT status, COUNT(*) FROM order_intent_submission GROUP BY status;
+SELECT source, status, attemptCount, lastObservedExecutionId, lastObservedExecutionAt, failureReason
+FROM execution_reconciliation_cursor;
+SELECT COUNT(*) FROM unmatched_execution;
+```
 
 Manual recovery checks:
 
 - Re-run reconciliation from the durable cursor if broker executions may have been missed.
 - Keep `akra.order.status-lookup.backfill-days` and `akra.order.status-lookup.forward-days` aligned with KIS order-history retention and the operational delay expected before unknown/cancel-pending recovery runs.
 - Inspect unmatched executions before manually adjusting strategy state.
-- Do not clear outbox or processed-event records unless the replay impact is understood.
+- Do not clear outbox, processed-event, order submission, reconciliation cursor, fill, or unmatched-execution records unless the replay and duplicate impact is understood.
