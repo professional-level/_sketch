@@ -217,7 +217,7 @@ Before enabling real orders:
 - Confirm broker order status lookup windows are wide enough for `SUBMISSION_UNKNOWN` and `CANCEL_PENDING` recovery without creating excessive KIS query load.
 - Configure domestic and US order windows, holidays, early-close dates, and LOC/MOC cutoffs until an exchange calendar sync is available.
 - Configure `akra.trading-calendar.us.*` in `strategy-execution-service` separately from purchase-service risk windows. The daily active-strategy run resolves the order session date from the requested timestamp and market close, then skips strategy execution when that target US session is closed.
-- Confirm the legacy `stock-purchase-service` scheduler gate is acceptable for the deployment. By default it skips sell-order creation, submission recovery/reconciliation, and simulation on configured overseas US non-trading days; disabling `akra.order.risk.trading-hours.enabled` restores the old weekday-only scheduler behavior.
+- Confirm the legacy `stock-purchase-service` scheduler gate is acceptable for the deployment. By default it skips sell-order creation and simulation outside the configured overseas US order window, while submission recovery and reconciliation can continue for the whole configured US trading date. All three jobs skip configured overseas US non-trading days; disabling `akra.order.risk.trading-hours.enabled` restores the old weekday-only scheduler behavior.
 - Confirm `application-secret.properties` is not included in the built artifact or Git diff, or omit it entirely and inject the KIS values at runtime.
 
 Broker recovery, risk, and trading-hours guard keys:

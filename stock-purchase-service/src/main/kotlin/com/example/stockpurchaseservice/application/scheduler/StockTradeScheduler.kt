@@ -25,14 +25,14 @@ internal class StockTradeScheduler(
 ) {
     @Scheduled(cron = "0 */1 * ? * MON-FRI") // TODO: Adjust scheduler frequency by sell strategy.
     suspend fun sellOrderByStrategies() {
-        runIfTradingDay("sell-order-by-strategies") {
+        runIfOrderSubmissionWindow("sell-order-by-strategies") {
             createSellOrdersByStrategyUseCase.execute()
         }
     }
 
     @Scheduled(cron = "0 */1 * ? * MON-FRI") // TODO: Adjust scheduler frequency by sell strategy.
     suspend fun executionCheck() {
-        runIfTradingDay("execution-check") {
+        runIfRecoveryTradingDate("execution-check") {
             recoverUnknownOrderSubmissionsUseCase.execute()
             reconcileExecutionsUseCase.execute()
         }
@@ -40,17 +40,28 @@ internal class StockTradeScheduler(
 
     @Scheduled(cron = "0 */1 * ? * MON-FRI")
     suspend fun simulateStockPurchase() {
-        runIfTradingDay("simulate-stock-purchase") {
+        runIfOrderSubmissionWindow("simulate-stock-purchase") {
             simulateStockPurchaseUseCase.execute()
         }
     }
 
-    private suspend fun runIfTradingDay(
+    private suspend fun runIfOrderSubmissionWindow(
         jobName: String,
         block: suspend () -> Unit,
     ) {
-        if (!scheduleGate.shouldRunNow()) {
-            log.info("Skipping stock trade scheduler job outside configured trading calendar: job={}", jobName)
+        if (!scheduleGate.shouldRunOrderSubmissionNow()) {
+            log.info("Skipping stock trade scheduler job outside configured order window: job={}", jobName)
+            return
+        }
+        block()
+    }
+
+    private suspend fun runIfRecoveryTradingDate(
+        jobName: String,
+        block: suspend () -> Unit,
+    ) {
+        if (!scheduleGate.shouldRunRecoveryNow()) {
+            log.info("Skipping stock trade scheduler recovery job outside configured trading date: job={}", jobName)
             return
         }
         block()
@@ -62,7 +73,9 @@ internal class StockTradeScheduler(
 }
 
 internal fun interface StockTradeScheduleGate {
-    fun shouldRunNow(): Boolean
+    fun shouldRunOrderSubmissionNow(): Boolean
+
+    fun shouldRunRecoveryNow(): Boolean = shouldRunOrderSubmissionNow()
 }
 
 @Component
@@ -70,11 +83,40 @@ internal class TradingHoursStockTradeScheduleGate(
     private val properties: OrderRiskProperties,
 ) : StockTradeScheduleGate {
 
-    override fun shouldRunNow(): Boolean {
-        return shouldRunAt(ZonedDateTime.now())
+    override fun shouldRunOrderSubmissionNow(): Boolean {
+        return shouldRunOrderSubmissionAt(ZonedDateTime.now())
+    }
+
+    override fun shouldRunRecoveryNow(): Boolean {
+        return shouldRunRecoveryAt(ZonedDateTime.now())
     }
 
     internal fun shouldRunAt(now: ZonedDateTime): Boolean {
+        return shouldRunOrderSubmissionAt(now)
+    }
+
+    internal fun shouldRunOrderSubmissionAt(now: ZonedDateTime): Boolean {
+        val tradingHours = properties.tradingHours
+        if (!tradingHours.enabled) return true
+
+        val overseasUs = tradingHours.overseasUs
+        if (!overseasUs.enabled) return true
+
+        val zone = overseasUs.zoneId.toZoneIdOrNull() ?: return false
+        val localDateTime = now.withZoneSameInstant(zone)
+        val localDate = localDateTime.toLocalDate()
+        if (!overseasUs.isTradingDate(localDate)) return false
+
+        val open = overseasUs.regularOpen.toLocalTimeOrNull() ?: return false
+        val regularClose = overseasUs.regularClose.toLocalTimeOrNull() ?: return false
+        val close = overseasUs.effectiveClose(localDate, regularClose) ?: return false
+        if (!close.isAfter(open)) return false
+
+        val localTime = localDateTime.toLocalTime()
+        return !localTime.isBefore(open) && localTime.isBefore(close)
+    }
+
+    internal fun shouldRunRecoveryAt(now: ZonedDateTime): Boolean {
         val tradingHours = properties.tradingHours
         if (!tradingHours.enabled) return true
 
@@ -83,19 +125,14 @@ internal class TradingHoursStockTradeScheduleGate(
 
         val zone = overseasUs.zoneId.toZoneIdOrNull() ?: return false
         val localDate = now.withZoneSameInstant(zone).toLocalDate()
-        val localTime = now.withZoneSameInstant(zone).toLocalTime()
-        if (overseasUs.weekdaysOnly && localDate.dayOfWeek in CLOSED_WEEKDAYS) return false
-        if (overseasUs.isConfiguredHoliday(localDate)) return false
-        if (overseasUs.defaultUsEquityCalendarEnabled && UsEquityMarketCalendar.isMarketHoliday(localDate)) {
-            return false
-        }
+        return overseasUs.isTradingDate(localDate)
+    }
 
-        val open = overseasUs.regularOpen.toLocalTimeOrNull() ?: return false
-        val regularClose = overseasUs.regularClose.toLocalTimeOrNull() ?: return false
-        val close = overseasUs.effectiveClose(localDate, regularClose) ?: return false
-        if (!close.isAfter(open)) return false
-
-        return !localTime.isBefore(open) && localTime.isBefore(close)
+    private fun OrderRiskProperties.MarketTradingHours.isTradingDate(localDate: LocalDate): Boolean {
+        if (weekdaysOnly && localDate.dayOfWeek in CLOSED_WEEKDAYS) return false
+        if (isConfiguredHoliday(localDate)) return false
+        if (defaultUsEquityCalendarEnabled && UsEquityMarketCalendar.isMarketHoliday(localDate)) return false
+        return true
     }
 
     private fun OrderRiskProperties.MarketTradingHours.isConfiguredHoliday(date: LocalDate): Boolean {

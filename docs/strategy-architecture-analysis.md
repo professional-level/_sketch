@@ -620,7 +620,7 @@ stock-search-service
 - `stock-purchase-service` now runs a config-backed trading-hours guard before broker submission through `OrderRiskControlPort`.
 - The guard blocks order intents before KIS calls when the request is outside the configured domestic or US order window, lands on a configured market holiday, or exceeds the configured LOC/MOC cutoff.
 - US early-close dates can be configured with a common early-close time, and individual dates can override that close time through `early-close-times[yyyy-MM-dd]`; this limits LIMIT, LOC, and MOC submission windows for those dates.
-- The legacy `stock-purchase-service` scheduler also uses the configured overseas US trading calendar to skip sell-order creation, submission recovery/reconciliation, and simulation on US non-trading days. This prevents holiday scheduler churn before per-order risk guards run.
+- The legacy `stock-purchase-service` scheduler also uses the configured overseas US trading calendar. Sell-order creation and simulation stay inside the configured order window, while submission recovery/reconciliation can keep running for the whole configured US trading date; all three paths skip US non-trading days.
 - Rejected intents follow the existing risk rejection path: rejected submission storage plus `OrderRejected` publication.
 - This is still not a full exchange-calendar integration. Automatic holiday/early-close synchronization and broker-verified live-market acceptance checks remain production hardening work.
 
