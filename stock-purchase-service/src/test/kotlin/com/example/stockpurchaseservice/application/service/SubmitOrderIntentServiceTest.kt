@@ -265,6 +265,128 @@ class SubmitOrderIntentServiceTest {
     }
 
     @Test
+    fun `returns submission unknown when duplicate order intent is still unresolved`() = runBlocking {
+        val marketPort = FakeMarketServicePort()
+        val processedEventPort = FakeProcessedEventPort(startResult = false)
+        val eventPort = FakeOrderExecutionEventPort()
+        val submissionPort = FakeOrderIntentSubmissionPort(
+            existingSubmission = submission(
+                idempotencyKey = "duplicate-unknown",
+                externalOrderId = "maybe-broker-existing",
+                branchOrderNumber = "branch-existing",
+                status = OrderIntentSubmissionStatusDto.SUBMISSION_UNKNOWN,
+            ),
+        )
+        val service = SubmitOrderIntentService(
+            marketPort,
+            processedEventPort,
+            submissionPort,
+            eventPort,
+            FakeOrderRiskControlPort(),
+            FakeOperationalAlertPort(),
+        )
+
+        val result = service.execute(orderIntentCommand(idempotencyKey = "duplicate-unknown"))
+
+        assertEquals(OrderIntentSubmissionStatus.SUBMISSION_UNKNOWN, result.status)
+        assertEquals("maybe-broker-existing", result.externalOrderId)
+        assertEquals("branch-existing", result.branchOrderNumber)
+        assertEquals(emptyList(), marketPort.sellOrders)
+        assertEquals(emptyList(), eventPort.submitted)
+    }
+
+    @Test
+    fun `returns rejected when duplicate order intent was rejected`() = runBlocking {
+        val marketPort = FakeMarketServicePort()
+        val processedEventPort = FakeProcessedEventPort(startResult = false)
+        val eventPort = FakeOrderExecutionEventPort()
+        val submissionPort = FakeOrderIntentSubmissionPort(
+            existingSubmission = submission(
+                idempotencyKey = "duplicate-rejected",
+                externalOrderId = null,
+                status = OrderIntentSubmissionStatusDto.REJECTED,
+            ),
+        )
+        val service = SubmitOrderIntentService(
+            marketPort,
+            processedEventPort,
+            submissionPort,
+            eventPort,
+            FakeOrderRiskControlPort(),
+            FakeOperationalAlertPort(),
+        )
+
+        val result = service.execute(orderIntentCommand(idempotencyKey = "duplicate-rejected"))
+
+        assertEquals(OrderIntentSubmissionStatus.REJECTED, result.status)
+        assertEquals(null, result.externalOrderId)
+        assertEquals(emptyList(), marketPort.sellOrders)
+        assertEquals(emptyList(), eventPort.submitted)
+    }
+
+    @Test
+    fun `returns existing broker ids when duplicate order intent is cancel pending`() = runBlocking {
+        val marketPort = FakeMarketServicePort()
+        val processedEventPort = FakeProcessedEventPort(startResult = false)
+        val eventPort = FakeOrderExecutionEventPort()
+        val submissionPort = FakeOrderIntentSubmissionPort(
+            existingSubmission = submission(
+                idempotencyKey = "duplicate-cancel-pending",
+                externalOrderId = "broker-cancel-pending",
+                branchOrderNumber = "branch-cancel-pending",
+                status = OrderIntentSubmissionStatusDto.CANCEL_PENDING,
+            ),
+        )
+        val service = SubmitOrderIntentService(
+            marketPort,
+            processedEventPort,
+            submissionPort,
+            eventPort,
+            FakeOrderRiskControlPort(),
+            FakeOperationalAlertPort(),
+        )
+
+        val result = service.execute(orderIntentCommand(idempotencyKey = "duplicate-cancel-pending"))
+
+        assertEquals(OrderIntentSubmissionStatus.SKIPPED_DUPLICATE, result.status)
+        assertEquals("broker-cancel-pending", result.externalOrderId)
+        assertEquals("branch-cancel-pending", result.branchOrderNumber)
+        assertEquals(emptyList(), marketPort.sellOrders)
+        assertEquals(emptyList(), eventPort.submitted)
+    }
+
+    @Test
+    fun `returns existing broker ids when duplicate order intent was cancelled`() = runBlocking {
+        val marketPort = FakeMarketServicePort()
+        val processedEventPort = FakeProcessedEventPort(startResult = false)
+        val eventPort = FakeOrderExecutionEventPort()
+        val submissionPort = FakeOrderIntentSubmissionPort(
+            existingSubmission = submission(
+                idempotencyKey = "duplicate-cancelled",
+                externalOrderId = "broker-cancelled",
+                branchOrderNumber = "branch-cancelled",
+                status = OrderIntentSubmissionStatusDto.CANCELLED,
+            ),
+        )
+        val service = SubmitOrderIntentService(
+            marketPort,
+            processedEventPort,
+            submissionPort,
+            eventPort,
+            FakeOrderRiskControlPort(),
+            FakeOperationalAlertPort(),
+        )
+
+        val result = service.execute(orderIntentCommand(idempotencyKey = "duplicate-cancelled"))
+
+        assertEquals(OrderIntentSubmissionStatus.SKIPPED_DUPLICATE, result.status)
+        assertEquals("broker-cancelled", result.externalOrderId)
+        assertEquals("branch-cancelled", result.branchOrderNumber)
+        assertEquals(emptyList(), marketPort.sellOrders)
+        assertEquals(emptyList(), eventPort.submitted)
+    }
+
+    @Test
     fun `stores submission unknown without publishing rejected when broker result is unclear`() = runBlocking {
         val marketPort = FakeMarketServicePort(
             buyFailure = BrokerOrderSubmissionUnknownException("timeout after broker submit"),
@@ -663,6 +785,21 @@ class SubmitOrderIntentServiceTest {
             branchOrderNumber = branchOrderNumber,
             submittedAt = ZonedDateTime.parse("2026-05-30T09:00:00+09:00"),
             status = status,
+        )
+    }
+
+    private fun orderIntentCommand(idempotencyKey: String): SubmitOrderIntentCommand {
+        return SubmitOrderIntentCommand(
+            eventId = UUID.randomUUID(),
+            idempotencyKey = idempotencyKey,
+            strategyExecutionId = "laor-v4-strategy:TQQQ",
+            symbol = "TQQQ",
+            side = OrderIntentSide.SELL,
+            orderType = OrderIntentType.LIMIT,
+            price = 112.0,
+            quantity = 1,
+            orderTag = "TARGET_SELL",
+            createdAt = ZonedDateTime.parse("2026-05-30T09:00:00+09:00"),
         )
     }
 
