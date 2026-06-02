@@ -292,7 +292,7 @@ Before enabling real orders:
 - Confirm broker order status lookup windows are wide enough for `SUBMISSION_UNKNOWN` and `CANCEL_PENDING` recovery without creating excessive KIS query load.
 - Configure domestic and US order windows, holidays, early-close dates, and LOC/MOC cutoffs until an exchange calendar sync is available.
 - Configure `akra.trading-calendar.us.*` in `strategy-execution-service` separately from purchase-service risk windows. The daily active-strategy run resolves the order session date from the requested timestamp and market close, then skips strategy execution when that target US session is closed.
-- Confirm the legacy `stock-purchase-service` scheduler gate is acceptable for the deployment. By default it skips sell-order creation and simulation outside the configured overseas US order window, while submission recovery and reconciliation can continue for the whole configured US trading date. All three jobs skip configured overseas US non-trading days; disabling `akra.order.risk.trading-hours.enabled` restores the old weekday-only scheduler behavior.
+- Confirm the legacy `stock-purchase-service` scheduler gate is acceptable for the deployment. By default it runs sell-order creation and simulation when any enabled market's configured order window is open, and it runs submission recovery plus reconciliation when any enabled market is on a configured trading date. Jobs skip only when every enabled market is outside its configured order window or trading date. Disabling `akra.order.risk.trading-hours.enabled` restores the old weekday-only scheduler behavior.
 - Confirm `application-secret.properties` is not included in the built artifact or Git diff, or omit it entirely and inject the KIS values at runtime. The root KIS wrapper blocks this property source by default under production-like profiles.
 
 Broker recovery, risk, and trading-hours guard keys:
@@ -315,6 +315,8 @@ akra.order.risk.max-order-notional=1000
 akra.order.risk.max-account-pending-buy-notional=5000
 akra.order.risk.max-account-exposure-notional=20000
 akra.order.risk.max-daily-order-count=20
+akra.order.risk.daily-order-count.markets[0]=DOMESTIC
+akra.order.risk.daily-order-count.markets[1]=OVERSEAS_US
 akra.order.risk.enabled-strategy-prefixes[0]=laor-v4-live
 akra.order.risk.symbol-max-order-notional.TQQQ=1000
 akra.order.risk.strategy-trading-environments[laor-v4-live]=LIVE
@@ -428,7 +430,7 @@ It also exposes an operator status endpoint for outbox and strategy lifecycle po
 GET /operations/strategy-execution/status
 ```
 
-The response includes order-intent outbox publisher counts, processed start-request count, strategy order event counts by type, and active/completed counts for Laor V4 and final-price bating strategy executions.
+The response includes order-intent outbox publisher counts, processed start-request count, strategy order event counts by type, and active/completed counts for Laor V4 and final-price bating strategy executions. It also includes active strategy state summaries. For Laor V4, check `activeLaorV4Strategies[].progressRound` as the current T/progress round, plus `availableCash`, `holdingQuantity`, and `averagePurchasePrice`. For final-price bating, check `activeFinalPriceBatingV1Strategies[].currentCash`, `currentHoldingQuantity`, and `currentAveragePrice`.
 
 ## DB Schema Migration
 
@@ -483,6 +485,7 @@ The response includes:
 - reconciliation cursor status, attempt counts, last observed execution id/time, saved fill count, unmatched execution count, and failure reason
 - total unmatched broker execution count
 - the 20 most recent unmatched broker executions
+- broker-backed `accountSnapshots` for the configured risk exposure markets, including orderable cash, available cash, settled/withdrawable cash buckets, position quantity, average purchase price, current price, purchase amount, evaluation amount, and profit/loss when KIS provides them
 
 Use this endpoint with the alert counters when checking whether broker submission recovery, cancel request confirmation, reconciliation, and unmatched execution handling are advancing after a restart.
 `CANCEL_PENDING` means the broker accepted the cancel request, or the cancel response was unclear, but the original order has not yet been confirmed as cancelled by broker status lookup. `OrderCancelled` should only be treated as final after that status becomes `CANCELLED`.
@@ -539,12 +542,13 @@ API checks after restart:
 ```text
 GET /actuator/health
 GET /operations/trading/status
+GET /operations/strategy-execution/status
 GET /operations/trading/account-snapshot?market=OVERSEAS_US&exchange=NASD&currency=USD
 GET /strategy-executions/laor-v4
 GET /strategy-executions/final-price-bating-v1
 ```
 
-Confirm `recentPersistentSubmissionUnknownCount`, failed outbox counts, reconciliation cursor `status`/`failureReason`, and unmatched execution counts are stable or decreasing before re-enabling new strategy starts.
+Confirm `recentPersistentSubmissionUnknownCount`, failed outbox counts, reconciliation cursor `status`/`failureReason`, unmatched execution counts, broker account snapshots, and active strategy state summaries are stable or improving before re-enabling new strategy starts.
 
 Kafka outage recovery:
 
@@ -579,7 +583,7 @@ SELECT COUNT(*) FROM unmatched_execution;
 Manual recovery checks:
 
 - Re-run reconciliation from the durable cursor if broker executions may have been missed.
-- Compare broker account snapshots with strategy state APIs before manually creating replacement orders; cash, holding quantity, and average price must agree with the broker-backed account view or have an explicit operator note.
+- Compare broker account snapshots with strategy state APIs before manually creating replacement orders; cash, holding quantity, and average price must agree with the broker-backed account view or have an explicit operator note. `/operations/trading/status` now exposes broker-backed `accountSnapshots`, while `/operations/strategy-execution/status` exposes active strategy `progressRound`/current T, cash, holding quantity, and average price.
 - When `SUBMISSION_UNKNOWN` or `CANCEL_PENDING` rows recover to broker fill statuses, or to `CANCELLED` with cumulative fill quantity, verify both `order_execution_outbox_event` and `execution_fill` before manually adjusting strategy state.
 - Keep `akra.order.status-lookup.backfill-days`, `akra.order.status-lookup.forward-days`, and `akra.order.execution-reconciliation.backfill-days` aligned with KIS order-history retention and the operational delay expected before unknown/cancel-pending recovery or broker execution reconciliation runs.
 - Inspect unmatched executions before manually adjusting strategy state.
