@@ -51,13 +51,16 @@ internal class OrderIntentOutboxEventRepository : AbstractReactiveRepository<Ord
             session.createQuery(
                 """
                 SELECT e.id FROM OrderIntentOutboxEventEntity e
-                WHERE e.status = 'PENDING'
-                   OR (e.status = 'FAILED' AND (e.nextAttemptAt IS NULL OR e.nextAttemptAt <= :now))
-                   OR (e.status = 'PROCESSING' AND e.claimExpiresAt <= :now)
+                WHERE e.status = :pendingStatus
+                   OR (e.status = :failedStatus AND (e.nextAttemptAt IS NULL OR e.nextAttemptAt <= :now))
+                   OR (e.status = :processingStatus AND e.claimExpiresAt <= :now)
                 ORDER BY e.createdAt ASC
                 """.trimIndent(),
                 UUID::class.java,
-            ).setParameter("now", now)
+            ).setParameter("pendingStatus", OrderIntentOutboxEventStatus.PENDING)
+                .setParameter("failedStatus", OrderIntentOutboxEventStatus.FAILED)
+                .setParameter("processingStatus", OrderIntentOutboxEventStatus.PROCESSING)
+                .setParameter("now", now)
                 .setMaxResults(limit)
                 .resultList
         }.awaitSuspending()
