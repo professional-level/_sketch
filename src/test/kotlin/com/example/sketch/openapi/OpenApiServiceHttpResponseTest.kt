@@ -73,6 +73,120 @@ class OpenApiServiceHttpResponseTest {
         assertEquals("500 INTERNAL_SERVER_ERROR", exception.message)
     }
 
+    @Test
+    fun `sends official tr id for real overseas us loc buy order`() = runTest {
+        val exchangeFunction = SingleResponseExchangeFunction.success()
+        val service = openApiService(exchangeFunction)
+
+        service.postOverseasStockOrder(
+            OverseasStockOrderRequest(
+                PDNO = "tqqq",
+                OVRS_EXCG_CD = "nasd",
+                ORD_QTY = 1,
+                OVRS_ORD_UNPR = "112.5",
+                ORD_DVSN = "34",
+                isMock = false,
+            ),
+        )
+
+        with(exchangeFunction.requests.single()) {
+            assertEquals("/uapi/overseas-stock/v1/trading/order", url().path)
+            assertEquals("TTTT1002U", headers().getFirst("tr_id"))
+            assertEquals("real-app-key", headers().getFirst("appkey"))
+            assertEquals("real-app-secret", headers().getFirst("appsecret"))
+        }
+    }
+
+    @Test
+    fun `sends official tr id for mock overseas us sell order`() = runTest {
+        val exchangeFunction = SingleResponseExchangeFunction.success()
+        val service = openApiService(exchangeFunction)
+
+        service.postOverseasStockOrder(
+            OverseasStockOrderRequest(
+                PDNO = "TQQQ",
+                ORD_QTY = 1,
+                OVRS_ORD_UNPR = "112.5",
+                ORD_DVSN = "00",
+                SLL_TYPE = "00",
+                isMock = true,
+            ),
+        )
+
+        with(exchangeFunction.requests.single()) {
+            assertEquals("/uapi/overseas-stock/v1/trading/order", url().path)
+            assertEquals("VTTT1006U", headers().getFirst("tr_id"))
+            assertEquals("mock-app-key", headers().getFirst("appkey"))
+            assertEquals("mock-app-secret", headers().getFirst("appsecret"))
+        }
+    }
+
+    @Test
+    fun `sends official tr id for mock overseas cancel order`() = runTest {
+        val exchangeFunction = SingleResponseExchangeFunction.success()
+        val service = openApiService(exchangeFunction)
+
+        service.postOverseasStockOrderCancel(
+            OverseasStockOrderCancelRequest(
+                PDNO = "TQQQ",
+                ORGN_ODNO = "broker-order-1",
+                ORD_QTY = 1,
+                isMock = true,
+            ),
+        )
+
+        with(exchangeFunction.requests.single()) {
+            assertEquals("/uapi/overseas-stock/v1/trading/order-rvsecncl", url().path)
+            assertEquals("VTTT1004U", headers().getFirst("tr_id"))
+        }
+    }
+
+    @Test
+    fun `sends official tr id and query fields for mock overseas execution history`() = runTest {
+        val exchangeFunction = SingleResponseExchangeFunction.success()
+        val service = openApiService(exchangeFunction)
+
+        service.getOverseasExecutionOrders(
+            GetOverseasExecutionOrdersRequest(
+                ordStrtDt = "20260601",
+                ordEndDt = "20260602",
+                pdno = "TQQQ",
+                ovrsExcgCd = "NASD",
+                isMock = true,
+            ),
+        )
+
+        with(exchangeFunction.requests.single()) {
+            assertEquals("/uapi/overseas-stock/v1/trading/inquire-ccnl", url().path)
+            assertEquals("VTTS3035R", headers().getFirst("tr_id"))
+            assertEquals("TQQQ", url().queryValue("PDNO"))
+            assertEquals("20260601", url().queryValue("ORD_STRT_DT"))
+            assertEquals("20260602", url().queryValue("ORD_END_DT"))
+            assertEquals("NASD", url().queryValue("OVRS_EXCG_CD"))
+        }
+    }
+
+    @Test
+    fun `sends official tr id and query fields for mock overseas balance`() = runTest {
+        val exchangeFunction = SingleResponseExchangeFunction.success()
+        val service = openApiService(exchangeFunction)
+
+        service.getOverseasStockBalance(
+            GetOverseasStockBalanceRequest(
+                ovrsExcgCd = "NASD",
+                trCrcyCd = "USD",
+                isMock = true,
+            ),
+        )
+
+        with(exchangeFunction.requests.single()) {
+            assertEquals("/uapi/overseas-stock/v1/trading/inquire-balance", url().path)
+            assertEquals("VTTS3012R", headers().getFirst("tr_id"))
+            assertEquals("NASD", url().queryValue("OVRS_EXCG_CD"))
+            assertEquals("USD", url().queryValue("TR_CRCY_CD"))
+        }
+    }
+
     private fun openApiService(exchangeFunction: SingleResponseExchangeFunction): OpenApiService {
         val webClient = WebClient.builder()
             .baseUrl("https://mock.kis.test")
@@ -113,6 +227,36 @@ class OpenApiServiceHttpResponseTest {
                     .build(),
             )
         }
+
+        companion object {
+            fun success(): SingleResponseExchangeFunction {
+                return SingleResponseExchangeFunction(
+                    status = HttpStatus.OK,
+                    body = """
+                    {
+                      "rt_cd": "0",
+                      "msg_cd": "MCA00000",
+                      "msg1": "ok",
+                      "output": {
+                        "ODNO": "broker-order-1"
+                      }
+                    }
+                    """.trimIndent(),
+                )
+            }
+        }
+    }
+
+    private fun java.net.URI.queryValue(name: String): String? {
+        return rawQuery.orEmpty()
+            .split("&")
+            .mapNotNull { part ->
+                val pieces = part.split("=", limit = 2)
+                pieces.firstOrNull()?.takeIf { it == name }?.let {
+                    java.net.URLDecoder.decode(pieces.getOrElse(1) { "" }, Charsets.UTF_8)
+                }
+            }
+            .firstOrNull()
     }
 
     private class PreloadedTokenStore(
