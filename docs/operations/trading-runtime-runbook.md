@@ -225,6 +225,12 @@ Broker recovery, risk, and trading-hours guard keys:
 akra.order-intent.default-trading-environment=MOCK
 akra.order-intent.strategy-trading-environments[laor-v4-live]=LIVE
 akra.order-intent.strategy-trading-environments[laor-v4-paper]=MOCK
+akra.trading-calendar.us.enabled=true
+akra.trading-calendar.us.default-us-equity-calendar-enabled=true
+akra.trading-calendar.us.holidays[0]=2026-07-03
+akra.trading-calendar.us.early-close-days[0]=2026-11-27
+akra.trading-calendar.us.early-close-time=13:00
+akra.trading-calendar.us.early-close-times[2026-11-27]=12:30
 akra.order.overseas.default-exchange=NASD
 akra.order.status-lookup.backfill-days=1
 akra.order.status-lookup.forward-days=1

@@ -13,5 +13,7 @@ class TradingCalendarProperties {
         var defaultUsEquityCalendarEnabled: Boolean = true
         var holidays: List<String> = emptyList()
         var earlyCloseDays: List<String> = emptyList()
+        var earlyCloseTime: String? = null
+        var earlyCloseTimes: MutableMap<String, String> = mutableMapOf()
     }
 }

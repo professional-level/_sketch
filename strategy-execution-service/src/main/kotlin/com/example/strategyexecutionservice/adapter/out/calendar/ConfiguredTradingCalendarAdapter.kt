@@ -44,8 +44,12 @@ internal class ConfiguredTradingCalendarAdapter(
 
     private fun TradingCalendarProperties.MarketCalendar.earlyCloseTime(date: LocalDate): LocalTime? {
         if (!enabled || !isTradingDay(date)) return null
+        val dateOverride = earlyCloseTimes[date.toString()]?.toLocalTimeOrNull()
+        if (dateOverride != null) {
+            return dateOverride
+        }
         if (date in earlyCloseDays.mapNotNull { it.toLocalDateOrNull() }.toSet()) {
-            return UsEquityMarketCalendar.standardEarlyClose
+            return earlyCloseTime?.toLocalTimeOrNull() ?: UsEquityMarketCalendar.standardEarlyClose
         }
         return if (defaultUsEquityCalendarEnabled) {
             UsEquityMarketCalendar.earlyCloseTime(date)
@@ -60,6 +64,10 @@ internal class ConfiguredTradingCalendarAdapter(
 
     private fun String.toLocalDateOrNull(): LocalDate? {
         return runCatching { LocalDate.parse(trim()) }.getOrNull()
+    }
+
+    private fun String.toLocalTimeOrNull(): LocalTime? {
+        return runCatching { LocalTime.parse(trim()) }.getOrNull()
     }
 
     companion object {

@@ -46,6 +46,35 @@ class ConfiguredTradingCalendarAdapterTest {
     }
 
     @Test
+    fun `uses configured early close time for listed dates`() {
+        val properties = TradingCalendarProperties().apply {
+            us.earlyCloseDays = listOf("2026-11-27")
+            us.earlyCloseTime = "12:45"
+        }
+        val adapter = ConfiguredTradingCalendarAdapter(properties)
+
+        assertEquals(
+            LocalTime.parse("12:45"),
+            adapter.earlyCloseTime(TradingMarket.US, LocalDate.parse("2026-11-27")),
+        )
+    }
+
+    @Test
+    fun `uses date-specific early close override before common early close time`() {
+        val properties = TradingCalendarProperties().apply {
+            us.earlyCloseDays = listOf("2026-11-27")
+            us.earlyCloseTime = "13:00"
+            us.earlyCloseTimes["2026-11-27"] = "12:30"
+        }
+        val adapter = ConfiguredTradingCalendarAdapter(properties)
+
+        assertEquals(
+            LocalTime.parse("12:30"),
+            adapter.earlyCloseTime(TradingMarket.US, LocalDate.parse("2026-11-27")),
+        )
+    }
+
+    @Test
     fun `converts requested timestamp to configured market date`() {
         val adapter = ConfiguredTradingCalendarAdapter(TradingCalendarProperties())
 
