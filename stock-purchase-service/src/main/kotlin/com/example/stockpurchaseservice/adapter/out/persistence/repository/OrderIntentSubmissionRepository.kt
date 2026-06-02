@@ -53,6 +53,22 @@ internal class OrderIntentSubmissionRepository :
         }
     }
 
+    suspend fun findRecentProblemSubmissions(limit: Int): List<OrderIntentSubmissionEntity> {
+        return sessionFactory.withSession { session ->
+            session.createQuery(
+                """
+                FROM OrderIntentSubmissionEntity o
+                WHERE o.status IN (:statuses)
+                ORDER BY o.submittedAt DESC
+                """.trimIndent(),
+                OrderIntentSubmissionEntity::class.java,
+            )
+                .setParameter("statuses", PROBLEM_SUBMISSION_STATUSES)
+                .setMaxResults(limit)
+                .resultList
+        }.awaitSuspending()
+    }
+
     override suspend fun countBrokerSubmittedBetween(
         from: ZonedDateTime,
         to: ZonedDateTime,
@@ -179,6 +195,10 @@ internal class OrderIntentSubmissionRepository :
         )
         private val ACTIVE_EXPOSURE_STATUSES = listOf(
             OrderIntentSubmissionStatus.SUBMITTED,
+            OrderIntentSubmissionStatus.SUBMISSION_UNKNOWN,
+            OrderIntentSubmissionStatus.CANCEL_PENDING,
+        )
+        private val PROBLEM_SUBMISSION_STATUSES = listOf(
             OrderIntentSubmissionStatus.SUBMISSION_UNKNOWN,
             OrderIntentSubmissionStatus.CANCEL_PENDING,
         )

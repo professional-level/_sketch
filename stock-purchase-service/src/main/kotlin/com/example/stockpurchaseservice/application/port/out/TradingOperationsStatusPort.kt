@@ -1,6 +1,9 @@
 package com.example.stockpurchaseservice.application.port.out
 
+import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
+import com.example.stockpurchaseservice.application.port.`in`.OrderIntentType
 import java.time.ZonedDateTime
+import java.util.UUID
 
 interface TradingOperationsStatusPort {
     suspend fun loadStatus(): TradingOperationsStatusSnapshot
@@ -8,6 +11,7 @@ interface TradingOperationsStatusPort {
 
 data class TradingOperationsStatusSnapshot(
     val orderSubmissionStatusCounts: List<OrderSubmissionStatusCount>,
+    val recentProblemSubmissions: List<OrderSubmissionProblemStatus>,
     val orderExecutionOutboxStatusCounts: List<OutboxStatusCount>,
     val reconciliationCursors: List<ExecutionReconciliationCursorStatus>,
     val unmatchedExecutionCount: Long,
@@ -17,6 +21,20 @@ data class TradingOperationsStatusSnapshot(
 data class OrderSubmissionStatusCount(
     val status: OrderIntentSubmissionStatusDto,
     val count: Long,
+)
+
+data class OrderSubmissionProblemStatus(
+    val orderIntentId: UUID,
+    val strategyExecutionId: String,
+    val symbol: String,
+    val market: StockOrderMarket?,
+    val side: OrderIntentSide,
+    val orderType: OrderIntentType,
+    val status: OrderIntentSubmissionStatusDto,
+    val statusReason: String?,
+    val externalOrderId: String?,
+    val submittedAt: ZonedDateTime,
+    val lastStatusCheckedAt: ZonedDateTime?,
 )
 
 data class OutboxStatusCount(

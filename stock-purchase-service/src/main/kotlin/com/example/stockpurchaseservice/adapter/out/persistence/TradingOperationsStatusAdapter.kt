@@ -3,6 +3,7 @@ package com.example.stockpurchaseservice.adapter.out.persistence
 import com.example.common.PersistenceAdapter
 import com.example.stockpurchaseservice.adapter.out.persistence.entity.ExecutionReconciliationCursorEntity
 import com.example.stockpurchaseservice.adapter.out.persistence.entity.OrderExecutionOutboxEventStatus
+import com.example.stockpurchaseservice.adapter.out.persistence.entity.OrderIntentSubmissionEntity
 import com.example.stockpurchaseservice.adapter.out.persistence.entity.UnmatchedExecutionEntity
 import com.example.stockpurchaseservice.adapter.out.persistence.entity.UnmatchedExecutionType
 import com.example.stockpurchaseservice.adapter.out.persistence.repository.ExecutionReconciliationCursorRepository
@@ -12,6 +13,7 @@ import com.example.stockpurchaseservice.adapter.out.persistence.repository.Unmat
 import com.example.stockpurchaseservice.application.port.out.ExecutionReconciliationCursorStatus
 import com.example.stockpurchaseservice.application.port.out.ExecutionTypeDto
 import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionStatusDto
+import com.example.stockpurchaseservice.application.port.out.OrderSubmissionProblemStatus
 import com.example.stockpurchaseservice.application.port.out.OrderSubmissionStatusCount
 import com.example.stockpurchaseservice.application.port.out.OutboxStatusCount
 import com.example.stockpurchaseservice.application.port.out.TradingOperationsStatusPort
@@ -36,6 +38,9 @@ internal class TradingOperationsStatusAdapter(
                     count = orderCounts.entries.firstOrNull { it.key.toDto() == status }?.value ?: 0L,
                 )
             },
+            recentProblemSubmissions = orderIntentSubmissionRepository
+                .findRecentProblemSubmissions(RECENT_PROBLEM_SUBMISSION_LIMIT)
+                .map { it.toProblemStatus() },
             orderExecutionOutboxStatusCounts = OrderExecutionOutboxEventStatus.values().map { status ->
                 OutboxStatusCount(
                     status = status.name,
@@ -47,6 +52,23 @@ internal class TradingOperationsStatusAdapter(
             unmatchedExecutionCount = unmatchedExecutionRepository.countAll(),
             recentUnmatchedExecutions = unmatchedExecutionRepository.findRecent(RECENT_UNMATCHED_LIMIT)
                 .map { it.toStatus() },
+        )
+    }
+
+    private fun OrderIntentSubmissionEntity.toProblemStatus(): OrderSubmissionProblemStatus {
+        val dto = toDto()
+        return OrderSubmissionProblemStatus(
+            orderIntentId = dto.orderIntentId,
+            strategyExecutionId = dto.strategyExecutionId,
+            symbol = dto.symbol,
+            market = dto.market,
+            side = dto.side,
+            orderType = dto.orderType,
+            status = dto.status,
+            statusReason = dto.statusReason,
+            externalOrderId = dto.externalOrderId,
+            submittedAt = dto.submittedAt,
+            lastStatusCheckedAt = dto.lastStatusCheckedAt,
         )
     }
 
@@ -90,5 +112,6 @@ internal class TradingOperationsStatusAdapter(
 
     private companion object {
         const val RECENT_UNMATCHED_LIMIT = 20
+        const val RECENT_PROBLEM_SUBMISSION_LIMIT = 20
     }
 }

@@ -4,6 +4,7 @@ import com.example.common.WebAdapter
 import com.example.stockpurchaseservice.application.port.`in`.GetTradingOperationsStatusUseCase
 import com.example.stockpurchaseservice.application.port.`in`.TradingOperationsStatusResult
 import com.example.stockpurchaseservice.application.port.out.ExecutionReconciliationCursorStatus
+import com.example.stockpurchaseservice.application.port.out.OrderSubmissionProblemStatus
 import com.example.stockpurchaseservice.application.port.out.OrderSubmissionStatusCount
 import com.example.stockpurchaseservice.application.port.out.OutboxStatusCount
 import com.example.stockpurchaseservice.application.port.out.UnmatchedExecutionStatus
@@ -26,6 +27,7 @@ internal class TradingOperationsStatusController(
 internal data class TradingOperationsStatusResponse(
     val generatedAt: ZonedDateTime,
     val orderSubmissionStatusCounts: List<OrderSubmissionStatusCount>,
+    val recentProblemSubmissions: List<OrderSubmissionProblemStatus>,
     val orderExecutionOutboxStatusCounts: List<OutboxStatusCount>,
     val reconciliationCursors: List<ExecutionReconciliationCursorStatus>,
     val unmatchedExecutionCount: Long,
@@ -36,6 +38,7 @@ private fun TradingOperationsStatusResult.toResponse(): TradingOperationsStatusR
     return TradingOperationsStatusResponse(
         generatedAt = generatedAt,
         orderSubmissionStatusCounts = snapshot.orderSubmissionStatusCounts,
+        recentProblemSubmissions = snapshot.recentProblemSubmissions,
         orderExecutionOutboxStatusCounts = snapshot.orderExecutionOutboxStatusCounts,
         reconciliationCursors = snapshot.reconciliationCursors,
         unmatchedExecutionCount = snapshot.unmatchedExecutionCount,

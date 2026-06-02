@@ -1,15 +1,20 @@
 package com.example.stockpurchaseservice.adapter.`in`.web
 
+import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
+import com.example.stockpurchaseservice.application.port.`in`.OrderIntentType
 import com.example.stockpurchaseservice.application.port.`in`.GetTradingOperationsStatusUseCase
 import com.example.stockpurchaseservice.application.port.`in`.TradingOperationsStatusResult
 import com.example.stockpurchaseservice.application.port.out.ExecutionReconciliationCursorStatus
 import com.example.stockpurchaseservice.application.port.out.ExecutionTypeDto
 import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionStatusDto
+import com.example.stockpurchaseservice.application.port.out.OrderSubmissionProblemStatus
 import com.example.stockpurchaseservice.application.port.out.OrderSubmissionStatusCount
 import com.example.stockpurchaseservice.application.port.out.OutboxStatusCount
+import com.example.stockpurchaseservice.application.port.out.StockOrderMarket
 import com.example.stockpurchaseservice.application.port.out.TradingOperationsStatusSnapshot
 import com.example.stockpurchaseservice.application.port.out.UnmatchedExecutionStatus
 import java.time.ZonedDateTime
+import java.util.UUID
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -30,6 +35,7 @@ class TradingOperationsStatusControllerTest {
         assertEquals(1, useCase.callCount)
         assertEquals(result.generatedAt, response.generatedAt)
         assertEquals(result.snapshot.orderSubmissionStatusCounts, response.orderSubmissionStatusCounts)
+        assertEquals(result.snapshot.recentProblemSubmissions, response.recentProblemSubmissions)
         assertEquals(result.snapshot.orderExecutionOutboxStatusCounts, response.orderExecutionOutboxStatusCounts)
         assertEquals(result.snapshot.reconciliationCursors, response.reconciliationCursors)
         assertEquals(result.snapshot.unmatchedExecutionCount, response.unmatchedExecutionCount)
@@ -40,6 +46,21 @@ class TradingOperationsStatusControllerTest {
         return TradingOperationsStatusSnapshot(
             orderSubmissionStatusCounts = listOf(
                 OrderSubmissionStatusCount(OrderIntentSubmissionStatusDto.SUBMISSION_UNKNOWN, 1),
+            ),
+            recentProblemSubmissions = listOf(
+                OrderSubmissionProblemStatus(
+                    orderIntentId = UUID.fromString("00000000-0000-0000-0000-000000000001"),
+                    strategyExecutionId = "laor-v4:TQQQ",
+                    symbol = "TQQQ",
+                    market = StockOrderMarket.OVERSEAS_US,
+                    side = OrderIntentSide.BUY,
+                    orderType = OrderIntentType.LOC,
+                    status = OrderIntentSubmissionStatusDto.SUBMISSION_UNKNOWN,
+                    statusReason = "broker status lookup failed",
+                    externalOrderId = "broker-1",
+                    submittedAt = ZonedDateTime.parse("2026-06-02T09:30:00+09:00[Asia/Seoul]"),
+                    lastStatusCheckedAt = ZonedDateTime.parse("2026-06-02T09:31:00+09:00[Asia/Seoul]"),
+                ),
             ),
             orderExecutionOutboxStatusCounts = listOf(
                 OutboxStatusCount("FAILED", 2),
