@@ -2,8 +2,9 @@
 
 Use `verify-github-delivery.ps1` after pushing a deployment commit. It checks
 that the expected GitHub Actions workflows succeeded for the exact commit SHA
-and, when Docker is available, that GHCR exposes the immutable image tags used by
-the Kubernetes rollout.
+and that GHCR exposes the immutable image tags used by the Kubernetes rollout.
+Registry verification defaults to `Auto`: it uses Docker when Docker is on
+`PATH`, otherwise it uses the GHCR Registry HTTP API.
 
 Dry-run:
 
@@ -16,13 +17,34 @@ Dry-run:
 Verify Actions and GHCR:
 
 ```powershell
-$env:GITHUB_TOKEN='REDACTED_TOKEN_WITH_ACTIONS_AND_PACKAGES_READ'
+$env:GHCR_USERNAME='REDACTED_GITHUB_LOGIN'
+$env:GHCR_TOKEN='REDACTED_TOKEN_WITH_PACKAGES_READ'
 .\verify-github-delivery.ps1 `
   -RepoFullName professional-level/_sketch `
   -CommitSha <git-sha>
 ```
 
-If the environment cannot use Docker but still needs to verify workflow status:
+Force Docker-based registry verification:
+
+```powershell
+.\verify-github-delivery.ps1 `
+  -RepoFullName professional-level/_sketch `
+  -CommitSha <git-sha> `
+  -RegistryCheckMode Docker
+```
+
+Force Dockerless GHCR HTTP registry verification:
+
+```powershell
+$env:GHCR_USERNAME='REDACTED_GITHUB_LOGIN'
+$env:GHCR_TOKEN='REDACTED_TOKEN_WITH_PACKAGES_READ'
+.\verify-github-delivery.ps1 `
+  -RepoFullName professional-level/_sketch `
+  -CommitSha <git-sha> `
+  -RegistryCheckMode Http
+```
+
+If the environment cannot access GHCR but still needs to verify workflow status:
 
 ```powershell
 .\verify-github-delivery.ps1 `
@@ -50,3 +72,7 @@ ghcr.io/professional-level/sketch-stock-purchase-service:<git-sha>
 This script does not print secret values. If `GITHUB_TOKEN` is not set, it uses
 unauthenticated GitHub API requests, which may be rate-limited or unable to see
 private workflow/package state.
+
+For GHCR HTTP registry verification, set either `GHCR_USERNAME` and
+`GHCR_TOKEN`, or `GITHUB_ACTOR` and `GITHUB_TOKEN`. The token needs package read
+permission for private packages. Public packages may be readable anonymously.

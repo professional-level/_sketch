@@ -20,6 +20,9 @@ param(
 
     [switch] $SkipRegistryCheck,
 
+    [ValidateSet("Auto", "Docker", "Http")]
+    [string] $RegistryCheckMode = "Auto",
+
     [switch] $DryRun
 )
 
@@ -54,6 +57,131 @@ function Require-Command {
     }
 }
 
+function Test-CommandExists {
+    param([string] $Name)
+
+    return $null -ne (Get-Command $Name -ErrorAction SilentlyContinue)
+}
+
+function Get-HeaderValue {
+    param(
+        [object] $Response,
+        [string] $Name
+    )
+
+    if ($null -eq $Response -or $null -eq $Response.Headers) {
+        return $null
+    }
+
+    $value = $Response.Headers[$Name]
+    if ($null -eq $value) {
+        return $null
+    }
+
+    if ($value -is [array]) {
+        return ($value -join ",")
+    }
+
+    return [string] $value
+}
+
+function Get-ResponseStatusCode {
+    param([object] $ErrorRecord)
+
+    if ($null -eq $ErrorRecord.Exception.Response) {
+        return $null
+    }
+
+    return [int] $ErrorRecord.Exception.Response.StatusCode
+}
+
+function ConvertTo-BearerChallenge {
+    param([string] $Header)
+
+    if ([string]::IsNullOrWhiteSpace($Header) -or -not $Header.TrimStart().StartsWith("Bearer ")) {
+        throw "Registry did not return a Bearer authentication challenge."
+    }
+
+    $challenge = @{}
+    $matches = [regex]::Matches($Header, '(\w+)="([^"]*)"')
+    foreach ($match in $matches) {
+        $challenge[$match.Groups[1].Value] = $match.Groups[2].Value
+    }
+
+    if (-not $challenge.ContainsKey("realm")) {
+        throw "Registry Bearer authentication challenge is missing realm."
+    }
+
+    return $challenge
+}
+
+function Get-GhcrCredentialHeaders {
+    $token = $env:GHCR_TOKEN
+    if ([string]::IsNullOrWhiteSpace($token)) {
+        $token = $env:GITHUB_TOKEN
+    }
+
+    $username = $env:GHCR_USERNAME
+    if ([string]::IsNullOrWhiteSpace($username)) {
+        $username = $env:GITHUB_ACTOR
+    }
+
+    if ([string]::IsNullOrWhiteSpace($token) -or [string]::IsNullOrWhiteSpace($username)) {
+        return @{}
+    }
+
+    $encoded = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("${username}:${token}"))
+    return @{ "Authorization" = "Basic $encoded" }
+}
+
+function Get-GhcrBearerToken {
+    param([hashtable] $Challenge)
+
+    $query = @()
+    foreach ($name in @("service", "scope")) {
+        if ($Challenge.ContainsKey($name) -and -not [string]::IsNullOrWhiteSpace($Challenge[$name])) {
+            $query += ("{0}={1}" -f $name, [uri]::EscapeDataString($Challenge[$name]))
+        }
+    }
+
+    $tokenUri = $Challenge["realm"]
+    if ($query.Count -gt 0) {
+        $tokenUri = "${tokenUri}?$($query -join '&')"
+    }
+
+    Write-Host "GET $tokenUri"
+    try {
+        $response = Invoke-RestMethod -Method Get -Uri $tokenUri -Headers (Get-GhcrCredentialHeaders)
+    }
+    catch {
+        $statusCode = Get-ResponseStatusCode $_
+        throw "GHCR bearer token request failed. Set GHCR_USERNAME and GHCR_TOKEN, or GITHUB_ACTOR and GITHUB_TOKEN, with packages read access. status=$statusCode"
+    }
+
+    $tokenProperty = $response.PSObject.Properties["token"]
+    if ($null -ne $tokenProperty -and -not [string]::IsNullOrWhiteSpace($tokenProperty.Value)) {
+        return $tokenProperty.Value
+    }
+
+    $accessTokenProperty = $response.PSObject.Properties["access_token"]
+    if ($null -ne $accessTokenProperty -and -not [string]::IsNullOrWhiteSpace($accessTokenProperty.Value)) {
+        return $accessTokenProperty.Value
+    }
+
+    throw "GHCR token endpoint did not return a bearer token."
+}
+
+function Get-RegistryManifestHeaders {
+    return @{
+        "Accept" = @(
+            "application/vnd.oci.image.index.v1+json",
+            "application/vnd.docker.distribution.manifest.list.v2+json",
+            "application/vnd.oci.image.manifest.v1+json",
+            "application/vnd.docker.distribution.manifest.v2+json"
+        ) -join ","
+    }
+}
+
 function Assert-WorkflowSucceeded {
     param(
         [object[]] $Runs,
@@ -73,7 +201,7 @@ function Assert-WorkflowSucceeded {
     Write-Host "Workflow '$WorkflowName' succeeded: $($run.html_url)"
 }
 
-function Assert-ImageExists {
+function Assert-ImageExistsWithDocker {
     param([string] $Image)
 
     Write-Host "docker manifest inspect $Image"
@@ -81,6 +209,58 @@ function Assert-ImageExists {
     if ($LASTEXITCODE -ne 0) {
         throw "Image manifest was not found or could not be inspected: $Image"
     }
+}
+
+function Assert-ImageExistsWithHttp {
+    param(
+        [string] $Owner,
+        [string] $Image,
+        [string] $Reference
+    )
+
+    $repository = "$Owner/sketch-$Image"
+    $manifestUri = "https://ghcr.io/v2/$repository/manifests/$Reference"
+    $headers = Get-RegistryManifestHeaders
+
+    Write-Host "GET $manifestUri"
+    try {
+        Invoke-WebRequest -Method Get -Uri $manifestUri -Headers $headers | Out-Null
+        Write-Host "Image manifest exists: ghcr.io/${repository}:$Reference"
+        return
+    }
+    catch {
+        $statusCode = Get-ResponseStatusCode $_
+        if ($statusCode -ne 401) {
+            throw "Image manifest was not found or could not be inspected: ghcr.io/${repository}:$Reference status=$statusCode"
+        }
+
+        $challenge = ConvertTo-BearerChallenge (Get-HeaderValue $_.Exception.Response "WWW-Authenticate")
+        $headers["Authorization"] = "Bearer $(Get-GhcrBearerToken $challenge)"
+    }
+
+    Write-Host "GET $manifestUri"
+    try {
+        Invoke-WebRequest -Method Get -Uri $manifestUri -Headers $headers | Out-Null
+        Write-Host "Image manifest exists: ghcr.io/${repository}:$Reference"
+    }
+    catch {
+        $statusCode = Get-ResponseStatusCode $_
+        throw "Image manifest was not found or could not be inspected: ghcr.io/${repository}:$Reference status=$statusCode"
+    }
+}
+
+function Resolve-RegistryCheckMode {
+    param([string] $Mode)
+
+    if ($Mode -ne "Auto") {
+        return $Mode
+    }
+
+    if (Test-CommandExists "docker") {
+        return "Docker"
+    }
+
+    return "Http"
 }
 
 if ($DryRun) {
@@ -94,6 +274,9 @@ if ($DryRun) {
     if ($SkipRegistryCheck) {
         Write-Host "Registry checks would be skipped."
     }
+    else {
+        Write-Host "Registry check mode: $RegistryCheckMode"
+    }
     return
 }
 
@@ -106,10 +289,20 @@ foreach ($workflow in $ExpectedWorkflowNames) {
 }
 
 if (-not $SkipRegistryCheck) {
-    Require-Command "docker"
     $owner = $RepoFullName.Split("/")[0]
+    $resolvedRegistryCheckMode = Resolve-RegistryCheckMode $RegistryCheckMode
+    Write-Host "Registry check mode: $resolvedRegistryCheckMode"
+    if ($resolvedRegistryCheckMode -eq "Docker") {
+        Require-Command "docker"
+    }
+
     foreach ($image in $ExpectedImages) {
-        Assert-ImageExists ("ghcr.io/{0}/sketch-{1}:{2}" -f $owner, $image, $CommitSha)
+        if ($resolvedRegistryCheckMode -eq "Docker") {
+            Assert-ImageExistsWithDocker ("ghcr.io/{0}/sketch-{1}:{2}" -f $owner, $image, $CommitSha)
+        }
+        else {
+            Assert-ImageExistsWithHttp $owner $image $CommitSha
+        }
     }
 }
 

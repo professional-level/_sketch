@@ -123,6 +123,7 @@ $githubDryRun = & $files.GitHubDeliveryScript -CommitSha "ae80c31584b78eeb736118
 Assert-Contains "GitHub delivery dry-run" $githubDryRun "Expected workflow: Container Images"
 Assert-Contains "GitHub delivery dry-run" $githubDryRun "Expected workflow: Operations Validation"
 Assert-Contains "GitHub delivery dry-run" $githubDryRun "ghcr.io/professional-level/sketch-stock-purchase-service:ae80c31584b78eeb7361184f84dc240c2bbcba81"
+Assert-Contains "GitHub delivery dry-run" $githubDryRun "Registry check mode: Auto"
 
 $runtime = Get-Content -LiteralPath $files.RuntimeManifest -Raw
 $infra = Get-Content -LiteralPath $files.InfraManifest -Raw
