@@ -235,25 +235,19 @@ internal class KisBrokerGatewayAdapter(
                 responseType = JsonNode::class.java,
                 callOptions = properties.toQueryCallOptions(),
             )
-            val returnCode = response.path("rt_cd").asText("")
+            val returnCode = response.textOrNull("rt_cd", "rtCd", "RT_CD").orEmpty()
             if (returnCode.isNotBlank() && returnCode != "0") {
                 throw RuntimeException(
                     "overseas execution lookup failed: ${
-                        response.path("msg_cd").asText()
-                    } ${response.path("msg1").asText()}".trim(),
+                        response.textOrNull("msg_cd", "msgCd", "MSG_CD").orEmpty()
+                    } ${response.textOrNull("msg1", "msg_1", "MSG1").orEmpty()}".trim(),
                 )
             }
-            val output = response.path("output")
-            val rows = when {
-                output.isArray -> output.toList()
-                output.isObject -> listOf(output)
-                else -> emptyList()
-            }
             BrokerOrderHistoryPage(
-                items = rows.mapNotNull { it.toBrokerHistoryItem() },
+                items = response.rows("output", "OUTPUT").mapNotNull { it.toBrokerHistoryItem() },
                 nextCursor = BrokerOrderHistoryPageCursor(
-                    foreignKeyContext = response.path("ctx_area_fk200").asText(""),
-                    nextKeyContext = response.path("ctx_area_nk200").asText(""),
+                    foreignKeyContext = response.textOrNull("ctx_area_fk200", "CTX_AREA_FK200").orEmpty(),
+                    nextKeyContext = response.textOrNull("ctx_area_nk200", "CTX_AREA_NK200").orEmpty(),
                 ),
             )
         }
@@ -267,19 +261,19 @@ internal class KisBrokerGatewayAdapter(
                 responseType = JsonNode::class.java,
                 callOptions = properties.toQueryCallOptions(),
             )
-            val returnCode = response.path("rt_cd").asText("")
+            val returnCode = response.textOrNull("rt_cd", "rtCd", "RT_CD").orEmpty()
             if (returnCode.isNotBlank() && returnCode != "0") {
                 throw RuntimeException(
                     "overseas balance lookup failed: ${
-                        response.path("msg_cd").asText()
-                    } ${response.path("msg1").asText()}".trim(),
+                        response.textOrNull("msg_cd", "msgCd", "MSG_CD").orEmpty()
+                    } ${response.textOrNull("msg1", "msg_1", "MSG1").orEmpty()}".trim(),
                 )
             }
             BrokerAccountSnapshotPage(
                 snapshot = response.toBrokerAccountSnapshot(query),
                 nextCursor = BrokerOrderHistoryPageCursor(
-                    foreignKeyContext = response.path("ctx_area_fk200").asText(""),
-                    nextKeyContext = response.path("ctx_area_nk200").asText(""),
+                    foreignKeyContext = response.textOrNull("ctx_area_fk200", "CTX_AREA_FK200").orEmpty(),
+                    nextKeyContext = response.textOrNull("ctx_area_nk200", "CTX_AREA_NK200").orEmpty(),
                 ),
             )
         }
@@ -517,22 +511,15 @@ private fun ZonedDateTime.toKisDate(): String {
 }
 
 private fun JsonNode.toBrokerAccountSnapshot(query: BrokerAccountSnapshotQuery): BrokerAccountSnapshot {
-    val output1 = path("output1")
-    val rows = when {
-        output1.isArray -> output1.toList()
-        output1.isObject -> listOf(output1)
-        path("output").isArray -> path("output").toList()
-        path("output").isObject -> listOf(path("output"))
-        else -> emptyList()
-    }
-    val summary = path("output2")
+    val rows = rows("output1", "OUTPUT1", "output", "OUTPUT")
+    val summary = nodeOrNull("output2", "OUTPUT2")
 
     return BrokerAccountSnapshot(
         market = StockOrderMarket.OVERSEAS_US,
         exchange = query.exchange.uppercase(),
         currency = query.currency.uppercase(),
         positions = rows.mapNotNull { it.toBrokerPositionSnapshot() },
-        availableCashAmount = summary.textOrNull(
+        availableCashAmount = summary?.textOrNull(
             "ovrs_ord_psbl_amt",
             "OVRS_ORD_PSBL_AMT",
             "frcr_ord_psbl_amt",
@@ -546,7 +533,7 @@ private fun JsonNode.toBrokerAccountSnapshot(query: BrokerAccountSnapshotQuery):
             "buy_psbl_amt",
             "BUY_PSBL_AMT",
         ).toDoubleValue(),
-        totalPurchaseAmount = summary.textOrNull(
+        totalPurchaseAmount = summary?.textOrNull(
             "frcr_buy_amt_smtl",
             "FRCR_BUY_AMT_SMTL",
             "tot_pchs_amt",
@@ -554,7 +541,7 @@ private fun JsonNode.toBrokerAccountSnapshot(query: BrokerAccountSnapshotQuery):
             "pchs_amt_smtl",
             "PCHS_AMT_SMTL",
         ).toDoubleValue(),
-        totalEvaluationAmount = summary.textOrNull(
+        totalEvaluationAmount = summary?.textOrNull(
             "tot_evlu_amt",
             "TOT_EVLU_AMT",
             "frcr_evlu_amt2",
@@ -562,7 +549,7 @@ private fun JsonNode.toBrokerAccountSnapshot(query: BrokerAccountSnapshotQuery):
             "ovrs_stck_evlu_amt",
             "OVRS_STCK_EVLU_AMT",
         ).toDoubleValue(),
-        totalProfitLossAmount = summary.textOrNull(
+        totalProfitLossAmount = summary?.textOrNull(
             "tot_evlu_pfls_amt",
             "TOT_EVLU_PFLS_AMT",
             "evlu_pfls_amt_smtl",
@@ -571,6 +558,22 @@ private fun JsonNode.toBrokerAccountSnapshot(query: BrokerAccountSnapshotQuery):
             "FRCR_EVLU_PFLS_AMT",
         ).toDoubleValue(),
     )
+}
+
+private fun JsonNode.rows(vararg fieldNames: String): List<JsonNode> {
+    val node = nodeOrNull(*fieldNames) ?: return emptyList()
+    return when {
+        node.isArray -> node.toList()
+        node.isObject -> listOf(node)
+        else -> emptyList()
+    }
+}
+
+private fun JsonNode.nodeOrNull(vararg fieldNames: String): JsonNode? {
+    return fieldNames
+        .asSequence()
+        .map { path(it) }
+        .firstOrNull { !it.isMissingNode && !it.isNull }
 }
 
 private fun BrokerAccountSnapshot.mergeSummaryFrom(next: BrokerAccountSnapshot): BrokerAccountSnapshot {

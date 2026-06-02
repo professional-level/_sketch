@@ -398,6 +398,66 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `overseas order history maps uppercase top level aliases and cursor`() {
+        val exchangeFunction = StubExchangeFunction(
+            responses = listOf(
+                """
+                {
+                  "RT_CD": "0",
+                  "CTX_AREA_FK200": "FKU",
+                  "CTX_AREA_NK200": "NKU",
+                  "OUTPUT": [
+                    {
+                      "ODNO": "upper-order-1",
+                      "PDNO": "TQQQ",
+                      "PRDT_ENG_NAME": "ProShares UltraPro QQQ",
+                      "ORD_DT": "20260601",
+                      "THCO_ORD_TMD": "093000",
+                      "ORD_QTY": "3",
+                      "TOT_CCLD_QTY": "1",
+                      "RMN_QTY": "2",
+                      "SLL_BUY_DVSN_NAME": "BUY",
+                      "AVG_PRVS": "112.5"
+                    }
+                  ]
+                }
+                """.trimIndent(),
+                """
+                {
+                  "RT_CD": "0",
+                  "CTX_AREA_FK200": "",
+                  "CTX_AREA_NK200": "",
+                  "OUTPUT": {
+                    "ODNO": "upper-order-2",
+                    "PDNO": "TQQQ",
+                    "ORD_DT": "20260602",
+                    "THCO_ORD_TMD": "093100",
+                    "ORD_QTY": "3",
+                    "TOT_CCLD_QTY": "3",
+                    "RMN_QTY": "0",
+                    "SLL_BUY_DVSN_NAME": "BUY",
+                    "AVG_PRVS": "111.0"
+                  }
+                }
+                """.trimIndent(),
+            ),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        val items = adapter.findOrderHistory(historyQuery())
+
+        assertEquals(listOf("upper-order-1", "upper-order-2"), items.map { it.externalOrderId })
+        assertEquals(listOf(1L, 3L), items.map { it.cumulativeFilledQuantity })
+        assertEquals(2, exchangeFunction.requests.size)
+        assertEquals("FKU", exchangeFunction.requests[1].queryValue("ctxAreaFk200"))
+        assertEquals("NKU", exchangeFunction.requests[1].queryValue("ctxAreaNk200"))
+    }
+
+    @Test
     fun `overseas account snapshot maps balance positions and summary`() {
         val exchangeFunction = StubExchangeFunction(
             responses = listOf(
@@ -463,6 +523,66 @@ class KisBrokerGatewayAdapterTest {
         assertEquals("/open-api/overseas/trading/inquire-balance", exchangeFunction.requests.single().url().path)
         assertEquals("NASD", exchangeFunction.requests.single().queryValue("ovrsExcgCd"))
         assertEquals("USD", exchangeFunction.requests.single().queryValue("trCrcyCd"))
+    }
+
+    @Test
+    fun `overseas account snapshot maps uppercase top level balance aliases`() {
+        val exchangeFunction = StubExchangeFunction(
+            responses = listOf(
+                """
+                {
+                  "RT_CD": "0",
+                  "CTX_AREA_FK200": "",
+                  "CTX_AREA_NK200": "",
+                  "OUTPUT1": {
+                    "OVRS_PDNO": "TQQQ",
+                    "OVRS_ITEM_NAME": "ProShares UltraPro QQQ",
+                    "OVRS_CBLC_QTY": "3",
+                    "PCHS_AVG_PRIC": "112.5",
+                    "NOW_PRIC2": "120.0",
+                    "FRCR_PCHS_AMT1": "337.5",
+                    "OVRS_STCK_EVLU_AMT": "360.0",
+                    "FRCR_EVLU_PFLS_AMT": "22.5"
+                  },
+                  "OUTPUT2": {
+                    "OVRS_ORD_PSBL_AMT": "1250.25",
+                    "FRCR_BUY_AMT_SMTL": "337.5",
+                    "TOT_EVLU_AMT": "360.0",
+                    "TOT_EVLU_PFLS_AMT": "22.5"
+                  }
+                }
+                """.trimIndent(),
+            ),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        val snapshot = adapter.findAccountSnapshot(
+            BrokerAccountSnapshotQuery(
+                market = StockOrderMarket.OVERSEAS_US,
+                exchange = "NASD",
+                currency = "USD",
+                isMock = false,
+            ),
+        )
+
+        assertEquals(1250.25, snapshot.availableCashAmount)
+        assertEquals(337.5, snapshot.totalPurchaseAmount)
+        assertEquals(360.0, snapshot.totalEvaluationAmount)
+        assertEquals(22.5, snapshot.totalProfitLossAmount)
+        with(snapshot.positions.single()) {
+            assertEquals("TQQQ", symbol)
+            assertEquals("ProShares UltraPro QQQ", stockName)
+            assertEquals(3, quantity)
+            assertEquals(112.5, averagePurchasePrice)
+            assertEquals(120.0, currentPrice)
+            assertEquals(337.5, purchaseAmount)
+            assertEquals(360.0, evaluationAmount)
+            assertEquals(22.5, profitLossAmount)
+        }
     }
 
     @Test
