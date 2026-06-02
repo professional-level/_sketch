@@ -290,7 +290,8 @@ GET /operations/trading/account-snapshot?market=OVERSEAS_US&exchange=NASD&curren
 GET /operations/trading/account-snapshot?market=DOMESTIC&exchange=KRX&currency=KRW
 ```
 
-This calls the broker wrapper's domestic or overseas balance lookup and returns current positions with quantity, average purchase price, current price, purchase amount, evaluation amount, profit/loss, and available cash amount when KIS provides those fields. Strict settled-cash classification, multi-currency conversion, and broader account cash/exposure modeling still require additional hardening.
+This calls the broker wrapper's domestic or overseas balance lookup and returns current positions with quantity, average purchase price, current price, purchase amount, evaluation amount, profit/loss, and legacy `availableCashAmount` when KIS provides those fields.
+The response also includes `cashCurrency`, `orderableCashAmount`, `settledCashAmount`, and `withdrawableCashAmount` when those KIS summary aliases are present. `availableCashAmount` remains as a legacy compatibility field and is derived from the first available broker cash bucket. Strict multi-currency conversion, FX-rate normalization, and broader account cash/exposure modeling still require additional hardening.
 
 When `akra.order.risk.max-account-exposure-notional` is set, buy order risk checks use the market-specific account snapshot to reject orders whose projected exposure would exceed the configured limit:
 
@@ -300,13 +301,13 @@ current broker evaluation amount + active pending buy notional + new order notio
 
 If the broker snapshot does not contain enough valuation data to calculate current exposure, the guard rejects the buy order instead of assuming zero exposure.
 
-When `akra.order.risk.account-cash.enabled=true`, buy order risk checks use the same overseas account snapshot to reject orders whose projected cash usage would exceed the broker-reported available cash amount:
+When `akra.order.risk.account-cash.enabled=true`, buy order risk checks use the same market-specific account snapshot to reject orders whose projected cash usage would exceed the broker-reported orderable cash amount:
 
 ```text
 active pending buy notional + new order notional + configured cash reserve
 ```
 
-If the broker snapshot does not contain an available cash amount, the guard rejects the buy order instead of assuming cash is available.
+If the broker snapshot does not contain `orderableCashAmount`, the guard falls back to legacy `availableCashAmount` for older snapshot providers. If neither amount exists, the guard rejects the buy order instead of assuming cash is available.
 
 ## Kafka And Temporal Restart Procedure
 

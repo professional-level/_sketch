@@ -28,6 +28,10 @@ class BrokerAccountSnapshotControllerTest {
                     ),
                 ),
                 availableCashAmount = 1250.25,
+                cashCurrency = "USD",
+                orderableCashAmount = 1250.25,
+                settledCashAmount = 1300.0,
+                withdrawableCashAmount = 1200.0,
                 totalPurchaseAmount = 337.5,
                 totalEvaluationAmount = 360.0,
                 totalProfitLossAmount = 22.5,
@@ -52,6 +56,10 @@ class BrokerAccountSnapshotControllerTest {
         assertEquals("USD", response.currency)
         assertEquals(result.snapshot.positions, response.positions)
         assertEquals(1250.25, response.availableCashAmount)
+        assertEquals("USD", response.cashCurrency)
+        assertEquals(1250.25, response.orderableCashAmount)
+        assertEquals(1300.0, response.settledCashAmount)
+        assertEquals(1200.0, response.withdrawableCashAmount)
         assertEquals(337.5, response.totalPurchaseAmount)
         assertEquals(360.0, response.totalEvaluationAmount)
         assertEquals(22.5, response.totalProfitLossAmount)

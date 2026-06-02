@@ -176,7 +176,7 @@ class OrderRiskControlAdapterTest {
     }
 
     @Test
-    fun `rejects buy when active orders plus reserve exceed broker available cash`() = runBlocking {
+    fun `rejects buy when active orders plus reserve exceed broker orderable cash`() = runBlocking {
         val properties = OrderRiskProperties().apply {
             accountCash.enabled = true
             accountCash.reserveNotional = 25.0
@@ -188,7 +188,8 @@ class OrderRiskControlAdapterTest {
                 exchange = "NASD",
                 currency = "USD",
                 positions = emptyList(),
-                availableCashAmount = 1_000.0,
+                availableCashAmount = 5_000.0,
+                orderableCashAmount = 1_000.0,
             ),
         )
 
@@ -197,8 +198,30 @@ class OrderRiskControlAdapterTest {
         )
 
         assertFalse(result.accepted)
-        assertContains(result.reason ?: "", "account cash usage 1075.0 exceeds available cash 1000.0")
+        assertContains(result.reason ?: "", "account cash usage 1075.0 exceeds orderable cash 1000.0")
         assertContains(result.reason ?: "", "(active=850.0 order=200.0 reserve=25.0)")
+    }
+
+    @Test
+    fun `uses legacy available cash when broker snapshot has no orderable cash bucket`() = runBlocking {
+        val properties = OrderRiskProperties().apply {
+            accountCash.enabled = true
+        }
+        val marketService = FakeMarketServicePort(
+            snapshot = AccountSnapshotDto(
+                market = StockOrderMarket.OVERSEAS_US,
+                exchange = "NASD",
+                currency = "USD",
+                positions = emptyList(),
+                availableCashAmount = 1_000.0,
+            ),
+        )
+
+        val result = adapter(properties, marketService = marketService).assess(
+            command(quantity = 1, limitPrice = 100.0),
+        )
+
+        assertTrue(result.accepted)
     }
 
     @Test

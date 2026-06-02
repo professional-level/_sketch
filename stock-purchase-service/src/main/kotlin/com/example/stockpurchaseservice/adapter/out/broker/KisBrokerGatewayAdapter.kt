@@ -638,26 +638,41 @@ private fun ZonedDateTime.toKisDate(): String {
 private fun JsonNode.toBrokerAccountSnapshot(query: BrokerAccountSnapshotQuery): BrokerAccountSnapshot {
     val rows = rows("output1", "OUTPUT1", "output", "OUTPUT")
     val summary = nodeOrNull("output2", "OUTPUT2")
+    val orderableCashAmount = summary?.textOrNull(
+        "ovrs_ord_psbl_amt",
+        "OVRS_ORD_PSBL_AMT",
+        "frcr_ord_psbl_amt",
+        "FRCR_ORD_PSBL_AMT",
+        "ord_psbl_frcr_amt",
+        "ORD_PSBL_FRCR_AMT",
+        "buy_psbl_amt",
+        "BUY_PSBL_AMT",
+    ).toDoubleValue()
+    val settledCashAmount = summary?.textOrNull(
+        "frcr_dncl_amt_2",
+        "FRCR_DNCL_AMT_2",
+        "frcr_dncl_amt",
+        "FRCR_DNCL_AMT",
+    ).toDoubleValue()
+    val withdrawableCashAmount = summary?.textOrNull(
+        "frcr_wdrw_psbl_amt",
+        "FRCR_WDRW_PSBL_AMT",
+        "ovrs_wdrw_psbl_amt",
+        "OVRS_WDRW_PSBL_AMT",
+        "wdrw_psbl_amt",
+        "WDRW_PSBL_AMT",
+    ).toDoubleValue()
 
     return BrokerAccountSnapshot(
         market = StockOrderMarket.OVERSEAS_US,
         exchange = query.exchange.uppercase(),
         currency = query.currency.uppercase(),
         positions = rows.mapNotNull { it.toBrokerPositionSnapshot() },
-        availableCashAmount = summary?.textOrNull(
-            "ovrs_ord_psbl_amt",
-            "OVRS_ORD_PSBL_AMT",
-            "frcr_ord_psbl_amt",
-            "FRCR_ORD_PSBL_AMT",
-            "ord_psbl_frcr_amt",
-            "ORD_PSBL_FRCR_AMT",
-            "frcr_dncl_amt_2",
-            "FRCR_DNCL_AMT_2",
-            "frcr_dncl_amt",
-            "FRCR_DNCL_AMT",
-            "buy_psbl_amt",
-            "BUY_PSBL_AMT",
-        ).toDoubleValue(),
+        availableCashAmount = orderableCashAmount ?: settledCashAmount ?: withdrawableCashAmount,
+        cashCurrency = query.currency.uppercase(),
+        orderableCashAmount = orderableCashAmount,
+        settledCashAmount = settledCashAmount,
+        withdrawableCashAmount = withdrawableCashAmount,
         totalPurchaseAmount = summary?.textOrNull(
             "frcr_buy_amt_smtl",
             "FRCR_BUY_AMT_SMTL",
@@ -688,22 +703,33 @@ private fun JsonNode.toBrokerAccountSnapshot(query: BrokerAccountSnapshotQuery):
 private fun JsonNode.toDomesticBrokerAccountSnapshot(): BrokerAccountSnapshot {
     val rows = rows("output1", "OUTPUT1", "output", "OUTPUT")
     val summary = nodeOrNull("output2", "OUTPUT2")
+    val orderableCashAmount = summary?.textOrNull(
+        "ord_psbl_cash",
+        "ORD_PSBL_CASH",
+    ).toDoubleValue()
+    val settledCashAmount = summary?.textOrNull(
+        "dnca_tot_amt",
+        "DNCA_TOT_AMT",
+    ).toDoubleValue()
+    val withdrawableCashAmount = summary?.textOrNull(
+        "nxdy_excc_amt",
+        "NXDY_EXCC_AMT",
+        "prvs_rcdl_excc_amt",
+        "PRVS_RCDL_EXCC_AMT",
+        "wdrw_psbl_amt",
+        "WDRW_PSBL_AMT",
+    ).toDoubleValue()
 
     return BrokerAccountSnapshot(
         market = StockOrderMarket.DOMESTIC,
         exchange = DOMESTIC_EXCHANGE,
         currency = DOMESTIC_CURRENCY,
         positions = rows.mapNotNull { it.toBrokerPositionSnapshot() },
-        availableCashAmount = summary?.textOrNull(
-            "ord_psbl_cash",
-            "ORD_PSBL_CASH",
-            "dnca_tot_amt",
-            "DNCA_TOT_AMT",
-            "nxdy_excc_amt",
-            "NXDY_EXCC_AMT",
-            "prvs_rcdl_excc_amt",
-            "PRVS_RCDL_EXCC_AMT",
-        ).toDoubleValue(),
+        availableCashAmount = orderableCashAmount ?: settledCashAmount ?: withdrawableCashAmount,
+        cashCurrency = DOMESTIC_CURRENCY,
+        orderableCashAmount = orderableCashAmount,
+        settledCashAmount = settledCashAmount,
+        withdrawableCashAmount = withdrawableCashAmount,
         totalPurchaseAmount = summary?.textOrNull(
             "pchs_amt_smtl",
             "PCHS_AMT_SMTL",
@@ -752,6 +778,10 @@ private fun BrokerAccountSnapshot.mergeSummaryFrom(next: BrokerAccountSnapshot):
         currency = next.currency,
         positions = emptyList(),
         availableCashAmount = next.availableCashAmount ?: availableCashAmount,
+        cashCurrency = next.cashCurrency ?: cashCurrency,
+        orderableCashAmount = next.orderableCashAmount ?: orderableCashAmount,
+        settledCashAmount = next.settledCashAmount ?: settledCashAmount,
+        withdrawableCashAmount = next.withdrawableCashAmount ?: withdrawableCashAmount,
         totalPurchaseAmount = next.totalPurchaseAmount ?: totalPurchaseAmount,
         totalEvaluationAmount = next.totalEvaluationAmount ?: totalEvaluationAmount,
         totalProfitLossAmount = next.totalProfitLossAmount ?: totalProfitLossAmount,

@@ -205,6 +205,10 @@ class StockOrderBrokerGatewayAdapterTest {
         assertEquals("NYSE", snapshot.exchange)
         assertEquals("USD", snapshot.currency)
         assertEquals(1250.25, snapshot.availableCashAmount)
+        assertEquals("USD", snapshot.cashCurrency)
+        assertEquals(1250.25, snapshot.orderableCashAmount)
+        assertEquals(1300.0, snapshot.settledCashAmount)
+        assertEquals(1200.0, snapshot.withdrawableCashAmount)
         with(brokerGateway.accountSnapshotQueries.single()) {
             assertEquals(StockOrderMarket.OVERSEAS_US, market)
             assertEquals("NYSE", exchange)
@@ -228,6 +232,10 @@ class StockOrderBrokerGatewayAdapterTest {
         assertEquals("KRX", snapshot.exchange)
         assertEquals("KRW", snapshot.currency)
         assertEquals(1250.25, snapshot.availableCashAmount)
+        assertEquals("KRW", snapshot.cashCurrency)
+        assertEquals(1250.25, snapshot.orderableCashAmount)
+        assertEquals(1300.0, snapshot.settledCashAmount)
+        assertEquals(1200.0, snapshot.withdrawableCashAmount)
         with(brokerGateway.accountSnapshotQueries.single()) {
             assertEquals(StockOrderMarket.DOMESTIC, market)
             assertEquals("KRX", exchange)
@@ -265,6 +273,10 @@ class StockOrderBrokerGatewayAdapterTest {
                 currency = query.currency,
                 positions = emptyList(),
                 availableCashAmount = 1250.25,
+                cashCurrency = query.currency,
+                orderableCashAmount = 1250.25,
+                settledCashAmount = 1300.0,
+                withdrawableCashAmount = 1200.0,
             )
         }
     }

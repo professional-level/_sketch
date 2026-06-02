@@ -483,6 +483,8 @@ class KisBrokerGatewayAdapterTest {
                   ],
                   "output2": {
                     "ovrs_ord_psbl_amt": "1250.25",
+                    "frcr_dncl_amt_2": "1300.00",
+                    "frcr_wdrw_psbl_amt": "1200.50",
                     "frcr_buy_amt_smtl": "337.5",
                     "tot_evlu_amt": "360.0",
                     "tot_evlu_pfls_amt": "22.5"
@@ -510,6 +512,10 @@ class KisBrokerGatewayAdapterTest {
         assertEquals("NASD", snapshot.exchange)
         assertEquals("USD", snapshot.currency)
         assertEquals(1250.25, snapshot.availableCashAmount)
+        assertEquals("USD", snapshot.cashCurrency)
+        assertEquals(1250.25, snapshot.orderableCashAmount)
+        assertEquals(1300.0, snapshot.settledCashAmount)
+        assertEquals(1200.5, snapshot.withdrawableCashAmount)
         assertEquals(337.5, snapshot.totalPurchaseAmount)
         assertEquals(360.0, snapshot.totalEvaluationAmount)
         assertEquals(22.5, snapshot.totalProfitLossAmount)
@@ -550,7 +556,9 @@ class KisBrokerGatewayAdapterTest {
                     }
                   ],
                   "output2": {
+                    "ord_psbl_cash": "1200000",
                     "dnca_tot_amt": "1250000",
+                    "nxdy_excc_amt": "1100000",
                     "pchs_amt_smtl": "210000",
                     "tot_evlu_amt": "216000",
                     "evlu_pfls_smtl": "6000"
@@ -575,7 +583,11 @@ class KisBrokerGatewayAdapterTest {
         assertEquals(StockOrderMarket.DOMESTIC, snapshot.market)
         assertEquals("KRX", snapshot.exchange)
         assertEquals("KRW", snapshot.currency)
-        assertEquals(1_250_000.0, snapshot.availableCashAmount)
+        assertEquals(1_200_000.0, snapshot.availableCashAmount)
+        assertEquals("KRW", snapshot.cashCurrency)
+        assertEquals(1_200_000.0, snapshot.orderableCashAmount)
+        assertEquals(1_250_000.0, snapshot.settledCashAmount)
+        assertEquals(1_100_000.0, snapshot.withdrawableCashAmount)
         assertEquals(210_000.0, snapshot.totalPurchaseAmount)
         assertEquals(216_000.0, snapshot.totalEvaluationAmount)
         assertEquals(6_000.0, snapshot.totalProfitLossAmount)
@@ -616,6 +628,8 @@ class KisBrokerGatewayAdapterTest {
                   },
                   "OUTPUT2": {
                     "OVRS_ORD_PSBL_AMT": "1250.25",
+                    "FRCR_DNCL_AMT_2": "1300.00",
+                    "FRCR_WDRW_PSBL_AMT": "1200.50",
                     "FRCR_BUY_AMT_SMTL": "337.5",
                     "TOT_EVLU_AMT": "360.0",
                     "TOT_EVLU_PFLS_AMT": "22.5"
@@ -640,6 +654,10 @@ class KisBrokerGatewayAdapterTest {
         )
 
         assertEquals(1250.25, snapshot.availableCashAmount)
+        assertEquals("USD", snapshot.cashCurrency)
+        assertEquals(1250.25, snapshot.orderableCashAmount)
+        assertEquals(1300.0, snapshot.settledCashAmount)
+        assertEquals(1200.5, snapshot.withdrawableCashAmount)
         assertEquals(337.5, snapshot.totalPurchaseAmount)
         assertEquals(360.0, snapshot.totalEvaluationAmount)
         assertEquals(22.5, snapshot.totalProfitLossAmount)
@@ -711,6 +729,8 @@ class KisBrokerGatewayAdapterTest {
 
         assertEquals(listOf("TQQQ", "SOXL"), snapshot.positions.map { it.symbol })
         assertEquals(1250.25, snapshot.availableCashAmount)
+        assertEquals("USD", snapshot.cashCurrency)
+        assertEquals(1250.25, snapshot.orderableCashAmount)
         assertEquals(360.0, snapshot.totalEvaluationAmount)
         assertEquals(2, exchangeFunction.requests.size)
         assertEquals("FK1", exchangeFunction.requests[1].queryValue("ctxAreaFk200"))
@@ -814,6 +834,7 @@ class KisBrokerGatewayAdapterTest {
 
         assertEquals("TQQQ", snapshot.positions.single().symbol)
         assertEquals(1250.25, snapshot.availableCashAmount)
+        assertEquals(1250.25, snapshot.orderableCashAmount)
         assertEquals(2, exchangeFunction.requests.size)
     }
 

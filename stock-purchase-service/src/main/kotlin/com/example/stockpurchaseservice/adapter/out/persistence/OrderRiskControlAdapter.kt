@@ -109,15 +109,17 @@ internal class OrderRiskControlAdapter(
             ?: return "account cash cannot be assessed: order notional is missing for ${command.symbol}"
         val reserveNotional = properties.accountCash.reserveNotional.coerceAtLeast(0.0)
         val activeBuyNotional = orderRiskSubmissionReader.sumActiveBuyNotional()
-        val availableCash = runCatching {
-            marketServicePort.findAccountSnapshot(command.toAccountSnapshotQuery()).availableCashAmount
+        val snapshot = runCatching {
+            marketServicePort.findAccountSnapshot(command.toAccountSnapshotQuery())
         }.getOrElse { exception ->
             return "account cash cannot be assessed: ${exception.message ?: exception::class.java.simpleName}"
-        } ?: return "account cash cannot be assessed: broker snapshot has no available cash amount"
+        }
+        val orderableCash = snapshot.orderableCashForRisk()
+            ?: return "account cash cannot be assessed: broker snapshot has no orderable cash amount"
 
         val projectedCashUsage = activeBuyNotional + orderNotional + reserveNotional
-        return if (projectedCashUsage > availableCash) {
-            "account cash usage $projectedCashUsage exceeds available cash $availableCash " +
+        return if (projectedCashUsage > orderableCash) {
+            "account cash usage $projectedCashUsage exceeds orderable cash $orderableCash " +
                 "(active=$activeBuyNotional order=$orderNotional reserve=$reserveNotional)"
         } else {
             null
@@ -192,6 +194,10 @@ internal class OrderRiskControlAdapter(
         } else {
             positionExposure.filterNotNull().sum()
         }
+    }
+
+    private fun AccountSnapshotDto.orderableCashForRisk(): Double? {
+        return orderableCashAmount ?: availableCashAmount
     }
 
     private fun OrderRiskAssessmentCommand.orderIntentTradingEnvironmentPolicy(): StrategyTradingEnvironmentPolicy? {

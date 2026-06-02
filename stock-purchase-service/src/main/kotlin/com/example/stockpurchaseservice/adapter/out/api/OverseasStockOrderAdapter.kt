@@ -104,6 +104,10 @@ internal class OverseasStockOrderAdapter(
                 )
             },
             availableCashAmount = snapshot.availableCashAmount,
+            cashCurrency = snapshot.cashCurrency,
+            orderableCashAmount = snapshot.orderableCashAmount,
+            settledCashAmount = snapshot.settledCashAmount,
+            withdrawableCashAmount = snapshot.withdrawableCashAmount,
             totalPurchaseAmount = snapshot.totalPurchaseAmount,
             totalEvaluationAmount = snapshot.totalEvaluationAmount,
             totalProfitLossAmount = snapshot.totalProfitLossAmount,
