@@ -180,6 +180,7 @@ internal data class BrokerOrderHistoryItem(
         return BrokerOrderStatusDto(
             status = status,
             externalOrderId = externalOrderId,
+            externalExecutionId = externalExecutionId,
             reason = statusReason(status),
             checkedAt = checkedAt,
             orderedQuantity = orderedQuantity,

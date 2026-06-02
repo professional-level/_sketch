@@ -2,14 +2,20 @@ package com.example.stockpurchaseservice.application.service
 
 import com.example.common.UseCaseImpl
 import com.example.stockpurchaseservice.application.port.`in`.RecoverUnknownOrderSubmissionsUseCase
+import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatus
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatusDto
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatusQuery
+import com.example.stockpurchaseservice.application.port.out.ExecutionFillDto
+import com.example.stockpurchaseservice.application.port.out.ExecutionFillPort
+import com.example.stockpurchaseservice.application.port.out.ExecutionTypeDto
 import com.example.stockpurchaseservice.application.port.out.MarketServicePort
 import com.example.stockpurchaseservice.application.port.out.OrderCancelledMessage
 import com.example.stockpurchaseservice.application.port.out.OrderExecutionEventPort
+import com.example.stockpurchaseservice.application.port.out.OrderFilledMessage
 import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionDto
 import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionPort
+import com.example.stockpurchaseservice.application.port.out.OrderPartiallyFilledMessage
 import com.example.stockpurchaseservice.application.port.out.OrderRejectedMessage
 import com.example.stockpurchaseservice.application.port.out.OrderSubmittedMessage
 import com.example.stockpurchaseservice.application.port.out.OperationalAlertPort
@@ -29,6 +35,7 @@ class RecoverUnknownOrderSubmissionsService(
     private val orderExecutionEventPort: OrderExecutionEventPort,
     private val operationalAlertPort: OperationalAlertPort,
     private val stockOrderPort: StockOrderPort? = null,
+    private val executionFillPort: ExecutionFillPort? = null,
 ) : RecoverUnknownOrderSubmissionsUseCase {
     internal var clock: Clock = Clock.systemDefaultZone()
 
@@ -44,9 +51,11 @@ class RecoverUnknownOrderSubmissionsService(
     private suspend fun recover(submission: OrderIntentSubmissionDto) {
         val status = lookupStatus(submission, RecoveryMode.UNKNOWN_SUBMISSION) ?: return
         when (status.status) {
-            BrokerOrderStatus.SUBMITTED,
+            BrokerOrderStatus.SUBMITTED -> markSubmitted(submission, status)
             BrokerOrderStatus.PARTIALLY_FILLED,
-            BrokerOrderStatus.FILLED -> markSubmitted(submission, status)
+            BrokerOrderStatus.FILLED -> markSubmitted(submission, status)?.let { recovered ->
+                recoverFillFromStatus(recovered, status)
+            }
             BrokerOrderStatus.REJECTED -> markRejected(submission, status)
             BrokerOrderStatus.CANCELLED -> markCancelled(submission, status)
             BrokerOrderStatus.UNKNOWN -> {
@@ -67,7 +76,9 @@ class RecoverUnknownOrderSubmissionsService(
         when (status.status) {
             BrokerOrderStatus.CANCELLED -> markCancelled(submission, status)
             BrokerOrderStatus.REJECTED -> markRejected(submission, status)
-            BrokerOrderStatus.FILLED -> markSubmittedWithoutRepublishing(submission, status)
+            BrokerOrderStatus.FILLED -> markSubmittedWithoutRepublishing(submission, status)?.let { recovered ->
+                recoverFillFromStatus(recovered, status)
+            }
             BrokerOrderStatus.SUBMITTED,
             BrokerOrderStatus.PARTIALLY_FILLED,
             BrokerOrderStatus.UNKNOWN -> {
@@ -128,8 +139,8 @@ class RecoverUnknownOrderSubmissionsService(
     private suspend fun markSubmitted(
         submission: OrderIntentSubmissionDto,
         status: BrokerOrderStatusDto,
-    ) {
-        val externalOrderId = status.externalOrderId ?: submission.externalOrderId ?: return
+    ): OrderIntentSubmissionDto? {
+        val externalOrderId = status.externalOrderId ?: submission.externalOrderId ?: return null
         val recovered = submission.copy(
             externalOrderId = externalOrderId,
             statusReason = null,
@@ -138,19 +149,102 @@ class RecoverUnknownOrderSubmissionsService(
         orderIntentSubmissionPort.saveSubmitted(recovered)
         syncRecoveredLegacySellOrder(recovered, externalOrderId, OrderStateDto.SELLING_IN_PROCESS)
         orderExecutionEventPort.publishSubmitted(recovered.toSubmittedMessage())
+        return recovered
     }
 
     private suspend fun markSubmittedWithoutRepublishing(
         submission: OrderIntentSubmissionDto,
         status: BrokerOrderStatusDto,
-    ) {
-        val externalOrderId = status.externalOrderId ?: submission.externalOrderId ?: return
+    ): OrderIntentSubmissionDto? {
+        val externalOrderId = status.externalOrderId ?: submission.externalOrderId ?: return null
         val recovered = submission.copy(
             externalOrderId = externalOrderId,
             statusReason = status.reason,
             lastStatusCheckedAt = status.checkedAt,
         )
         orderIntentSubmissionPort.saveSubmitted(recovered)
+        return recovered
+    }
+
+    private suspend fun recoverFillFromStatus(
+        submission: OrderIntentSubmissionDto,
+        status: BrokerOrderStatusDto,
+    ) {
+        val fillPort = executionFillPort ?: return
+        val externalOrderId = status.externalOrderId ?: submission.externalOrderId ?: return
+        val cumulativeFilledQuantity = status.cumulativeFilledQuantity?.takeIf { it > 0 } ?: return
+        val alreadySavedQuantity = fillPort.sumQuantityByExternalOrderId(externalOrderId)
+        val deltaFilledQuantity = cumulativeFilledQuantity - alreadySavedQuantity
+        if (deltaFilledQuantity <= 0 || deltaFilledQuantity > Int.MAX_VALUE.toLong()) return
+
+        val executionType = submission.side.toExecutionType()
+        val externalExecutionId = status.externalExecutionId
+            ?: "$externalOrderId:$cumulativeFilledQuantity:$executionType"
+        if (fillPort.exists(externalExecutionId)) return
+
+        val filledPrice = status.averageExecutionPrice ?: submission.submittedPrice ?: return
+        val filledAt = status.brokerReportedAt ?: status.checkedAt
+        val fill = ExecutionFillDto(
+            externalExecutionId = externalExecutionId,
+            externalOrderId = externalOrderId,
+            stockId = submission.symbol,
+            stockName = submission.symbol,
+            createdAt = filledAt,
+            quantity = deltaFilledQuantity.toInt(),
+            type = executionType,
+        )
+
+        publishRecoveredFillEvent(
+            submission = submission,
+            externalOrderId = externalOrderId,
+            externalExecutionId = externalExecutionId,
+            filledPrice = filledPrice,
+            filledQuantity = deltaFilledQuantity,
+            filledAt = filledAt,
+            fullyFilled = status.status == BrokerOrderStatus.FILLED ||
+                cumulativeFilledQuantity >= submission.quantity,
+        )
+        fillPort.saveIfNew(fill)
+    }
+
+    private suspend fun publishRecoveredFillEvent(
+        submission: OrderIntentSubmissionDto,
+        externalOrderId: String,
+        externalExecutionId: String,
+        filledPrice: Double,
+        filledQuantity: Long,
+        filledAt: ZonedDateTime,
+        fullyFilled: Boolean,
+    ) {
+        if (fullyFilled) {
+            orderExecutionEventPort.publishFilled(
+                OrderFilledMessage(
+                    eventId = deterministicEventId("$externalExecutionId:ORDER_FILLED"),
+                    strategyExecutionId = submission.strategyExecutionId,
+                    orderIntentId = submission.orderIntentId.toString(),
+                    brokerOrderId = externalOrderId,
+                    side = submission.side,
+                    filledPrice = filledPrice,
+                    filledQuantity = filledQuantity,
+                    orderTag = submission.orderTag,
+                    filledAt = filledAt,
+                ),
+            )
+        } else {
+            orderExecutionEventPort.publishPartiallyFilled(
+                OrderPartiallyFilledMessage(
+                    eventId = deterministicEventId("$externalExecutionId:ORDER_PARTIALLY_FILLED"),
+                    strategyExecutionId = submission.strategyExecutionId,
+                    orderIntentId = submission.orderIntentId.toString(),
+                    brokerOrderId = externalOrderId,
+                    side = submission.side,
+                    filledPrice = filledPrice,
+                    filledQuantity = filledQuantity,
+                    orderTag = submission.orderTag,
+                    filledAt = filledAt,
+                ),
+            )
+        }
     }
 
     private suspend fun markRejected(
@@ -311,6 +405,13 @@ class RecoverUnknownOrderSubmissionsService(
         return when {
             length == 6 && all(Char::isDigit) -> StockOrderMarket.DOMESTIC
             else -> StockOrderMarket.OVERSEAS_US
+        }
+    }
+
+    private fun OrderIntentSide.toExecutionType(): ExecutionTypeDto {
+        return when (this) {
+            OrderIntentSide.SELL -> ExecutionTypeDto.SELLING
+            OrderIntentSide.BUY -> ExecutionTypeDto.PURCHASE
         }
     }
 

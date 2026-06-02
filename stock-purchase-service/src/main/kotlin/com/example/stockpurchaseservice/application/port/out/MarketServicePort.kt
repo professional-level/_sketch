@@ -94,6 +94,7 @@ data class BrokerOrderStatusQuery(
 data class BrokerOrderStatusDto(
     val status: BrokerOrderStatus,
     val externalOrderId: String? = null,
+    val externalExecutionId: String? = null,
     val reason: String? = null,
     val checkedAt: ZonedDateTime = ZonedDateTime.now(),
     val orderedQuantity: Long? = null,

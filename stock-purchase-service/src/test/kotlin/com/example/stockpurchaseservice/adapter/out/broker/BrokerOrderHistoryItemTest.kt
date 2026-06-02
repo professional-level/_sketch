@@ -55,10 +55,15 @@ class BrokerOrderHistoryItemTest {
     @Test
     fun `maps partially filled row to partially filled status`() {
         val status = listOf(
-            row(cumulativeFilledQuantity = 1, orderedPrice = 112.5),
+            row(
+                cumulativeFilledQuantity = 1,
+                externalExecutionId = "broker-fill-1",
+                orderedPrice = 112.5,
+            ),
         ).findStatusFor(query(externalOrderId = "broker-1"))
 
         assertEquals(BrokerOrderStatus.PARTIALLY_FILLED, status.status)
+        assertEquals("broker-fill-1", status.externalExecutionId)
         assertEquals(3L, status.orderedQuantity)
         assertEquals(112.5, status.orderedPrice)
         assertEquals(1L, status.cumulativeFilledQuantity)

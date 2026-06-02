@@ -6,6 +6,9 @@ import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatus
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatusDto
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatusQuery
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderSubmissionDto
+import com.example.stockpurchaseservice.application.port.out.ExecutionFillDto
+import com.example.stockpurchaseservice.application.port.out.ExecutionFillPort
+import com.example.stockpurchaseservice.application.port.out.ExecutionTypeDto
 import com.example.stockpurchaseservice.application.port.out.ExecutedStockDto
 import com.example.stockpurchaseservice.application.port.out.MarketServicePort
 import com.example.stockpurchaseservice.application.port.out.OrderCancelledMessage
@@ -105,24 +108,28 @@ class RecoverUnknownOrderSubmissionsServiceTest {
     }
 
     @Test
-    fun `recovers unknown partially filled submission to submitted event`() = runBlocking {
+    fun `recovers unknown partially filled submission to submitted and partial fill event`() = runBlocking {
         val submissionPort = FakeOrderIntentSubmissionPort(listOf(submission()))
         val eventPort = FakeOrderExecutionEventPort()
+        val executionFillPort = FakeExecutionFillPort()
         val service = RecoverUnknownOrderSubmissionsService(
             marketService = FakeMarketServicePort(
                 status = BrokerOrderStatusDto(
                     status = BrokerOrderStatus.PARTIALLY_FILLED,
                     externalOrderId = "broker-1",
+                    externalExecutionId = "exec-1",
                     checkedAt = CHECKED_AT,
                     orderedQuantity = 3,
                     cumulativeFilledQuantity = 1,
                     remainingQuantity = 2,
                     averageExecutionPrice = 112.5,
+                    brokerReportedAt = BROKER_REPORTED_AT,
                 ),
             ),
             orderIntentSubmissionPort = submissionPort,
             orderExecutionEventPort = eventPort,
             operationalAlertPort = FakeOperationalAlertPort(),
+            executionFillPort = executionFillPort,
         )
 
         service.execute()
@@ -130,8 +137,90 @@ class RecoverUnknownOrderSubmissionsServiceTest {
         assertEquals("broker-1", submissionPort.submitted.single().externalOrderId)
         assertEquals(CHECKED_AT, submissionPort.submitted.single().lastStatusCheckedAt)
         assertEquals("broker-1", eventPort.submitted.single().brokerOrderId)
+        assertEquals("broker-1", eventPort.partiallyFilled.single().brokerOrderId)
+        assertEquals(OrderIntentSide.BUY, eventPort.partiallyFilled.single().side)
+        assertEquals(112.5, eventPort.partiallyFilled.single().filledPrice)
+        assertEquals(1L, eventPort.partiallyFilled.single().filledQuantity)
+        assertEquals(BROKER_REPORTED_AT, eventPort.partiallyFilled.single().filledAt)
+        assertEquals("exec-1", executionFillPort.saved.single().externalExecutionId)
+        assertEquals(1, executionFillPort.saved.single().quantity)
+        assertEquals(ExecutionTypeDto.PURCHASE, executionFillPort.saved.single().type)
         assertEquals(emptyList(), eventPort.rejected)
         assertEquals(emptyList(), eventPort.cancelled)
+        assertEquals(emptyList(), eventPort.filled)
+    }
+
+    @Test
+    fun `recovers unknown filled submission to filled event for unsaved delta`() = runBlocking {
+        val submissionPort = FakeOrderIntentSubmissionPort(listOf(submission()))
+        val eventPort = FakeOrderExecutionEventPort()
+        val executionFillPort = FakeExecutionFillPort(
+            initialQuantitiesByExternalOrderId = mapOf("broker-1" to 1L),
+        )
+        val service = RecoverUnknownOrderSubmissionsService(
+            marketService = FakeMarketServicePort(
+                status = BrokerOrderStatusDto(
+                    status = BrokerOrderStatus.FILLED,
+                    externalOrderId = "broker-1",
+                    externalExecutionId = "exec-3",
+                    checkedAt = CHECKED_AT,
+                    orderedQuantity = 3,
+                    cumulativeFilledQuantity = 3,
+                    remainingQuantity = 0,
+                    averageExecutionPrice = 113.0,
+                    brokerReportedAt = BROKER_REPORTED_AT,
+                ),
+            ),
+            orderIntentSubmissionPort = submissionPort,
+            orderExecutionEventPort = eventPort,
+            operationalAlertPort = FakeOperationalAlertPort(),
+            executionFillPort = executionFillPort,
+        )
+
+        service.execute()
+
+        assertEquals("broker-1", submissionPort.submitted.single().externalOrderId)
+        assertEquals("broker-1", eventPort.filled.single().brokerOrderId)
+        assertEquals(2L, eventPort.filled.single().filledQuantity)
+        assertEquals(113.0, eventPort.filled.single().filledPrice)
+        assertEquals(BROKER_REPORTED_AT, eventPort.filled.single().filledAt)
+        assertEquals("exec-3", executionFillPort.saved.single().externalExecutionId)
+        assertEquals(2, executionFillPort.saved.single().quantity)
+        assertEquals(emptyList(), eventPort.partiallyFilled)
+    }
+
+    @Test
+    fun `skips recovered fill event when cumulative quantity is already recorded`() = runBlocking {
+        val submissionPort = FakeOrderIntentSubmissionPort(listOf(submission()))
+        val eventPort = FakeOrderExecutionEventPort()
+        val executionFillPort = FakeExecutionFillPort(
+            initialQuantitiesByExternalOrderId = mapOf("broker-1" to 3L),
+        )
+        val service = RecoverUnknownOrderSubmissionsService(
+            marketService = FakeMarketServicePort(
+                status = BrokerOrderStatusDto(
+                    status = BrokerOrderStatus.FILLED,
+                    externalOrderId = "broker-1",
+                    externalExecutionId = "exec-3",
+                    checkedAt = CHECKED_AT,
+                    orderedQuantity = 3,
+                    cumulativeFilledQuantity = 3,
+                    remainingQuantity = 0,
+                    averageExecutionPrice = 113.0,
+                ),
+            ),
+            orderIntentSubmissionPort = submissionPort,
+            orderExecutionEventPort = eventPort,
+            operationalAlertPort = FakeOperationalAlertPort(),
+            executionFillPort = executionFillPort,
+        )
+
+        service.execute()
+
+        assertEquals("broker-1", submissionPort.submitted.single().externalOrderId)
+        assertEquals(emptyList(), eventPort.filled)
+        assertEquals(emptyList(), eventPort.partiallyFilled)
+        assertEquals(emptyList(), executionFillPort.saved)
     }
 
     @Test
@@ -417,6 +506,8 @@ class RecoverUnknownOrderSubmissionsServiceTest {
         val submitted: MutableList<OrderSubmittedMessage> = mutableListOf()
         val rejected: MutableList<OrderRejectedMessage> = mutableListOf()
         val cancelled: MutableList<OrderCancelledMessage> = mutableListOf()
+        val filled: MutableList<OrderFilledMessage> = mutableListOf()
+        val partiallyFilled: MutableList<OrderPartiallyFilledMessage> = mutableListOf()
 
         override suspend fun publishSubmitted(event: OrderSubmittedMessage) {
             submitted += event
@@ -430,9 +521,37 @@ class RecoverUnknownOrderSubmissionsServiceTest {
             cancelled += event
         }
 
-        override suspend fun publishFilled(event: OrderFilledMessage) = Unit
+        override suspend fun publishFilled(event: OrderFilledMessage) {
+            filled += event
+        }
 
-        override suspend fun publishPartiallyFilled(event: OrderPartiallyFilledMessage) = Unit
+        override suspend fun publishPartiallyFilled(event: OrderPartiallyFilledMessage) {
+            partiallyFilled += event
+        }
+    }
+
+    private class FakeExecutionFillPort(
+        private val duplicateExecutionIds: Set<String> = emptySet(),
+        private val initialQuantitiesByExternalOrderId: Map<String, Long> = emptyMap(),
+    ) : ExecutionFillPort {
+        val saved: MutableList<ExecutionFillDto> = mutableListOf()
+
+        override suspend fun exists(externalExecutionId: String): Boolean {
+            return externalExecutionId in duplicateExecutionIds ||
+                saved.any { it.externalExecutionId == externalExecutionId }
+        }
+
+        override suspend fun saveIfNew(fill: ExecutionFillDto): Boolean {
+            if (exists(fill.externalExecutionId)) return false
+
+            saved += fill
+            return true
+        }
+
+        override suspend fun sumQuantityByExternalOrderId(externalOrderId: String): Long {
+            return initialQuantitiesByExternalOrderId.getOrDefault(externalOrderId, 0L) +
+                saved.filter { it.externalOrderId == externalOrderId }.sumOf { it.quantity.toLong() }
+        }
     }
 
     private fun orderDto(orderState: OrderStateDto): OrderDto {
@@ -509,5 +628,6 @@ class RecoverUnknownOrderSubmissionsServiceTest {
         private val INTERNAL_ORDER_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000002")
         private val LEGACY_ORDER_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000010")
         private val CHECKED_AT: ZonedDateTime = ZonedDateTime.parse("2026-06-02T09:00:00+09:00")
+        private val BROKER_REPORTED_AT: ZonedDateTime = ZonedDateTime.parse("2026-06-02T09:01:00+09:00")
     }
 }
