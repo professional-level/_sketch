@@ -24,8 +24,9 @@ mock_app_key=REPLACE_WITH_MOCK_APP_KEY
 mock_app_secret=REPLACE_WITH_MOCK_APP_SECRET
 mock_account=00000000
 mock_account_tail=01
-account=00000000
-account_tail=01
+# Optional real trading account. Leave blank until real-order paths are validated.
+account=
+account_tail=
 ```
 
 Equivalent runtime-injected environment variable names:
@@ -39,8 +40,9 @@ KIS_MOCK_APP_KEY=REDACTED
 KIS_MOCK_APP_SECRET=REDACTED
 KIS_MOCK_ACCOUNT=00000000
 KIS_MOCK_ACCOUNT_TAIL=01
-KIS_ACCOUNT=00000000
-KIS_ACCOUNT_TAIL=01
+# Optional real trading account. Omit these until real-order paths are validated.
+KIS_ACCOUNT=
+KIS_ACCOUNT_TAIL=
 ```
 
 The root KIS wrapper keeps real and mock access tokens in separate in-memory cache scopes. Token cache entries are refreshed before the KIS expiry timestamp, or by `expires_in` when the explicit expiry field is absent.
@@ -77,11 +79,11 @@ docs/operations/sql/20260602_create_kis_token_refresh_lock.mysql.sql
 
 The JDBC adapter shares issued tokens through the configured application database and uses `kis_token_refresh_lock` to prevent multiple wrapper instances from refreshing the same real/mock token scope at the same time. The lock is a short TTL row lock, so keep application clocks sane, monitor refresh timeout failures, and size `lock-ttl` above the expected KIS token issuance latency.
 
-## KIS Mock Broker Smoke Test
+## KIS Broker Smoke Tests
 
-`stock-purchase-service` includes a disabled-by-default smoke test for the broker gateway contract against a running root KIS wrapper. It is not part of CI. The test hard-codes broker commands with `isMock=true`, so it should be run only against a wrapper instance that has valid KIS mock credentials configured.
+`stock-purchase-service` includes disabled-by-default smoke tests for the broker gateway contract against a running root KIS wrapper. They are not part of CI. The mock tests hard-code broker commands with `isMock=true`, so they should be run only against a wrapper instance that has valid KIS mock credentials configured. The real-account smoke is query-only and uses `isMock=false`; it must never be extended to submit or cancel orders.
 
-Query-only smoke:
+Mock query-only smoke:
 
 ```powershell
 # Optional when the shell does not already use JDK 17.
@@ -97,6 +99,23 @@ This verifies:
 - overseas mock account snapshot through `/open-api/overseas/trading/inquire-balance`
 - overseas mock order history through `/open-api/overseas/trading/inquire-ccnl`
 - JSON/protobuf mapping through the same `KisBrokerGatewayAdapter` used by `stock-purchase-service`
+
+Real-account query-only smoke:
+
+```powershell
+# Optional when the shell does not already use JDK 17.
+$env:JAVA_HOME='C:\path\to\jdk17'
+$env:Path="$env:JAVA_HOME\bin;$env:Path"
+$env:KIS_BROKER_REAL_QUERY_SMOKE_ENABLED='true'
+$env:KIS_BROKER_SMOKE_BASE_URL='http://localhost:8079'
+$env:KIS_BROKER_SMOKE_SYMBOL='TQQQ'
+$env:KIS_BROKER_SMOKE_EXCHANGE='NASD'
+$env:KIS_BROKER_SMOKE_CURRENCY='USD'
+Remove-Item Env:\KIS_BROKER_SMOKE_SUBMIT_ENABLED -ErrorAction SilentlyContinue
+.\gradlew.bat --no-daemon :stock-purchase-service:test --tests "com.example.stockpurchaseservice.adapter.out.broker.KisBrokerGatewaySmokeTest" --rerun-tasks
+```
+
+This verifies the real-account overseas balance and order-history wrapper routes without placing broker orders. The smoke does not supply credentials itself; the running root wrapper must receive real KIS credentials and the real account number from runtime-injected secrets. Keep the execution note redacted: record pass/fail, route, market, and message codes only, never app keys, access tokens, account numbers, account tails, or raw KIS payloads.
 
 FX provider smoke:
 
@@ -151,12 +170,16 @@ Blocked by default:
 - `akra.order.kis-open-api.base-url` points at `localhost`, `127.0.0.1`, `0.0.0.0`, or `::1`.
 - `akra.order.domestic.mock=true` or `akra.order.overseas.mock=true`.
 - `spring.jpa.hibernate.ddl-auto` is set to an automatic schema mutation mode such as `update`, `create`, or `create-drop`.
+- `akra.order.risk.enabled=false`.
+- `akra.order.risk.sell-position.enabled=false`.
+- `akra.order.risk.trading-hours.enabled=false`.
 
 Temporary waiver properties exist for controlled tests only:
 
 ```properties
 akra.runtime.safety.allow-local-broker-endpoint-in-production=true
 akra.runtime.safety.allow-mock-trading-in-production=true
+akra.runtime.safety.allow-disabled-risk-controls-in-production=true
 ```
 
 `strategy-execution-service` fails startup under a production-like profile when:
@@ -164,12 +187,17 @@ akra.runtime.safety.allow-mock-trading-in-production=true
 - `akra.temporal.enabled=true` and `akra.temporal.target` points at a local endpoint.
 - `akra.market-data.kis-open-api.base-url` points at a local endpoint.
 - `spring.jpa.hibernate.ddl-auto` is set to an automatic schema mutation mode such as `update`, `create`, or `create-drop`.
+- `akra.order-intent.default-trading-environment=MOCK`.
+- `akra.trading-calendar.us.enabled=false`.
+- `akra.trading-calendar.us.default-us-equity-calendar-enabled=false`.
 
 Temporary waiver properties:
 
 ```properties
 akra.runtime.safety.allow-local-temporal-target-in-production=true
 akra.runtime.safety.allow-local-market-data-endpoint-in-production=true
+akra.runtime.safety.allow-mock-order-intent-in-production=true
+akra.runtime.safety.allow-disabled-trading-calendar-in-production=true
 ```
 
 These waivers should not be enabled for real capital.
@@ -187,6 +215,7 @@ Before enabling real orders:
 - Confirm risk guard limits are set for order notional, account pending buy notional, broker account exposure/cash, symbol notional, daily order count, disabled strategies, and strategy trading environments.
 - Confirm broker order status lookup windows are wide enough for `SUBMISSION_UNKNOWN` and `CANCEL_PENDING` recovery without creating excessive KIS query load.
 - Configure domestic and US order windows, holidays, early-close dates, and LOC/MOC cutoffs until an exchange calendar sync is available.
+- Confirm the legacy `stock-purchase-service` scheduler gate is acceptable for the deployment. By default it skips sell-order creation, submission recovery/reconciliation, and simulation on configured overseas US non-trading days; disabling `akra.order.risk.trading-hours.enabled` restores the old weekday-only scheduler behavior.
 - Confirm `application-secret.properties` is not included in the built artifact or Git diff, or omit it entirely and inject the KIS values at runtime.
 
 Broker recovery, risk, and trading-hours guard keys:
@@ -195,6 +224,7 @@ Broker recovery, risk, and trading-hours guard keys:
 akra.order-intent.default-trading-environment=MOCK
 akra.order-intent.strategy-trading-environments[laor-v4-live]=LIVE
 akra.order-intent.strategy-trading-environments[laor-v4-paper]=MOCK
+akra.order.overseas.default-exchange=NASD
 akra.order.status-lookup.backfill-days=1
 akra.order.status-lookup.forward-days=1
 akra.order.risk.max-order-notional=1000
@@ -279,6 +309,17 @@ Keep real webhook URLs and PagerDuty routing keys outside Git, because many aler
 
 Kafka event boundaries carry the same trace fields through outbox rows and Kafka headers. Listener-side MDC restoration lets subsequent logs and operational alerts retain the upstream trace context. Temporal daily workflow runs derive a deterministic trace context from the Temporal workflow type, workflow id, and run id, then pass it to activities and restore it into MDC before invoking use cases. Temporal SDK/OpenTelemetry exporter wiring remains a separate hardening task.
 
+`strategy-execution-service` exposes strategy state APIs for operator screens:
+
+```text
+GET /strategy-executions/laor-v4
+GET /strategy-executions/laor-v4/{executionId}
+GET /strategy-executions/final-price-bating-v1
+GET /strategy-executions/final-price-bating-v1/{executionId}
+```
+
+The Laor V4 responses include current progress round/T, available cash, holding quantity, average purchase price, realized P/L, cycle, mode, and last execution run metadata. The final-price bating responses include buy/sell filled quantities, remaining quantities, average fill prices, current cash, current holding quantity, current average price, and lifecycle timestamps.
+
 ## DB Schema Migration
 
 Local sketch profiles currently use Hibernate `ddl-auto=update`, but production-like environments should not rely on automatic DDL. `stock-purchase-service` and `strategy-execution-service` now fail startup under production-like profiles unless `spring.jpa.hibernate.ddl-auto` is empty, `none`, or `validate`. Before deploying the Kafka trace propagation, outbox retry scheduling, KIS branch-order persistence, and final-price lifecycle persistence build, apply:
@@ -289,6 +330,7 @@ docs/operations/sql/20260602_add_outbox_trace_columns.mysql.sql
 docs/operations/sql/20260602_add_outbox_next_attempt_at.mysql.sql
 docs/operations/sql/20260602_add_outbox_claim_lease.mysql.sql
 docs/operations/sql/20260602_add_order_intent_submission_branch_order_number.mysql.sql
+docs/operations/sql/20260602_add_order_intent_submission_exchange.mysql.sql
 docs/operations/sql/20260602_add_order_intent_submission_trading_environment.mysql.sql
 docs/operations/sql/20260602_add_order_intent_submission_market.mysql.sql
 ```
@@ -298,14 +340,14 @@ These migrations create `strategy-execution-service` `final_price_bating_v1_stra
 - `strategy-execution-service`: `order_intent_outbox_event`
 - `stock-purchase-service`: `order_execution_outbox_event`
 
-They also add nullable `branchOrderNumber`, `tradingEnvironment`, and `market` to `stock-purchase-service` `order_intent_submission`, so KIS domestic `KRX_FWDG_ORD_ORGNO` values can be reused for later cancel/recovery requests, the expected mock/live route remains auditable from stored order intent submissions, and active pending buy notional can be summed per market currency.
+They also add nullable `branchOrderNumber`, `exchange`, `tradingEnvironment`, and `market` to `stock-purchase-service` `order_intent_submission`, so KIS domestic `KRX_FWDG_ORD_ORGNO` values can be reused for later cancel/recovery requests, KIS overseas submit/cancel/status lookup can reuse the submitted exchange code, the expected mock/live route remains auditable from stored order intent submissions, and active pending buy notional can be summed per market currency.
 
 Operational sequence:
 
 1. Stop outbox publishers or drain traffic so new outbox rows are not being written during the schema change.
 2. Run the preflight query in the SQL file and confirm the target columns do not already exist.
 3. Apply the `CREATE TABLE` and `ALTER TABLE` statements in the migration files.
-4. Run the post-apply verification queries and confirm `final_price_bating_v1_strategy_execution` has its primary key and lifecycle columns, six nullable `VARCHAR(255)` trace columns, two nullable `DATETIME(6)` retry-scheduling columns, two nullable `VARCHAR(255)` claim owner columns, two nullable `DATETIME(6)` claim expiry columns, one nullable `VARCHAR(255)` branch order number column, one nullable `VARCHAR(16)` trading environment column, and one nullable `VARCHAR(32)` market column.
+4. Run the post-apply verification queries and confirm `final_price_bating_v1_strategy_execution` has its primary key and lifecycle columns, six nullable `VARCHAR(255)` trace columns, two nullable `DATETIME(6)` retry-scheduling columns, two nullable `VARCHAR(255)` claim owner columns, two nullable `DATETIME(6)` claim expiry columns, one nullable `VARCHAR(255)` branch order number column, one nullable `VARCHAR(16)` exchange column, one nullable `VARCHAR(16)` trading environment column, and one nullable `VARCHAR(32)` market column.
 5. Start `strategy-execution-service` and `stock-purchase-service`.
 
 Outbox publishers use `akra.outbox.publish-retry-initial-delay-ms` and `akra.outbox.publish-retry-max-delay-ms` to calculate exponential backoff after Kafka publish failures. Failed rows are republished only after `nextAttemptAt`, so repeated Kafka outages should not produce tight retry loops. Before publishing, each instance claims rows with `PROCESSING`, `claimOwner`, and `claimExpiresAt`; expired claims are eligible for another instance to reclaim.
@@ -319,6 +361,7 @@ GET /operations/trading/status
 The response includes:
 
 - order submission counts by `SUBMITTED`, `SUBMISSION_UNKNOWN`, `CANCEL_PENDING`, `REJECTED`, and `CANCELLED`
+- order execution outbox counts by publisher status
 - reconciliation cursor status, attempt counts, last observed execution id/time, saved fill count, unmatched execution count, and failure reason
 - total unmatched broker execution count
 - the 20 most recent unmatched broker executions

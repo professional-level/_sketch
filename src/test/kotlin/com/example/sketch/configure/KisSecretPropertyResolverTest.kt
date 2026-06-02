@@ -65,6 +65,25 @@ class KisSecretPropertyResolverTest {
     }
 
     @Test
+    fun `allows real account properties to be omitted`() {
+        val properties = mapOf(
+            "base_url" to "https://openapi.koreainvestment.com:9443",
+            "app_key" to "real-app-key",
+            "app_secret" to "real-app-secret",
+            "mock_base_url" to "https://openapivts.koreainvestment.com:29443",
+            "mock_app_key" to "mock-app-key",
+            "mock_app_secret" to "mock-app-secret",
+            "mock_account" to "00000000",
+            "mock_account_tail" to "01",
+        )
+
+        val resolved = KisSecretPropertyResolver.resolve(properties::get)
+
+        assertEquals(null, resolved.account)
+        assertEquals(null, resolved.accountTail)
+    }
+
+    @Test
     fun `fails when a required secret is missing`() {
         val exception = assertFailsWith<IllegalArgumentException> {
             KisSecretPropertyResolver.resolve(emptyMap<String, String>()::get)
@@ -90,6 +109,52 @@ class KisSecretPropertyResolverTest {
         assertEquals(
             "KIS secret property is still a placeholder. Provide a real value for one of: app_key, kis.app-key, kis.app.key, KIS_APP_KEY",
             exception.message,
+        )
+    }
+
+    @Test
+    fun `fails when optional real account is still a template placeholder`() {
+        val properties = validRequiredSecrets() + mapOf(
+            "account" to "00000000",
+            "account_tail" to "01",
+        )
+
+        val exception = assertFailsWith<IllegalArgumentException> {
+            KisSecretPropertyResolver.resolve(properties::get)
+        }
+
+        assertEquals(
+            "KIS real account property is still a placeholder. Omit account/account_tail or provide a real account value.",
+            exception.message,
+        )
+    }
+
+    @Test
+    fun `fails when real account pair is incomplete`() {
+        val properties = validRequiredSecrets() + mapOf(
+            "account" to "11111111",
+        )
+
+        val exception = assertFailsWith<IllegalArgumentException> {
+            KisSecretPropertyResolver.resolve(properties::get)
+        }
+
+        assertEquals(
+            "KIS real account properties must be provided together. Provide both account and account_tail, or omit both.",
+            exception.message,
+        )
+    }
+
+    private fun validRequiredSecrets(): Map<String, String> {
+        return mapOf(
+            "base_url" to "https://openapi.koreainvestment.com:9443",
+            "app_key" to "real-app-key",
+            "app_secret" to "real-app-secret",
+            "mock_base_url" to "https://openapivts.koreainvestment.com:29443",
+            "mock_app_key" to "mock-app-key",
+            "mock_app_secret" to "mock-app-secret",
+            "mock_account" to "00000000",
+            "mock_account_tail" to "01",
         )
     }
 }

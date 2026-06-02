@@ -17,6 +17,7 @@ class OrderRiskProperties {
     var strategyTradingEnvironments: MutableMap<String, OrderTradingEnvironment> = mutableMapOf()
     var accountExposure: AccountExposureProperties = AccountExposureProperties()
     var accountCash: AccountCashProperties = AccountCashProperties()
+    var sellPosition: SellPositionProperties = SellPositionProperties()
     var currencyConversion: CurrencyConversionProperties = CurrencyConversionProperties()
     var tradingHours: TradingHoursProperties = TradingHoursProperties()
 
@@ -28,6 +29,10 @@ class OrderRiskProperties {
     class AccountCashProperties {
         var enabled: Boolean = false
         var reserveNotional: Double = 0.0
+    }
+
+    class SellPositionProperties {
+        var enabled: Boolean = true
     }
 
     class CurrencyConversionProperties {
@@ -76,6 +81,7 @@ class OrderRiskProperties {
         }
         var overseasUs: MarketTradingHours = MarketTradingHours().apply {
             zoneId = "America/New_York"
+            defaultUsEquityCalendarEnabled = true
             regularOpen = "09:30"
             regularClose = "16:00"
             locCutoff = "15:50"
@@ -88,6 +94,7 @@ class OrderRiskProperties {
         var enabled: Boolean = true
         var zoneId: String = "UTC"
         var weekdaysOnly: Boolean = true
+        var defaultUsEquityCalendarEnabled: Boolean = false
         var holidays: List<String> = emptyList()
         var earlyCloseDates: List<String> = emptyList()
         var earlyCloseTimes: MutableMap<String, String> = mutableMapOf()

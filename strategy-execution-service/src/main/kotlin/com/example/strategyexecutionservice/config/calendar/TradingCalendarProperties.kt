@@ -8,7 +8,9 @@ class TradingCalendarProperties {
 
     class MarketCalendar {
         var enabled: Boolean = true
+        var zoneId: String = "America/New_York"
         var weekdaysOnly: Boolean = true
+        var defaultUsEquityCalendarEnabled: Boolean = true
         var holidays: List<String> = emptyList()
         var earlyCloseDays: List<String> = emptyList()
     }

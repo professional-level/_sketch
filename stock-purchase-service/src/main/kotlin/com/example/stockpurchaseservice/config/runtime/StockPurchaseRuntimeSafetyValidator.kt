@@ -16,6 +16,12 @@ class StockPurchaseRuntimeSafetyValidator(
     private val domesticMockOrder: Boolean,
     @Value("\${akra.order.overseas.mock:true}")
     private val overseasMockOrder: Boolean,
+    @Value("\${akra.order.risk.enabled:true}")
+    private val orderRiskEnabled: Boolean,
+    @Value("\${akra.order.risk.sell-position.enabled:true}")
+    private val sellPositionRiskEnabled: Boolean,
+    @Value("\${akra.order.risk.trading-hours.enabled:true}")
+    private val tradingHoursRiskEnabled: Boolean,
 ) : ApplicationRunner {
 
     override fun run(args: ApplicationArguments) {
@@ -28,8 +34,12 @@ class StockPurchaseRuntimeSafetyValidator(
                 domesticMockOrder = domesticMockOrder,
                 overseasMockOrder = overseasMockOrder,
                 hibernateDdlAuto = environment.getProperty("spring.jpa.hibernate.ddl-auto"),
+                orderRiskEnabled = orderRiskEnabled,
+                sellPositionRiskEnabled = sellPositionRiskEnabled,
+                tradingHoursRiskEnabled = tradingHoursRiskEnabled,
                 allowLocalBrokerEndpointInProduction = properties.allowLocalBrokerEndpointInProduction,
                 allowMockTradingInProduction = properties.allowMockTradingInProduction,
+                allowDisabledRiskControlsInProduction = properties.allowDisabledRiskControlsInProduction,
             ),
         )
 
@@ -54,8 +64,12 @@ object StockPurchaseRuntimeSafetyRules {
         val domesticMockOrder: Boolean,
         val overseasMockOrder: Boolean,
         val hibernateDdlAuto: String?,
+        val orderRiskEnabled: Boolean,
+        val sellPositionRiskEnabled: Boolean,
+        val tradingHoursRiskEnabled: Boolean,
         val allowLocalBrokerEndpointInProduction: Boolean,
         val allowMockTradingInProduction: Boolean,
+        val allowDisabledRiskControlsInProduction: Boolean,
     )
 
     fun validate(input: Input): List<String> {
@@ -77,6 +91,22 @@ object StockPurchaseRuntimeSafetyRules {
         if (!isSafeHibernateDdlAuto(input.hibernateDdlAuto)) {
             violations += "prod/live profile cannot use Hibernate automatic DDL " +
                 "(spring.jpa.hibernate.ddl-auto=${input.hibernateDdlAuto}); apply migrations explicitly and use none or validate"
+        }
+
+        if (!input.allowDisabledRiskControlsInProduction) {
+            if (!input.orderRiskEnabled) {
+                violations += "prod/live profile cannot disable order risk controls " +
+                    "(akra.order.risk.enabled=false)"
+            } else {
+                if (!input.sellPositionRiskEnabled) {
+                    violations += "prod/live profile cannot disable sell position risk control " +
+                        "(akra.order.risk.sell-position.enabled=false)"
+                }
+                if (!input.tradingHoursRiskEnabled) {
+                    violations += "prod/live profile cannot disable trading-hours risk control " +
+                        "(akra.order.risk.trading-hours.enabled=false)"
+                }
+            }
         }
 
         return violations

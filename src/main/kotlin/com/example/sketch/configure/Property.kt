@@ -57,6 +57,15 @@ data class KisSecretProperties(
 
 object KisSecretPropertyResolver {
     fun resolve(getProperty: (String) -> String?): KisSecretProperties {
+        val account = getProperty.optional("account", "kis.account", "KIS_ACCOUNT")
+        val accountTail = getProperty.optional(
+            "account_tail",
+            "kis.account-tail",
+            "kis.account.tail",
+            "KIS_ACCOUNT_TAIL",
+        )
+        validateRealAccountPair(account, accountTail)
+
         return KisSecretProperties(
             baseUrl = getProperty.required("base_url", "kis.base-url", "kis.base.url", "KIS_BASE_URL"),
             appKey = getProperty.required("app_key", "kis.app-key", "kis.app.key", "KIS_APP_KEY"),
@@ -90,13 +99,8 @@ object KisSecretPropertyResolver {
                 "kis.mock.account.tail",
                 "KIS_MOCK_ACCOUNT_TAIL",
             ),
-            account = getProperty.optional("account", "kis.account", "KIS_ACCOUNT"),
-            accountTail = getProperty.optional(
-                "account_tail",
-                "kis.account-tail",
-                "kis.account.tail",
-                "KIS_ACCOUNT_TAIL",
-            ),
+            account = account,
+            accountTail = accountTail,
         )
     }
 
@@ -117,6 +121,29 @@ object KisSecretPropertyResolver {
         return keys.firstNotNullOfOrNull { key ->
             this(key).configuredOrNull()
         }
+    }
+
+    private fun validateRealAccountPair(account: String?, accountTail: String?) {
+        val accountProvided = account != null
+        val accountTailProvided = accountTail != null
+        require(accountProvided == accountTailProvided) {
+            "KIS real account properties must be provided together. Provide both account and account_tail, or omit both."
+        }
+        if (account == null || accountTail == null) return
+
+        require(!account.isPlaceholderAccount()) {
+            "KIS real account property is still a placeholder. Omit account/account_tail or provide a real account value."
+        }
+        require(!accountTail.startsWith("REPLACE_WITH_", ignoreCase = true)) {
+            "KIS real account tail property is still a placeholder. Omit account/account_tail or provide a real account tail."
+        }
+    }
+
+    private fun String.isPlaceholderAccount(): Boolean {
+        val normalized = trim().uppercase()
+        return normalized.startsWith("REPLACE_WITH_") ||
+            normalized == "REDACTED" ||
+            normalized.all { it == '0' }
     }
 
     private fun String?.configuredOrNull(): String? {

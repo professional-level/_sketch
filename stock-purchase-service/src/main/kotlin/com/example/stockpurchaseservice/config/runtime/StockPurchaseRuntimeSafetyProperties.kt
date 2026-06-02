@@ -8,4 +8,5 @@ class StockPurchaseRuntimeSafetyProperties {
     var productionProfiles: List<String> = listOf("prod", "production", "live")
     var allowLocalBrokerEndpointInProduction: Boolean = false
     var allowMockTradingInProduction: Boolean = false
+    var allowDisabledRiskControlsInProduction: Boolean = false
 }

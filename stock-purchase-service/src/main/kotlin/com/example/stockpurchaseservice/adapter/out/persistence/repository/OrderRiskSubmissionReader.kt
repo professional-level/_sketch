@@ -20,4 +20,9 @@ internal interface OrderRiskSubmissionReader {
     ): Boolean
 
     suspend fun sumActiveBuyNotional(market: OrderIntentSubmissionMarket): Double
+
+    suspend fun sumActiveSellQuantity(
+        symbol: String,
+        market: OrderIntentSubmissionMarket,
+    ): Long
 }

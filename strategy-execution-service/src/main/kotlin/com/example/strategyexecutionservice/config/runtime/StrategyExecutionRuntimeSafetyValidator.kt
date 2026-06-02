@@ -16,6 +16,12 @@ class StrategyExecutionRuntimeSafetyValidator(
     private val temporalTarget: String,
     @Value("\${akra.market-data.kis-open-api.base-url:http://localhost:8079}")
     private val marketDataBaseUrl: String,
+    @Value("\${akra.order-intent.default-trading-environment:MOCK}")
+    private val defaultOrderIntentTradingEnvironment: String,
+    @Value("\${akra.trading-calendar.us.enabled:true}")
+    private val usTradingCalendarEnabled: Boolean,
+    @Value("\${akra.trading-calendar.us.default-us-equity-calendar-enabled:true}")
+    private val defaultUsEquityCalendarEnabled: Boolean,
 ) : ApplicationRunner {
 
     override fun run(args: ApplicationArguments) {
@@ -28,8 +34,13 @@ class StrategyExecutionRuntimeSafetyValidator(
                 temporalTarget = temporalTarget,
                 marketDataBaseUrl = marketDataBaseUrl,
                 hibernateDdlAuto = environment.getProperty("spring.jpa.hibernate.ddl-auto"),
+                defaultOrderIntentTradingEnvironment = defaultOrderIntentTradingEnvironment,
+                usTradingCalendarEnabled = usTradingCalendarEnabled,
+                defaultUsEquityCalendarEnabled = defaultUsEquityCalendarEnabled,
                 allowLocalTemporalTargetInProduction = properties.allowLocalTemporalTargetInProduction,
                 allowLocalMarketDataEndpointInProduction = properties.allowLocalMarketDataEndpointInProduction,
+                allowMockOrderIntentInProduction = properties.allowMockOrderIntentInProduction,
+                allowDisabledTradingCalendarInProduction = properties.allowDisabledTradingCalendarInProduction,
             ),
         )
 
@@ -54,8 +65,13 @@ object StrategyExecutionRuntimeSafetyRules {
         val temporalTarget: String,
         val marketDataBaseUrl: String,
         val hibernateDdlAuto: String?,
+        val defaultOrderIntentTradingEnvironment: String,
+        val usTradingCalendarEnabled: Boolean,
+        val defaultUsEquityCalendarEnabled: Boolean,
         val allowLocalTemporalTargetInProduction: Boolean,
         val allowLocalMarketDataEndpointInProduction: Boolean,
+        val allowMockOrderIntentInProduction: Boolean,
+        val allowDisabledTradingCalendarInProduction: Boolean,
     )
 
     fun validate(input: Input): List<String> {
@@ -81,6 +97,24 @@ object StrategyExecutionRuntimeSafetyRules {
         if (!isSafeHibernateDdlAuto(input.hibernateDdlAuto)) {
             violations += "prod/live profile cannot use Hibernate automatic DDL " +
                 "(spring.jpa.hibernate.ddl-auto=${input.hibernateDdlAuto}); apply migrations explicitly and use none or validate"
+        }
+
+        if (
+            !input.allowMockOrderIntentInProduction &&
+            input.defaultOrderIntentTradingEnvironment.trim().uppercase() == "MOCK"
+        ) {
+            violations += "prod/live profile cannot default order intents to MOCK " +
+                "(akra.order-intent.default-trading-environment=${input.defaultOrderIntentTradingEnvironment})"
+        }
+
+        if (!input.allowDisabledTradingCalendarInProduction) {
+            if (!input.usTradingCalendarEnabled) {
+                violations += "prod/live profile cannot disable US trading calendar " +
+                    "(akra.trading-calendar.us.enabled=false)"
+            } else if (!input.defaultUsEquityCalendarEnabled) {
+                violations += "prod/live profile cannot disable default US equity calendar " +
+                    "(akra.trading-calendar.us.default-us-equity-calendar-enabled=false)"
+            }
         }
 
         return violations

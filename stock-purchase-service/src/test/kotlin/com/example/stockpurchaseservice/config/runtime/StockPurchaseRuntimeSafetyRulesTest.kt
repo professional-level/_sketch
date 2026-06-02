@@ -83,6 +83,40 @@ class StockPurchaseRuntimeSafetyRulesTest {
     }
 
     @Test
+    fun `blocks disabled order risk controls in production profile`() {
+        val violations = StockPurchaseRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                brokerBaseUrl = "https://broker-wrapper.example.com",
+                domesticMockOrder = false,
+                overseasMockOrder = false,
+                orderRiskEnabled = false,
+            ),
+        )
+
+        assertEquals(1, violations.size)
+        assertTrue(violations.single().contains("cannot disable order risk controls"))
+    }
+
+    @Test
+    fun `blocks disabled critical risk sub-controls in production profile`() {
+        val violations = StockPurchaseRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                brokerBaseUrl = "https://broker-wrapper.example.com",
+                domesticMockOrder = false,
+                overseasMockOrder = false,
+                sellPositionRiskEnabled = false,
+                tradingHoursRiskEnabled = false,
+            ),
+        )
+
+        assertEquals(2, violations.size)
+        assertTrue(violations.any { it.contains("sell position risk control") })
+        assertTrue(violations.any { it.contains("trading-hours risk control") })
+    }
+
+    @Test
     fun `allows explicitly waived production checks`() {
         val violations = StockPurchaseRuntimeSafetyRules.validate(
             input(
@@ -91,8 +125,10 @@ class StockPurchaseRuntimeSafetyRulesTest {
                 domesticMockOrder = true,
                 overseasMockOrder = true,
                 hibernateDdlAuto = "validate",
+                orderRiskEnabled = false,
                 allowLocalBrokerEndpointInProduction = true,
                 allowMockTradingInProduction = true,
+                allowDisabledRiskControlsInProduction = true,
             ),
         )
 
@@ -105,8 +141,12 @@ class StockPurchaseRuntimeSafetyRulesTest {
         domesticMockOrder: Boolean,
         overseasMockOrder: Boolean,
         hibernateDdlAuto: String? = "validate",
+        orderRiskEnabled: Boolean = true,
+        sellPositionRiskEnabled: Boolean = true,
+        tradingHoursRiskEnabled: Boolean = true,
         allowLocalBrokerEndpointInProduction: Boolean = false,
         allowMockTradingInProduction: Boolean = false,
+        allowDisabledRiskControlsInProduction: Boolean = false,
     ) = StockPurchaseRuntimeSafetyRules.Input(
         activeProfiles = activeProfiles,
         enabled = true,
@@ -115,7 +155,11 @@ class StockPurchaseRuntimeSafetyRulesTest {
         domesticMockOrder = domesticMockOrder,
         overseasMockOrder = overseasMockOrder,
         hibernateDdlAuto = hibernateDdlAuto,
+        orderRiskEnabled = orderRiskEnabled,
+        sellPositionRiskEnabled = sellPositionRiskEnabled,
+        tradingHoursRiskEnabled = tradingHoursRiskEnabled,
         allowLocalBrokerEndpointInProduction = allowLocalBrokerEndpointInProduction,
         allowMockTradingInProduction = allowMockTradingInProduction,
+        allowDisabledRiskControlsInProduction = allowDisabledRiskControlsInProduction,
     )
 }

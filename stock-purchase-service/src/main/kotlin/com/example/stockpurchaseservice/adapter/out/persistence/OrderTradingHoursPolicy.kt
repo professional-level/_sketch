@@ -1,10 +1,12 @@
 package com.example.stockpurchaseservice.adapter.out.persistence
 
+import com.example.common.market.UsEquityMarketCalendar
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentType
 import com.example.stockpurchaseservice.application.port.out.OrderRiskAssessmentCommand
 import com.example.stockpurchaseservice.application.port.out.StockOrderMarket
 import com.example.stockpurchaseservice.config.risk.OrderRiskProperties
 import java.time.DayOfWeek
+import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
@@ -27,15 +29,17 @@ internal class OrderTradingHoursPolicy(
         if (window.weekdaysOnly && localDate.dayOfWeek in CLOSED_WEEKDAYS) {
             return "order blocked on ${command.market} non-trading weekday: date=$localDate"
         }
-        if (localDate in window.holidayDates()) {
+        if (window.isMarketHoliday(localDate)) {
             return "order blocked on ${command.market} market holiday: date=$localDate"
         }
 
         val open = window.regularOpen.toLocalTimeOrNull()
             ?: return "invalid trading-hours open for ${command.market}: ${window.regularOpen}"
-        val close = window.effectiveClose(localDate)
+        val regularClose = window.regularClose.toLocalTimeOrNull()
+            ?: return "invalid trading-hours close for ${command.market}: ${window.regularClose}"
+        val close = window.effectiveClose(localDate, regularClose)
             ?: return "invalid trading-hours close for ${command.market}"
-        val orderCutoff = window.orderCutoff(command.orderType, close)
+        val orderCutoff = window.orderCutoff(command.orderType, regularClose, close)
             ?: return "invalid trading-hours cutoff for ${command.market} ${command.orderType}"
 
         if (!orderCutoff.isAfter(open)) {
@@ -57,16 +61,33 @@ internal class OrderTradingHoursPolicy(
         }
     }
 
-    private fun OrderRiskProperties.MarketTradingHours.holidayDates(): Set<LocalDate> {
-        return holidays.mapNotNull { it.toLocalDateOrNull() }.toSet()
+    private fun OrderRiskProperties.MarketTradingHours.isMarketHoliday(date: LocalDate): Boolean {
+        if (date in holidays.mapNotNull { it.toLocalDateOrNull() }.toSet()) return true
+        return defaultUsEquityCalendarEnabled && UsEquityMarketCalendar.isMarketHoliday(date)
     }
 
-    private fun OrderRiskProperties.MarketTradingHours.effectiveClose(date: LocalDate): LocalTime? {
-        val regularCloseTime = regularClose.toLocalTimeOrNull() ?: return null
-        val configuredEarlyCloseTime = earlyCloseTimes[date.toString()] ?: earlyCloseTimeForListedDate(date)
-        if (configuredEarlyCloseTime == null) return regularCloseTime
+    private fun OrderRiskProperties.MarketTradingHours.effectiveClose(
+        date: LocalDate,
+        regularCloseTime: LocalTime,
+    ): LocalTime? {
+        val configuredEarlyCloseTime = earlyCloseTimeFor(date)
+        if (configuredEarlyCloseTime == null) {
+            return if (defaultUsEquityCalendarEnabled) {
+                UsEquityMarketCalendar.earlyCloseTime(date) ?: regularCloseTime
+            } else {
+                regularCloseTime
+            }
+        }
         if (configuredEarlyCloseTime.isNullOrBlank()) return null
         return configuredEarlyCloseTime.toLocalTimeOrNull()
+    }
+
+    private fun OrderRiskProperties.MarketTradingHours.earlyCloseTimeFor(date: LocalDate): String? {
+        val dateKey = date.toString()
+        if (earlyCloseTimes.containsKey(dateKey)) {
+            return earlyCloseTimes[dateKey]
+        }
+        return earlyCloseTimeForListedDate(date)
     }
 
     private fun OrderRiskProperties.MarketTradingHours.earlyCloseTimeForListedDate(date: LocalDate): String? {
@@ -76,6 +97,7 @@ internal class OrderTradingHoursPolicy(
 
     private fun OrderRiskProperties.MarketTradingHours.orderCutoff(
         orderType: OrderIntentType,
+        regularClose: LocalTime,
         close: LocalTime,
     ): LocalTime? {
         val configuredCutoffValue = when (orderType) {
@@ -86,7 +108,9 @@ internal class OrderTradingHoursPolicy(
         if (configuredCutoffValue.isNullOrBlank()) return close
 
         val configuredCutoff = configuredCutoffValue.toLocalTimeOrNull() ?: return null
-        return minOf(configuredCutoff, close)
+        val cutoffOffset = Duration.between(configuredCutoff, regularClose)
+        if (cutoffOffset.isNegative) return null
+        return close.minus(cutoffOffset)
     }
 
     private fun String.toZoneIdOrNull(): ZoneId? {

@@ -35,6 +35,7 @@ internal class OrderRiskControlAdapter(
         disabledStrategyReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }
         tradingEnvironmentReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }
         tradingHoursPolicy.rejectReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }
+        sellPositionReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }
         orderNotionalReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }
         accountPendingBuyExposureReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }
         accountCashReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }
@@ -61,6 +62,30 @@ internal class OrderRiskControlAdapter(
         return if (actualEnvironment != matchedPolicy.environment) {
             "strategy trading environment mismatch: prefix=${matchedPolicy.prefix} " +
                 "expected=${matchedPolicy.environment} actual=$actualEnvironment market=${command.market}"
+        } else {
+            null
+        }
+    }
+
+    private suspend fun sellPositionReason(command: OrderRiskAssessmentCommand): String? {
+        if (!properties.sellPosition.enabled || command.side != OrderIntentSide.SELL) return null
+
+        val snapshot = runCatching {
+            marketServicePort.findAccountSnapshot(command.toAccountSnapshotQuery())
+        }.getOrElse { exception ->
+            return "sell position cannot be assessed: ${exception.message ?: exception::class.java.simpleName}"
+        }
+        val heldQuantity = snapshot.positionQuantity(command.symbol)
+            ?: return "sell position cannot be assessed: no broker position for ${command.symbol}"
+        val activeSellQuantity = orderRiskSubmissionReader.sumActiveSellQuantity(
+            symbol = command.symbol,
+            market = command.market.toEntity(),
+        )
+        val projectedSellQuantity = activeSellQuantity + command.quantity
+
+        return if (projectedSellQuantity > heldQuantity) {
+            "sell quantity $projectedSellQuantity exceeds broker position $heldQuantity for ${command.symbol} " +
+                "(active=$activeSellQuantity order=${command.quantity})"
         } else {
             null
         }
@@ -234,6 +259,13 @@ internal class OrderRiskControlAdapter(
 
     private fun AccountSnapshotDto.orderableCashForRisk(): Double? {
         return orderableCashAmount ?: availableCashAmount
+    }
+
+    private fun AccountSnapshotDto.positionQuantity(symbol: String): Long? {
+        val normalizedSymbol = symbol.trim().uppercase()
+        return positions
+            .firstOrNull { it.symbol.trim().uppercase() == normalizedSymbol }
+            ?.quantity
     }
 
     private fun Double.toRiskCurrency(sourceCurrency: String): RiskCurrencyAmount? {

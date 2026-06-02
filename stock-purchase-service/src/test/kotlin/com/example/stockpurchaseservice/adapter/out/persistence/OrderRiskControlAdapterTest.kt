@@ -72,6 +72,16 @@ class OrderRiskControlAdapterTest {
     }
 
     @Test
+    fun `rejects order on default overseas us market holiday`() = runBlocking {
+        val result = adapter().assess(
+            command(createdAt = ZonedDateTime.parse("2026-07-03T10:00:00-04:00[America/New_York]")),
+        )
+
+        assertFalse(result.accepted)
+        assertContains(result.reason ?: "", "market holiday")
+    }
+
+    @Test
     fun `applies configured early close to limit orders`() = runBlocking {
         val properties = OrderRiskProperties().apply {
             tradingHours.overseasUs.earlyCloseDates = listOf("2026-06-01")
@@ -90,7 +100,7 @@ class OrderRiskControlAdapterTest {
     }
 
     @Test
-    fun `applies date specific early close before loc cutoff`() = runBlocking {
+    fun `moves loc cutoff earlier on date specific early close`() = runBlocking {
         val properties = OrderRiskProperties().apply {
             tradingHours.overseasUs.earlyCloseDates = listOf("2026-06-01")
             tradingHours.overseasUs.earlyCloseTime = "13:00"
@@ -106,7 +116,7 @@ class OrderRiskControlAdapterTest {
         )
 
         assertFalse(result.accepted)
-        assertContains(result.reason ?: "", "allowed=09:30-12:30")
+        assertContains(result.reason ?: "", "allowed=09:30-12:20")
     }
 
     @Test
@@ -119,6 +129,31 @@ class OrderRiskControlAdapterTest {
             command(
                 orderType = OrderIntentType.LIMIT,
                 createdAt = ZonedDateTime.parse("2026-06-01T12:29:00-04:00[America/New_York]"),
+            ),
+        )
+
+        assertTrue(result.accepted)
+    }
+
+    @Test
+    fun `moves loc cutoff earlier on default overseas us early close`() = runBlocking {
+        val result = adapter().assess(
+            command(
+                orderType = OrderIntentType.LOC,
+                createdAt = ZonedDateTime.parse("2026-11-27T12:51:00-05:00[America/New_York]"),
+            ),
+        )
+
+        assertFalse(result.accepted)
+        assertContains(result.reason ?: "", "allowed=09:30-12:50")
+    }
+
+    @Test
+    fun `accepts loc before adjusted default overseas us early close cutoff`() = runBlocking {
+        val result = adapter().assess(
+            command(
+                orderType = OrderIntentType.LOC,
+                createdAt = ZonedDateTime.parse("2026-11-27T12:49:00-05:00[America/New_York]"),
             ),
         )
 
@@ -239,6 +274,7 @@ class OrderRiskControlAdapterTest {
     fun `does not apply pending buy exposure limit to sell orders`() = runBlocking {
         val properties = OrderRiskProperties().apply {
             maxAccountPendingBuyNotional = 1_000.0
+            sellPosition.enabled = false
         }
         val reader = FakeOrderRiskSubmissionReader(activeBuyNotional = 1_500.0)
 
@@ -420,6 +456,7 @@ class OrderRiskControlAdapterTest {
     fun `does not apply account cash guard to sell orders`() = runBlocking {
         val properties = OrderRiskProperties().apply {
             accountCash.enabled = true
+            sellPosition.enabled = false
         }
         val reader = FakeOrderRiskSubmissionReader(activeBuyNotional = 2_000.0)
 
@@ -484,6 +521,94 @@ class OrderRiskControlAdapterTest {
 
         assertFalse(result.accepted)
         assertContains(result.reason ?: "", "account exposure cannot be assessed")
+    }
+
+    @Test
+    fun `rejects sell when order quantity exceeds broker position`() = runBlocking {
+        val marketService = FakeMarketServicePort(
+            snapshot = AccountSnapshotDto(
+                market = StockOrderMarket.OVERSEAS_US,
+                exchange = "NASD",
+                currency = "USD",
+                positions = listOf(
+                    AccountPositionSnapshotDto(
+                        symbol = "TQQQ",
+                        stockName = "ProShares UltraPro QQQ",
+                        quantity = 3,
+                    ),
+                ),
+            ),
+        )
+
+        val result = adapter(marketService = marketService).assess(
+            command(side = OrderIntentSide.SELL, quantity = 4),
+        )
+
+        assertFalse(result.accepted)
+        assertContains(result.reason ?: "", "sell quantity 4 exceeds broker position 3")
+    }
+
+    @Test
+    fun `rejects sell when active sell orders plus new order exceed broker position`() = runBlocking {
+        val reader = FakeOrderRiskSubmissionReader(activeSellQuantity = 3)
+        val marketService = FakeMarketServicePort(
+            snapshot = AccountSnapshotDto(
+                market = StockOrderMarket.OVERSEAS_US,
+                exchange = "NASD",
+                currency = "USD",
+                positions = listOf(
+                    AccountPositionSnapshotDto(
+                        symbol = "TQQQ",
+                        stockName = "ProShares UltraPro QQQ",
+                        quantity = 5,
+                    ),
+                ),
+            ),
+        )
+
+        val result = adapter(reader = reader, marketService = marketService).assess(
+            command(side = OrderIntentSide.SELL, quantity = 3),
+        )
+
+        assertFalse(result.accepted)
+        assertEquals(listOf("TQQQ" to OrderIntentSubmissionMarket.OVERSEAS_US), reader.activeSellQuantityRequests)
+        assertContains(result.reason ?: "", "sell quantity 6 exceeds broker position 5")
+        assertContains(result.reason ?: "", "(active=3 order=3)")
+    }
+
+    @Test
+    fun `accepts sell when broker position covers active and new sell quantities`() = runBlocking {
+        val reader = FakeOrderRiskSubmissionReader(activeSellQuantity = 2)
+        val marketService = FakeMarketServicePort(
+            snapshot = AccountSnapshotDto(
+                market = StockOrderMarket.OVERSEAS_US,
+                exchange = "NASD",
+                currency = "USD",
+                positions = listOf(
+                    AccountPositionSnapshotDto(
+                        symbol = "tqqq",
+                        stockName = "ProShares UltraPro QQQ",
+                        quantity = 5,
+                    ),
+                ),
+            ),
+        )
+
+        val result = adapter(reader = reader, marketService = marketService).assess(
+            command(side = OrderIntentSide.SELL, quantity = 3),
+        )
+
+        assertTrue(result.accepted)
+    }
+
+    @Test
+    fun `rejects sell when broker position is missing`() = runBlocking {
+        val result = adapter().assess(
+            command(side = OrderIntentSide.SELL, quantity = 1),
+        )
+
+        assertFalse(result.accepted)
+        assertContains(result.reason ?: "", "no broker position for TQQQ")
     }
 
     @Test
@@ -604,8 +729,10 @@ class OrderRiskControlAdapterTest {
 
     private class FakeOrderRiskSubmissionReader(
         private val activeBuyNotional: Double = 0.0,
+        private val activeSellQuantity: Long = 0,
     ) : OrderRiskSubmissionReader {
         val activeBuyNotionalMarkets: MutableList<OrderIntentSubmissionMarket> = mutableListOf()
+        val activeSellQuantityRequests: MutableList<Pair<String, OrderIntentSubmissionMarket>> = mutableListOf()
 
         override suspend fun countBrokerSubmittedBetween(
             from: ZonedDateTime,
@@ -624,6 +751,14 @@ class OrderRiskControlAdapterTest {
         override suspend fun sumActiveBuyNotional(market: OrderIntentSubmissionMarket): Double {
             activeBuyNotionalMarkets += market
             return activeBuyNotional
+        }
+
+        override suspend fun sumActiveSellQuantity(
+            symbol: String,
+            market: OrderIntentSubmissionMarket,
+        ): Long {
+            activeSellQuantityRequests += symbol to market
+            return activeSellQuantity
         }
     }
 

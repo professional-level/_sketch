@@ -78,6 +78,51 @@ class StrategyExecutionRuntimeSafetyRulesTest {
     }
 
     @Test
+    fun `blocks mock default order intent environment in production profile`() {
+        val violations = StrategyExecutionRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                temporalTarget = "temporal.example.com:7233",
+                marketDataBaseUrl = "https://broker-wrapper.example.com",
+                defaultOrderIntentTradingEnvironment = "MOCK",
+            ),
+        )
+
+        assertEquals(1, violations.size)
+        assertTrue(violations.single().contains("default order intents to MOCK"))
+    }
+
+    @Test
+    fun `blocks disabled us trading calendar in production profile`() {
+        val violations = StrategyExecutionRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                temporalTarget = "temporal.example.com:7233",
+                marketDataBaseUrl = "https://broker-wrapper.example.com",
+                usTradingCalendarEnabled = false,
+            ),
+        )
+
+        assertEquals(1, violations.size)
+        assertTrue(violations.single().contains("disable US trading calendar"))
+    }
+
+    @Test
+    fun `blocks disabled default us equity calendar in production profile`() {
+        val violations = StrategyExecutionRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                temporalTarget = "temporal.example.com:7233",
+                marketDataBaseUrl = "https://broker-wrapper.example.com",
+                defaultUsEquityCalendarEnabled = false,
+            ),
+        )
+
+        assertEquals(1, violations.size)
+        assertTrue(violations.single().contains("default US equity calendar"))
+    }
+
+    @Test
     fun `allows explicitly waived production checks`() {
         val violations = StrategyExecutionRuntimeSafetyRules.validate(
             input(
@@ -85,8 +130,12 @@ class StrategyExecutionRuntimeSafetyRulesTest {
                 temporalTarget = "127.0.0.1:7233",
                 marketDataBaseUrl = "http://localhost:8079",
                 hibernateDdlAuto = "validate",
+                defaultOrderIntentTradingEnvironment = "MOCK",
+                usTradingCalendarEnabled = false,
                 allowLocalTemporalTargetInProduction = true,
                 allowLocalMarketDataEndpointInProduction = true,
+                allowMockOrderIntentInProduction = true,
+                allowDisabledTradingCalendarInProduction = true,
             ),
         )
 
@@ -98,8 +147,13 @@ class StrategyExecutionRuntimeSafetyRulesTest {
         temporalTarget: String,
         marketDataBaseUrl: String,
         hibernateDdlAuto: String? = "validate",
+        defaultOrderIntentTradingEnvironment: String = "LIVE",
+        usTradingCalendarEnabled: Boolean = true,
+        defaultUsEquityCalendarEnabled: Boolean = true,
         allowLocalTemporalTargetInProduction: Boolean = false,
         allowLocalMarketDataEndpointInProduction: Boolean = false,
+        allowMockOrderIntentInProduction: Boolean = false,
+        allowDisabledTradingCalendarInProduction: Boolean = false,
     ) = StrategyExecutionRuntimeSafetyRules.Input(
         activeProfiles = activeProfiles,
         enabled = true,
@@ -108,7 +162,12 @@ class StrategyExecutionRuntimeSafetyRulesTest {
         temporalTarget = temporalTarget,
         marketDataBaseUrl = marketDataBaseUrl,
         hibernateDdlAuto = hibernateDdlAuto,
+        defaultOrderIntentTradingEnvironment = defaultOrderIntentTradingEnvironment,
+        usTradingCalendarEnabled = usTradingCalendarEnabled,
+        defaultUsEquityCalendarEnabled = defaultUsEquityCalendarEnabled,
         allowLocalTemporalTargetInProduction = allowLocalTemporalTargetInProduction,
         allowLocalMarketDataEndpointInProduction = allowLocalMarketDataEndpointInProduction,
+        allowMockOrderIntentInProduction = allowMockOrderIntentInProduction,
+        allowDisabledTradingCalendarInProduction = allowDisabledTradingCalendarInProduction,
     )
 }

@@ -8,4 +8,6 @@ class StrategyExecutionRuntimeSafetyProperties {
     var productionProfiles: List<String> = listOf("prod", "production", "live")
     var allowLocalTemporalTargetInProduction: Boolean = false
     var allowLocalMarketDataEndpointInProduction: Boolean = false
+    var allowMockOrderIntentInProduction: Boolean = false
+    var allowDisabledTradingCalendarInProduction: Boolean = false
 }
