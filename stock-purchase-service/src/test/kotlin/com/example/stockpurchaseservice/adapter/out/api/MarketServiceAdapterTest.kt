@@ -7,6 +7,7 @@ import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatusQu
 import com.example.stockpurchaseservice.application.port.out.CancelOrderDto
 import com.example.stockpurchaseservice.application.port.out.DomesticStockOrderPort
 import com.example.stockpurchaseservice.application.port.out.ExecutedStockDto
+import com.example.stockpurchaseservice.application.port.out.ExecutionLookupQuery
 import com.example.stockpurchaseservice.application.port.out.ExecutionTypeDto
 import com.example.stockpurchaseservice.application.port.out.OverseasStockOrderPort
 import com.example.stockpurchaseservice.application.port.out.PurchaseOrderDto
@@ -52,6 +53,27 @@ class MarketServiceAdapterTest {
         val executions = adapter.findExecutionListAtOneDay()
 
         assertEquals(listOf("005930", "TQQQ"), executions.map { it.stockId })
+    }
+
+    @Test
+    fun `forwards execution lookup range to both market adapters`() {
+        val domesticPort = FakeDomesticStockOrderPort(
+            executions = listOf(execution("005930", "domestic-order")),
+        )
+        val overseasPort = FakeOverseasStockOrderPort(
+            executions = listOf(execution("TQQQ", "overseas-order")),
+        )
+        val adapter = MarketServiceAdapter(domesticPort, overseasPort)
+        val query = ExecutionLookupQuery(
+            from = ZonedDateTime.parse("2026-06-01T09:00:00+09:00"),
+            to = ZonedDateTime.parse("2026-06-03T09:00:00+09:00"),
+        )
+
+        val executions = adapter.findExecutionList(query)
+
+        assertEquals(listOf("005930", "TQQQ"), executions.map { it.stockId })
+        assertEquals(listOf(query), domesticPort.executionQueries)
+        assertEquals(listOf(query), overseasPort.executionQueries)
     }
 
     @Test
@@ -114,6 +136,7 @@ class MarketServiceAdapterTest {
     ) : DomesticStockOrderPort {
         val buyOrders: MutableList<PurchaseOrderDto> = mutableListOf()
         val cancelOrders: MutableList<CancelOrderDto> = mutableListOf()
+        val executionQueries: MutableList<ExecutionLookupQuery> = mutableListOf()
         val statusQueries: MutableList<BrokerOrderStatusQuery> = mutableListOf()
 
         override fun buyStock(order: PurchaseOrderDto): BrokerOrderSubmissionDto {
@@ -134,6 +157,11 @@ class MarketServiceAdapterTest {
             return executions
         }
 
+        override fun findExecutionList(query: ExecutionLookupQuery): List<ExecutedStockDto> {
+            executionQueries += query
+            return executions
+        }
+
         override fun findOrderSubmissionStatus(query: BrokerOrderStatusQuery): BrokerOrderStatusDto {
             statusQueries += query
             return status
@@ -146,6 +174,7 @@ class MarketServiceAdapterTest {
     ) : OverseasStockOrderPort {
         val buyOrders: MutableList<PurchaseOrderDto> = mutableListOf()
         val cancelOrders: MutableList<CancelOrderDto> = mutableListOf()
+        val executionQueries: MutableList<ExecutionLookupQuery> = mutableListOf()
         val statusQueries: MutableList<BrokerOrderStatusQuery> = mutableListOf()
 
         override fun buyStock(order: PurchaseOrderDto): BrokerOrderSubmissionDto {
@@ -163,6 +192,11 @@ class MarketServiceAdapterTest {
         }
 
         override fun findExecutionListAtOneDay(): List<ExecutedStockDto> {
+            return executions
+        }
+
+        override fun findExecutionList(query: ExecutionLookupQuery): List<ExecutedStockDto> {
+            executionQueries += query
             return executions
         }
 
