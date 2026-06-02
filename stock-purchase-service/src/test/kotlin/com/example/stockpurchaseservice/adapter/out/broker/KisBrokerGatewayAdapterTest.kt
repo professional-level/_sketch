@@ -1570,6 +1570,31 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `ignores domestic non rejection marker paired with reason code`() {
+        val adapter = domesticHistoryAdapter(
+            domesticHistoryResponse(
+                domesticRow(
+                    orderId = "not-rejected-domestic-order",
+                    orderedQuantity = "10",
+                    filledQuantity = "4",
+                    remainingQuantity = "6",
+                    statusName = "Accepted",
+                    rejectionReason = "Not rejected",
+                    rejectionReasonCode = "APBK001",
+                ),
+            ),
+        )
+
+        val item = adapter.findOrderHistory(domesticHistoryQuery()).single()
+        val status = item.toStatus()
+
+        assertEquals(null, item.rejectionReason)
+        assertEquals(0L, item.rejectedQuantity)
+        assertEquals(BrokerOrderStatus.PARTIALLY_FILLED, status.status)
+        assertEquals("broker partially filled quantity=4 remaining=6", status.reason)
+    }
+
+    @Test
     fun `maps domestic cancel fields to cancelled status`() {
         val adapter = domesticHistoryAdapter(
             domesticHistoryResponse(
@@ -1766,6 +1791,42 @@ class KisBrokerGatewayAdapterTest {
 
         assertEquals(BrokerOrderStatus.REJECTED, status.status)
         assertEquals("APBK001", status.reason)
+    }
+
+    @Test
+    fun `ignores overseas non rejection marker paired with reason code`() {
+        val adapter = overseasHistoryAdapter(
+            """
+            {
+              "rt_cd": "0",
+              "ctx_area_fk200": "",
+              "ctx_area_nk200": "",
+              "output": [
+                {
+                  "ODNO": "not-rejected-overseas-order",
+                  "PDNO": "TQQQ",
+                  "ORD_DT": "20260602",
+                  "ORD_TMD": "093000",
+                  "ORD_QTY": "10",
+                  "TOT_CCLD_QTY": "4",
+                  "RMN_QTY": "6",
+                  "SLL_BUY_DVSN_NAME": "BUY",
+                  "PRCS_STAT_NAME": "Accepted",
+                  "RJCT_RSON_CD": "APBK001",
+                  "RJCT_RSON_CD_NAME": "not rejected"
+                }
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        val item = adapter.findOrderHistory(historyQuery()).single()
+        val status = item.toStatus()
+
+        assertEquals(null, item.rejectionReason)
+        assertEquals(0L, item.rejectedQuantity)
+        assertEquals(BrokerOrderStatus.PARTIALLY_FILLED, status.status)
+        assertEquals("broker partially filled quantity=4 remaining=6", status.reason)
     }
 
     @Test

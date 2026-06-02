@@ -917,7 +917,7 @@ private fun DailyExecutionOrdersResponseOuterClass.DailyExecutionOrdersOutput1.t
             ordStatName,
             rvseCnclDvsnName,
         ),
-        rejectionReason = joinedText(
+        rejectionReason = joinedRejectionReason(
             rjctRson,
             rjctRsonName,
             rjctRsonCn,
@@ -1004,7 +1004,7 @@ private fun JsonNode.toBrokerHistoryItem(): BrokerOrderHistoryItem? {
         "CNCL_DVSN_NAME",
     )
     val statusMessage = joinedText(statusName, revisionCancelName)
-    val rejectionReason = joinedText(
+    val rejectionReason = joinedRejectionReason(
         textOrNull("rjct_rson", "rjctRson", "RJCT_RSON"),
         textOrNull("rjct_rson_name", "rjctRsonName", "RJCT_RSON_NAME"),
         textOrNull("rjct_rson_cn", "rjctRsonCn", "RJCT_RSON_CN"),
@@ -1152,6 +1152,43 @@ private fun joinedText(vararg values: String?): String? {
         .joinToString("; ")
         .takeIf(String::isNotBlank)
 }
+
+private fun joinedRejectionReason(vararg values: String?): String? {
+    val tokens = values
+        .mapNotNull { it?.trim()?.takeIf(String::isNotBlank) }
+        .distinct()
+    val hasNonRejectionMarker = tokens.any { it.isNonRejectionReasonMarker() }
+    val rejectionTokens = tokens.filterNot { it.isNonRejectionReasonMarker() }
+    return when {
+        rejectionTokens.isEmpty() -> null
+        hasNonRejectionMarker && rejectionTokens.all { it.isKisReasonCodeToken() } -> null
+        else -> rejectionTokens.joinToString("; ")
+    }
+}
+
+private fun String.isNonRejectionReasonMarker(): Boolean {
+    val normalized = lowercase()
+        .filterNot { it.isWhitespace() || it == '_' || it == '-' || it == '/' || it == '.' }
+    return normalized.isBlank() || normalized in NON_REJECTION_REASON_MARKERS
+}
+
+private fun String.isKisReasonCodeToken(): Boolean {
+    return KIS_REASON_CODE_TOKEN.matches(trim())
+}
+
+private val NON_REJECTION_REASON_MARKERS = setOf(
+    "notrejected",
+    "norejection",
+    "none",
+    "na",
+    "notapplicable",
+    "\uC5C6\uC74C",
+    "\uD574\uB2F9\uC5C6\uC74C",
+    "\uAC70\uBD80\uC0AC\uC720\uC5C6\uC74C",
+    "\uAC70\uC808\uC0AC\uC720\uC5C6\uC74C",
+)
+
+private val KIS_REASON_CODE_TOKEN = Regex("[A-Za-z]{2,}[A-Za-z0-9_-]*\\d[A-Za-z0-9_-]*")
 
 private fun WebClient.submitStockOrder(
     uri: String,
