@@ -24,6 +24,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 
 class OpenApiServiceHttpResponseTest {
@@ -151,6 +152,71 @@ class OpenApiServiceHttpResponseTest {
     }
 
     @Test
+    fun `sends official tr id for real domestic buy order`() = runTest {
+        val exchangeFunction = SingleResponseExchangeFunction.success()
+        val service = openApiService(exchangeFunction)
+
+        service.postStockOrder(
+            StockOrderRequest(
+                PDNO = "005930",
+                ORD_QTY = 1,
+                ORD_UNPR = 70_000,
+                isMock = false,
+            ),
+        )
+
+        with(exchangeFunction.requests.single()) {
+            assertEquals("/uapi/domestic-stock/v1/trading/order-cash", url().path)
+            assertEquals("TTTC0012U", headers().getFirst("tr_id"))
+            assertEquals("real-app-key", headers().getFirst("appkey"))
+            assertEquals("real-app-secret", headers().getFirst("appsecret"))
+            with(bodyAsJson()) {
+                assertEquals("00000000", text("CANO"))
+                assertEquals("01", text("ACNT_PRDT_CD"))
+                assertEquals("KRX", text("EXCG_ID_DVSN_CD"))
+                assertEquals("", text("SLL_TYPE"))
+                assertEquals("005930", text("PDNO"))
+                assertEquals("00", text("ORD_DVSN"))
+                assertEquals("1", text("ORD_QTY"))
+                assertEquals("70000", text("ORD_UNPR"))
+            }
+        }
+    }
+
+    @Test
+    fun `sends official tr id for mock domestic sell order`() = runTest {
+        val exchangeFunction = SingleResponseExchangeFunction.success()
+        val service = openApiService(exchangeFunction)
+
+        service.postStockOrder(
+            StockOrderRequest(
+                PDNO = "005930",
+                ORD_QTY = 1,
+                ORD_UNPR = 70_000,
+                SLL_TYPE = "01",
+                isMock = true,
+            ),
+        )
+
+        with(exchangeFunction.requests.single()) {
+            assertEquals("/uapi/domestic-stock/v1/trading/order-cash", url().path)
+            assertEquals("VTTC0011U", headers().getFirst("tr_id"))
+            assertEquals("mock-app-key", headers().getFirst("appkey"))
+            assertEquals("mock-app-secret", headers().getFirst("appsecret"))
+            with(bodyAsJson()) {
+                assertEquals("00000000", text("CANO"))
+                assertEquals("01", text("ACNT_PRDT_CD"))
+                assertEquals("KRX", text("EXCG_ID_DVSN_CD"))
+                assertEquals("01", text("SLL_TYPE"))
+                assertEquals("005930", text("PDNO"))
+                assertEquals("00", text("ORD_DVSN"))
+                assertEquals("1", text("ORD_QTY"))
+                assertEquals("70000", text("ORD_UNPR"))
+            }
+        }
+    }
+
+    @Test
     fun `sends official tr id for mock overseas cancel order`() = runTest {
         val exchangeFunction = SingleResponseExchangeFunction.success()
         val service = openApiService(exchangeFunction)
@@ -203,6 +269,9 @@ class OpenApiServiceHttpResponseTest {
             assertEquals("20260601", url().queryValue("ORD_STRT_DT"))
             assertEquals("20260602", url().queryValue("ORD_END_DT"))
             assertEquals("NASD", url().queryValue("OVRS_EXCG_CD"))
+            assertEquals("", url().queryValue("ODNO"))
+            assertEquals("", url().queryValue("ORD_DT"))
+            assertFalse(url().rawQuery.orEmpty().contains("%22%22"))
         }
     }
 
@@ -339,6 +408,59 @@ class OpenApiServiceHttpResponseTest {
             assertEquals("00", url().queryValue("PRCS_DVSN"))
             assertEquals("FK1", url().queryValue("CTX_AREA_FK100"))
             assertEquals("NK1", url().queryValue("CTX_AREA_NK100"))
+        }
+    }
+
+    @Test
+    fun `sends official tr id and blank query fields for mock domestic execution history`() = runTest {
+        val exchangeFunction = SingleResponseExchangeFunction.success()
+        val service = openApiService(exchangeFunction)
+
+        service.getExecutionOrders(
+            GetDailyExecutionOrdersRequest(
+                inqrStrtDt = "20260601",
+                inqrEndDt = "20260602",
+                isMock = true,
+            ),
+        )
+
+        with(exchangeFunction.requests.single()) {
+            assertEquals("/uapi/domestic-stock/v1/trading/inquire-daily-ccld", url().path)
+            assertEquals("VTTC0081R", headers().getFirst("tr_id"))
+            assertEquals("20260601", url().queryValue("INQR_STRT_DT"))
+            assertEquals("20260602", url().queryValue("INQR_END_DT"))
+            assertEquals("00", url().queryValue("SLL_BUY_DVSN_CD"))
+            assertEquals("00", url().queryValue("INQR_DVSN"))
+            assertEquals("", url().queryValue("PDNO"))
+            assertEquals("00", url().queryValue("CCLD_DVSN"))
+            assertEquals("", url().queryValue("ORD_GNO_BRNO"))
+            assertEquals("", url().queryValue("ODNO"))
+            assertEquals("00", url().queryValue("INQR_DVSN_3"))
+            assertEquals("", url().queryValue("INQR_DVSN_1"))
+            assertEquals("KRX", url().queryValue("EXCG_ID_DVSN_CD"))
+            assertEquals("", url().queryValue("CTX_AREA_FK100"))
+            assertEquals("", url().queryValue("CTX_AREA_NK100"))
+            assertFalse(url().rawQuery.orEmpty().contains("%22%22"))
+        }
+    }
+
+    @Test
+    fun `sends official fields and blank cursor for domestic cancelable lookup`() = runTest {
+        val exchangeFunction = SingleResponseExchangeFunction.success()
+        val service = openApiService(exchangeFunction)
+
+        service.getStockOrderCancelable(GetStockOrderCancelableRequest(isMock = true))
+
+        with(exchangeFunction.requests.single()) {
+            assertEquals("/uapi/domestic-stock/v1/trading/inquire-psbl-rvsecncl", url().path)
+            assertEquals("TTTC0084R", headers().getFirst("tr_id"))
+            assertEquals("00000000", url().queryValue("CANO"))
+            assertEquals("01", url().queryValue("ACNT_PRDT_CD"))
+            assertEquals("1", url().queryValue("INQR_DVSN_1"))
+            assertEquals("0", url().queryValue("INQR_DVSN_2"))
+            assertEquals("", url().queryValue("CTX_AREA_FK100"))
+            assertEquals("", url().queryValue("CTX_AREA_NK100"))
+            assertFalse(url().rawQuery.orEmpty().contains("%22%22"))
         }
     }
 
