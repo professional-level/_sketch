@@ -1037,6 +1037,7 @@ private fun JsonNode.toBrokerHistoryItem(): BrokerOrderHistoryItem? {
         textOrNull("rjct_rson_cd", "rjctRsonCd", "RJCT_RSON_CD"),
         textOrNull("rjct_rson_cd_name", "rjctRsonCdName", "RJCT_RSON_CD_NAME"),
     )
+    val rejected = textOrNull("rjct_yn", "rjctYn", "RJCT_YN").equals("Y", ignoreCase = true)
     val cancelled = statusMessage?.contains(CANCELLED_KOREAN) == true ||
         revisionCancelCode == KIS_CANCEL_REVISION_CODE ||
         textOrNull("cncl_yn", "cnclYn", "CNCL_YN").equals("Y", ignoreCase = true)
@@ -1107,7 +1108,7 @@ private fun JsonNode.toBrokerHistoryItem(): BrokerOrderHistoryItem? {
         orderedPrice = orderedPrice,
         cumulativeFilledQuantity = filledQuantity,
         remainingQuantity = remainingQuantity,
-        rejectedQuantity = explicitRejectedQuantity.takeIf { it > 0 } ?: if (rejectionReason != null) orderedQuantity else 0,
+        rejectedQuantity = explicitRejectedQuantity.takeIf { it > 0 } ?: if (rejectionReason != null || rejected) orderedQuantity else 0,
         cancelledQuantity = explicitCancelledQuantity.takeIf { it > 0 } ?: if (cancelled) remainingQuantity else 0,
         cancelled = cancelled,
         side = textOrNull(
@@ -1143,7 +1144,7 @@ private fun JsonNode.toBrokerHistoryItem(): BrokerOrderHistoryItem? {
             "AVG_CCLD_PRIC",
         ).toDoubleValue(),
         statusMessage = statusMessage,
-        rejectionReason = rejectionReason,
+        rejectionReason = rejectionReason ?: if (rejected) "broker rejected flag=Y" else null,
     )
 }
 
