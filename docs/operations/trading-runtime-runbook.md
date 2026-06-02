@@ -466,4 +466,5 @@ Manual recovery checks:
 - When `SUBMISSION_UNKNOWN` or `CANCEL_PENDING` rows recover to broker fill statuses, or to `CANCELLED` with cumulative fill quantity, verify both `order_execution_outbox_event` and `execution_fill` before manually adjusting strategy state.
 - Keep `akra.order.status-lookup.backfill-days`, `akra.order.status-lookup.forward-days`, and `akra.order.execution-reconciliation.backfill-days` aligned with KIS order-history retention and the operational delay expected before unknown/cancel-pending recovery or broker execution reconciliation runs.
 - Inspect unmatched executions before manually adjusting strategy state.
+- Repeated rolling backfill observations of the same unmatched broker execution reuse the durable `unmatched_execution` row and do not resend the unmatched-execution alert unless the row was first resolved and then observed again.
 - Do not clear outbox, processed-event, order submission, reconciliation cursor, fill, or unmatched-execution records unless the replay and duplicate impact is understood.

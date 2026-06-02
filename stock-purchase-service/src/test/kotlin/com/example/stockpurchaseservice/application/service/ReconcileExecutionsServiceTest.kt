@@ -268,6 +268,30 @@ class ReconcileExecutionsServiceTest {
     }
 
     @Test
+    fun `does not resend unmatched execution alert for already recorded broker execution`() = runBlocking {
+        val reconciliationStatePort = FakeExecutionReconciliationStatePort(
+            existingUnmatchedExecutionIds = setOf("exec-1"),
+        )
+        val alertPort = FakeOperationalAlertPort()
+        val service = service(
+            marketPort = FakeMarketServicePort(
+                executions = listOf(execution(externalExecutionId = "exec-1", quantity = 30)),
+            ),
+            executionFillPort = FakeExecutionFillPort(),
+            submissionPort = FakeOrderIntentSubmissionPort(submissions = emptyList()),
+            eventPort = FakeOrderExecutionEventPort(),
+            reconciliationStatePort = reconciliationStatePort,
+            operationalAlertPort = alertPort,
+        )
+
+        service.execute()
+
+        assertEquals(emptyList(), reconciliationStatePort.unmatched)
+        assertEquals(emptyList(), alertPort.unmatchedExecution)
+        assertEquals(1, reconciliationStatePort.completed.single().unmatchedExecutionCount)
+    }
+
+    @Test
     fun `unmatched execution can be published after order submission appears`() = runBlocking {
         val executionFillPort = FakeExecutionFillPort()
         val execution = execution(externalExecutionId = "exec-1", quantity = 30)
@@ -815,7 +839,9 @@ class ReconcileExecutionsServiceTest {
 
     private class FakeExecutionReconciliationStatePort(
         private val cursor: ExecutionReconciliationCursorDto? = null,
+        existingUnmatchedExecutionIds: Set<String> = emptySet(),
     ) : ExecutionReconciliationStatePort {
+        private val unmatchedExecutionIds: MutableSet<String> = existingUnmatchedExecutionIds.toMutableSet()
         val startedSources: MutableList<String> = mutableListOf()
         val completed: MutableList<ExecutionReconciliationResultDto> = mutableListOf()
         val failedReasons: MutableList<String?> = mutableListOf()
@@ -842,11 +868,14 @@ class ReconcileExecutionsServiceTest {
             failedReasons += reason
         }
 
-        override suspend fun saveUnmatchedExecution(execution: UnmatchedExecutionDto) {
+        override suspend fun saveUnmatchedExecution(execution: UnmatchedExecutionDto): Boolean {
+            if (!unmatchedExecutionIds.add(execution.externalExecutionId)) return false
             unmatched += execution
+            return true
         }
 
         override suspend fun markUnmatchedExecutionResolved(externalExecutionId: String) {
+            unmatchedExecutionIds -= externalExecutionId
             resolvedUnmatchedExecutionIds += externalExecutionId
         }
     }

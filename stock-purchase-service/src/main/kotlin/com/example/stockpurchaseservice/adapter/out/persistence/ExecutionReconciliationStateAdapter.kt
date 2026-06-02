@@ -50,9 +50,10 @@ internal class ExecutionReconciliationStateAdapter(
         cursorRepository.update(current.failed(failedAt, reason))
     }
 
-    override suspend fun saveUnmatchedExecution(execution: UnmatchedExecutionDto) {
-        if (unmatchedExecutionRepository.exists(execution.externalExecutionId)) return
+    override suspend fun saveUnmatchedExecution(execution: UnmatchedExecutionDto): Boolean {
+        if (unmatchedExecutionRepository.exists(execution.externalExecutionId)) return false
         unmatchedExecutionRepository.save(UnmatchedExecutionEntity.from(execution)).awaitSuspending()
+        return true
     }
 
     override suspend fun markUnmatchedExecutionResolved(externalExecutionId: String) {

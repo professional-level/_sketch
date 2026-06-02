@@ -248,7 +248,8 @@ class ReconcileExecutionsService(
             reason = reason,
             observedAt = observedAt,
         )
-        executionReconciliationStatePort.saveUnmatchedExecution(unmatchedExecution)
+        val newlyRecorded = executionReconciliationStatePort.saveUnmatchedExecution(unmatchedExecution)
+        if (!newlyRecorded) return
         runCatching {
             operationalAlertPort.alertUnmatchedExecution(unmatchedExecution.toAlert(RECONCILIATION_SOURCE))
         }
