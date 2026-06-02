@@ -8,6 +8,10 @@ param(
 
     [string] $ManifestPath = (Join-Path $PSScriptRoot "trading-runtime.yaml"),
 
+    [string] $InfraManifestPath,
+
+    [string] $InfraNamespace = "trading-infra",
+
     [string] $SecretManifestPath,
 
     [string] $SqlDirectory = (Join-Path (Split-Path $PSScriptRoot -Parent) "sql"),
@@ -16,11 +20,15 @@ param(
 
     [int] $RolloutTimeoutSeconds = 300,
 
+    [int] $InfraTimeoutSeconds = 600,
+
     [switch] $DryRun,
 
     [switch] $SkipMigrations,
 
     [switch] $SkipRolloutStatus,
+
+    [switch] $SkipInfraStatus,
 
     [switch] $AllowTemplatePlaceholders
 )
@@ -99,6 +107,28 @@ if (-not $SkipMigrations -and -not (Test-Path -LiteralPath $SqlDirectory)) {
 $tempManifests = @()
 
 try {
+    if (-not [string]::IsNullOrWhiteSpace($InfraManifestPath)) {
+        $tempInfraManifest = New-RenderedManifest $InfraManifestPath $ImageTag
+        $tempManifests += $tempInfraManifest
+        $infraApplyArgs = @("apply", "-f", $tempInfraManifest)
+        if ($DryRun) {
+            $infraApplyArgs += "--dry-run=client"
+        }
+        Invoke-Kubectl @infraApplyArgs
+
+        if (-not $DryRun -and -not $SkipInfraStatus) {
+            foreach ($statefulSet in @("mysql", "zookeeper", "kafka", "temporal-postgresql")) {
+                Invoke-Kubectl "rollout" "status" "statefulset/$statefulSet" "-n" $InfraNamespace "--timeout=$($InfraTimeoutSeconds)s"
+            }
+
+            Invoke-Kubectl "wait" "-n" $InfraNamespace "--for=condition=complete" "job/akra-kafka-topic-bootstrap" "--timeout=$($InfraTimeoutSeconds)s"
+
+            foreach ($deployment in @("temporal", "temporal-ui")) {
+                Invoke-Kubectl "rollout" "status" "deployment/$deployment" "-n" $InfraNamespace "--timeout=$($InfraTimeoutSeconds)s"
+            }
+        }
+    }
+
     if (-not [string]::IsNullOrWhiteSpace($SecretManifestPath)) {
         $tempSecretManifest = New-RenderedManifest $SecretManifestPath $ImageTag
         $tempManifests += $tempSecretManifest

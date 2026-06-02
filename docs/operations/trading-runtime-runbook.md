@@ -347,6 +347,7 @@ These waivers should not be enabled for real capital.
 
 Before enabling real orders:
 
+- Use managed MySQL/Kafka/Temporal services where possible. If bootstrapping the checked-in cluster template, prepare `docs/operations/kubernetes/trading-infra.yaml`, replace its `REPLACE_...` values, and wait for MySQL, Kafka, the Kafka topic bootstrap Job, Temporal, and Temporal UI before applying trading services. Keep `trading-infra-secrets.mysql-app-password` equal to `trading-database-secrets.password`.
 - Replace placeholder values in `docs/operations/kubernetes/trading-runtime.yaml` or the equivalent deployment manifest; do not apply the checked-in placeholders to a real cluster.
 - When using Vault, replace placeholder values in `docs/operations/kubernetes/external-secrets.yaml`, confirm the External Secrets Operator CRDs are installed, and wait for `kis-broker-secrets` plus `trading-database-secrets` to become Ready before starting application pods.
 - Build immutable service images with `.github/workflows/container-images.yml` or an equivalent pipeline, then replace `REPLACE_IMAGE_TAG` with the Git SHA tag.
@@ -631,8 +632,8 @@ When Kafka, Temporal, the broker wrapper, or an application service restarts, tr
 Restart order:
 
 1. Pause discretionary strategy starts and stock discovery triggers if the operator has that control.
-2. Start infrastructure first: Kafka/ZooKeeper, Temporal database, Temporal frontend, and Temporal UI.
-3. Verify Kafka topics and Temporal namespace are reachable.
+2. Start infrastructure first: MySQL, Kafka/ZooKeeper, the Kafka topic bootstrap Job, Temporal database, Temporal frontend, and Temporal UI.
+3. Verify MySQL accepts connections, Kafka topics exist, and the Temporal namespace is reachable.
 4. Start the root KIS broker wrapper before trading services and confirm token persistence is healthy.
 5. Start `strategy-execution-service`; schedule registration is idempotent and should recreate or reuse the active-strategy schedule.
 6. Start `stock-purchase-service`; outbox publishers, unknown-submission recovery, cancel-pending recovery, and reconciliation cursors should resume from stored state.
@@ -669,6 +670,13 @@ Kafka outage recovery:
 
 - Keep outbox rows intact. `PENDING` and retry-eligible `FAILED` rows are republished after Kafka returns.
 - If an application instance crashed while publishing, `PROCESSING` rows become claimable only after `claimExpiresAt`; wait at least the configured outbox claim lease before declaring them stuck.
+- Confirm the required topics exist before restarting publishers:
+
+```powershell
+kubectl -n trading-infra exec statefulset/kafka -- \
+  kafka-topics --bootstrap-server kafka-0.kafka.trading-infra.svc.cluster.local:9092 --list
+```
+
 - Use the operations endpoint and SQL counts to confirm both outboxes drain:
 
 ```sql

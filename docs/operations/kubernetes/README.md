@@ -28,6 +28,24 @@ The template uses `external-secrets.io/v1` `SecretStore` and `ExternalSecret`
 resources. Confirm the installed External Secrets Operator CRD version in the
 target cluster before applying it.
 
+`trading-infra.yaml` is an optional bootstrap template for the runtime
+dependencies expected by `trading-runtime.yaml`:
+
+- MySQL at `mysql.trading-infra.svc.cluster.local:3306`
+- Kafka brokers at `kafka-0.kafka.trading-infra.svc.cluster.local:9092`,
+  `kafka-1.kafka.trading-infra.svc.cluster.local:9092`, and
+  `kafka-2.kafka.trading-infra.svc.cluster.local:9092`
+- Temporal frontend at `temporal-frontend.trading-infra.svc.cluster.local:7233`
+
+Use managed services or a dedicated operator when available. The checked-in
+infra manifest is a bootstrap template with PVCs and a Kafka topic creation Job,
+not a complete HA operations platform.
+
+When using this bootstrap template, the prepared
+`trading-infra-secrets.mysql-app-password` value must match
+`trading-database-secrets.password` in the application namespace. Otherwise the
+SQL migration Job and application pods will fail database authentication.
+
 Images are built by `.github/workflows/container-images.yml` for:
 
 - `ghcr.io/professional-level/sketch-kis-wrapper`
@@ -44,6 +62,7 @@ To validate the checked-in template without applying it:
 ```powershell
 .\deploy-trading-runtime.ps1 `
   -ImageTag 0123456789abcdef `
+  -InfraManifestPath .\trading-infra.yaml `
   -SecretManifestPath .\external-secrets.yaml `
   -DryRun `
   -AllowTemplatePlaceholders
@@ -51,21 +70,24 @@ To validate the checked-in template without applying it:
 
 For an actual rollout, first create a prepared manifest copy where every
 `REPLACE_...` value has been replaced by the deployment secret manager or
-cluster-specific values. If using External Secrets Operator, prepare a matching
-`external-secrets.prepared.yaml` and run:
+cluster-specific values. If using the checked-in infra and External Secrets
+Operator templates, prepare matching `trading-infra.prepared.yaml` and
+`external-secrets.prepared.yaml` files, then run:
 
 ```powershell
 .\deploy-trading-runtime.ps1 `
   -ImageTag <git-sha> `
+  -InfraManifestPath .\trading-infra.prepared.yaml `
   -SecretManifestPath .\external-secrets.prepared.yaml `
   -ManifestPath .\trading-runtime.prepared.yaml
 ```
 
 The helper refuses unresolved placeholders during real rollout. It renders the
-image tag, applies the optional secret manifest first, applies the runtime
-manifest, updates the SQL migration ConfigMap, recreates and unsuspends the
-migration Job, waits for it to complete, then restarts and waits for the service
-Deployments.
+image tag, applies the optional infra manifest and waits for its StatefulSets,
+topic bootstrap Job, and Deployments, applies the optional secret manifest,
+applies the runtime manifest, updates the SQL migration ConfigMap, recreates and
+unsuspends the migration Job, waits for it to complete, then restarts and waits
+for the service Deployments.
 
 For a local dry build, stage the boot jar and build with the matching
 Dockerfile:
