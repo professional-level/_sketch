@@ -33,7 +33,7 @@ internal class OrderRiskControlAdapter(
     override suspend fun assess(command: OrderRiskAssessmentCommand): OrderRiskAssessmentResult {
         if (!properties.enabled) return OrderRiskAssessmentResult.accepted()
 
-        disabledStrategyReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }
+        strategyAvailabilityReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }
         tradingEnvironmentReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }
         tradingHoursPolicy.rejectReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }
         sellPositionReason(command)?.let { return OrderRiskAssessmentResult.rejected(it) }
@@ -47,12 +47,26 @@ internal class OrderRiskControlAdapter(
         return OrderRiskAssessmentResult.accepted()
     }
 
-    private fun disabledStrategyReason(command: OrderRiskAssessmentCommand): String? {
+    private fun strategyAvailabilityReason(command: OrderRiskAssessmentCommand): String? {
         val matchedPrefix = properties.disabledStrategyPrefixes
             .map(String::trim)
             .filter(String::isNotBlank)
             .firstOrNull { command.strategyExecutionId.startsWith(it) }
-        return matchedPrefix?.let { "strategy disabled by risk policy: prefix=$it" }
+        if (matchedPrefix != null) {
+            return "strategy disabled by risk policy: prefix=$matchedPrefix"
+        }
+
+        val enabledPrefixes = properties.enabledStrategyPrefixes
+            .map(String::trim)
+            .filter(String::isNotBlank)
+        if (enabledPrefixes.isEmpty()) return null
+
+        return if (enabledPrefixes.any { command.strategyExecutionId.startsWith(it) }) {
+            null
+        } else {
+            "strategy not enabled by risk policy: strategyExecutionId=${command.strategyExecutionId} " +
+                "enabledPrefixes=${enabledPrefixes.joinToString(",")}"
+        }
     }
 
     private fun tradingEnvironmentReason(command: OrderRiskAssessmentCommand): String? {

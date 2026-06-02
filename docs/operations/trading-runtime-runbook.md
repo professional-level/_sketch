@@ -240,6 +240,7 @@ akra.order.risk.max-order-notional=1000
 akra.order.risk.max-account-pending-buy-notional=5000
 akra.order.risk.max-account-exposure-notional=20000
 akra.order.risk.max-daily-order-count=20
+akra.order.risk.enabled-strategy-prefixes[0]=laor-v4-live
 akra.order.risk.strategy-trading-environments[laor-v4-live]=LIVE
 akra.order.risk.strategy-trading-environments[laor-v4-paper]=MOCK
 akra.order.risk.account-exposure.overseas-exchange=NASD

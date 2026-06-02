@@ -653,6 +653,50 @@ class OrderRiskControlAdapterTest {
     }
 
     @Test
+    fun `rejects strategy outside enabled prefix allow list`() = runBlocking {
+        val properties = OrderRiskProperties().apply {
+            enabledStrategyPrefixes = listOf("laor-v4-live")
+        }
+
+        val result = adapter(properties).assess(
+            command(strategyExecutionId = "laor-v4-paper:TQQQ"),
+        )
+
+        assertFalse(result.accepted)
+        assertContains(result.reason ?: "", "strategy not enabled by risk policy")
+        assertContains(result.reason ?: "", "enabledPrefixes=laor-v4-live")
+    }
+
+    @Test
+    fun `accepts strategy inside enabled prefix allow list`() = runBlocking {
+        val properties = OrderRiskProperties().apply {
+            enabledStrategyPrefixes = listOf("laor-v4-paper")
+        }
+
+        val result = adapter(properties).assess(
+            command(strategyExecutionId = "laor-v4-paper:TQQQ"),
+        )
+
+        assertTrue(result.accepted)
+    }
+
+    @Test
+    fun `disabled strategy prefix wins over enabled allow list`() = runBlocking {
+        val properties = OrderRiskProperties().apply {
+            enabledStrategyPrefixes = listOf("laor-v4")
+            disabledStrategyPrefixes = listOf("laor-v4-paper")
+        }
+
+        val result = adapter(properties).assess(
+            command(strategyExecutionId = "laor-v4-paper:TQQQ"),
+        )
+
+        assertFalse(result.accepted)
+        assertContains(result.reason ?: "", "strategy disabled by risk policy")
+        assertContains(result.reason ?: "", "prefix=laor-v4-paper")
+    }
+
+    @Test
     fun `rejects strategy when expected live environment would route to mock broker`() = runBlocking {
         val properties = OrderRiskProperties().apply {
             strategyTradingEnvironments["laor-v4-live"] = OrderTradingEnvironment.LIVE

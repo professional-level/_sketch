@@ -12,6 +12,7 @@ class OrderRiskProperties {
     var maxAccountExposureNotional: Double? = null
     var maxDailyOrderCount: Long? = null
     var duplicateOrderKillSwitchEnabled: Boolean = true
+    var enabledStrategyPrefixes: List<String> = emptyList()
     var disabledStrategyPrefixes: List<String> = emptyList()
     var symbolMaxOrderNotional: MutableMap<String, Double> = mutableMapOf()
     var strategyTradingEnvironments: MutableMap<String, OrderTradingEnvironment> = mutableMapOf()
