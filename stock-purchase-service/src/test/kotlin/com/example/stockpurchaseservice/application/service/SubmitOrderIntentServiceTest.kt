@@ -96,6 +96,62 @@ class SubmitOrderIntentServiceTest {
     }
 
     @Test
+    fun `submits sell order intent to market port`() = runBlocking {
+        val marketPort = FakeMarketServicePort()
+        val processedEventPort = FakeProcessedEventPort()
+        val submissionPort = FakeOrderIntentSubmissionPort()
+        val eventPort = FakeOrderExecutionEventPort()
+        val service = SubmitOrderIntentService(
+            marketPort,
+            processedEventPort,
+            submissionPort,
+            eventPort,
+            FakeOrderRiskControlPort(),
+            FakeOperationalAlertPort(),
+        )
+        val eventId = UUID.randomUUID()
+
+        val result = service.execute(
+            SubmitOrderIntentCommand(
+                eventId = eventId,
+                idempotencyKey = "laor-v4-strategy:TQQQ:2026-05-30:MOC_SELL:0",
+                strategyExecutionId = "laor-v4-strategy:TQQQ",
+                symbol = "TQQQ",
+                side = OrderIntentSide.SELL,
+                orderType = OrderIntentType.MOC,
+                price = null,
+                quantity = 2,
+                orderTag = "MOC_SELL",
+                exchange = "NYSE",
+                createdAt = ZonedDateTime.parse("2026-05-30T09:00:00+09:00"),
+            ),
+        )
+
+        assertEquals(OrderIntentSubmissionStatus.SUBMITTED, result.status)
+        assertEquals("broker-sell-1", result.externalOrderId)
+        assertEquals("branch-sell-1", result.branchOrderNumber)
+        assertEquals(eventId, processedEventPort.succeeded.single())
+        with(submissionPort.saved.single()) {
+            assertEquals(eventId, orderIntentId)
+            assertEquals(OrderIntentSide.SELL, side)
+            assertEquals(OrderIntentType.MOC, orderType)
+            assertEquals(StockOrderMarket.OVERSEAS_US, market)
+            assertEquals("NYSE", exchange)
+            assertEquals(null, submittedPrice)
+        }
+        assertEquals("broker-sell-1", eventPort.submitted.single().brokerOrderId)
+        with(marketPort.sellOrders.single()) {
+            assertEquals("TQQQ", stockId)
+            assertEquals(0.0, sellingPrice)
+            assertEquals(2, quantity)
+            assertEquals(StockOrderMarket.OVERSEAS_US, market)
+            assertEquals(StockOrderType.MOC, orderType)
+            assertEquals("NYSE", exchange)
+        }
+        assertEquals(emptyList(), marketPort.buyOrders)
+    }
+
+    @Test
     fun `routes six digit symbols to domestic market`() = runBlocking {
         val marketPort = FakeMarketServicePort()
         val processedEventPort = FakeProcessedEventPort()
