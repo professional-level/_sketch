@@ -70,6 +70,7 @@ class RunActiveStrategyExecutionsServiceTest {
         val command = runStrategyExecutionUseCase.commands.single() as RunStrategyExecutionCommand.LaorV4
         assertEquals("laor-v4-strategy:TQQQ", command.executionId)
         assertEquals("2026-05-31", command.executionRunId)
+        assertEquals(requestedAt, command.requestedAt)
         assertEquals(LaorV4StrategySymbol.TQQQ, command.symbol)
         assertEquals(20, command.totalSplitCount)
         assertEquals(1.12, command.firstBuyLimitMultiplier)
@@ -83,6 +84,46 @@ class RunActiveStrategyExecutionsServiceTest {
         assertEquals(20.0, savedState.state.progressRound)
         assertEquals(10L, savedState.state.holdingQuantity)
         assertEquals(100.0, savedState.state.averagePurchasePrice)
+    }
+
+    @Test
+    fun `passes next order session start time to strategy run after market close`() = runBlocking {
+        val statePort = FakeStrategyExecutionStatePort(
+            activeStates = listOf(
+                LaorV4ExecutionState(
+                    executionId = "laor-v4-strategy:TQQQ",
+                    symbol = LaorV4StrategySymbol.TQQQ,
+                    totalSplitCount = 20,
+                    state = LaorV4StrategyState(availableCash = 2_240.0),
+                ),
+            ),
+        )
+        val marketDataPort = FakeMarketDataPort()
+        val runStrategyExecutionUseCase = FakeRunStrategyExecutionUseCase(
+            plannedState = LaorV4State(availableCash = 2_240.0),
+        )
+        val triggerAt = ZonedDateTime.parse("2026-06-01T20:00:00-04:00[America/New_York]")
+        val orderRequestedAt = ZonedDateTime.parse("2026-06-02T09:30:00-04:00[America/New_York]")
+        val service = RunActiveStrategyExecutionsService(
+            strategyExecutionStatePort = statePort,
+            marketDataPort = marketDataPort,
+            runStrategyExecutionUseCase = runStrategyExecutionUseCase,
+            tradingCalendarPort = FakeTradingCalendarPort(
+                orderSessionDate = LocalDate.parse("2026-06-02"),
+                orderSessionStartAt = orderRequestedAt,
+            ),
+        )
+
+        service.execute(
+            RunActiveStrategyExecutionsCommand(
+                executionRunId = "ACTIVE_STRATEGIES_DAILY:2026-06-02",
+                requestedAt = triggerAt,
+            ),
+        )
+
+        val command = runStrategyExecutionUseCase.commands.single() as RunStrategyExecutionCommand.LaorV4
+        assertEquals(orderRequestedAt, command.requestedAt)
+        assertEquals(triggerAt, statePort.saved.single().lastExecutedAt)
     }
 
     @Test
@@ -251,6 +292,7 @@ class RunActiveStrategyExecutionsServiceTest {
     private class FakeTradingCalendarPort(
         private val closedDates: Set<LocalDate> = emptySet(),
         private val orderSessionDate: LocalDate? = null,
+        private val orderSessionStartAt: ZonedDateTime? = null,
     ) : TradingCalendarPort {
         override fun isTradingDay(market: TradingMarket, date: LocalDate): Boolean {
             return date !in closedDates
@@ -258,6 +300,10 @@ class RunActiveStrategyExecutionsServiceTest {
 
         override fun orderSessionDate(market: TradingMarket, requestedAt: ZonedDateTime): LocalDate {
             return orderSessionDate ?: requestedAt.toLocalDate()
+        }
+
+        override fun orderSessionStartAt(market: TradingMarket, requestedAt: ZonedDateTime): ZonedDateTime {
+            return orderSessionStartAt ?: requestedAt
         }
     }
 

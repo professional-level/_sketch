@@ -29,7 +29,7 @@ class RunStrategyExecutionService(
     override suspend fun execute(command: RunStrategyExecutionCommand): RunStrategyExecutionResult {
         val strategy = command.toStrategyExecution()
         val plan = strategy.generateOrders(command.market.toDomain())
-        val createdAt = ZonedDateTime.now()
+        val createdAt = command.requestedAt
 
         orderIntentPort.publishAll(
             plan.orders.mapIndexed { index, orderIntent ->

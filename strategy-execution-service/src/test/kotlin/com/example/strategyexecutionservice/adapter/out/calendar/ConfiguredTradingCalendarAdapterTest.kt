@@ -99,6 +99,49 @@ class ConfiguredTradingCalendarAdapterTest {
     }
 
     @Test
+    fun `resolves order session start after regular close to next trading day open`() {
+        val adapter = ConfiguredTradingCalendarAdapter(TradingCalendarProperties())
+
+        val startAt = adapter.orderSessionStartAt(
+            TradingMarket.US,
+            ZonedDateTime.parse("2026-07-03T09:00:00+09:00[Asia/Seoul]"),
+        )
+
+        assertEquals(
+            ZonedDateTime.parse("2026-07-06T09:30:00-04:00[America/New_York]"),
+            startAt,
+        )
+    }
+
+    @Test
+    fun `keeps order session start at requested timestamp during regular session`() {
+        val adapter = ConfiguredTradingCalendarAdapter(TradingCalendarProperties())
+        val requestedAt = ZonedDateTime.parse("2026-06-02T10:15:00-04:00[America/New_York]")
+
+        val startAt = adapter.orderSessionStartAt(TradingMarket.US, requestedAt)
+
+        assertEquals(requestedAt, startAt)
+    }
+
+    @Test
+    fun `uses configured regular open when resolving order session start`() {
+        val properties = TradingCalendarProperties().apply {
+            us.regularOpen = "10:00"
+        }
+        val adapter = ConfiguredTradingCalendarAdapter(properties)
+
+        val startAt = adapter.orderSessionStartAt(
+            TradingMarket.US,
+            ZonedDateTime.parse("2026-06-01T20:00:00-04:00[America/New_York]"),
+        )
+
+        assertEquals(
+            ZonedDateTime.parse("2026-06-02T10:00:00-04:00[America/New_York]"),
+            startAt,
+        )
+    }
+
+    @Test
     fun `uses early close when resolving order session date`() {
         val adapter = ConfiguredTradingCalendarAdapter(TradingCalendarProperties())
 

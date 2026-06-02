@@ -10,6 +10,8 @@ class TradingCalendarProperties {
         var enabled: Boolean = true
         var zoneId: String = "America/New_York"
         var weekdaysOnly: Boolean = true
+        var regularOpen: String = "09:30"
+        var regularClose: String = "16:00"
         var defaultUsEquityCalendarEnabled: Boolean = true
         var holidays: List<String> = emptyList()
         var earlyCloseDays: List<String> = emptyList()

@@ -31,6 +31,7 @@ class StrategyExecutionTemporalActivitiesAdapterTest {
             RunLaorV4StrategyWorkflowInput(
                 executionId = "laor-v4-strategy:TQQQ",
                 executionRunId = "2026-05-30",
+                requestedAt = "2026-06-02T09:30:00-04:00[America/New_York]",
                 symbol = "TQQQ",
                 totalSplitCount = 40,
                 firstBuyLimitMultiplier = 1.12,
@@ -57,6 +58,7 @@ class StrategyExecutionTemporalActivitiesAdapterTest {
         val command = useCase.commands.single() as RunStrategyExecutionCommand.LaorV4
         assertEquals("laor-v4-strategy:TQQQ", command.executionId)
         assertEquals("2026-05-30", command.executionRunId)
+        assertEquals("2026-06-02T09:30-04:00[America/New_York]", command.requestedAt.toString())
         assertEquals(LaorV4StrategySymbol.TQQQ, command.symbol)
         assertEquals(40, command.totalSplitCount)
         assertEquals(1.12, command.firstBuyLimitMultiplier)

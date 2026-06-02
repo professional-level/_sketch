@@ -10,6 +10,7 @@ import com.example.strategyexecutionservice.domain.strategy.execution.OrderSide
 import com.example.strategyexecutionservice.domain.strategy.execution.OrderType
 import com.example.strategyexecutionservice.domain.strategy.execution.StrategyExecutionType
 import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategySymbol
+import java.time.ZonedDateTime
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -20,11 +21,13 @@ class RunStrategyExecutionServiceTest {
     fun `runs laor strategy and publishes order intent messages`() = runBlocking {
         val orderIntentPort = FakeOrderIntentPort()
         val service = RunStrategyExecutionService(orderIntentPort)
+        val requestedAt = ZonedDateTime.parse("2026-06-02T09:30:00-04:00[America/New_York]")
 
         val result = service.execute(
             RunStrategyExecutionCommand.LaorV4(
                 executionId = "laor-v4-strategy:TQQQ",
                 executionRunId = "2026-05-30",
+                requestedAt = requestedAt,
                 symbol = LaorV4StrategySymbol.TQQQ,
                 totalSplitCount = 20,
                 firstBuyLimitMultiplier = 1.12,
@@ -48,6 +51,7 @@ class RunStrategyExecutionServiceTest {
             assertEquals(1, quantity)
             assertEquals("FIRST_BUY", orderTag)
             assertEquals("laor-v4-strategy:TQQQ:2026-05-30:FIRST_BUY:0", idempotencyKey)
+            assertEquals(requestedAt, createdAt)
             assertEquals(OrderTradingEnvironment.MOCK, tradingEnvironment)
         }
     }

@@ -40,6 +40,12 @@ internal class ConfiguredTradingCalendarAdapter(
         }
     }
 
+    override fun orderSessionStartAt(market: TradingMarket, requestedAt: ZonedDateTime): ZonedDateTime {
+        return when (market) {
+            TradingMarket.US -> properties.us.orderSessionStartAt(requestedAt)
+        }
+    }
+
     private fun TradingCalendarProperties.MarketCalendar.isTradingDay(date: LocalDate): Boolean {
         if (!enabled) return true
         if (defaultUsEquityCalendarEnabled && !UsEquityMarketCalendar.isTradingDay(date)) return false
@@ -67,13 +73,44 @@ internal class ConfiguredTradingCalendarAdapter(
     private fun TradingCalendarProperties.MarketCalendar.orderSessionDate(requestedAt: ZonedDateTime): LocalDate {
         val marketDateTime = requestedAt.withZoneSameInstant(zone())
         val localDate = marketDateTime.toLocalDate()
-        val sessionClose = earlyCloseTime(localDate) ?: UsEquityMarketCalendar.regularClose
+        val sessionClose = sessionCloseTime(localDate)
         val candidate = if (!isTradingDay(localDate) || !marketDateTime.toLocalTime().isBefore(sessionClose)) {
             localDate.plusDays(1)
         } else {
             localDate
         }
         return nextTradingDay(candidate)
+    }
+
+    private fun TradingCalendarProperties.MarketCalendar.orderSessionStartAt(requestedAt: ZonedDateTime): ZonedDateTime {
+        val zone = zone()
+        val marketDateTime = requestedAt.withZoneSameInstant(zone)
+        val localDate = marketDateTime.toLocalDate()
+        val sessionDate = orderSessionDate(requestedAt)
+        val sessionOpen = regularOpenTime()
+        val sessionClose = sessionCloseTime(localDate)
+        val localTime = marketDateTime.toLocalTime()
+
+        if (
+            localDate == sessionDate &&
+            !localTime.isBefore(sessionOpen) &&
+            localTime.isBefore(sessionClose)
+        ) {
+            return marketDateTime
+        }
+        return sessionDate.atTime(sessionOpen).atZone(zone)
+    }
+
+    private fun TradingCalendarProperties.MarketCalendar.regularOpenTime(): LocalTime {
+        return regularOpen.toLocalTimeOrNull() ?: UsEquityMarketCalendar.regularOpen
+    }
+
+    private fun TradingCalendarProperties.MarketCalendar.regularCloseTime(): LocalTime {
+        return regularClose.toLocalTimeOrNull() ?: UsEquityMarketCalendar.regularClose
+    }
+
+    private fun TradingCalendarProperties.MarketCalendar.sessionCloseTime(date: LocalDate): LocalTime {
+        return earlyCloseTime(date) ?: regularCloseTime()
     }
 
     private fun TradingCalendarProperties.MarketCalendar.nextTradingDay(startDate: LocalDate): LocalDate {

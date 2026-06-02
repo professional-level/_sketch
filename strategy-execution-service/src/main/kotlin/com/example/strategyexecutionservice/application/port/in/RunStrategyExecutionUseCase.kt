@@ -3,6 +3,7 @@ package com.example.strategyexecutionservice.application.port.`in`
 import com.example.common.UseCase
 import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategyMode
 import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategySymbol
+import java.time.ZonedDateTime
 
 @UseCase
 interface RunStrategyExecutionUseCase {
@@ -12,10 +13,12 @@ interface RunStrategyExecutionUseCase {
 sealed class RunStrategyExecutionCommand {
     abstract val executionId: String
     abstract val executionRunId: String
+    abstract val requestedAt: ZonedDateTime
 
     data class LaorV4(
         override val executionId: String,
         override val executionRunId: String,
+        override val requestedAt: ZonedDateTime,
         val symbol: LaorV4StrategySymbol,
         val totalSplitCount: Int,
         val firstBuyLimitMultiplier: Double,

@@ -15,6 +15,7 @@ import com.example.strategyexecutionservice.application.port.out.StrategyMarketD
 import com.example.strategyexecutionservice.application.port.out.TradingCalendarPort
 import com.example.strategyexecutionservice.application.port.out.TradingMarket
 import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategyState
+import java.time.ZonedDateTime
 
 @UseCaseImpl
 class RunActiveStrategyExecutionsService(
@@ -39,6 +40,7 @@ class RunActiveStrategyExecutionsService(
 
         var executedStrategyCount = 0
         var createdOrderIntentCount = 0
+        val orderRequestedAt = tradingCalendarPort.orderSessionStartAt(TradingMarket.US, command.requestedAt)
 
         for (strategy in activeStrategies) {
             if (strategy.lastExecutionRunId == command.executionRunId) {
@@ -51,6 +53,7 @@ class RunActiveStrategyExecutionsService(
             val result = runStrategyExecutionUseCase.execute(
                 strategy.toCommand(
                     executionRunId = command.executionRunId,
+                    requestedAt = orderRequestedAt,
                     market = market,
                 ),
             )
@@ -76,11 +79,13 @@ class RunActiveStrategyExecutionsService(
 
     private fun LaorV4ExecutionState.toCommand(
         executionRunId: String,
+        requestedAt: ZonedDateTime,
         market: StrategyMarketDataSnapshot,
     ): RunStrategyExecutionCommand.LaorV4 {
         return RunStrategyExecutionCommand.LaorV4(
             executionId = executionId,
             executionRunId = executionRunId,
+            requestedAt = requestedAt,
             symbol = symbol,
             totalSplitCount = totalSplitCount,
             firstBuyLimitMultiplier = firstBuyLimitMultiplier,

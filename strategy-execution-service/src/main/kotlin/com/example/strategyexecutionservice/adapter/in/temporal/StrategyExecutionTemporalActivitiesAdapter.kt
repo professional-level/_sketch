@@ -73,9 +73,14 @@ class StrategyExecutionTemporalActivitiesAdapter(
     }
 
     private fun RunLaorV4StrategyWorkflowInput.toCommand(): RunStrategyExecutionCommand.LaorV4 {
+        val requestedAt = this.requestedAt
+            .takeIf { it.isNotBlank() }
+            ?.let(ZonedDateTime::parse)
+            ?: ZonedDateTime.now()
         return RunStrategyExecutionCommand.LaorV4(
             executionId = executionId,
             executionRunId = executionRunId,
+            requestedAt = requestedAt,
             symbol = LaorV4StrategySymbol.valueOf(symbol),
             totalSplitCount = totalSplitCount,
             firstBuyLimitMultiplier = firstBuyLimitMultiplier,

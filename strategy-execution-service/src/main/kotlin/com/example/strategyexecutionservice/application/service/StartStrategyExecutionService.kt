@@ -78,6 +78,7 @@ class StartStrategyExecutionService(
             RunStrategyExecutionCommand.LaorV4(
                 executionId = command.executionId,
                 executionRunId = command.idempotencyKey,
+                requestedAt = command.requestedAt,
                 symbol = command.strategySymbol,
                 totalSplitCount = command.totalSplitCount,
                 firstBuyLimitMultiplier = command.firstBuyLimitMultiplier,

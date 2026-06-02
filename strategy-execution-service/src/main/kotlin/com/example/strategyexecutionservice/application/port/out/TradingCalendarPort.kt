@@ -15,6 +15,10 @@ interface TradingCalendarPort {
         return tradingDate(market, requestedAt)
     }
 
+    fun orderSessionStartAt(market: TradingMarket, requestedAt: ZonedDateTime): ZonedDateTime {
+        return requestedAt
+    }
+
     fun earlyCloseTime(market: TradingMarket, date: LocalDate): LocalTime? {
         return null
     }

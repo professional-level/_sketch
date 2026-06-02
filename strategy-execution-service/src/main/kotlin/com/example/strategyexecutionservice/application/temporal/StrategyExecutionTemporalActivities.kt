@@ -33,6 +33,7 @@ data class RunActiveStrategyExecutionsWorkflowResult(
 data class RunLaorV4StrategyWorkflowInput(
     val executionId: String = "",
     val executionRunId: String = "",
+    val requestedAt: String = "",
     val symbol: String = "",
     val totalSplitCount: Int = 20,
     val firstBuyLimitMultiplier: Double = 1.12,
