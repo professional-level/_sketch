@@ -13,6 +13,7 @@ import com.example.stockpurchaseservice.application.port.out.CancelOrderDto
 import com.example.stockpurchaseservice.application.port.out.MarketServicePort
 import com.example.stockpurchaseservice.application.port.out.OperationalAlertPort
 import com.example.stockpurchaseservice.application.port.out.OrderCancellationSubmissionAlert
+import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionDto
 import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionPort
 import com.example.stockpurchaseservice.application.port.out.ProcessedEventPort
 import com.example.stockpurchaseservice.application.port.out.StockOrderMarket
@@ -35,18 +36,20 @@ class CancelOrderSubmissionService(
             return CancelOrderSubmissionResult(CancelOrderSubmissionStatus.SKIPPED_DUPLICATE)
         }
 
+        var originalSubmission: OrderIntentSubmissionDto? = null
         return try {
-            val submission = marketService.cancelOrder(command.toCancelOrderDto())
-            markOriginalOrderCancelPending(command, "cancel request accepted by broker")
+            originalSubmission = orderIntentSubmissionPort.findByExternalOrderId(command.originalBrokerOrderId)
+            val submission = marketService.cancelOrder(command.toCancelOrderDto(originalSubmission))
+            markOriginalOrderCancelPending(originalSubmission, command, "cancel request accepted by broker")
             processedEventPort.markSuccess(command.eventId)
             CancelOrderSubmissionResult(
                 status = CancelOrderSubmissionStatus.ACCEPTED,
                 brokerOrderId = submission.externalOrderId,
             )
         } catch (exception: BrokerOrderSubmissionUnknownException) {
-            markOriginalOrderCancelPending(command, exception.message)
+            markOriginalOrderCancelPending(originalSubmission, command, exception.message)
             runCatching {
-                operationalAlertPort.alertOrderCancellationSubmissionUnknown(command.toAlert(exception.message))
+                operationalAlertPort.alertOrderCancellationSubmissionUnknown(command.toAlert(exception.message, originalSubmission))
             }
             processedEventPort.markSuccess(command.eventId)
             CancelOrderSubmissionResult(
@@ -55,29 +58,32 @@ class CancelOrderSubmissionService(
             )
         } catch (exception: BrokerOrderRejectedException) {
             runCatching {
-                operationalAlertPort.alertOrderCancellationSubmissionFailed(command.toAlert(exception.message))
+                operationalAlertPort.alertOrderCancellationSubmissionFailed(command.toAlert(exception.message, originalSubmission))
             }
             processedEventPort.markSuccess(command.eventId)
             CancelOrderSubmissionResult(CancelOrderSubmissionStatus.REJECTED)
         } catch (exception: BrokerOrderTemporaryUnavailableException) {
             runCatching {
-                operationalAlertPort.alertOrderCancellationSubmissionFailed(command.toAlert(exception.message))
+                operationalAlertPort.alertOrderCancellationSubmissionFailed(command.toAlert(exception.message, originalSubmission))
             }
             processedEventPort.markFailed(command.eventId, exception.message)
             throw exception
         } catch (exception: Throwable) {
             runCatching {
-                operationalAlertPort.alertOrderCancellationSubmissionFailed(command.toAlert(exception.message))
+                operationalAlertPort.alertOrderCancellationSubmissionFailed(command.toAlert(exception.message, originalSubmission))
             }
             processedEventPort.markFailed(command.eventId, exception.message)
             throw exception
         }
     }
 
-    private fun CancelOrderSubmissionCommand.toCancelOrderDto(): CancelOrderDto {
+    private fun CancelOrderSubmissionCommand.toCancelOrderDto(
+        originalSubmission: OrderIntentSubmissionDto?,
+    ): CancelOrderDto {
         val market = symbol.toStockOrderMarket()
+        val resolvedBranchOrderNumber = branchOrderNumber ?: originalSubmission?.branchOrderNumber
         if (market == StockOrderMarket.DOMESTIC) {
-            require(!branchOrderNumber.isNullOrBlank()) {
+            require(!resolvedBranchOrderNumber.isNullOrBlank()) {
                 "domestic cancellation requires branchOrderNumber"
             }
         }
@@ -85,7 +91,7 @@ class CancelOrderSubmissionService(
             orderId = toInternalOrderId(),
             stockId = symbol,
             originalOrderId = originalBrokerOrderId,
-            branchOrderNumber = branchOrderNumber,
+            branchOrderNumber = resolvedBranchOrderNumber,
             quantity = quantity.toInt(),
             market = market,
             orderType = orderType.toStockOrderType(),
@@ -94,24 +100,28 @@ class CancelOrderSubmissionService(
         )
     }
 
-    private fun CancelOrderSubmissionCommand.toAlert(reason: String?): OrderCancellationSubmissionAlert {
+    private fun CancelOrderSubmissionCommand.toAlert(
+        reason: String?,
+        originalSubmission: OrderIntentSubmissionDto?,
+    ): OrderCancellationSubmissionAlert {
         return OrderCancellationSubmissionAlert(
             cancellationRequestId = eventId,
             idempotencyKey = idempotencyKey,
             strategyExecutionId = strategyExecutionId,
             symbol = symbol,
             originalBrokerOrderId = originalBrokerOrderId,
-            branchOrderNumber = branchOrderNumber,
+            branchOrderNumber = branchOrderNumber ?: originalSubmission?.branchOrderNumber,
             reason = reason,
             occurredAt = ZonedDateTime.now(),
         )
     }
 
     private suspend fun markOriginalOrderCancelPending(
+        original: OrderIntentSubmissionDto?,
         command: CancelOrderSubmissionCommand,
         reason: String?,
     ) {
-        val original = orderIntentSubmissionPort.findByExternalOrderId(command.originalBrokerOrderId) ?: return
+        original ?: return
         orderIntentSubmissionPort.saveCancelPending(
             original.copy(
                 statusReason = reason,

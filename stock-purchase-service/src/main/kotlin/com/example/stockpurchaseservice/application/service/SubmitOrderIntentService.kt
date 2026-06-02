@@ -140,6 +140,7 @@ class SubmitOrderIntentService(
             orderTag = command.orderTag,
             internalOrderId = orderId,
             externalOrderId = submission.externalOrderId,
+            branchOrderNumber = submission.branchOrderNumber,
             submittedAt = ZonedDateTime.now(),
             status = OrderIntentSubmissionStatusDto.SUBMITTED,
         )

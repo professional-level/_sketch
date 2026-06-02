@@ -106,6 +106,38 @@ class CancelOrderSubmissionServiceTest {
     }
 
     @Test
+    fun `uses stored branch order number for domestic cancel request`() = runBlocking {
+        val marketPort = FakeMarketServicePort()
+        val service = CancelOrderSubmissionService(
+            marketPort,
+            FakeProcessedEventPort(),
+            FakeOperationalAlertPort(),
+            FakeOrderIntentSubmissionPort(
+                originalSubmission(
+                    symbol = "005930",
+                    externalOrderId = "domestic-order-1",
+                    branchOrderNumber = "00001",
+                ),
+            ),
+        )
+
+        service.execute(
+            cancelCommand(
+                symbol = "005930",
+                originalBrokerOrderId = "domestic-order-1",
+                branchOrderNumber = null,
+                quantity = 1,
+            ),
+        )
+
+        with(marketPort.cancelOrders.single()) {
+            assertEquals(StockOrderMarket.DOMESTIC, market)
+            assertEquals("domestic-order-1", originalOrderId)
+            assertEquals("00001", branchOrderNumber)
+        }
+    }
+
+    @Test
     fun `skips duplicate cancel request`() = runBlocking {
         val marketPort = FakeMarketServicePort()
         val processedEventPort = FakeProcessedEventPort(started = false)
@@ -227,12 +259,14 @@ class CancelOrderSubmissionServiceTest {
 
     private fun originalSubmission(
         externalOrderId: String,
+        symbol: String = "TQQQ",
+        branchOrderNumber: String? = null,
     ): OrderIntentSubmissionDto {
         return OrderIntentSubmissionDto(
             orderIntentId = UUID.fromString("00000000-0000-0000-0000-000000000111"),
-            idempotencyKey = "order:TQQQ:broker-order-1",
-            strategyExecutionId = "strategy:TQQQ",
-            symbol = "TQQQ",
+            idempotencyKey = "order:$symbol:$externalOrderId",
+            strategyExecutionId = "strategy:$symbol",
+            symbol = symbol,
             side = OrderIntentSide.BUY,
             orderType = OrderIntentType.LIMIT,
             submittedPrice = 100.0,
@@ -240,6 +274,7 @@ class CancelOrderSubmissionServiceTest {
             orderTag = "FIRST_BUY",
             internalOrderId = UUID.fromString("00000000-0000-0000-0000-000000000222"),
             externalOrderId = externalOrderId,
+            branchOrderNumber = branchOrderNumber,
             submittedAt = ZonedDateTime.parse("2026-06-02T08:50:00+09:00"),
         )
     }

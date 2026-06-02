@@ -44,6 +44,7 @@ interface OverseasStockOrderPort {
 
 data class BrokerOrderSubmissionDto(
     val externalOrderId: String,
+    val branchOrderNumber: String? = null,
 )
 
 class BrokerOrderSubmissionUnknownException(

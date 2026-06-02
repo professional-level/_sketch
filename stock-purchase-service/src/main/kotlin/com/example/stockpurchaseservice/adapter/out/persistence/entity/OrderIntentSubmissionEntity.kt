@@ -48,6 +48,8 @@ internal class OrderIntentSubmissionEntity private constructor(
     val internalOrderId: UUID,
     @Column
     val externalOrderId: String?,
+    @Column
+    val branchOrderNumber: String?,
     @Column(nullable = false)
     val submittedAt: ZonedDateTime,
     @Enumerated(EnumType.STRING)
@@ -71,6 +73,7 @@ internal class OrderIntentSubmissionEntity private constructor(
             orderTag = orderTag,
             internalOrderId = internalOrderId,
             externalOrderId = externalOrderId,
+            branchOrderNumber = branchOrderNumber,
             submittedAt = submittedAt,
             status = status.toDto(),
             statusReason = statusReason,
@@ -92,6 +95,7 @@ internal class OrderIntentSubmissionEntity private constructor(
                 orderTag = dto.orderTag,
                 internalOrderId = dto.internalOrderId,
                 externalOrderId = dto.externalOrderId,
+                branchOrderNumber = dto.branchOrderNumber,
                 submittedAt = dto.submittedAt,
                 status = OrderIntentSubmissionStatus.from(dto.status),
                 statusReason = dto.statusReason?.take(1000),

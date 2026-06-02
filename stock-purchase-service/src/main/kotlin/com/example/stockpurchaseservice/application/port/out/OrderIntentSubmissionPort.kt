@@ -28,6 +28,7 @@ data class OrderIntentSubmissionDto(
     val orderTag: String,
     val internalOrderId: UUID,
     val externalOrderId: String?,
+    val branchOrderNumber: String? = null,
     val submittedAt: ZonedDateTime,
     val status: OrderIntentSubmissionStatusDto = OrderIntentSubmissionStatusDto.SUBMITTED,
     val statusReason: String? = null,

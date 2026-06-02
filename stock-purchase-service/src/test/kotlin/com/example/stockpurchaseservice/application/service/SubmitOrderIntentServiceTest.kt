@@ -76,6 +76,7 @@ class SubmitOrderIntentServiceTest {
         assertEquals(OrderIntentSubmissionStatus.SUBMITTED, result.status)
         assertEquals(eventId, processedEventPort.succeeded.single())
         assertEquals(eventId, submissionPort.saved.single().orderIntentId)
+        assertEquals("branch-buy-1", submissionPort.saved.single().branchOrderNumber)
         assertEquals("broker-buy-1", eventPort.submitted.single().brokerOrderId)
         with(marketPort.buyOrders.single()) {
             assertEquals("TQQQ", stockId)
@@ -376,12 +377,18 @@ class SubmitOrderIntentServiceTest {
         override fun buyStock(order: PurchaseOrderDto): BrokerOrderSubmissionDto {
             buyFailure?.let { throw it }
             buyOrders += order
-            return BrokerOrderSubmissionDto(externalOrderId = "broker-buy-${buyOrders.size}")
+            return BrokerOrderSubmissionDto(
+                externalOrderId = "broker-buy-${buyOrders.size}",
+                branchOrderNumber = "branch-buy-${buyOrders.size}",
+            )
         }
 
         override fun sellStock(order: SellingOrderDto): BrokerOrderSubmissionDto {
             sellOrders += order
-            return BrokerOrderSubmissionDto(externalOrderId = "broker-sell-${sellOrders.size}")
+            return BrokerOrderSubmissionDto(
+                externalOrderId = "broker-sell-${sellOrders.size}",
+                branchOrderNumber = "branch-sell-${sellOrders.size}",
+            )
         }
 
         override fun findExecutionListAtOneDay(): List<ExecutedStockDto> {

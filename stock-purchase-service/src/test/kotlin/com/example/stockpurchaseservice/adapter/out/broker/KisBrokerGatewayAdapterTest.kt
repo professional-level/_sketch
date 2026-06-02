@@ -1254,6 +1254,46 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `maps submitted stock order response branch order number`() {
+        val exchangeFunction = ResponseExchangeFunction(
+            responses = listOf(
+                protobufResponse(
+                    ApiResponse.StockOrder.newBuilder()
+                        .setRtCd("0")
+                        .setOutput(
+                            ApiResponse.Output.newBuilder()
+                                .setKRXFWDGORDORGNO("00001")
+                                .setODNO("domestic-order-1")
+                                .build(),
+                        )
+                        .build(),
+                ),
+            ),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        val submission = adapter.submitOrder(
+            BrokerOrderCommand(
+                internalOrderId = UUID.randomUUID(),
+                market = StockOrderMarket.DOMESTIC,
+                side = OrderIntentSide.BUY,
+                symbol = "005930",
+                orderType = StockOrderType.LIMIT,
+                price = 70_000.0,
+                quantity = 1,
+                isMock = false,
+            ),
+        )
+
+        assertEquals("domestic-order-1", submission.externalOrderId)
+        assertEquals("00001", submission.branchOrderNumber)
+    }
+
+    @Test
     fun `domestic cancel checks cancelable order before submitting cancel request`() {
         val exchangeFunction = ResponseExchangeFunction(
             responses = listOf(

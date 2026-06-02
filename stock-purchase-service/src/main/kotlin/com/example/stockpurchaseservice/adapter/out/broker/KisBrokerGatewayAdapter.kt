@@ -812,7 +812,10 @@ private fun WebClient.submitStockOrder(
         ?: throw BrokerOrderSubmissionUnknownException(
             message = "stock order accepted but broker order id is missing",
         )
-    return BrokerOrderSubmissionDto(externalOrderId = externalOrderId)
+    return BrokerOrderSubmissionDto(
+        externalOrderId = externalOrderId,
+        branchOrderNumber = order.output.getKRXFWDGORDORGNO().takeIf { it.isNotBlank() },
+    )
 }
 
 internal fun parseKisOrderDateTime(date: String, time: String): ZonedDateTime {
