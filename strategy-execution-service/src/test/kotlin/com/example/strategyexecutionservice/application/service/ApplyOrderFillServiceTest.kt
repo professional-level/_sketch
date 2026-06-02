@@ -8,12 +8,14 @@ import com.example.strategyexecutionservice.application.port.out.LaorV4Execution
 import com.example.strategyexecutionservice.application.port.out.MarketDataPort
 import com.example.strategyexecutionservice.application.port.out.OrderIntentMessage
 import com.example.strategyexecutionservice.application.port.out.OrderIntentPort
+import com.example.strategyexecutionservice.application.port.out.OrderTradingEnvironment
 import com.example.strategyexecutionservice.application.port.out.StrategyExecutionOrderEventPort
 import com.example.strategyexecutionservice.application.port.out.StrategyExecutionOrderEventRecord
 import com.example.strategyexecutionservice.application.port.out.StrategyExecutionOrderEventType
 import com.example.strategyexecutionservice.application.port.out.StrategyExecutionLifecycleStatus
 import com.example.strategyexecutionservice.application.port.out.StrategyExecutionStatePort
 import com.example.strategyexecutionservice.application.port.out.StrategyMarketDataSnapshot
+import com.example.strategyexecutionservice.config.orderintent.OrderIntentProperties
 import com.example.strategyexecutionservice.domain.strategy.execution.OrderSide
 import com.example.strategyexecutionservice.domain.strategy.execution.OrderType
 import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategyState
@@ -254,6 +256,11 @@ class ApplyOrderFillServiceTest {
             FakeMarketDataPort(),
             orderEventPort,
             orderIntentPort,
+            tradingEnvironmentResolver = OrderIntentTradingEnvironmentResolver(
+                OrderIntentProperties().apply {
+                    strategyTradingEnvironments["FinalPriceBatingV1"] = OrderTradingEnvironment.LIVE
+                },
+            ),
         )
 
         val result = service.execute(
@@ -289,6 +296,7 @@ class ApplyOrderFillServiceTest {
             assertEquals(73_130.0, price)
             assertEquals(2L, quantity)
             assertEquals("FINAL_PRICE_BATING_V1_SELL", orderTag)
+            assertEquals(OrderTradingEnvironment.LIVE, tradingEnvironment)
         }
     }
 
