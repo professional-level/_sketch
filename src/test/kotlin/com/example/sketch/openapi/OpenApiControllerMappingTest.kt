@@ -53,6 +53,56 @@ class OpenApiControllerMappingTest {
     }
 
     @Test
+    fun `maps uppercase kis stock order response aliases`() {
+        val response = ParseJsonResponse.parseJsonString(
+            """
+            {
+              "RT_CD": "0",
+              "MSG_CD": "MCA00000",
+              "MSG1": "accepted",
+              "OUTPUT": {
+                "ORD_GNO_BRNO": "00002",
+                "ORD_NO": "domestic-order-2",
+                "THCO_ORD_TMD": "101500"
+              }
+            }
+            """.trimIndent(),
+        ).toPostStockOrderResponse()
+
+        assertEquals("0", response.rtCd)
+        assertEquals("MCA00000", response.msgCd)
+        assertEquals("accepted", response.msg1)
+        assertEquals("00002", response.output.getKRXFWDGORDORGNO())
+        assertEquals("domestic-order-2", response.output.getODNO())
+        assertEquals("101500", response.output.getORDTMD())
+    }
+
+    @Test
+    fun `maps alternate nested stock order output aliases`() {
+        val response = ParseJsonResponse.parseJsonString(
+            """
+            {
+              "rtCd": "0",
+              "msgCd": "APBK002",
+              "msg1": "accepted",
+              "output1": {
+                "krxFwdgOrdOrgno": "00003",
+                "order_no": "domestic-order-3",
+                "ordTmd": "102000"
+              }
+            }
+            """.trimIndent(),
+        ).toPostStockOrderResponse()
+
+        assertEquals("0", response.rtCd)
+        assertEquals("APBK002", response.msgCd)
+        assertEquals("accepted", response.msg1)
+        assertEquals("00003", response.output.getKRXFWDGORDORGNO())
+        assertEquals("domestic-order-3", response.output.getODNO())
+        assertEquals("102000", response.output.getORDTMD())
+    }
+
+    @Test
     fun `maps standard kis domestic daily execution order response`() {
         val response = ParseJsonResponse.parseJsonString(
             """

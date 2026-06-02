@@ -233,16 +233,22 @@ class OpenApiController(
 // TODO: 해당 to~로직을 다른 interface로 변경
 internal fun OpenApiResponse.toPostStockOrderResponse(): ApiResponse.StockOrder {
     val responseNode = normalizedKisResponseNode() ?: return stockOrder {}
-    val outputNode = responseNode.path("output").takeIf { !it.isMissingNode && !it.isNull } ?: responseNode
+    val outputNode = responseNode.objectNode("output", "OUTPUT", "output1", "OUTPUT1") ?: responseNode
 
     return stockOrder {
-        rtCd = responseNode.text("rt_cd", "rtCd")
-        msgCd = responseNode.text("msg_cd", "msgCd")
-        msg1 = responseNode.text("msg1", "msg_1")
+        rtCd = responseNode.text("rt_cd", "rtCd", "RT_CD")
+        msgCd = responseNode.text("msg_cd", "msgCd", "MSG_CD")
+        msg1 = responseNode.text("msg1", "msg_1", "MSG1")
         output = output {
-            kRXFWDGORDORGNO = outputNode.text("KRX_FWDG_ORD_ORGNO", "krx_fwdg_ord_orgno")
-            oDNO = outputNode.text("ODNO", "odno")
-            oRDTMD = outputNode.text("ORD_TMD", "ord_tmd")
+            kRXFWDGORDORGNO = outputNode.text(
+                "KRX_FWDG_ORD_ORGNO",
+                "krx_fwdg_ord_orgno",
+                "krxFwdgOrdOrgno",
+                "ORD_GNO_BRNO",
+                "ord_gno_brno",
+            )
+            oDNO = outputNode.text("ODNO", "odno", "ORD_NO", "ord_no", "order_no")
+            oRDTMD = outputNode.text("ORD_TMD", "ord_tmd", "ordTmd", "THCO_ORD_TMD", "thco_ord_tmd")
         }
     }
 }
