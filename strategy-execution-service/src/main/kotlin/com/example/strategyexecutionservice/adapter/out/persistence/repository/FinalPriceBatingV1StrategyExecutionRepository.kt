@@ -5,6 +5,7 @@ import com.example.strategyexecutionservice.adapter.out.persistence.entity.Final
 import common.AbstractReactiveRepository
 import io.smallrye.mutiny.coroutines.awaitSuspending
 import jakarta.enterprise.context.ApplicationScoped
+import jakarta.persistence.Tuple
 import org.springframework.stereotype.Repository
 
 @ApplicationScoped
@@ -21,6 +22,24 @@ internal class FinalPriceBatingV1StrategyExecutionRepository :
                 .setParameter("status", FinalPriceBatingV1StrategyExecutionStatus.ACTIVE)
                 .resultList
         }.awaitSuspending()
+    }
+
+    suspend fun countByStatus(): Map<FinalPriceBatingV1StrategyExecutionStatus, Long> {
+        val rows = sessionFactory.withSession { session ->
+            session.createQuery(
+                """
+                SELECT e.status, COUNT(e)
+                FROM FinalPriceBatingV1StrategyExecutionEntity e
+                GROUP BY e.status
+                """.trimIndent(),
+                Tuple::class.java,
+            ).resultList
+        }.awaitSuspending()
+
+        return rows.associate { tuple ->
+            tuple.get(0, FinalPriceBatingV1StrategyExecutionStatus::class.java) to
+                tuple.get(1, java.lang.Number::class.java).longValue()
+        }
     }
 
     suspend fun upsert(entity: FinalPriceBatingV1StrategyExecutionEntity) {

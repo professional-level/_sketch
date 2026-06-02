@@ -359,6 +359,14 @@ GET /strategy-executions/final-price-bating-v1/{executionId}
 
 The Laor V4 responses include current progress round/T, available cash, holding quantity, average purchase price, realized P/L, cycle, mode, and last execution run metadata. The final-price bating responses include buy/sell filled quantities, remaining quantities, average fill prices, current cash, current holding quantity, current average price, and lifecycle timestamps.
 
+It also exposes an operator status endpoint for outbox and strategy lifecycle polling:
+
+```text
+GET /operations/strategy-execution/status
+```
+
+The response includes order-intent outbox publisher counts, processed start-request count, strategy order event counts by type, and active/completed counts for Laor V4 and final-price bating strategy executions.
+
 ## DB Schema Migration
 
 Local sketch profiles currently use Hibernate `ddl-auto=update`, but production-like environments should not rely on automatic DDL. The root KIS wrapper, `stock-purchase-service`, and `strategy-execution-service` now fail startup under production-like profiles unless `spring.jpa.hibernate.ddl-auto` is empty, `none`, or `validate`. Use `docs/operations/sql/MIGRATION_MANIFEST.md` as the full ordered manifest, including KIS token persistence tables. Before deploying the Kafka outbox persistence, trace propagation, retry scheduling, KIS branch-order persistence, and final-price lifecycle persistence build, apply:

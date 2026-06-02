@@ -6,6 +6,7 @@ import common.AbstractReactiveRepository
 import io.smallrye.mutiny.Uni
 import io.smallrye.mutiny.coroutines.awaitSuspending
 import jakarta.enterprise.context.ApplicationScoped
+import jakarta.persistence.Tuple
 import org.springframework.stereotype.Repository
 import java.time.ZonedDateTime
 import java.util.UUID
@@ -15,6 +16,24 @@ import java.util.UUID
 internal class OrderIntentOutboxEventRepository : AbstractReactiveRepository<OrderIntentOutboxEventEntity, UUID>() {
     suspend fun exists(id: UUID): Boolean {
         return findById(id).awaitSuspending() != null
+    }
+
+    suspend fun countByStatus(): Map<OrderIntentOutboxEventStatus, Long> {
+        val rows = sessionFactory.withSession { session ->
+            session.createQuery(
+                """
+                SELECT e.status, COUNT(e)
+                FROM OrderIntentOutboxEventEntity e
+                GROUP BY e.status
+                """.trimIndent(),
+                Tuple::class.java,
+            ).resultList
+        }.awaitSuspending()
+
+        return rows.associate { tuple ->
+            tuple.get(0, OrderIntentOutboxEventStatus::class.java) to
+                tuple.get(1, java.lang.Number::class.java).longValue()
+        }
     }
 
     suspend fun claimPublishable(

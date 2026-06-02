@@ -14,4 +14,13 @@ internal class StrategyExecutionStartRequestRepository :
     suspend fun existsByIdempotencyKey(idempotencyKey: String): Boolean {
         return findById(idempotencyKey).awaitSuspending() != null
     }
+
+    suspend fun countAll(): Long {
+        return sessionFactory.withSession { session ->
+            session.createQuery(
+                "SELECT COUNT(e) FROM StrategyExecutionStartRequestEntity e",
+                java.lang.Number::class.java,
+            ).singleResult
+        }.awaitSuspending().longValue()
+    }
 }

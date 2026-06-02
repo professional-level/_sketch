@@ -5,6 +5,7 @@ import com.example.strategyexecutionservice.adapter.out.persistence.entity.LaorV
 import common.AbstractReactiveRepository
 import io.smallrye.mutiny.coroutines.awaitSuspending
 import jakarta.enterprise.context.ApplicationScoped
+import jakarta.persistence.Tuple
 import org.springframework.stereotype.Repository
 
 @ApplicationScoped
@@ -21,6 +22,24 @@ internal class LaorV4StrategyExecutionRepository :
                 .setParameter("status", LaorV4StrategyExecutionStatus.ACTIVE)
                 .resultList
         }.awaitSuspending()
+    }
+
+    suspend fun countByStatus(): Map<LaorV4StrategyExecutionStatus, Long> {
+        val rows = sessionFactory.withSession { session ->
+            session.createQuery(
+                """
+                SELECT e.status, COUNT(e)
+                FROM LaorV4StrategyExecutionEntity e
+                GROUP BY e.status
+                """.trimIndent(),
+                Tuple::class.java,
+            ).resultList
+        }.awaitSuspending()
+
+        return rows.associate { tuple ->
+            tuple.get(0, LaorV4StrategyExecutionStatus::class.java) to
+                tuple.get(1, java.lang.Number::class.java).longValue()
+        }
     }
 
     suspend fun upsert(entity: LaorV4StrategyExecutionEntity) {
