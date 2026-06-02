@@ -193,7 +193,7 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
-    fun `overseas cancel checks order history before submitting cancel request`() {
+    fun `overseas cancel checks unfilled orders before submitting cancel request`() {
         val exchangeFunction = ResponseExchangeFunction(
             responses = listOf(
                 jsonResponse(
@@ -251,14 +251,14 @@ class KisBrokerGatewayAdapterTest {
 
         assertEquals("overseas-cancel-1", submission.externalOrderId)
         assertEquals(2, exchangeFunction.requests.size)
-        assertEquals("/open-api/overseas/trading/inquire-ccnl", exchangeFunction.requests[0].url().path)
-        assertEquals("TQQQ", exchangeFunction.requests[0].queryValue("pdno"))
-        assertEquals("", exchangeFunction.requests[0].queryValue("odno"))
+        assertEquals("/open-api/overseas/trading/inquire-nccs", exchangeFunction.requests[0].url().path)
+        assertEquals("NASD", exchangeFunction.requests[0].queryValue("ovrsExcgCd"))
+        assertEquals("DS", exchangeFunction.requests[0].queryValue("sortSqn"))
         assertEquals("/open-api/overseas/trading/order-rvsecncl", exchangeFunction.requests[1].url().path)
     }
 
     @Test
-    fun `overseas cancel matches order history by original broker order id`() {
+    fun `overseas cancel matches unfilled order by original broker order id`() {
         val exchangeFunction = ResponseExchangeFunction(
             responses = listOf(
                 jsonResponse(
@@ -317,7 +317,7 @@ class KisBrokerGatewayAdapterTest {
 
         assertEquals("overseas-cancel-1", submission.externalOrderId)
         assertEquals(2, exchangeFunction.requests.size)
-        assertEquals("/open-api/overseas/trading/inquire-ccnl", exchangeFunction.requests[0].url().path)
+        assertEquals("/open-api/overseas/trading/inquire-nccs", exchangeFunction.requests[0].url().path)
         assertEquals("/open-api/overseas/trading/order-rvsecncl", exchangeFunction.requests[1].url().path)
     }
 
@@ -395,7 +395,80 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
-    fun `overseas cancel rejects when explicit branch order number does not match history`() {
+    fun `overseas unfilled lookup maps uppercase aliases and cursor pagination`() {
+        val exchangeFunction = ResponseExchangeFunction(
+            responses = listOf(
+                jsonResponse(
+                    """
+                    {
+                      "RT_CD": "0",
+                      "CTX_AREA_FK200": "FK1",
+                      "CTX_AREA_NK200": "NK1",
+                      "OUTPUT": []
+                    }
+                    """.trimIndent(),
+                ),
+                jsonResponse(
+                    """
+                    {
+                      "RT_CD": "0",
+                      "CTX_AREA_FK200": "",
+                      "CTX_AREA_NK200": "",
+                      "OUTPUT": [
+                        {
+                          "ODNO": "overseas-order-1",
+                          "ORD_GNO_BRNO": "00001",
+                          "OVRS_PDNO": "TQQQ",
+                          "NCCS_QTY": "2"
+                        }
+                      ]
+                    }
+                    """.trimIndent(),
+                ),
+                protobufResponse(
+                    ApiResponse.StockOrder.newBuilder()
+                        .setRtCd("0")
+                        .setOutput(
+                            ApiResponse.Output.newBuilder()
+                                .setODNO("overseas-cancel-1")
+                                .build(),
+                        )
+                        .build(),
+                ),
+            ),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        val submission = adapter.cancelOrder(
+            brokerCancelCommand(
+                market = StockOrderMarket.OVERSEAS_US,
+                symbol = "TQQQ",
+                originalOrderId = "overseas-order-1",
+                branchOrderNumber = "00001",
+                price = 112.5,
+                quantity = 2,
+                orderType = StockOrderType.LOC,
+                isMock = false,
+            ),
+        )
+
+        assertEquals("overseas-cancel-1", submission.externalOrderId)
+        assertEquals(3, exchangeFunction.requests.size)
+        assertEquals("/open-api/overseas/trading/inquire-nccs", exchangeFunction.requests[0].url().path)
+        assertEquals("", exchangeFunction.requests[0].queryValue("ctxAreaFk200"))
+        assertEquals("", exchangeFunction.requests[0].queryValue("ctxAreaNk200"))
+        assertEquals("/open-api/overseas/trading/inquire-nccs", exchangeFunction.requests[1].url().path)
+        assertEquals("FK1", exchangeFunction.requests[1].queryValue("ctxAreaFk200"))
+        assertEquals("NK1", exchangeFunction.requests[1].queryValue("ctxAreaNk200"))
+        assertEquals("/open-api/overseas/trading/order-rvsecncl", exchangeFunction.requests[2].url().path)
+    }
+
+    @Test
+    fun `overseas cancel rejects when explicit branch order number does not match unfilled order`() {
         val exchangeFunction = ResponseExchangeFunction(
             responses = listOf(
                 jsonResponse(
@@ -448,7 +521,7 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
-    fun `overseas cancel rejects when order is not found in history`() {
+    fun `overseas cancel rejects when order is not found in unfilled orders`() {
         val exchangeFunction = ResponseExchangeFunction(
             responses = listOf(
                 jsonResponse(

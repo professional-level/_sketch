@@ -76,6 +76,19 @@ data class GetOverseasExecutionOrdersRequest(
     val ctxAreaFk200: String = "",
 )
 
+data class GetOverseasUnfilledOrdersRequest(
+    val isMock: Boolean = true,
+    val ovrsExcgCd: String = "NASD",
+    val sortSqn: String = "DS",
+    val ctxAreaFk200: String = "",
+    val ctxAreaNk200: String = "",
+) {
+    init {
+        require(ovrsExcgCd.isNotBlank()) { "ovrsExcgCd must not be blank" }
+        require(sortSqn.isNotBlank()) { "sortSqn must not be blank" }
+    }
+}
+
 data class GetOverseasStockBalanceRequest(
     val isMock: Boolean = true,
     val ovrsExcgCd: String = "NASD",

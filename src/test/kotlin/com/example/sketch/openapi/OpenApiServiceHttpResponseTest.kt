@@ -276,6 +276,32 @@ class OpenApiServiceHttpResponseTest {
     }
 
     @Test
+    fun `sends official tr id and query fields for mock overseas unfilled orders`() = runTest {
+        val exchangeFunction = SingleResponseExchangeFunction.success()
+        val service = openApiService(exchangeFunction)
+
+        service.getOverseasUnfilledOrders(
+            GetOverseasUnfilledOrdersRequest(
+                ovrsExcgCd = "NASD",
+                sortSqn = "DS",
+                ctxAreaFk200 = "FK1",
+                ctxAreaNk200 = "NK1",
+                isMock = true,
+            ),
+        )
+
+        with(exchangeFunction.requests.single()) {
+            assertEquals("/uapi/overseas-stock/v1/trading/inquire-nccs", url().path)
+            assertEquals("VTTS3018R", headers().getFirst("tr_id"))
+            assertEquals("NASD", url().queryValue("OVRS_EXCG_CD"))
+            assertEquals("DS", url().queryValue("SORT_SQN"))
+            assertEquals("FK1", url().queryValue("CTX_AREA_FK200"))
+            assertEquals("NK1", url().queryValue("CTX_AREA_NK200"))
+            assertFalse(url().rawQuery.orEmpty().contains("%22%22"))
+        }
+    }
+
+    @Test
     fun `sends official chart price query and normalizes overseas fx rate`() = runTest {
         val exchangeFunction = SingleResponseExchangeFunction(
             status = HttpStatus.OK,

@@ -72,6 +72,10 @@ enum class RequestType(
         requestURI = "/uapi/overseas-stock/v1/trading/order-rvsecncl",
         type = HttpMethod.POST,
     ),
+    GET_OVERSEAS_STOCK_ORDER_UNFILLED(
+        requestURI = "/uapi/overseas-stock/v1/trading/inquire-nccs",
+        type = HttpMethod.GET,
+    ),
     GET_OVERSEAS_STOCK_BALANCE(
         requestURI = "/uapi/overseas-stock/v1/trading/inquire-balance",
         type = HttpMethod.GET,
@@ -253,6 +257,10 @@ enum class QueryParameter(
                 )
                 RequestType.POST_OVERSEAS_STOCK_ORDER -> emptyList()
                 RequestType.POST_OVERSEAS_STOCK_ORDER_CANCEL -> emptyList()
+                RequestType.GET_OVERSEAS_STOCK_ORDER_UNFILLED -> listOf(
+                    CANO, ACNT_PRDT_CD, OVRS_EXCG_CD, SORT_SQN,
+                    CTX_AREA_FK200, CTX_AREA_NK200,
+                )
                 RequestType.GET_OVERSEAS_STOCK_BALANCE -> listOf(
                     CANO, ACNT_PRDT_CD, OVRS_EXCG_CD, TR_CRCY_CD,
                     CTX_AREA_FK200, CTX_AREA_NK200,

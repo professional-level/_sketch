@@ -570,6 +570,34 @@ class OpenApiService(
         )
     }
 
+    suspend fun getOverseasUnfilledOrders(request: GetOverseasUnfilledOrdersRequest): OpenApiResponse {
+        val token = getToken(isMock = request.isMock)
+        val info = RequestType.GET_OVERSEAS_STOCK_ORDER_UNFILLED
+        val headers = build(token = token, trId = if (request.isMock) "VTTS3018R" else "TTTS3018R")
+            .addHeader(HeaderBuilder.HeaderKey.CUSTOMER_TYPE, "P")
+            .build()
+            .withMockCredentialIfNeeded(request.isMock)
+        val (cano, acntPrdtCd) = stockAccount(request.isMock)
+        val queryParameters = QueryParameter.forType(
+            info,
+            mapOf(
+                CANO to cano,
+                QueryParameter.ACNT_PRDT_CD to acntPrdtCd,
+                QueryParameter.OVRS_EXCG_CD to request.ovrsExcgCd.uppercase(),
+                QueryParameter.SORT_SQN to request.sortSqn,
+                QueryParameter.CTX_AREA_FK200 to request.ctxAreaFk200,
+                QueryParameter.CTX_AREA_NK200 to request.ctxAreaNk200,
+            ),
+        )
+
+        return executeHttpRequest(
+            info = info,
+            headers = headers,
+            queryParameters = queryParameters,
+            isMockApi = request.isMock,
+        )
+    }
+
     suspend fun getOverseasStockBalance(request: GetOverseasStockBalanceRequest): OpenApiResponse {
         val token = getToken(isMock = request.isMock)
         val info = RequestType.GET_OVERSEAS_STOCK_BALANCE
