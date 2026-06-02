@@ -894,85 +894,151 @@ private fun DailyExecutionOrdersResponseOuterClass.DailyExecutionOrdersOutput1.t
 }
 
 private fun JsonNode.toBrokerHistoryItem(): BrokerOrderHistoryItem? {
-    val orderId = textOrNull("odno", "ODNO", "ord_no", "ORD_NO", "order_no", "ORDER_NO") ?: ""
+    val orderId = textOrNull(
+        "odno",
+        "ODNO",
+        "ordNo",
+        "ord_no",
+        "ORD_NO",
+        "orderNo",
+        "order_no",
+        "ORDER_NO",
+    ) ?: ""
     if (orderId.isBlank()) return null
-    val orderedQuantity = longValue("ft_ord_qty", "FT_ORD_QTY", "ord_qty", "ORD_QTY")
+    val orderedQuantity = longValue(
+        "ft_ord_qty",
+        "ftOrdQty",
+        "FT_ORD_QTY",
+        "ord_qty",
+        "ordQty",
+        "ORD_QTY",
+    )
     val orderedPrice = textOrNull(
         "ft_ord_unpr",
+        "ftOrdUnpr",
         "FT_ORD_UNPR",
         "ft_ord_unpr3",
+        "ftOrdUnpr3",
         "FT_ORD_UNPR3",
         "ord_unpr",
+        "ordUnpr",
         "ORD_UNPR",
         "ord_unpr3",
+        "ordUnpr3",
         "ORD_UNPR3",
         "ovrs_ord_unpr",
+        "ovrsOrdUnpr",
         "OVRS_ORD_UNPR",
         "ovrs_ord_unpr3",
+        "ovrsOrdUnpr3",
         "OVRS_ORD_UNPR3",
     ).toDoubleValue()
     val filledQuantity = longValue(
         "ft_ccld_qty",
+        "ftCcldQty",
         "FT_CCLD_QTY",
         "tot_ccld_qty",
+        "totCcldQty",
         "TOT_CCLD_QTY",
         "ccld_qty",
+        "ccldQty",
         "CCLD_QTY",
     )
-    val remainingQuantity = longValue("nccs_qty", "NCCS_QTY", "rmn_qty", "RMN_QTY")
-    val statusName = textOrNull("prcs_stat_name", "PRCS_STAT_NAME", "ord_stat_name", "ORD_STAT_NAME")
+    val remainingQuantity = longValue("nccs_qty", "nccsQty", "NCCS_QTY", "rmn_qty", "rmnQty", "RMN_QTY")
+    val statusName = textOrNull(
+        "prcs_stat_name",
+        "prcsStatName",
+        "PRCS_STAT_NAME",
+        "ord_stat_name",
+        "ordStatName",
+        "ORD_STAT_NAME",
+    )
     val revisionCancelCode = textOrNull(
         "rvse_cncl_dvsn",
+        "rvseCnclDvsn",
         "RVSE_CNCL_DVSN",
         "rvse_cncl_dvsn_cd",
+        "rvseCnclDvsnCd",
         "RVSE_CNCL_DVSN_CD",
     )
     val revisionCancelName = textOrNull(
         "rvse_cncl_dvsn_name",
+        "rvseCnclDvsnName",
         "RVSE_CNCL_DVSN_NAME",
         "cncl_dvsn_name",
+        "cnclDvsnName",
         "CNCL_DVSN_NAME",
     )
     val statusMessage = joinedText(statusName, revisionCancelName)
     val rejectionReason = joinedText(
-        textOrNull("rjct_rson", "RJCT_RSON"),
-        textOrNull("rjct_rson_name", "RJCT_RSON_NAME"),
-        textOrNull("rjct_rson_cn", "RJCT_RSON_CN"),
-        textOrNull("rjct_rson_cd", "RJCT_RSON_CD"),
-        textOrNull("rjct_rson_cd_name", "RJCT_RSON_CD_NAME"),
+        textOrNull("rjct_rson", "rjctRson", "RJCT_RSON"),
+        textOrNull("rjct_rson_name", "rjctRsonName", "RJCT_RSON_NAME"),
+        textOrNull("rjct_rson_cn", "rjctRsonCn", "RJCT_RSON_CN"),
+        textOrNull("rjct_rson_cd", "rjctRsonCd", "RJCT_RSON_CD"),
+        textOrNull("rjct_rson_cd_name", "rjctRsonCdName", "RJCT_RSON_CD_NAME"),
     )
-    val cancelled = statusMessage?.contains(CANCELLED_KOREAN) == true || revisionCancelCode == KIS_CANCEL_REVISION_CODE
-    val explicitCancelledQuantity = longValue("cncl_cfrm_qty", "CNCL_CFRM_QTY", "cncl_qty", "CNCL_QTY")
-    val explicitRejectedQuantity = longValue("rjct_qty", "RJCT_QTY", "rjct_cfrm_qty", "RJCT_CFRM_QTY")
+    val cancelled = statusMessage?.contains(CANCELLED_KOREAN) == true ||
+        revisionCancelCode == KIS_CANCEL_REVISION_CODE ||
+        textOrNull("cncl_yn", "cnclYn", "CNCL_YN").equals("Y", ignoreCase = true)
+    val explicitCancelledQuantity = longValue(
+        "cncl_cfrm_qty",
+        "cnclCfrmQty",
+        "CNCL_CFRM_QTY",
+        "cncl_qty",
+        "cnclQty",
+        "CNCL_QTY",
+    )
+    val explicitRejectedQuantity = longValue(
+        "rjct_qty",
+        "rjctQty",
+        "RJCT_QTY",
+        "rjct_cfrm_qty",
+        "rjctCfrmQty",
+        "RJCT_CFRM_QTY",
+    )
     return BrokerOrderHistoryItem(
         externalOrderId = orderId,
         externalExecutionId = textOrNull(
             "ccld_no",
+            "ccldNo",
             "CCLD_NO",
             "ft_ccld_no",
+            "ftCcldNo",
             "FT_CCLD_NO",
             "ovrs_ccld_no",
+            "ovrsCcldNo",
             "OVRS_CCLD_NO",
             "exec_no",
+            "execNo",
             "EXEC_NO",
             "execution_no",
+            "executionNo",
             "EXECUTION_NO",
             "cntr_no",
+            "cntrNo",
             "CNTR_NO",
         ),
-        originalOrderId = textOrNull("orgn_odno", "ORGN_ODNO"),
+        originalOrderId = textOrNull("orgn_odno", "orgnOdno", "ORGN_ODNO"),
         branchOrderNumber = textOrNull(
             "ord_gno_brno",
+            "ordGnoBrno",
             "ORD_GNO_BRNO",
             "krx_fwdg_ord_orgno",
             "KRX_FWDG_ORD_ORGNO",
             "krxFwdgOrdOrgno",
         ),
-        symbol = textOrNull("pdno", "PDNO", "ovrs_pdno", "OVRS_PDNO").orEmpty(),
-        stockName = textOrNull("prdt_name", "PRDT_NAME", "prdt_eng_name", "PRDT_ENG_NAME").orEmpty(),
+        symbol = textOrNull("pdno", "PDNO", "ovrs_pdno", "ovrsPdno", "OVRS_PDNO").orEmpty(),
+        stockName = textOrNull(
+            "prdt_name",
+            "prdtName",
+            "PRDT_NAME",
+            "prdt_eng_name",
+            "prdtEngName",
+            "PRDT_ENG_NAME",
+        ).orEmpty(),
         orderedAt = parseKisOrderDateTime(
-            textOrNull("ord_dt", "ORD_DT", "dmst_ord_dt", "DMST_ORD_DT").orEmpty(),
-            textOrNull("ord_tmd", "ORD_TMD", "thco_ord_tmd", "THCO_ORD_TMD").orEmpty(),
+            textOrNull("ord_dt", "ordDt", "ORD_DT", "dmst_ord_dt", "dmstOrdDt", "DMST_ORD_DT").orEmpty(),
+            textOrNull("ord_tmd", "ordTmd", "ORD_TMD", "thco_ord_tmd", "thcoOrdTmd", "THCO_ORD_TMD").orEmpty(),
         ),
         orderedQuantity = orderedQuantity,
         orderedPrice = orderedPrice,
@@ -983,25 +1049,34 @@ private fun JsonNode.toBrokerHistoryItem(): BrokerOrderHistoryItem? {
         cancelled = cancelled,
         side = textOrNull(
             "sll_buy_dvsn_cd",
+            "sllBuyDvsnCd",
             "SLL_BUY_DVSN_CD",
             "sll_buy_dvsn_cd_name",
+            "sllBuyDvsnCdName",
             "SLL_BUY_DVSN_CD_NAME",
             "sll_buy_dvsn_name",
+            "sllBuyDvsnName",
             "SLL_BUY_DVSN_NAME",
         )
             .toOrderIntentSide(),
         averageExecutionPrice = textOrNull(
             "ft_ccld_unpr",
+            "ftCcldUnpr",
             "FT_CCLD_UNPR",
             "ft_ccld_unpr3",
+            "ftCcldUnpr3",
             "FT_CCLD_UNPR3",
             "ccld_unpr",
+            "ccldUnpr",
             "CCLD_UNPR",
             "ovrs_ccld_unpr",
+            "ovrsCcldUnpr",
             "OVRS_CCLD_UNPR",
             "avg_prvs",
+            "avgPrvs",
             "AVG_PRVS",
             "avg_ccld_pric",
+            "avgCcldPric",
             "AVG_CCLD_PRIC",
         ).toDoubleValue(),
         statusMessage = statusMessage,

@@ -1698,6 +1698,100 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `maps overseas camel case history aliases as cumulative execution`() {
+        val adapter = overseasHistoryAdapter(
+            """
+            {
+              "rtCd": "0",
+              "ctxAreaFk200": "",
+              "ctxAreaNk200": "",
+              "output": [
+                {
+                  "ordNo": "camel-order",
+                  "orgnOdno": "original-camel-order",
+                  "ordGnoBrno": "00003",
+                  "ovrsPdno": "TQQQ",
+                  "prdtEngName": "ProShares UltraPro QQQ",
+                  "ordDt": "20260602",
+                  "thcoOrdTmd": "093500",
+                  "ftOrdQty": "4",
+                  "ftOrdUnpr3": "113.75",
+                  "ftCcldNo": "camel-fill-1",
+                  "totCcldQty": "2",
+                  "rmnQty": "2",
+                  "sllBuyDvsnCdName": "BUY",
+                  "avgPrvs": "113.75"
+                }
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        val item = adapter.findOrderHistory(historyQuery()).single()
+        val status = item.toStatus()
+        val execution = item.toExecutionDto()
+
+        assertEquals("camel-order", item.externalOrderId)
+        assertEquals("original-camel-order", item.originalOrderId)
+        assertEquals("00003", item.branchOrderNumber)
+        assertEquals(4, item.orderedQuantity)
+        assertEquals(113.75, item.orderedPrice)
+        assertEquals(2, item.cumulativeFilledQuantity)
+        assertEquals(2, item.remainingQuantity)
+        assertEquals(OrderIntentSide.BUY, item.side)
+        assertEquals(BrokerOrderStatus.PARTIALLY_FILLED, status.status)
+        checkNotNull(execution)
+        assertEquals("camel-fill-1", execution.externalExecutionId)
+        assertEquals(2, execution.quantity)
+        assertEquals(113.75, execution.averageExecutionPrice)
+    }
+
+    @Test
+    fun `maps overseas camel case rejection and cancellation aliases`() {
+        val adapter = overseasHistoryAdapter(
+            """
+            {
+              "rtCd": "0",
+              "ctxAreaFk200": "",
+              "ctxAreaNk200": "",
+              "output": [
+                {
+                  "ordNo": "camel-rejected-order",
+                  "pdno": "TQQQ",
+                  "ordDt": "20260602",
+                  "ordTmd": "093000",
+                  "ordQty": "3",
+                  "totCcldQty": "0",
+                  "rmnQty": "0",
+                  "sllBuyDvsnCdName": "BUY",
+                  "rjctRsonCd": "APBK001"
+                },
+                {
+                  "ordNo": "camel-cancelled-order",
+                  "pdno": "TQQQ",
+                  "ordDt": "20260602",
+                  "ordTmd": "093100",
+                  "ordQty": "3",
+                  "totCcldQty": "0",
+                  "rmnQty": "3",
+                  "cnclYn": "Y",
+                  "cnclCfrmQty": "3",
+                  "sllBuyDvsnCdName": "BUY"
+                }
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        val statuses = adapter.findOrderHistory(historyQuery()).map { it.toStatus() }
+
+        assertEquals(BrokerOrderStatus.REJECTED, statuses[0].status)
+        assertEquals("APBK001", statuses[0].reason)
+        assertEquals(BrokerOrderStatus.CANCELLED, statuses[1].status)
+        assertEquals("broker cancelled quantity=3", statuses[1].reason)
+    }
+
+    @Test
     fun `maps overseas official order price alias for status disambiguation`() {
         val adapter = overseasHistoryAdapter(
             """
