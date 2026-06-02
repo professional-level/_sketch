@@ -3,6 +3,7 @@ package com.example.stockpurchaseservice.adapter.out.persistence
 import com.example.stockpurchaseservice.adapter.out.persistence.entity.OrderIntentSubmissionSide
 import com.example.stockpurchaseservice.adapter.out.persistence.entity.OrderIntentSubmissionMarket
 import com.example.stockpurchaseservice.adapter.out.persistence.repository.OrderRiskSubmissionReader
+import com.example.stockpurchaseservice.adapter.out.risk.ConfiguredFxRateAdapter
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentType
 import com.example.stockpurchaseservice.application.port.out.AccountPositionSnapshotDto
@@ -529,6 +530,7 @@ class OrderRiskControlAdapterTest {
         return OrderRiskControlAdapter(
             orderRiskSubmissionReader = reader,
             marketServicePort = marketService,
+            fxRatePort = ConfiguredFxRateAdapter(properties),
             properties = properties,
             domesticMockOrder = domesticMockOrder,
             overseasMockOrder = overseasMockOrder,

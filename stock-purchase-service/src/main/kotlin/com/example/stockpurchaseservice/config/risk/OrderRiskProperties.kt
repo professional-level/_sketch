@@ -2,6 +2,7 @@ package com.example.stockpurchaseservice.config.risk
 
 import com.example.stockpurchaseservice.application.port.out.OrderTradingEnvironment
 import org.springframework.boot.context.properties.ConfigurationProperties
+import java.time.Duration
 
 @ConfigurationProperties(prefix = "akra.order.risk")
 class OrderRiskProperties {
@@ -30,10 +31,20 @@ class OrderRiskProperties {
     }
 
     class CurrencyConversionProperties {
+        var provider: String = "static"
         var baseCurrency: String = "USD"
         var domesticCurrency: String = "KRW"
         var overseasUsCurrency: String = "USD"
         var ratesToBase: MutableMap<String, Double> = mutableMapOf()
+        var http: HttpFxRateProperties = HttpFxRateProperties()
+    }
+
+    class HttpFxRateProperties {
+        var baseUrl: String = ""
+        var path: String = "/fx/rates"
+        var sourceCurrencyParam: String = "sourceCurrency"
+        var baseCurrencyParam: String = "baseCurrency"
+        var timeout: Duration = Duration.ofSeconds(3)
     }
 
     class TradingHoursProperties {

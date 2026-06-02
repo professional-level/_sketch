@@ -11,6 +11,7 @@ import com.example.stockpurchaseservice.application.port.out.OrderRiskControlPor
 import com.example.stockpurchaseservice.application.port.out.OrderTradingEnvironment
 import com.example.stockpurchaseservice.application.port.out.AccountSnapshotDto
 import com.example.stockpurchaseservice.application.port.out.AccountSnapshotQuery
+import com.example.stockpurchaseservice.application.port.out.FxRatePort
 import com.example.stockpurchaseservice.application.port.out.MarketServicePort
 import com.example.stockpurchaseservice.application.port.out.StockOrderMarket
 import com.example.stockpurchaseservice.config.risk.OrderRiskProperties
@@ -21,6 +22,7 @@ import java.time.ZonedDateTime
 internal class OrderRiskControlAdapter(
     private val orderRiskSubmissionReader: OrderRiskSubmissionReader,
     private val marketServicePort: MarketServicePort,
+    private val fxRatePort: FxRatePort,
     private val properties: OrderRiskProperties,
     @Value("\${akra.order.domestic.mock:true}") private val domesticMockOrder: Boolean = true,
     @Value("\${akra.order.overseas.mock:true}") private val overseasMockOrder: Boolean = true,
@@ -247,11 +249,10 @@ internal class OrderRiskControlAdapter(
                 rateToBase = 1.0,
             )
         }
-        val rate = properties.currencyConversion.ratesToBase[source]
-            ?: properties.currencyConversion.ratesToBase[source.lowercase()]
-            ?: properties.currencyConversion.ratesToBase[source.uppercase()]
-            ?: return null
-        if (rate <= 0.0) return null
+        val quote = runCatching {
+            fxRatePort.getRateToBase(source, base)
+        }.getOrNull() ?: return null
+        val rate = quote.rateToBase
         return RiskCurrencyAmount(
             amount = this * rate,
             currency = base,

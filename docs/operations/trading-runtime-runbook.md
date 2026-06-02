@@ -188,10 +188,18 @@ akra.order.risk.account-exposure.overseas-exchange=NASD
 akra.order.risk.account-exposure.overseas-currency=USD
 akra.order.risk.account-cash.enabled=true
 akra.order.risk.account-cash.reserve-notional=100
+akra.order.risk.currency-conversion.provider=static
 akra.order.risk.currency-conversion.base-currency=USD
 akra.order.risk.currency-conversion.domestic-currency=KRW
 akra.order.risk.currency-conversion.overseas-us-currency=USD
 akra.order.risk.currency-conversion.rates-to-base.KRW=0.00075
+# Optional live/operator-managed FX endpoint:
+# akra.order.risk.currency-conversion.provider=http
+# akra.order.risk.currency-conversion.http.base-url=https://fx-gateway.example.invalid
+# akra.order.risk.currency-conversion.http.path=/fx/rates
+# akra.order.risk.currency-conversion.http.source-currency-param=sourceCurrency
+# akra.order.risk.currency-conversion.http.base-currency-param=baseCurrency
+# akra.order.risk.currency-conversion.http.timeout=3s
 akra.order.risk.trading-hours.enabled=true
 akra.order.risk.trading-hours.domestic.regular-open=09:00
 akra.order.risk.trading-hours.domestic.regular-close=15:30
@@ -296,7 +304,7 @@ GET /operations/trading/account-snapshot?market=DOMESTIC&exchange=KRX&currency=K
 ```
 
 This calls the broker wrapper's domestic or overseas balance lookup and returns current positions with quantity, average purchase price, current price, purchase amount, evaluation amount, profit/loss, and legacy `availableCashAmount` when KIS provides those fields.
-The response also includes `cashCurrency`, `orderableCashAmount`, `settledCashAmount`, and `withdrawableCashAmount` when those KIS summary aliases are present. `availableCashAmount` remains as a legacy compatibility field and is derived from the first available broker cash bucket. Risk checks can normalize configured domestic and overseas currencies with static `rates-to-base` settings; live FX sourcing and broader account cash/exposure modeling still require additional hardening.
+The response also includes `cashCurrency`, `orderableCashAmount`, `settledCashAmount`, and `withdrawableCashAmount` when those KIS summary aliases are present. `availableCashAmount` remains as a legacy compatibility field and is derived from the first available broker cash bucket. Risk checks can normalize configured domestic and overseas currencies through the configured FX provider. The default provider uses static `rates-to-base` settings, and the optional HTTP provider can call an operator-managed FX endpoint; a KIS/official FX adapter and broader account cash/exposure modeling still require additional hardening.
 
 When `akra.order.risk.max-account-exposure-notional` is set, buy order risk checks use the market-specific account snapshot to reject orders whose projected exposure would exceed the configured limit:
 
@@ -304,7 +312,7 @@ When `akra.order.risk.max-account-exposure-notional` is set, buy order risk chec
 current broker evaluation amount + active pending buy notional + new order notional
 ```
 
-The configured exposure limit is interpreted in `akra.order.risk.currency-conversion.base-currency`. Domestic and overseas order/cash/exposure amounts are converted with `akra.order.risk.currency-conversion.rates-to-base.*` when the market currency differs from the base currency. If a required FX rate is missing, the guard rejects the buy order instead of comparing unlike currencies.
+The configured exposure limit is interpreted in `akra.order.risk.currency-conversion.base-currency`. Domestic and overseas order/cash/exposure amounts are converted through the configured FX provider when the market currency differs from the base currency. With `provider=static`, the guard uses `akra.order.risk.currency-conversion.rates-to-base.*`. With `provider=http`, it calls the configured HTTP endpoint with `sourceCurrency` and `baseCurrency` query parameters and expects a positive `rateToBase`, `rate`, or `exchangeRate` field in the JSON response. If a required FX rate is missing or the provider fails, the guard rejects the buy order instead of comparing unlike currencies.
 
 If the broker snapshot does not contain enough valuation data to calculate current exposure, the guard rejects the buy order instead of assuming zero exposure.
 
