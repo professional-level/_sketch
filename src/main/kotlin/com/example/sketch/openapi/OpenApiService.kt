@@ -307,15 +307,21 @@ class OpenApiService(
             isMockApi = request.isMock,
         )
         val quote = response.firstFxRateCandidate()
-            ?: throw IllegalStateException("overseas fx rate response has no rate")
+        return when (quote) {
+            null -> OverseasFxRateResponse(
+                symbol = request.symbol.uppercase(),
+                marketDivCode = request.marketDivCode.uppercase(),
+                diagnostic = response.fxRateDiagnostic(),
+            )
 
-        return OverseasFxRateResponse(
-            symbol = request.symbol.uppercase(),
-            marketDivCode = request.marketDivCode.uppercase(),
-            rate = quote.rate,
-            observedDate = quote.observedDate,
-            rawField = quote.rawField,
-        )
+            else -> OverseasFxRateResponse(
+                symbol = request.symbol.uppercase(),
+                marketDivCode = request.marketDivCode.uppercase(),
+                rate = quote.rate,
+                observedDate = quote.observedDate,
+                rawField = quote.rawField,
+            )
+        }
     }
 
     suspend fun postStockOrder(request: StockOrderRequest): OpenApiResponse {
@@ -804,10 +810,41 @@ private fun JsonNode.firstFxRateCandidate(): FxRateCandidate? {
         .firstOrNull()
 }
 
+private fun JsonNode.fxRateDiagnostic(): OverseasFxRateDiagnostic {
+    return OverseasFxRateDiagnostic(
+        returnCode = textOrNull("rt_cd") ?: textOrNull("rtCd") ?: textOrNull("RT_CD"),
+        messageCode = textOrNull("msg_cd") ?: textOrNull("msgCd") ?: textOrNull("MSG_CD"),
+        message = textOrNull("msg1") ?: textOrNull("message") ?: textOrNull("MSG1"),
+        output1Fields = path("output1").fieldNamesList(),
+        output2Fields = path("output2").nestedFieldNamesList(),
+    )
+}
+
 private fun JsonNode.asObjectList(): List<JsonNode> {
     return when {
         isArray -> elements().asSequence().filter { it.isObject }.toList()
         isObject -> listOf(this)
+        else -> emptyList()
+    }
+}
+
+private fun JsonNode.fieldNamesList(): List<String> {
+    return when {
+        isObject -> fieldNames().asSequence().toList().sorted()
+        else -> emptyList()
+    }
+}
+
+private fun JsonNode.nestedFieldNamesList(): List<String> {
+    return when {
+        isObject -> fieldNamesList()
+        isArray -> elements()
+            .asSequence()
+            .filter { it.isObject }
+            .flatMap { it.fieldNames().asSequence() }
+            .toSet()
+            .toList()
+            .sorted()
         else -> emptyList()
     }
 }

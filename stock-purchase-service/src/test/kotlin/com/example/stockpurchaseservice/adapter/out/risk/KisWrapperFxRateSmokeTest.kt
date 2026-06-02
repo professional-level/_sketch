@@ -9,7 +9,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import kotlin.test.fail
 
 @Tag("kis-smoke")
 @EnabledIfEnvironmentVariable(named = "KIS_FX_SMOKE_ENABLED", matches = "true")
@@ -28,7 +27,7 @@ class KisWrapperFxRateSmokeTest {
         val quote = try {
             adapter.getRateToBase(config.sourceCurrency, config.baseCurrency)
         } catch (exception: RuntimeException) {
-            fail(
+            throw AssertionError(
                 "KIS wrapper FX smoke failed: " +
                     "exception=${exception::class.java.simpleName}, " +
                     "message=${exception.message}, " +
@@ -96,7 +95,7 @@ class KisWrapperFxRateSmokeTest {
                     baseUrl = setting("KIS_FX_SMOKE_BASE_URL", "http://localhost:8079"),
                     sourceCurrency = setting("KIS_FX_SMOKE_SOURCE_CURRENCY", "KRW").uppercase(),
                     baseCurrency = setting("KIS_FX_SMOKE_BASE_CURRENCY", "USD").uppercase(),
-                    marketDivCode = setting("KIS_FX_SMOKE_MARKET_DIV_CODE", "KX").uppercase(),
+                    marketDivCode = setting("KIS_FX_SMOKE_MARKET_DIV_CODE", "X").uppercase(),
                     symbol = setting("KIS_FX_SMOKE_SYMBOL", "USDKRW").uppercase(),
                     invert = setting("KIS_FX_SMOKE_INVERT", "true").toBooleanStrictOrNull() ?: true,
                     isMock = setting("KIS_FX_SMOKE_IS_MOCK", "true").toBooleanStrictOrNull() ?: true,

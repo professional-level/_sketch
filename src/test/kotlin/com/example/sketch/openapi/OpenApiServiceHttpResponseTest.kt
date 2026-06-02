@@ -24,6 +24,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 
 class OpenApiServiceHttpResponseTest {
 
@@ -227,7 +228,7 @@ class OpenApiServiceHttpResponseTest {
         val response = service.getOverseasFxRate(
             GetOverseasFxRateRequest(
                 isMock = true,
-                marketDivCode = "KX",
+                marketDivCode = "X",
                 symbol = "USDKRW",
                 fromDate = "20260601",
                 toDate = "20260602",
@@ -235,19 +236,61 @@ class OpenApiServiceHttpResponseTest {
         )
 
         assertEquals("USDKRW", response.symbol)
-        assertEquals("KX", response.marketDivCode)
+        assertEquals("X", response.marketDivCode)
         assertEquals(1330.25, response.rate)
         assertEquals("20260602", response.observedDate)
         assertEquals("ovrs_nmix_prpr", response.rawField)
         with(exchangeFunction.requests.single()) {
             assertEquals("/uapi/overseas-price/v1/quotations/inquire-daily-chartprice", url().path)
             assertEquals("FHKST03030100", headers().getFirst("tr_id"))
-            assertEquals("KX", url().queryValue("FID_COND_MRKT_DIV_CODE"))
+            assertEquals("X", url().queryValue("FID_COND_MRKT_DIV_CODE"))
             assertEquals("USDKRW", url().queryValue("FID_INPUT_ISCD"))
             assertEquals("20260601", url().queryValue("FID_INPUT_DATE_1"))
             assertEquals("20260602", url().queryValue("FID_INPUT_DATE_2"))
             assertEquals("D", url().queryValue("FID_PERIOD_DIV_CODE"))
         }
+    }
+
+    @Test
+    fun `returns overseas fx diagnostic when chart response has no rate candidate`() = runTest {
+        val exchangeFunction = SingleResponseExchangeFunction(
+            status = HttpStatus.OK,
+            body = """
+            {
+              "rt_cd": "0",
+              "msg_cd": "MCA00000",
+              "msg1": "ok",
+              "output1": {
+                "stck_bsop_date": "20260602",
+                "unknown_price": "1,330.25"
+              },
+              "output2": [
+                {
+                  "stck_bsop_date": "20260601",
+                  "another_price": "1,329.50"
+                }
+              ]
+            }
+            """.trimIndent(),
+        )
+        val service = openApiService(exchangeFunction)
+
+        val response = service.getOverseasFxRate(
+            GetOverseasFxRateRequest(
+                isMock = true,
+                marketDivCode = "X",
+                symbol = "USDKRW",
+            ),
+        )
+
+        assertEquals("USDKRW", response.symbol)
+        assertEquals("X", response.marketDivCode)
+        assertNull(response.rate)
+        assertEquals("0", response.diagnostic?.returnCode)
+        assertEquals("MCA00000", response.diagnostic?.messageCode)
+        assertEquals("ok", response.diagnostic?.message)
+        assertEquals(listOf("stck_bsop_date", "unknown_price"), response.diagnostic?.output1Fields)
+        assertEquals(listOf("another_price", "stck_bsop_date"), response.diagnostic?.output2Fields)
     }
 
     @Test

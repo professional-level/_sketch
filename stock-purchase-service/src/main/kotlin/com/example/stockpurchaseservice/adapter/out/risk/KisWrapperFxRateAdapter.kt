@@ -39,7 +39,7 @@ internal class KisWrapperFxRateAdapter(
             ?.replace(",", "")
             ?.toDoubleOrNull()
             ?.takeIf { it > 0.0 }
-            ?: return null
+            ?: throw response.toMissingRateException()
         val rate = if (pair.invert) 1.0 / rawRate else rawRate
         return FxRateQuoteDto(
             sourceCurrency = source,
@@ -90,6 +90,28 @@ internal class KisWrapperFxRateAdapter(
             .asSequence()
             .map { path(it).asText("").trim() }
             .firstOrNull { it.isNotBlank() }
+    }
+
+    private fun JsonNode.toMissingRateException(): IllegalStateException {
+        val diagnostic = path("diagnostic")
+        if (!diagnostic.isObject) {
+            return IllegalStateException("KIS wrapper FX response has no positive rate")
+        }
+        return IllegalStateException(
+            "KIS wrapper FX response has no positive rate: " +
+                "returnCode=${diagnostic.textOrNull("returnCode")}, " +
+                "messageCode=${diagnostic.textOrNull("messageCode")}, " +
+                "message=${diagnostic.textOrNull("message")}, " +
+                "output1Fields=${diagnostic.path("output1Fields").textList()}, " +
+                "output2Fields=${diagnostic.path("output2Fields").textList()}",
+        )
+    }
+
+    private fun JsonNode.textList(): List<String> {
+        return when {
+            isArray -> elements().asSequence().map { it.asText() }.filter { it.isNotBlank() }.toList()
+            else -> emptyList()
+        }
     }
 
     private fun String.normalizedCurrency(): String {

@@ -104,7 +104,7 @@ data class OverseasDailyPriceCandle(
 
 data class GetOverseasFxRateRequest(
     val isMock: Boolean = true,
-    val marketDivCode: String = "KX",
+    val marketDivCode: String = "X",
     val symbol: String = "",
     val fromDate: String = ZonedDateTime.now(ZoneId.of("Asia/Seoul")).minusDays(7).toDefaultDateStringFormat(),
     val toDate: String = ZonedDateTime.now(ZoneId.of("Asia/Seoul")).toDefaultDateStringFormat(),
@@ -122,10 +122,19 @@ data class GetOverseasFxRateRequest(
 data class OverseasFxRateResponse(
     val symbol: String,
     val marketDivCode: String,
-    val rate: Double,
+    val rate: Double? = null,
     val observedDate: String? = null,
     val provider: String = "kis-overseas-daily-chartprice",
     val rawField: String? = null,
+    val diagnostic: OverseasFxRateDiagnostic? = null,
+)
+
+data class OverseasFxRateDiagnostic(
+    val returnCode: String? = null,
+    val messageCode: String? = null,
+    val message: String? = null,
+    val output1Fields: List<String> = emptyList(),
+    val output2Fields: List<String> = emptyList(),
 )
 
 data class OverseasStockOrderRequest(

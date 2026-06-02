@@ -161,3 +161,32 @@ Next action:
 - Use a KIS mock account that is enabled for overseas mock orders, then rerun submit/query/cancel smoke.
 - Keep query-only smoke and submit smoke as separate executions to avoid KIS per-second transaction limits.
 - Run `KisWrapperFxRateSmokeTest` against a running root wrapper to verify the configured `provider=kis-wrapper` currency-pair mapping before enabling broker-backed FX in risk checks.
+
+## 2026-06-02 FX Provider Smoke With Root Wrapper
+
+Environment:
+
+- root KIS wrapper: local `:bootRun` on `http://localhost:8079`
+- FX smoke test: `KisWrapperFxRateSmokeTest`
+- smoke mode: query-only, no broker order submission
+- currency pair: `KRW -> USD`
+- KIS chart query: market code `X`, symbol `USDKRW`, period `D`, mock API
+
+Result:
+
+- The root wrapper reached `/open-api/overseas/quotations/fx-rate` and returned HTTP 200.
+- KIS returned business success metadata: return code `0`, message code `MCA00000`.
+- The response exposed chart-price field names in `output1`, including `ovrs_nmix_prpr`, but the wrapper did not find a positive rate candidate for `X + USDKRW`.
+- `KisWrapperFxRateSmokeTest` failed with `tests=1`, `failures=1`, `errors=0`.
+- No secrets, account identifiers, tokens, or raw KIS payloads were recorded.
+
+Impact:
+
+- Broker-backed FX is not yet safe to enable for production risk checks with the current `KRW-USD` pair mapping.
+- The adapter now fails closed with a diagnostic error instead of silently returning no quote or surfacing an opaque wrapper 500.
+- Market code `X` is the correct default category for the chartprice FX API; the remaining gap is the actual KIS input symbol or data availability for the desired USD/KRW quote.
+
+Next action:
+
+- Confirm the KIS `FID_INPUT_ISCD` value for USD/KRW from the official API portal or a working KIS example.
+- Rerun `KisWrapperFxRateSmokeTest` with the confirmed symbol and keep the `provider=kis-wrapper` risk guard disabled until a positive quote is verified.

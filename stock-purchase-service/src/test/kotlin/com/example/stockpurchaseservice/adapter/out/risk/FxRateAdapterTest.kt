@@ -11,7 +11,9 @@ import org.springframework.web.reactive.function.client.WebClient
 import reactor.core.publisher.Mono
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class FxRateAdapterTest {
 
@@ -101,7 +103,7 @@ class FxRateAdapterTest {
             """
             {
               "symbol": "USDKRW",
-              "marketDivCode": "KX",
+              "marketDivCode": "X",
               "rate": 1330.0,
               "observedDate": "20260602",
               "provider": "kis-overseas-daily-chartprice"
@@ -110,7 +112,7 @@ class FxRateAdapterTest {
         )
         val properties = OrderRiskProperties.CurrencyConversionProperties().apply {
             kisWrapper.pairs["KRW-USD"] = OrderRiskProperties.KisWrapperFxRatePairProperties().apply {
-                marketDivCode = "KX"
+                marketDivCode = "X"
                 symbol = "USDKRW"
                 invert = true
                 isMock = false
@@ -133,11 +135,54 @@ class FxRateAdapterTest {
         assertEquals(1.0 / 1330.0, rate?.rateToBase)
         assertEquals("kis-overseas-daily-chartprice", rate?.provider)
         assertEquals("/open-api/overseas/quotations/fx-rate", exchangeFunction.requests.single().url().path)
-        assertEquals("KX", exchangeFunction.requests.single().url().queryValue("marketDivCode"))
+        assertEquals("X", exchangeFunction.requests.single().url().queryValue("marketDivCode"))
         assertEquals("USDKRW", exchangeFunction.requests.single().url().queryValue("symbol"))
         assertEquals("false", exchangeFunction.requests.single().url().queryValue("isMock"))
         assertEquals("20260601", exchangeFunction.requests.single().url().queryValue("fromDate"))
         assertEquals("20260602", exchangeFunction.requests.single().url().queryValue("toDate"))
+    }
+
+    @Test
+    fun `kis wrapper fx rate adapter surfaces diagnostic when response has no positive rate`() {
+        val exchangeFunction = CapturingExchangeFunction(
+            """
+            {
+              "symbol": "USDKRW",
+              "marketDivCode": "X",
+              "rate": null,
+              "diagnostic": {
+                "returnCode": "0",
+                "messageCode": "MCA00000",
+                "message": "ok",
+                "output1Fields": ["stck_bsop_date", "unknown_price"],
+                "output2Fields": ["another_price", "stck_bsop_date"]
+              }
+            }
+            """.trimIndent(),
+        )
+        val properties = OrderRiskProperties.CurrencyConversionProperties().apply {
+            kisWrapper.pairs["KRW-USD"] = OrderRiskProperties.KisWrapperFxRatePairProperties().apply {
+                marketDivCode = "X"
+                symbol = "USDKRW"
+                invert = true
+            }
+        }
+        val adapter = KisWrapperFxRateAdapter(
+            webClient = WebClient.builder()
+                .baseUrl("http://kis-wrapper.test")
+                .exchangeFunction(exchangeFunction)
+                .build(),
+            properties = properties,
+        )
+
+        val exception = assertFailsWith<IllegalStateException> {
+            adapter.getRateToBase("KRW", "USD")
+        }
+
+        assertTrue(exception.message.orEmpty().contains("returnCode=0"))
+        assertTrue(exception.message.orEmpty().contains("messageCode=MCA00000"))
+        assertTrue(exception.message.orEmpty().contains("unknown_price"))
+        assertTrue(exception.message.orEmpty().contains("another_price"))
     }
 
     @Test

@@ -51,7 +51,7 @@ class OrderRiskProperties {
     class KisWrapperFxRateProperties {
         var path: String = "/open-api/overseas/quotations/fx-rate"
         var timeout: Duration = Duration.ofSeconds(5)
-        var defaultMarketDivCode: String = "KX"
+        var defaultMarketDivCode: String = "X"
         var pairs: MutableMap<String, KisWrapperFxRatePairProperties> = mutableMapOf()
     }
 
