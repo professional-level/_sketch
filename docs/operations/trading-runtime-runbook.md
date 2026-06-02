@@ -163,6 +163,40 @@ Remove-Item Env:\KIS_BROKER_SMOKE_SUBMIT_ENABLED -ErrorAction SilentlyContinue
 
 This verifies the real-account domestic balance and daily execution-history wrapper routes without placing broker orders. Record only redacted route, market, pass/fail, and message-code evidence.
 
+Real-account submit/query/cancel smoke is a separate live-order check. It is disabled unless both the market-specific enable flag and the explicit risk confirmation are present:
+
+```powershell
+# Overseas live order smoke.
+$env:KIS_BROKER_REAL_SUBMIT_SMOKE_ENABLED='true'
+$env:KIS_BROKER_REAL_SUBMIT_CONFIRM='I_UNDERSTAND_LIVE_ORDER_RISK'
+$env:KIS_BROKER_SMOKE_BASE_URL='http://localhost:8079'
+$env:KIS_BROKER_SMOKE_SYMBOL='TQQQ'
+$env:KIS_BROKER_SMOKE_EXCHANGE='NASD'
+$env:KIS_BROKER_SMOKE_CURRENCY='USD'
+$env:KIS_BROKER_SMOKE_PRICE='1'
+$env:KIS_BROKER_SMOKE_QUANTITY='1'
+$env:KIS_BROKER_SMOKE_HISTORY_ATTEMPTS='6'
+$env:KIS_BROKER_SMOKE_HISTORY_POLL_SECONDS='5'
+.\gradlew.bat --no-daemon :stock-purchase-service:test --tests "com.example.stockpurchaseservice.adapter.out.broker.KisBrokerGatewaySmokeTest" --rerun-tasks
+```
+
+```powershell
+# Domestic live order smoke.
+$env:KIS_BROKER_REAL_DOMESTIC_SUBMIT_SMOKE_ENABLED='true'
+$env:KIS_BROKER_REAL_SUBMIT_CONFIRM='I_UNDERSTAND_LIVE_ORDER_RISK'
+$env:KIS_BROKER_SMOKE_BASE_URL='http://localhost:8079'
+$env:KIS_BROKER_SMOKE_DOMESTIC_SYMBOL='005930'
+$env:KIS_BROKER_SMOKE_DOMESTIC_EXCHANGE='KRX'
+$env:KIS_BROKER_SMOKE_DOMESTIC_CURRENCY='KRW'
+$env:KIS_BROKER_SMOKE_DOMESTIC_PRICE='1'
+$env:KIS_BROKER_SMOKE_DOMESTIC_QUANTITY='1'
+$env:KIS_BROKER_SMOKE_HISTORY_ATTEMPTS='6'
+$env:KIS_BROKER_SMOKE_HISTORY_POLL_SECONDS='5'
+.\gradlew.bat --no-daemon :stock-purchase-service:test --tests "com.example.stockpurchaseservice.adapter.out.broker.KisBrokerGatewaySmokeTest" --rerun-tasks
+```
+
+Run live submit smoke only in an approved live-order window with deliberately small quantity and a limit price chosen to keep the order cancelable. The smoke submits, waits for broker history visibility, submits cancel, and requires the original broker order to map to internal `CANCELLED`. Record only redacted pass/fail, market, symbol/exchange/currency, and broker return/message codes.
+
 FX provider smoke:
 
 ```powershell

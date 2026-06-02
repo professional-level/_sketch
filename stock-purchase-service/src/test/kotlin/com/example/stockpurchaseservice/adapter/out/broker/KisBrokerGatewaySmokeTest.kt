@@ -152,6 +152,43 @@ class KisBrokerGatewaySmokeTest {
     fun `mock submit query and cancel smoke`() {
         val config = SmokeConfig.fromEnvironment()
         assumeTrue(config.submitEnabled, "Set KIS_BROKER_SMOKE_SUBMIT_ENABLED=true to place a mock order")
+        runOverseasSubmitQueryCancelSmoke(config, isMock = true, brokerEnvironment = "mock")
+    }
+
+    @Test
+    @EnabledIfEnvironmentVariable(named = "KIS_BROKER_REAL_SUBMIT_SMOKE_ENABLED", matches = "true")
+    fun `real overseas submit query and cancel smoke`() {
+        val config = SmokeConfig.fromEnvironment()
+        assumeTrue(
+            config.liveSubmitConfirmed,
+            "Set KIS_BROKER_REAL_SUBMIT_CONFIRM=I_UNDERSTAND_LIVE_ORDER_RISK to place real broker orders",
+        )
+        runOverseasSubmitQueryCancelSmoke(config, isMock = false, brokerEnvironment = "real")
+    }
+
+    @Test
+    @EnabledIfEnvironmentVariable(named = "KIS_BROKER_DOMESTIC_SUBMIT_SMOKE_ENABLED", matches = "true")
+    fun `mock domestic submit query and cancel smoke`() {
+        val config = SmokeConfig.fromEnvironment()
+        runDomesticSubmitQueryCancelSmoke(config, isMock = true, brokerEnvironment = "mock domestic")
+    }
+
+    @Test
+    @EnabledIfEnvironmentVariable(named = "KIS_BROKER_REAL_DOMESTIC_SUBMIT_SMOKE_ENABLED", matches = "true")
+    fun `real domestic submit query and cancel smoke`() {
+        val config = SmokeConfig.fromEnvironment()
+        assumeTrue(
+            config.liveSubmitConfirmed,
+            "Set KIS_BROKER_REAL_SUBMIT_CONFIRM=I_UNDERSTAND_LIVE_ORDER_RISK to place real broker orders",
+        )
+        runDomesticSubmitQueryCancelSmoke(config, isMock = false, brokerEnvironment = "real domestic")
+    }
+
+    private fun runOverseasSubmitQueryCancelSmoke(
+        config: SmokeConfig,
+        isMock: Boolean,
+        brokerEnvironment: String,
+    ) {
         val adapter = brokerGateway(config)
 
         val submitCommand = BrokerOrderCommand(
@@ -162,17 +199,17 @@ class KisBrokerGatewaySmokeTest {
             orderType = StockOrderType.LIMIT,
             price = config.price,
             quantity = config.quantity,
-            isMock = true,
+            isMock = isMock,
         )
-        val submitted = runBrokerSmokeStep("mock submit", config, submitCommand) {
+        val submitted = runBrokerSmokeStep("$brokerEnvironment overseas submit", brokerEnvironment, config, submitCommand) {
             adapter.submitOrder(submitCommand)
         }
         assertTrue(submitted.externalOrderId.isNotBlank())
 
-        val submittedHistory = awaitOrderHistory(adapter, config, submitted.externalOrderId)
+        val submittedHistory = awaitOrderHistory(adapter, config, submitted.externalOrderId, isMock)
         assertNotNull(
             submittedHistory,
-            "Submitted mock order did not appear in broker history " +
+            "Submitted $brokerEnvironment overseas order did not appear in broker history " +
                 "after attempts=${config.historyAttempts}, " +
                 "pollSeconds=${config.historyPollInterval.seconds}, " +
                 "symbol=${config.symbol}, orderId=${submitted.externalOrderId}",
@@ -189,29 +226,36 @@ class KisBrokerGatewaySmokeTest {
             price = config.price,
             quantity = config.quantity,
             cancelAll = true,
-            isMock = true,
+            isMock = isMock,
         )
-        val cancelled = runBrokerSmokeStep("mock cancel", config, cancelCommand) {
+        val cancelled = runBrokerSmokeStep("$brokerEnvironment overseas cancel", brokerEnvironment, config, cancelCommand) {
             adapter.cancelOrder(cancelCommand)
         }
 
         assertTrue(cancelled.externalOrderId.isNotBlank())
 
-        val cancelledStatus = awaitOrderStatus(adapter, config, submitted.externalOrderId, submitted.branchOrderNumber)
+        val cancelledStatus = awaitOrderStatus(
+            adapter,
+            config,
+            submitted.externalOrderId,
+            submitted.branchOrderNumber,
+            isMock,
+        )
         assertEquals(
             BrokerOrderStatus.CANCELLED,
             cancelledStatus.status,
-            "Cancelled mock order did not map to broker CANCELLED status " +
+            "Cancelled $brokerEnvironment overseas order did not map to broker CANCELLED status " +
                 "after attempts=${config.historyAttempts}, " +
                 "pollSeconds=${config.historyPollInterval.seconds}, " +
                 "symbol=${config.symbol}, orderId=${submitted.externalOrderId}, latestStatus=$cancelledStatus",
         )
     }
 
-    @Test
-    @EnabledIfEnvironmentVariable(named = "KIS_BROKER_DOMESTIC_SUBMIT_SMOKE_ENABLED", matches = "true")
-    fun `mock domestic submit query and cancel smoke`() {
-        val config = SmokeConfig.fromEnvironment()
+    private fun runDomesticSubmitQueryCancelSmoke(
+        config: SmokeConfig,
+        isMock: Boolean,
+        brokerEnvironment: String,
+    ) {
         val adapter = brokerGateway(config)
 
         val submitCommand = BrokerOrderCommand(
@@ -222,20 +266,20 @@ class KisBrokerGatewaySmokeTest {
             orderType = StockOrderType.LIMIT,
             price = config.domesticPrice,
             quantity = config.domesticQuantity,
-            isMock = true,
+            isMock = isMock,
         )
-        val submitted = runBrokerSmokeStep("mock domestic submit", config, submitCommand) {
+        val submitted = runBrokerSmokeStep("$brokerEnvironment submit", brokerEnvironment, config, submitCommand) {
             adapter.submitOrder(submitCommand)
         }
         assertTrue(submitted.externalOrderId.isNotBlank())
         val branchOrderNumber = submitted.branchOrderNumber
-            ?: fail("Domestic mock order response did not include branch order number: orderId=${submitted.externalOrderId}")
+            ?: fail("Domestic $brokerEnvironment order response did not include branch order number: orderId=${submitted.externalOrderId}")
         assertTrue(branchOrderNumber.isNotBlank())
 
-        val submittedHistory = awaitDomesticOrderHistory(adapter, config, submitted.externalOrderId)
+        val submittedHistory = awaitDomesticOrderHistory(adapter, config, submitted.externalOrderId, isMock)
         assertNotNull(
             submittedHistory,
-            "Submitted domestic mock order did not appear in broker history " +
+            "Submitted $brokerEnvironment order did not appear in broker history " +
                 "after attempts=${config.historyAttempts}, " +
                 "pollSeconds=${config.historyPollInterval.seconds}, " +
                 "symbol=${config.domesticSymbol}, orderId=${submitted.externalOrderId}, " +
@@ -253,19 +297,25 @@ class KisBrokerGatewaySmokeTest {
             price = config.domesticPrice,
             quantity = config.domesticQuantity,
             cancelAll = true,
-            isMock = true,
+            isMock = isMock,
         )
-        val cancelled = runBrokerSmokeStep("mock domestic cancel", config, cancelCommand) {
+        val cancelled = runBrokerSmokeStep("$brokerEnvironment cancel", brokerEnvironment, config, cancelCommand) {
             adapter.cancelOrder(cancelCommand)
         }
 
         assertTrue(cancelled.externalOrderId.isNotBlank())
 
-        val cancelledStatus = awaitDomesticOrderStatus(adapter, config, submitted.externalOrderId, branchOrderNumber)
+        val cancelledStatus = awaitDomesticOrderStatus(
+            adapter,
+            config,
+            submitted.externalOrderId,
+            branchOrderNumber,
+            isMock,
+        )
         assertEquals(
             BrokerOrderStatus.CANCELLED,
             cancelledStatus.status,
-            "Cancelled domestic mock order did not map to broker CANCELLED status " +
+            "Cancelled $brokerEnvironment order did not map to broker CANCELLED status " +
                 "after attempts=${config.historyAttempts}, " +
                 "pollSeconds=${config.historyPollInterval.seconds}, " +
                 "symbol=${config.domesticSymbol}, orderId=${submitted.externalOrderId}, " +
@@ -275,6 +325,7 @@ class KisBrokerGatewaySmokeTest {
 
     private fun <T> runBrokerSmokeStep(
         step: String,
+        brokerEnvironment: String,
         config: SmokeConfig,
         command: Any,
         block: () -> T,
@@ -283,7 +334,7 @@ class KisBrokerGatewaySmokeTest {
             block()
         } catch (exception: BrokerOrderRejectedException) {
             fail(
-                "$step rejected by KIS mock broker: " +
+                "$step rejected by KIS $brokerEnvironment broker: " +
                     "returnCode=${exception.brokerReturnCode}, " +
                     "messageCode=${exception.brokerMessageCode}, " +
                     "brokerMessage=${exception.brokerMessage}, " +
@@ -324,9 +375,10 @@ class KisBrokerGatewaySmokeTest {
         adapter: KisBrokerGatewayAdapter,
         config: SmokeConfig,
         externalOrderId: String,
+        isMock: Boolean,
     ): BrokerOrderHistoryItem? {
         repeat(config.historyAttempts) {
-            val match = adapter.findOrderHistory(config.historyQuery(isMock = true))
+            val match = adapter.findOrderHistory(config.historyQuery(isMock = isMock))
                 .firstOrNull { it.externalOrderId == externalOrderId }
             if (match != null) return match
             Thread.sleep(config.historyPollInterval.toMillis())
@@ -338,9 +390,10 @@ class KisBrokerGatewaySmokeTest {
         adapter: KisBrokerGatewayAdapter,
         config: SmokeConfig,
         externalOrderId: String,
+        isMock: Boolean,
     ): BrokerOrderHistoryItem? {
         repeat(config.historyAttempts) {
-            val match = adapter.findOrderHistory(config.domesticHistoryQuery(isMock = true))
+            val match = adapter.findOrderHistory(config.domesticHistoryQuery(isMock = isMock))
                 .firstOrNull { it.externalOrderId == externalOrderId }
             if (match != null) return match
             Thread.sleep(config.historyPollInterval.toMillis())
@@ -353,10 +406,11 @@ class KisBrokerGatewaySmokeTest {
         config: SmokeConfig,
         externalOrderId: String,
         branchOrderNumber: String?,
+        isMock: Boolean,
     ): BrokerOrderStatusDto {
         var latestStatus: BrokerOrderStatusDto? = null
         repeat(config.historyAttempts) {
-            latestStatus = adapter.findOrderHistory(config.historyQuery(isMock = true)).findStatusFor(
+            latestStatus = adapter.findOrderHistory(config.historyQuery(isMock = isMock)).findStatusFor(
                 BrokerOrderStatusQuery(
                     orderIntentId = UUID.randomUUID(),
                     internalOrderId = UUID.randomUUID(),
@@ -382,10 +436,11 @@ class KisBrokerGatewaySmokeTest {
         config: SmokeConfig,
         externalOrderId: String,
         branchOrderNumber: String?,
+        isMock: Boolean,
     ): BrokerOrderStatusDto {
         var latestStatus: BrokerOrderStatusDto? = null
         repeat(config.historyAttempts) {
-            latestStatus = adapter.findOrderHistory(config.domesticHistoryQuery(isMock = true)).findStatusFor(
+            latestStatus = adapter.findOrderHistory(config.domesticHistoryQuery(isMock = isMock)).findStatusFor(
                 BrokerOrderStatusQuery(
                     orderIntentId = UUID.randomUUID(),
                     internalOrderId = UUID.randomUUID(),
@@ -419,9 +474,13 @@ class KisBrokerGatewaySmokeTest {
         val price: Double,
         val quantity: Int,
         val submitEnabled: Boolean,
+        val liveSubmitConfirmation: String,
         val historyAttempts: Int,
         val historyPollInterval: Duration,
     ) {
+        val liveSubmitConfirmed: Boolean
+            get() = liveSubmitConfirmation == LIVE_SUBMIT_CONFIRMATION
+
         fun redacted(): String {
             return "SmokeConfig(" +
                 "baseUrl=$baseUrl, " +
@@ -436,6 +495,7 @@ class KisBrokerGatewaySmokeTest {
                 "price=$price, " +
                 "quantity=$quantity, " +
                 "submitEnabled=$submitEnabled, " +
+                "liveSubmitConfirmed=$liveSubmitConfirmed, " +
                 "historyAttempts=$historyAttempts, " +
                 "historyPollInterval=$historyPollInterval" +
                 ")"
@@ -497,6 +557,7 @@ class KisBrokerGatewaySmokeTest {
                     quantity = setting("KIS_BROKER_SMOKE_QUANTITY", "1").toInt(),
                     submitEnabled = setting("KIS_BROKER_SMOKE_SUBMIT_ENABLED", "false").toBooleanStrictOrNull()
                         ?: false,
+                    liveSubmitConfirmation = setting("KIS_BROKER_REAL_SUBMIT_CONFIRM", ""),
                     historyAttempts = setting("KIS_BROKER_SMOKE_HISTORY_ATTEMPTS", "6").toInt(),
                     historyPollInterval = Duration.ofSeconds(
                         setting("KIS_BROKER_SMOKE_HISTORY_POLL_SECONDS", "5").toLong(),
@@ -509,6 +570,8 @@ class KisBrokerGatewaySmokeTest {
                     ?: System.getProperty(name)
                     ?: defaultValue
             }
+
+            private const val LIVE_SUBMIT_CONFIRMATION = "I_UNDERSTAND_LIVE_ORDER_RISK"
         }
     }
 }

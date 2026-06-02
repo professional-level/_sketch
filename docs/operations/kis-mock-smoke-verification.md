@@ -252,3 +252,53 @@ Recording rule:
 
 - Record only pass/fail, route, market, configured public symbol/exchange/currency, and redacted broker return/message codes.
 - Do not record account numbers, account tails, app keys, app secrets, access tokens, raw KIS payloads, or position-level holdings.
+
+## Real Account Submit/Cancel Smoke Template
+
+No real-account submit/query/cancel smoke result is recorded yet. This smoke places real broker orders and is disabled unless the market-specific enable flag and explicit risk confirmation are both set.
+
+Overseas command shape:
+
+```powershell
+$env:KIS_BROKER_REAL_SUBMIT_SMOKE_ENABLED='true'
+$env:KIS_BROKER_REAL_SUBMIT_CONFIRM='I_UNDERSTAND_LIVE_ORDER_RISK'
+$env:KIS_BROKER_SMOKE_BASE_URL='http://localhost:8079'
+$env:KIS_BROKER_SMOKE_SYMBOL='TQQQ'
+$env:KIS_BROKER_SMOKE_EXCHANGE='NASD'
+$env:KIS_BROKER_SMOKE_CURRENCY='USD'
+$env:KIS_BROKER_SMOKE_PRICE='1'
+$env:KIS_BROKER_SMOKE_QUANTITY='1'
+$env:KIS_BROKER_SMOKE_HISTORY_ATTEMPTS='6'
+$env:KIS_BROKER_SMOKE_HISTORY_POLL_SECONDS='5'
+Remove-Item Env:\KIS_BROKER_SMOKE_ENABLED -ErrorAction SilentlyContinue
+Remove-Item Env:\KIS_BROKER_SMOKE_SUBMIT_ENABLED -ErrorAction SilentlyContinue
+.\gradlew.bat --no-daemon :stock-purchase-service:test --tests "com.example.stockpurchaseservice.adapter.out.broker.KisBrokerGatewaySmokeTest" --rerun-tasks
+```
+
+Domestic command shape:
+
+```powershell
+$env:KIS_BROKER_REAL_DOMESTIC_SUBMIT_SMOKE_ENABLED='true'
+$env:KIS_BROKER_REAL_SUBMIT_CONFIRM='I_UNDERSTAND_LIVE_ORDER_RISK'
+$env:KIS_BROKER_SMOKE_BASE_URL='http://localhost:8079'
+$env:KIS_BROKER_SMOKE_DOMESTIC_SYMBOL='005930'
+$env:KIS_BROKER_SMOKE_DOMESTIC_EXCHANGE='KRX'
+$env:KIS_BROKER_SMOKE_DOMESTIC_CURRENCY='KRW'
+$env:KIS_BROKER_SMOKE_DOMESTIC_PRICE='1'
+$env:KIS_BROKER_SMOKE_DOMESTIC_QUANTITY='1'
+$env:KIS_BROKER_SMOKE_HISTORY_ATTEMPTS='6'
+$env:KIS_BROKER_SMOKE_HISTORY_POLL_SECONDS='5'
+.\gradlew.bat --no-daemon :stock-purchase-service:test --tests "com.example.stockpurchaseservice.adapter.out.broker.KisBrokerGatewaySmokeTest" --rerun-tasks
+```
+
+Expected coverage:
+
+- accepted real order submit through the stock-purchase `KisBrokerGatewayAdapter`
+- broker history visibility for the submitted broker order id
+- cancel submission against the same broker order id and branch/order-org number when domestic
+- final history status mapped to internal `CANCELLED`
+
+Recording rule:
+
+- Record the exact date, market, public symbol/exchange/currency, pass/fail, and redacted broker return/message codes.
+- Do not record account numbers, account tails, app keys, app secrets, access tokens, raw KIS payloads, holdings, or cash balances.
