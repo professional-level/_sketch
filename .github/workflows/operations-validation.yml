@@ -7,17 +7,21 @@ on:
       - main
       - codex/trading-service-boundaries
     paths:
+      - ".gitignore"
       - ".github/workflows/container-images.yml"
       - ".github/workflows/operations-validation.yml"
       - "docs/operations/**"
+      - "gradle/wrapper/**"
       - "gradlew"
   pull_request:
     branches:
       - main
     paths:
+      - ".gitignore"
       - ".github/workflows/container-images.yml"
       - ".github/workflows/operations-validation.yml"
       - "docs/operations/**"
+      - "gradle/wrapper/**"
       - "gradlew"
 
 permissions:
