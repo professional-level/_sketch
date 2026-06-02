@@ -100,6 +100,38 @@ class ReconcileExecutionsServiceTest {
     }
 
     @Test
+    fun `processes broker executions in deterministic execution time order`() = runBlocking {
+        val eventPort = FakeOrderExecutionEventPort()
+        val service = service(
+            marketPort = FakeMarketServicePort(
+                executions = listOf(
+                    execution(
+                        externalExecutionId = "exec-2",
+                        quantity = 70,
+                        createdAt = ZonedDateTime.parse("2026-06-02T09:02:00+09:00"),
+                    ),
+                    execution(
+                        externalExecutionId = "exec-1",
+                        quantity = 30,
+                        createdAt = ZonedDateTime.parse("2026-06-02T09:01:00+09:00"),
+                    ),
+                ),
+            ),
+            executionFillPort = FakeExecutionFillPort(),
+            submissionPort = FakeOrderIntentSubmissionPort(
+                submissions = listOf(submission(quantity = 100)),
+            ),
+            eventPort = eventPort,
+        )
+
+        service.execute()
+
+        assertEquals(listOf(30L, 70L), eventPort.publishedFillQuantities)
+        assertEquals(30, eventPort.partiallyFilled.single().filledQuantity)
+        assertEquals(70, eventPort.filled.single().filledQuantity)
+    }
+
+    @Test
     fun `does not publish fill events for duplicate broker execution`() = runBlocking {
         val eventPort = FakeOrderExecutionEventPort()
         val reconciliationStatePort = FakeExecutionReconciliationStatePort()
@@ -667,13 +699,14 @@ class ReconcileExecutionsServiceTest {
         externalExecutionId: String,
         quantity: Int,
         externalOrderId: String = "broker-1",
+        createdAt: ZonedDateTime = ZonedDateTime.parse("2026-06-02T09:00:00+09:00"),
         quantityMode: ExecutionQuantityModeDto = ExecutionQuantityModeDto.DELTA,
         type: ExecutionTypeDto = ExecutionTypeDto.PURCHASE,
     ): ExecutedStockDto {
         return ExecutedStockDto(
             stockId = "TQQQ",
             stockName = "TQQQ",
-            createdAt = ZonedDateTime.parse("2026-06-02T09:00:00+09:00"),
+            createdAt = createdAt,
             quantity = quantity,
             type = type,
             externalOrderId = externalOrderId,
@@ -845,6 +878,7 @@ class ReconcileExecutionsServiceTest {
     ) : OrderExecutionEventPort {
         val partiallyFilled: MutableList<OrderPartiallyFilledMessage> = mutableListOf()
         val filled: MutableList<OrderFilledMessage> = mutableListOf()
+        val publishedFillQuantities: MutableList<Long> = mutableListOf()
         private val seenEventIds: MutableSet<UUID> = mutableSetOf()
 
         override suspend fun publishSubmitted(event: OrderSubmittedMessage) = Unit
@@ -856,12 +890,14 @@ class ReconcileExecutionsServiceTest {
         override suspend fun publishFilled(event: OrderFilledMessage) {
             if (failPublish) throw IllegalStateException("outbox unavailable")
             if (idempotent && !seenEventIds.add(event.eventId)) return
+            publishedFillQuantities += event.filledQuantity
             filled += event
         }
 
         override suspend fun publishPartiallyFilled(event: OrderPartiallyFilledMessage) {
             if (failPublish) throw IllegalStateException("outbox unavailable")
             if (idempotent && !seenEventIds.add(event.eventId)) return
+            publishedFillQuantities += event.filledQuantity
             partiallyFilled += event
         }
     }

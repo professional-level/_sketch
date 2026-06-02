@@ -120,36 +120,38 @@ class ReconcileExecutionsService(
         val executedStockList = mutableListOf<ExecutedStock>()
         val refinedExecutedStockList = mutableListOf<ExecutedStock>()
         var unmatchedExecutionCount = 0
-        brokerExecutionList.forEach { brokerExecution ->
-            val execution = brokerExecution.toDomainForReconciliation() ?: return@forEach
-            executedStockList += execution
-            when (val publishPlan = resolveFillPublishPlan(execution)) {
-                is FillPublishPlan.Unmatched -> {
-                    unmatchedExecutionCount += 1
-                    recordUnmatchedExecution(
-                        execution = execution,
-                        reason = publishPlan.reason,
-                        observedAt = startedAt,
-                    )
-                }
-
-                is FillPublishPlan.Publish -> {
-                    val fill = ExecutionFillDto.from(ExecutionFill.from(execution))
-                    if (executionFillPort.exists(fill.externalExecutionId)) {
-                        executionReconciliationStatePort.markUnmatchedExecutionResolved(fill.externalExecutionId)
-                        return@forEach
+        brokerExecutionList
+            .sortedWith(compareBy<ExecutedStockDto> { it.createdAt }.thenBy { it.externalExecutionId })
+            .forEach { brokerExecution ->
+                val execution = brokerExecution.toDomainForReconciliation() ?: return@forEach
+                executedStockList += execution
+                when (val publishPlan = resolveFillPublishPlan(execution)) {
+                    is FillPublishPlan.Unmatched -> {
+                        unmatchedExecutionCount += 1
+                        recordUnmatchedExecution(
+                            execution = execution,
+                            reason = publishPlan.reason,
+                            observedAt = startedAt,
+                        )
                     }
 
-                    publishOrderFillEvent(execution, publishPlan)
-                    if (executionFillPort.saveIfNew(fill)) {
-                        executionReconciliationStatePort.markUnmatchedExecutionResolved(fill.externalExecutionId)
-                        refinedExecutedStockList += execution
-                    } else if (executionFillPort.exists(fill.externalExecutionId)) {
-                        executionReconciliationStatePort.markUnmatchedExecutionResolved(fill.externalExecutionId)
+                    is FillPublishPlan.Publish -> {
+                        val fill = ExecutionFillDto.from(ExecutionFill.from(execution))
+                        if (executionFillPort.exists(fill.externalExecutionId)) {
+                            executionReconciliationStatePort.markUnmatchedExecutionResolved(fill.externalExecutionId)
+                            return@forEach
+                        }
+
+                        publishOrderFillEvent(execution, publishPlan)
+                        if (executionFillPort.saveIfNew(fill)) {
+                            executionReconciliationStatePort.markUnmatchedExecutionResolved(fill.externalExecutionId)
+                            refinedExecutedStockList += execution
+                        } else if (executionFillPort.exists(fill.externalExecutionId)) {
+                            executionReconciliationStatePort.markUnmatchedExecutionResolved(fill.externalExecutionId)
+                        }
                     }
                 }
             }
-        }
         markCompleted(
             observedExecutions = executedStockList,
             savedFillCount = refinedExecutedStockList.size,
