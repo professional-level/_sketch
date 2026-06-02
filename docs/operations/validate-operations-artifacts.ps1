@@ -130,6 +130,17 @@ Assert-Contains "runtime verify dry-run" $runtimeVerifyDryRun "Would verify trad
 Assert-Contains "runtime verify dry-run" $runtimeVerifyDryRun "deployment/stock-purchase-service uses image tag ae80c31584b78eeb7361184f84dc240c2bbcba81"
 Assert-Contains "runtime verify dry-run" $runtimeVerifyDryRun "Kafka topic exists: order-cancelled"
 
+$deployPlan = & $files.DeployScript `
+    -ImageTag "ae80c31584b78eeb7361184f84dc240c2bbcba81" `
+    -InfraManifestPath $files.InfraManifest `
+    -SecretManifestPath $files.ExternalSecretsManifest `
+    -PlanOnly `
+    -AllowTemplatePlaceholders *>&1 | Out-String
+Assert-Contains "deploy plan" $deployPlan "Would deploy trading runtime with image tag ae80c31584b78eeb7361184f84dc240c2bbcba81"
+Assert-Contains "deploy plan" $deployPlan "Would refresh SQL migration ConfigMap from:"
+Assert-Contains "deploy plan" $deployPlan "Would restart deployment: akra-trading/stock-purchase-service"
+Assert-Contains "deploy plan" $deployPlan "Plan only complete. Skipping kubectl commands."
+
 $runtime = Get-Content -LiteralPath $files.RuntimeManifest -Raw
 $infra = Get-Content -LiteralPath $files.InfraManifest -Raw
 $externalSecrets = Get-Content -LiteralPath $files.ExternalSecretsManifest -Raw

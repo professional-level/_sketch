@@ -80,6 +80,17 @@ To validate the checked-in template without applying it:
   -AllowTemplatePlaceholders
 ```
 
+To validate the rollout sequence and placeholder handling without `kubectl`:
+
+```powershell
+.\deploy-trading-runtime.ps1 `
+  -ImageTag 0123456789abcdef `
+  -InfraManifestPath .\trading-infra.yaml `
+  -SecretManifestPath .\external-secrets.yaml `
+  -PlanOnly `
+  -AllowTemplatePlaceholders
+```
+
 For an actual rollout, first create a prepared manifest copy where every
 `REPLACE_...` value has been replaced by the deployment secret manager or
 cluster-specific values. If using the checked-in infra and External Secrets

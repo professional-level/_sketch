@@ -6,7 +6,7 @@ param(
 
     [string] $Namespace = "akra-trading",
 
-    [string] $ManifestPath = (Join-Path $PSScriptRoot "trading-runtime.yaml"),
+    [string] $ManifestPath,
 
     [string] $InfraManifestPath,
 
@@ -14,7 +14,7 @@ param(
 
     [string] $SecretManifestPath,
 
-    [string] $SqlDirectory = (Join-Path (Split-Path $PSScriptRoot -Parent) "sql"),
+    [string] $SqlDirectory,
 
     [int] $MigrationTimeoutSeconds = 300,
 
@@ -23,6 +23,8 @@ param(
     [int] $InfraTimeoutSeconds = 600,
 
     [switch] $DryRun,
+
+    [switch] $PlanOnly,
 
     [switch] $SkipMigrations,
 
@@ -35,6 +37,22 @@ param(
 
 Set-StrictMode -Version 3.0
 $ErrorActionPreference = "Stop"
+
+$scriptRoot = $PSScriptRoot
+if ([string]::IsNullOrWhiteSpace($scriptRoot) -and -not [string]::IsNullOrWhiteSpace($PSCommandPath)) {
+    $scriptRoot = Split-Path -Parent (Resolve-Path $PSCommandPath)
+}
+if ([string]::IsNullOrWhiteSpace($scriptRoot)) {
+    throw "Could not resolve script root for deploy-trading-runtime.ps1."
+}
+
+if ([string]::IsNullOrWhiteSpace($ManifestPath)) {
+    $ManifestPath = Join-Path $scriptRoot "trading-runtime.yaml"
+}
+
+if ([string]::IsNullOrWhiteSpace($SqlDirectory)) {
+    $SqlDirectory = Join-Path (Split-Path $scriptRoot -Parent) "sql"
+}
 
 function Require-Command {
     param([string] $Name)
@@ -88,9 +106,9 @@ function New-RenderedManifest {
         ForEach-Object { $_.Value } |
         Sort-Object -Unique
 
-    if ($remainingPlaceholders.Count -gt 0 -and -not ($DryRun -and $AllowTemplatePlaceholders)) {
+    if ($remainingPlaceholders.Count -gt 0 -and -not (($DryRun -or $PlanOnly) -and $AllowTemplatePlaceholders)) {
         $joined = $remainingPlaceholders -join ", "
-        throw "Manifest still contains deployment placeholders: $joined. Use a prepared manifest with real values, or use -DryRun -AllowTemplatePlaceholders for template validation only."
+        throw "Manifest still contains deployment placeholders: $joined. Use a prepared manifest with real values, or use -DryRun/-PlanOnly -AllowTemplatePlaceholders for template validation only."
     }
 
     $tempPath = Join-Path ([System.IO.Path]::GetTempPath()) ("akra-trading-runtime-{0}.yaml" -f [Guid]::NewGuid())
@@ -98,11 +116,69 @@ function New-RenderedManifest {
     return $tempPath
 }
 
-Require-Command "kubectl"
-
 if (-not $SkipMigrations -and -not (Test-Path -LiteralPath $SqlDirectory)) {
     throw "SQL migration directory was not found: $SqlDirectory"
 }
+
+if ($PlanOnly) {
+    $tempPlanManifests = @()
+    try {
+        Write-Host "Would deploy trading runtime with image tag $ImageTag"
+
+        if (-not [string]::IsNullOrWhiteSpace($InfraManifestPath)) {
+            $tempInfraManifest = New-RenderedManifest $InfraManifestPath $ImageTag
+            $tempPlanManifests += $tempInfraManifest
+            Write-Host "Would apply infra manifest: $InfraManifestPath"
+            if (-not $SkipInfraStatus) {
+                foreach ($statefulSet in @("mysql", "zookeeper", "kafka", "temporal-postgresql")) {
+                    Write-Host "Would wait for infra statefulset rollout: $InfraNamespace/$statefulSet"
+                }
+                Write-Host "Would wait for infra job completion: $InfraNamespace/akra-kafka-topic-bootstrap"
+                foreach ($deployment in @("temporal", "temporal-ui")) {
+                    Write-Host "Would wait for infra deployment rollout: $InfraNamespace/$deployment"
+                }
+            }
+        }
+
+        if (-not [string]::IsNullOrWhiteSpace($SecretManifestPath)) {
+            $tempSecretManifest = New-RenderedManifest $SecretManifestPath $ImageTag
+            $tempPlanManifests += $tempSecretManifest
+            Write-Host "Would apply secret manifest: $SecretManifestPath"
+        }
+
+        $tempRuntimeManifest = New-RenderedManifest $ManifestPath $ImageTag
+        $tempPlanManifests += $tempRuntimeManifest
+        Write-Host "Would apply runtime manifest: $ManifestPath"
+
+        if (-not $SkipMigrations) {
+            Write-Host "Would refresh SQL migration ConfigMap from: $SqlDirectory"
+            Write-Host "Would recreate and unsuspend migration job: $Namespace/akra-trading-schema-migration"
+            Write-Host "Would wait for migration job completion: $Namespace/akra-trading-schema-migration"
+        }
+
+        foreach ($deployment in @(
+            "kis-wrapper",
+            "stock-search-service",
+            "strategy-execution-service",
+            "stock-purchase-service"
+        )) {
+            Write-Host "Would restart deployment: $Namespace/$deployment"
+            if (-not $SkipRolloutStatus) {
+                Write-Host "Would wait for deployment rollout: $Namespace/$deployment"
+            }
+        }
+
+        Write-Host "Plan only complete. Skipping kubectl commands."
+        return
+    }
+    finally {
+        foreach ($manifest in $tempPlanManifests) {
+            Remove-Item -LiteralPath $manifest -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
+Require-Command "kubectl"
 
 $tempManifests = @()
 
