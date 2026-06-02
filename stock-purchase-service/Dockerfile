@@ -1,7 +1,7 @@
 FROM eclipse-temurin:17-jre-alpine
 
 ARG JAR_FILE
-ARG APP_PORT=8082
+ARG APP_PORT=8083
 
 WORKDIR /app
 RUN addgroup -S -g 10001 app && adduser -S -u 10001 -G app app

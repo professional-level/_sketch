@@ -17,6 +17,34 @@ Before applying `trading-runtime.yaml`:
    ConfigMaps. KIS credentials should be mounted through the `kis-broker-secrets`
    Secret and read by the wrapper through `*_FILE` environment variables.
 
+Images are built by `.github/workflows/container-images.yml` for:
+
+- `ghcr.io/professional-level/sketch-kis-wrapper`
+- `ghcr.io/professional-level/sketch-stock-search-service`
+- `ghcr.io/professional-level/sketch-strategy-execution-service`
+- `ghcr.io/professional-level/sketch-stock-purchase-service`
+
+The workflow tags each image with the Git SHA and `latest` on push or manual
+dispatch. Prefer the immutable Git SHA tag when replacing `REPLACE_IMAGE_TAG` in
+the template.
+
+For a local dry build, stage the boot jar and build with the matching
+Dockerfile:
+
+```powershell
+.\gradlew.bat --no-daemon :stock-purchase-service:bootJar
+New-Item -ItemType Directory -Force .docker\stock-purchase-service | Out-Null
+$jar = Get-ChildItem stock-purchase-service\build\libs\*.jar |
+  Where-Object { $_.Name -notlike '*-plain.jar' } |
+  Select-Object -First 1
+Copy-Item $jar.FullName .docker\stock-purchase-service\app.jar
+docker build `
+  -f stock-purchase-service\Dockerfile `
+  --build-arg JAR_FILE=.docker/stock-purchase-service/app.jar `
+  --build-arg APP_PORT=8083 `
+  -t ghcr.io/professional-level/sketch-stock-purchase-service:local .
+```
+
 Create the SQL migration ConfigMap from the checked-in migration directory
 when running from this directory:
 

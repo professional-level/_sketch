@@ -19,6 +19,7 @@ application-secret.properties
 .env
 .env.*
 !.env.example
+.docker/
 kis-token-cache.json
 *.kis-token-cache.json
 bin/

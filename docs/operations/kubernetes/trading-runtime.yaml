@@ -218,10 +218,21 @@ spec:
       labels:
         app: kis-wrapper
     spec:
+      securityContext:
+        fsGroup: 10001
       containers:
         - name: app
-          image: ghcr.io/professional-level/_sketch/kis-wrapper:REPLACE_IMAGE_TAG
+          image: ghcr.io/professional-level/sketch-kis-wrapper:REPLACE_IMAGE_TAG
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsGroup: 10001
+            runAsNonRoot: true
+            runAsUser: 10001
+            capabilities:
+              drop:
+                - ALL
           ports:
             - name: http
               containerPort: 8079
@@ -263,6 +274,8 @@ spec:
             - name: kis-secrets
               mountPath: /run/secrets/kis
               readOnly: true
+            - name: tmp
+              mountPath: /tmp
       volumes:
         - name: runtime-config
           configMap:
@@ -270,6 +283,8 @@ spec:
         - name: kis-secrets
           secret:
             secretName: kis-broker-secrets
+        - name: tmp
+          emptyDir: {}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -286,10 +301,21 @@ spec:
       labels:
         app: stock-search-service
     spec:
+      securityContext:
+        fsGroup: 10001
       containers:
         - name: app
-          image: ghcr.io/professional-level/_sketch/stock-search-service:REPLACE_IMAGE_TAG
+          image: ghcr.io/professional-level/sketch-stock-search-service:REPLACE_IMAGE_TAG
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsGroup: 10001
+            runAsNonRoot: true
+            runAsUser: 10001
+            capabilities:
+              drop:
+                - ALL
           ports:
             - name: http
               containerPort: 8082
@@ -316,10 +342,14 @@ spec:
               mountPath: /etc/akra/config/application-prod.properties
               subPath: stock-search.application-prod.properties
               readOnly: true
+            - name: tmp
+              mountPath: /tmp
       volumes:
         - name: runtime-config
           configMap:
             name: akra-trading-runtime-config
+        - name: tmp
+          emptyDir: {}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -336,10 +366,21 @@ spec:
       labels:
         app: strategy-execution-service
     spec:
+      securityContext:
+        fsGroup: 10001
       containers:
         - name: app
-          image: ghcr.io/professional-level/_sketch/strategy-execution-service:REPLACE_IMAGE_TAG
+          image: ghcr.io/professional-level/sketch-strategy-execution-service:REPLACE_IMAGE_TAG
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsGroup: 10001
+            runAsNonRoot: true
+            runAsUser: 10001
+            capabilities:
+              drop:
+                - ALL
           ports:
             - name: http
               containerPort: 8080
@@ -368,10 +409,14 @@ spec:
               mountPath: /etc/akra/config/application-prod.properties
               subPath: strategy-execution.application-prod.properties
               readOnly: true
+            - name: tmp
+              mountPath: /tmp
       volumes:
         - name: runtime-config
           configMap:
             name: akra-trading-runtime-config
+        - name: tmp
+          emptyDir: {}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -388,10 +433,21 @@ spec:
       labels:
         app: stock-purchase-service
     spec:
+      securityContext:
+        fsGroup: 10001
       containers:
         - name: app
-          image: ghcr.io/professional-level/_sketch/stock-purchase-service:REPLACE_IMAGE_TAG
+          image: ghcr.io/professional-level/sketch-stock-purchase-service:REPLACE_IMAGE_TAG
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsGroup: 10001
+            runAsNonRoot: true
+            runAsUser: 10001
+            capabilities:
+              drop:
+                - ALL
           ports:
             - name: http
               containerPort: 8083
@@ -420,10 +476,14 @@ spec:
               mountPath: /etc/akra/config/application-prod.properties
               subPath: stock-purchase.application-prod.properties
               readOnly: true
+            - name: tmp
+              mountPath: /tmp
       volumes:
         - name: runtime-config
           configMap:
             name: akra-trading-runtime-config
+        - name: tmp
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

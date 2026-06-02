@@ -347,6 +347,7 @@ These waivers should not be enabled for real capital.
 Before enabling real orders:
 
 - Replace placeholder values in `docs/operations/kubernetes/trading-runtime.yaml` or the equivalent deployment manifest; do not apply the checked-in placeholders to a real cluster.
+- Build immutable service images with `.github/workflows/container-images.yml` or an equivalent pipeline, then replace `REPLACE_IMAGE_TAG` with the Git SHA tag.
 - Set `spring.profiles.active=prod` or another configured production profile.
 - Apply required DB migrations explicitly and set `spring.jpa.hibernate.ddl-auto=validate` or `none`; do not use `update` in production.
 - Point `akra.order.kis-open-api.base-url` and `akra.market-data.kis-open-api.base-url` to the deployed broker wrapper.
