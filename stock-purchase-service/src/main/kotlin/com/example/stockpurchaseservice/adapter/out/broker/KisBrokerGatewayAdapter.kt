@@ -897,6 +897,7 @@ private fun JsonNode.toBrokerHistoryItem(): BrokerOrderHistoryItem? {
     )
     val cancelled = statusMessage?.contains(CANCELLED_KOREAN) == true || revisionCancelCode == KIS_CANCEL_REVISION_CODE
     val explicitCancelledQuantity = longValue("cncl_cfrm_qty", "CNCL_CFRM_QTY", "cncl_qty", "CNCL_QTY")
+    val explicitRejectedQuantity = longValue("rjct_qty", "RJCT_QTY", "rjct_cfrm_qty", "RJCT_CFRM_QTY")
     return BrokerOrderHistoryItem(
         externalOrderId = orderId,
         externalExecutionId = textOrNull(
@@ -931,7 +932,7 @@ private fun JsonNode.toBrokerHistoryItem(): BrokerOrderHistoryItem? {
         orderedPrice = orderedPrice,
         cumulativeFilledQuantity = filledQuantity,
         remainingQuantity = remainingQuantity,
-        rejectedQuantity = if (rejectionReason != null) orderedQuantity else 0,
+        rejectedQuantity = explicitRejectedQuantity.takeIf { it > 0 } ?: if (rejectionReason != null) orderedQuantity else 0,
         cancelledQuantity = explicitCancelledQuantity.takeIf { it > 0 } ?: if (cancelled) remainingQuantity else 0,
         cancelled = cancelled,
         side = textOrNull(
