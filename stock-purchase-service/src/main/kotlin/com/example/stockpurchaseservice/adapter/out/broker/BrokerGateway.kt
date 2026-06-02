@@ -288,7 +288,7 @@ internal fun List<BrokerOrderHistoryItem>.findStatusFor(query: BrokerOrderStatus
 private fun List<BrokerOrderHistoryItem>.selectStatusCandidate(
     query: BrokerOrderStatusQuery,
 ): BrokerOrderHistoryItem? {
-    val externalOrderId = query.externalOrderId ?: return selectSingleTerminalOrSingle()
+    val externalOrderId = query.externalOrderId ?: return singleOrNull()
     return selectCandidateForExternalOrderId(externalOrderId)
 }
 

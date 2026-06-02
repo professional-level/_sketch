@@ -696,7 +696,7 @@ Broker integration phase
     -> KIS token / TR ID / raw API contract
 ```
 
-Implementation note: `SUBMISSION_UNKNOWN` recovery now passes the stored order quantity and submitted price into broker status lookup. When broker order id is absent, stock-purchase-service first matches broker history by symbol, side, and submitted date, then narrows candidates by ordered quantity and submitted price when matching broker row fields are available.
+Implementation note: `SUBMISSION_UNKNOWN` recovery now passes the stored order quantity and submitted price into broker status lookup. When broker order id is absent, stock-purchase-service first matches broker history by symbol, side, and submitted date, then narrows candidates by ordered quantity and submitted price when matching broker row fields are available. Recovery only resolves the broker status when that narrowed set has a single candidate; otherwise the submission remains `UNKNOWN` to avoid assigning another same-day order's terminal state.
 
 KIS overseas order history mapping includes `ft_ord_unpr3`/`FT_ORD_UNPR3` as submitted order price aliases, so broker-order-id-free recovery can still use the submitted price to disambiguate matching rows.
 

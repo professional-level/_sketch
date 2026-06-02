@@ -200,6 +200,17 @@ class BrokerOrderHistoryItemTest {
     }
 
     @Test
+    fun `returns unknown when broker id is absent and only one ambiguous candidate is terminal`() {
+        val status = listOf(
+            row(externalOrderId = "broker-1", cumulativeFilledQuantity = 3),
+            row(externalOrderId = "broker-2"),
+        ).findStatusFor(query(externalOrderId = null, orderedQuantity = 3))
+
+        assertEquals(BrokerOrderStatus.UNKNOWN, status.status)
+        assertEquals("ambiguous broker orders: broker-1, broker-2", status.reason)
+    }
+
+    @Test
     fun `uses ordered quantity to disambiguate lookup without broker order id`() {
         val status = listOf(
             row(externalOrderId = "broker-1", orderedQuantity = 1, cumulativeFilledQuantity = 1),
