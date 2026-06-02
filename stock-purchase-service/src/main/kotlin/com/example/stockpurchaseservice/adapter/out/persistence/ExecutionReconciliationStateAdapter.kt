@@ -54,4 +54,8 @@ internal class ExecutionReconciliationStateAdapter(
         if (unmatchedExecutionRepository.exists(execution.externalExecutionId)) return
         unmatchedExecutionRepository.save(UnmatchedExecutionEntity.from(execution)).awaitSuspending()
     }
+
+    override suspend fun markUnmatchedExecutionResolved(externalExecutionId: String) {
+        unmatchedExecutionRepository.deleteById(externalExecutionId).awaitSuspending()
+    }
 }

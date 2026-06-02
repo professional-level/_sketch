@@ -130,11 +130,17 @@ class ReconcileExecutionsService(
 
                 is FillPublishPlan.Publish -> {
                     val fill = ExecutionFillDto.from(ExecutionFill.from(execution))
-                    if (executionFillPort.exists(fill.externalExecutionId)) return@forEach
+                    if (executionFillPort.exists(fill.externalExecutionId)) {
+                        executionReconciliationStatePort.markUnmatchedExecutionResolved(fill.externalExecutionId)
+                        return@forEach
+                    }
 
                     publishOrderFillEvent(execution, publishPlan)
                     if (executionFillPort.saveIfNew(fill)) {
+                        executionReconciliationStatePort.markUnmatchedExecutionResolved(fill.externalExecutionId)
                         refinedExecutedStockList += execution
+                    } else if (executionFillPort.exists(fill.externalExecutionId)) {
+                        executionReconciliationStatePort.markUnmatchedExecutionResolved(fill.externalExecutionId)
                     }
                 }
             }

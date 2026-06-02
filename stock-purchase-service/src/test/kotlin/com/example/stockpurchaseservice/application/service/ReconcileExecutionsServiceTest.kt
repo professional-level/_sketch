@@ -102,6 +102,7 @@ class ReconcileExecutionsServiceTest {
     @Test
     fun `does not publish fill events for duplicate broker execution`() = runBlocking {
         val eventPort = FakeOrderExecutionEventPort()
+        val reconciliationStatePort = FakeExecutionReconciliationStatePort()
         val service = service(
             marketPort = FakeMarketServicePort(
                 executions = listOf(execution(externalExecutionId = "exec-1", quantity = 30)),
@@ -111,12 +112,14 @@ class ReconcileExecutionsServiceTest {
                 submissions = listOf(submission(quantity = 100)),
             ),
             eventPort = eventPort,
+            reconciliationStatePort = reconciliationStatePort,
         )
 
         service.execute()
 
         assertEquals(emptyList(), eventPort.partiallyFilled)
         assertEquals(emptyList(), eventPort.filled)
+        assertEquals(listOf("exec-1"), reconciliationStatePort.resolvedUnmatchedExecutionIds)
     }
 
     @Test
@@ -268,14 +271,14 @@ class ReconcileExecutionsServiceTest {
     fun `unmatched execution can be published after order submission appears`() = runBlocking {
         val executionFillPort = FakeExecutionFillPort()
         val execution = execution(externalExecutionId = "exec-1", quantity = 30)
-        val firstStatePort = FakeExecutionReconciliationStatePort()
+        val reconciliationStatePort = FakeExecutionReconciliationStatePort()
         val firstEventPort = FakeOrderExecutionEventPort()
         service(
             marketPort = FakeMarketServicePort(executions = listOf(execution)),
             executionFillPort = executionFillPort,
             submissionPort = FakeOrderIntentSubmissionPort(submissions = emptyList()),
             eventPort = firstEventPort,
-            reconciliationStatePort = firstStatePort,
+            reconciliationStatePort = reconciliationStatePort,
         ).execute()
 
         val secondEventPort = FakeOrderExecutionEventPort()
@@ -286,12 +289,14 @@ class ReconcileExecutionsServiceTest {
                 submissions = listOf(submission(quantity = 100)),
             ),
             eventPort = secondEventPort,
+            reconciliationStatePort = reconciliationStatePort,
         ).execute()
 
         assertEquals(emptyList(), firstEventPort.partiallyFilled)
-        assertEquals("NO_ORDER_INTENT_SUBMISSION", firstStatePort.unmatched.single().reason)
+        assertEquals("NO_ORDER_INTENT_SUBMISSION", reconciliationStatePort.unmatched.single().reason)
         assertEquals(30, secondEventPort.partiallyFilled.single().filledQuantity)
         assertEquals(listOf("exec-1"), executionFillPort.savedExternalExecutionIds)
+        assertEquals(listOf("exec-1"), reconciliationStatePort.resolvedUnmatchedExecutionIds)
     }
 
     @Test
@@ -737,6 +742,7 @@ class ReconcileExecutionsServiceTest {
         val completed: MutableList<ExecutionReconciliationResultDto> = mutableListOf()
         val failedReasons: MutableList<String?> = mutableListOf()
         val unmatched: MutableList<UnmatchedExecutionDto> = mutableListOf()
+        val resolvedUnmatchedExecutionIds: MutableList<String> = mutableListOf()
 
         override suspend fun findCursor(source: String): ExecutionReconciliationCursorDto? {
             return cursor?.takeIf { it.source == source }
@@ -760,6 +766,10 @@ class ReconcileExecutionsServiceTest {
 
         override suspend fun saveUnmatchedExecution(execution: UnmatchedExecutionDto) {
             unmatched += execution
+        }
+
+        override suspend fun markUnmatchedExecutionResolved(externalExecutionId: String) {
+            resolvedUnmatchedExecutionIds += externalExecutionId
         }
     }
 

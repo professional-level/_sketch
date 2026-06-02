@@ -13,6 +13,7 @@ interface ExecutionReconciliationStatePort {
 
     suspend fun markFailed(source: String, failedAt: ZonedDateTime, reason: String?)
     suspend fun saveUnmatchedExecution(execution: UnmatchedExecutionDto)
+    suspend fun markUnmatchedExecutionResolved(externalExecutionId: String)
 }
 
 data class ExecutionReconciliationCursorDto(
