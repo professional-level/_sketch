@@ -540,15 +540,21 @@ private data class KisCancelableOrderItem(
 }
 
 private fun JsonNode.toKisCancelableOrderItem(): KisCancelableOrderItem? {
-    val orderId = textOrNull("odno", "ODNO", "ord_no", "ORD_NO", "order_no").orEmpty()
-    val originalOrderId = textOrNull("orgn_odno", "ORGN_ODNO")
+    val orderId = textOrNull("odno", "ODNO", "ord_no", "ORD_NO", "order_no", "ORDER_NO").orEmpty()
+    val originalOrderId = textOrNull("orgn_odno", "ORGN_ODNO", "orgnOdno")
     val matchableOrderId = orderId.ifBlank { originalOrderId.orEmpty() }
     if (matchableOrderId.isBlank()) return null
     return KisCancelableOrderItem(
-        branchOrderNumber = textOrNull("ord_gno_brno", "ORD_GNO_BRNO", "krx_fwdg_ord_orgno", "KRX_FWDG_ORD_ORGNO"),
+        branchOrderNumber = textOrNull(
+            "ord_gno_brno",
+            "ORD_GNO_BRNO",
+            "krx_fwdg_ord_orgno",
+            "KRX_FWDG_ORD_ORGNO",
+            "krxFwdgOrdOrgno",
+        ),
         orderId = orderId,
         originalOrderId = originalOrderId,
-        symbol = textOrNull("pdno", "PDNO").orEmpty(),
+        symbol = textOrNull("pdno", "PDNO", "prdt_code", "PRDT_CODE").orEmpty(),
         possibleQuantity = longValue(
             "psbl_qty",
             "PSBL_QTY",
