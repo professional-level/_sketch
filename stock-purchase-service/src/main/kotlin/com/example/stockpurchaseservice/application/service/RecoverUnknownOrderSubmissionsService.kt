@@ -57,7 +57,10 @@ class RecoverUnknownOrderSubmissionsService(
                 recoverFillFromStatus(recovered, status)
             }
             BrokerOrderStatus.REJECTED -> markRejected(submission, status)
-            BrokerOrderStatus.CANCELLED -> markCancelled(submission, status)
+            BrokerOrderStatus.CANCELLED -> {
+                recoverFillFromStatus(submission, status)
+                markCancelled(submission, status)
+            }
             BrokerOrderStatus.UNKNOWN -> {
                 val unresolved = submission.copy(
                     statusReason = status.reason,
@@ -74,7 +77,10 @@ class RecoverUnknownOrderSubmissionsService(
     private suspend fun recoverCancelPending(submission: OrderIntentSubmissionDto) {
         val status = lookupStatus(submission, RecoveryMode.CANCEL_PENDING) ?: return
         when (status.status) {
-            BrokerOrderStatus.CANCELLED -> markCancelled(submission, status)
+            BrokerOrderStatus.CANCELLED -> {
+                recoverFillFromStatus(submission, status)
+                markCancelled(submission, status)
+            }
             BrokerOrderStatus.REJECTED -> markRejected(submission, status)
             BrokerOrderStatus.FILLED -> markSubmittedWithoutRepublishing(submission, status)?.let { recovered ->
                 recoverFillFromStatus(recovered, status)

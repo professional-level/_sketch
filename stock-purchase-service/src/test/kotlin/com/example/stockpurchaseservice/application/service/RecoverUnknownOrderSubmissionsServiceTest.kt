@@ -249,6 +249,45 @@ class RecoverUnknownOrderSubmissionsServiceTest {
     }
 
     @Test
+    fun `recovers unknown cancelled submission with partial fill event`() = runBlocking {
+        val submissionPort = FakeOrderIntentSubmissionPort(listOf(submission(externalOrderId = "broker-1")))
+        val eventPort = FakeOrderExecutionEventPort()
+        val executionFillPort = FakeExecutionFillPort()
+        val service = RecoverUnknownOrderSubmissionsService(
+            marketService = FakeMarketServicePort(
+                status = BrokerOrderStatusDto(
+                    status = BrokerOrderStatus.CANCELLED,
+                    externalOrderId = "broker-1",
+                    externalExecutionId = "cancelled-exec-1",
+                    reason = "cancel confirmed",
+                    checkedAt = CHECKED_AT,
+                    orderedQuantity = 3,
+                    cumulativeFilledQuantity = 1,
+                    remainingQuantity = 2,
+                    averageExecutionPrice = 112.5,
+                    brokerReportedAt = BROKER_REPORTED_AT,
+                ),
+            ),
+            orderIntentSubmissionPort = submissionPort,
+            orderExecutionEventPort = eventPort,
+            operationalAlertPort = FakeOperationalAlertPort(),
+            executionFillPort = executionFillPort,
+        )
+
+        service.execute()
+
+        assertEquals("broker-1", submissionPort.cancelled.single().externalOrderId)
+        assertEquals("broker-1", eventPort.partiallyFilled.single().brokerOrderId)
+        assertEquals(1L, eventPort.partiallyFilled.single().filledQuantity)
+        assertEquals(112.5, eventPort.partiallyFilled.single().filledPrice)
+        assertEquals(BROKER_REPORTED_AT, eventPort.partiallyFilled.single().filledAt)
+        assertEquals("cancelled-exec-1", executionFillPort.saved.single().externalExecutionId)
+        assertEquals("broker-1", eventPort.cancelled.single().brokerOrderId)
+        assertEquals(emptyList(), eventPort.submitted)
+        assertEquals(emptyList(), eventPort.filled)
+    }
+
+    @Test
     fun `keeps unknown submission when broker status is still unknown`() = runBlocking {
         val original = submission(externalOrderId = "broker-1")
         val submissionPort = FakeOrderIntentSubmissionPort(listOf(original))
@@ -423,6 +462,50 @@ class RecoverUnknownOrderSubmissionsServiceTest {
         assertEquals("broker-1", eventPort.cancelled.single().brokerOrderId)
         assertEquals("cancel confirmed", eventPort.cancelled.single().reason)
         assertEquals(emptyList(), eventPort.submitted)
+    }
+
+    @Test
+    fun `recovers cancel pending cancelled submission with partial fill event`() = runBlocking {
+        val pending = submission(externalOrderId = "broker-1").copy(
+            status = OrderIntentSubmissionStatusDto.CANCEL_PENDING,
+            statusReason = "cancel request accepted by broker",
+        )
+        val submissionPort = FakeOrderIntentSubmissionPort(
+            unknownSubmissions = emptyList(),
+            cancelPendingSubmissions = listOf(pending),
+        )
+        val eventPort = FakeOrderExecutionEventPort()
+        val executionFillPort = FakeExecutionFillPort()
+        val service = RecoverUnknownOrderSubmissionsService(
+            marketService = FakeMarketServicePort(
+                status = BrokerOrderStatusDto(
+                    status = BrokerOrderStatus.CANCELLED,
+                    externalOrderId = "broker-1",
+                    externalExecutionId = "cancelled-exec-1",
+                    reason = "cancel confirmed",
+                    checkedAt = CHECKED_AT,
+                    orderedQuantity = 3,
+                    cumulativeFilledQuantity = 1,
+                    remainingQuantity = 2,
+                    averageExecutionPrice = 112.5,
+                    brokerReportedAt = BROKER_REPORTED_AT,
+                ),
+            ),
+            orderIntentSubmissionPort = submissionPort,
+            orderExecutionEventPort = eventPort,
+            operationalAlertPort = FakeOperationalAlertPort(),
+            executionFillPort = executionFillPort,
+        )
+
+        service.execute()
+
+        assertEquals("broker-1", submissionPort.cancelled.single().externalOrderId)
+        assertEquals("broker-1", eventPort.partiallyFilled.single().brokerOrderId)
+        assertEquals(1L, eventPort.partiallyFilled.single().filledQuantity)
+        assertEquals("cancelled-exec-1", executionFillPort.saved.single().externalExecutionId)
+        assertEquals("broker-1", eventPort.cancelled.single().brokerOrderId)
+        assertEquals(emptyList(), eventPort.submitted)
+        assertEquals(emptyList(), eventPort.filled)
     }
 
     @Test
