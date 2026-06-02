@@ -185,6 +185,10 @@ Blocked by default:
 - `akra.order.risk.enabled=false`.
 - `akra.order.risk.sell-position.enabled=false`.
 - `akra.order.risk.trading-hours.enabled=false`.
+- `akra.order.risk.duplicate-order-kill-switch-enabled=false`.
+- `akra.order.risk.account-cash.enabled=false`.
+- Missing or non-positive `akra.order.risk.max-order-notional`, `max-account-pending-buy-notional`, `max-account-exposure-notional`, or `max-daily-order-count`.
+- Empty `akra.order.risk.enabled-strategy-prefixes`, `symbol-max-order-notional.*`, or `strategy-trading-environments`.
 
 Temporary waiver properties exist for controlled tests only:
 
@@ -232,7 +236,7 @@ Before enabling real orders:
 - Use JDBC or managed external storage for shared KIS tokens; do not use local-file token persistence for multi-instance production deployments.
 - Set real-vs-mock trading flags intentionally for the account being operated.
 - Confirm `strategy-execution-service` order-intent trading environment settings and `stock-purchase-service` broker mock/live flags agree for each strategy prefix.
-- Confirm risk guard limits are set for order notional, account pending buy notional, broker account exposure/cash, symbol notional, daily order count, disabled strategies, and strategy trading environments.
+- Confirm risk guard limits are set for order notional, account pending buy notional, broker account exposure/cash, symbol notional, daily order count, strategy allow-list, and strategy trading environments. `stock-purchase-service` startup now enforces these settings under production-like profiles unless the disabled-risk-control waiver is explicitly set.
 - Confirm broker order status lookup windows are wide enough for `SUBMISSION_UNKNOWN` and `CANCEL_PENDING` recovery without creating excessive KIS query load.
 - Configure domestic and US order windows, holidays, early-close dates, and LOC/MOC cutoffs until an exchange calendar sync is available.
 - Configure `akra.trading-calendar.us.*` in `strategy-execution-service` separately from purchase-service risk windows. The daily active-strategy run resolves the order session date from the requested timestamp and market close, then skips strategy execution when that target US session is closed.

@@ -281,6 +281,20 @@ class OrderRiskControlAdapterTest {
     }
 
     @Test
+    fun `rejects order when daily broker order count reaches configured limit`() = runBlocking {
+        val properties = OrderRiskProperties().apply {
+            tradingHours.enabled = false
+            maxDailyOrderCount = 2
+        }
+        val reader = FakeOrderRiskSubmissionReader(brokerSubmittedCount = 2)
+
+        val result = adapter(properties, reader).assess(command())
+
+        assertFalse(result.accepted)
+        assertContains(result.reason ?: "", "daily broker order count 2 reached limit 2")
+    }
+
+    @Test
     fun `checks duplicate orders using market trading day window`() = runBlocking {
         val properties = OrderRiskProperties().apply {
             tradingHours.enabled = false

@@ -1,5 +1,6 @@
 package com.example.stockpurchaseservice.config.runtime
 
+import com.example.stockpurchaseservice.config.risk.OrderRiskProperties
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.ApplicationArguments
 import org.springframework.boot.ApplicationRunner
@@ -10,18 +11,13 @@ import org.springframework.stereotype.Component
 class StockPurchaseRuntimeSafetyValidator(
     private val environment: Environment,
     private val properties: StockPurchaseRuntimeSafetyProperties,
+    private val orderRiskProperties: OrderRiskProperties,
     @Value("\${akra.order.kis-open-api.base-url:http://localhost:8079}")
     private val brokerBaseUrl: String,
     @Value("\${akra.order.domestic.mock:true}")
     private val domesticMockOrder: Boolean,
     @Value("\${akra.order.overseas.mock:true}")
     private val overseasMockOrder: Boolean,
-    @Value("\${akra.order.risk.enabled:true}")
-    private val orderRiskEnabled: Boolean,
-    @Value("\${akra.order.risk.sell-position.enabled:true}")
-    private val sellPositionRiskEnabled: Boolean,
-    @Value("\${akra.order.risk.trading-hours.enabled:true}")
-    private val tradingHoursRiskEnabled: Boolean,
 ) : ApplicationRunner {
 
     override fun run(args: ApplicationArguments) {
@@ -34,9 +30,18 @@ class StockPurchaseRuntimeSafetyValidator(
                 domesticMockOrder = domesticMockOrder,
                 overseasMockOrder = overseasMockOrder,
                 hibernateDdlAuto = environment.getProperty("spring.jpa.hibernate.ddl-auto"),
-                orderRiskEnabled = orderRiskEnabled,
-                sellPositionRiskEnabled = sellPositionRiskEnabled,
-                tradingHoursRiskEnabled = tradingHoursRiskEnabled,
+                orderRiskEnabled = orderRiskProperties.enabled,
+                sellPositionRiskEnabled = orderRiskProperties.sellPosition.enabled,
+                tradingHoursRiskEnabled = orderRiskProperties.tradingHours.enabled,
+                duplicateOrderKillSwitchEnabled = orderRiskProperties.duplicateOrderKillSwitchEnabled,
+                accountCashRiskEnabled = orderRiskProperties.accountCash.enabled,
+                maxOrderNotional = orderRiskProperties.maxOrderNotional,
+                maxAccountPendingBuyNotional = orderRiskProperties.maxAccountPendingBuyNotional,
+                maxAccountExposureNotional = orderRiskProperties.maxAccountExposureNotional,
+                maxDailyOrderCount = orderRiskProperties.maxDailyOrderCount,
+                enabledStrategyPrefixes = orderRiskProperties.enabledStrategyPrefixes,
+                symbolMaxOrderNotional = orderRiskProperties.symbolMaxOrderNotional,
+                strategyTradingEnvironmentPrefixes = orderRiskProperties.strategyTradingEnvironments.keys,
                 allowLocalBrokerEndpointInProduction = properties.allowLocalBrokerEndpointInProduction,
                 allowMockTradingInProduction = properties.allowMockTradingInProduction,
                 allowDisabledRiskControlsInProduction = properties.allowDisabledRiskControlsInProduction,
@@ -67,6 +72,15 @@ object StockPurchaseRuntimeSafetyRules {
         val orderRiskEnabled: Boolean,
         val sellPositionRiskEnabled: Boolean,
         val tradingHoursRiskEnabled: Boolean,
+        val duplicateOrderKillSwitchEnabled: Boolean,
+        val accountCashRiskEnabled: Boolean,
+        val maxOrderNotional: Double?,
+        val maxAccountPendingBuyNotional: Double?,
+        val maxAccountExposureNotional: Double?,
+        val maxDailyOrderCount: Long?,
+        val enabledStrategyPrefixes: Collection<String>,
+        val symbolMaxOrderNotional: Map<String, Double>,
+        val strategyTradingEnvironmentPrefixes: Collection<String>,
         val allowLocalBrokerEndpointInProduction: Boolean,
         val allowMockTradingInProduction: Boolean,
         val allowDisabledRiskControlsInProduction: Boolean,
@@ -106,10 +120,62 @@ object StockPurchaseRuntimeSafetyRules {
                     violations += "prod/live profile cannot disable trading-hours risk control " +
                         "(akra.order.risk.trading-hours.enabled=false)"
                 }
+                if (!input.duplicateOrderKillSwitchEnabled) {
+                    violations += "prod/live profile cannot disable duplicate active-order kill switch " +
+                        "(akra.order.risk.duplicate-order-kill-switch-enabled=false)"
+                }
+                if (!input.accountCashRiskEnabled) {
+                    violations += "prod/live profile cannot disable account cash risk control " +
+                        "(akra.order.risk.account-cash.enabled=false)"
+                }
+                if (!input.maxOrderNotional.isPositiveLimit()) {
+                    violations += "prod/live profile must configure a positive order notional limit " +
+                        "(akra.order.risk.max-order-notional)"
+                }
+                if (!input.maxAccountPendingBuyNotional.isPositiveLimit()) {
+                    violations += "prod/live profile must configure a positive account pending-buy notional limit " +
+                        "(akra.order.risk.max-account-pending-buy-notional)"
+                }
+                if (!input.maxAccountExposureNotional.isPositiveLimit()) {
+                    violations += "prod/live profile must configure a positive account exposure notional limit " +
+                        "(akra.order.risk.max-account-exposure-notional)"
+                }
+                if (!input.maxDailyOrderCount.isPositiveLimit()) {
+                    violations += "prod/live profile must configure a positive daily order count limit " +
+                        "(akra.order.risk.max-daily-order-count)"
+                }
+                if (!input.enabledStrategyPrefixes.hasConfiguredValue()) {
+                    violations += "prod/live profile must configure a strategy allow-list " +
+                        "(akra.order.risk.enabled-strategy-prefixes)"
+                }
+                if (!input.symbolMaxOrderNotional.hasPositiveSymbolLimit()) {
+                    violations += "prod/live profile must configure at least one positive symbol order notional limit " +
+                        "(akra.order.risk.symbol-max-order-notional.*)"
+                }
+                if (!input.strategyTradingEnvironmentPrefixes.hasConfiguredValue()) {
+                    violations += "prod/live profile must configure strategy trading environment policies " +
+                        "(akra.order.risk.strategy-trading-environments)"
+                }
             }
         }
 
         return violations
+    }
+
+    private fun Double?.isPositiveLimit(): Boolean {
+        return this != null && isFinite() && this > 0.0
+    }
+
+    private fun Long?.isPositiveLimit(): Boolean {
+        return this != null && this > 0
+    }
+
+    private fun Collection<String>.hasConfiguredValue(): Boolean {
+        return any { it.trim().isNotBlank() }
+    }
+
+    private fun Map<String, Double>.hasPositiveSymbolLimit(): Boolean {
+        return entries.any { (symbol, limit) -> symbol.trim().isNotBlank() && limit.isFinite() && limit > 0.0 }
     }
 
     private fun isSafeHibernateDdlAuto(value: String?): Boolean {

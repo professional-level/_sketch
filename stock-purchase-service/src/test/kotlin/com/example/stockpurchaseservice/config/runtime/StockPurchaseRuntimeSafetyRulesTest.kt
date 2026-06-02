@@ -132,6 +132,37 @@ class StockPurchaseRuntimeSafetyRulesTest {
     }
 
     @Test
+    fun `blocks incomplete production risk guard configuration`() {
+        val violations = StockPurchaseRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                brokerBaseUrl = "https://broker-wrapper.example.com",
+                domesticMockOrder = false,
+                overseasMockOrder = false,
+                duplicateOrderKillSwitchEnabled = false,
+                accountCashRiskEnabled = false,
+                maxOrderNotional = null,
+                maxAccountPendingBuyNotional = null,
+                maxAccountExposureNotional = null,
+                maxDailyOrderCount = null,
+                enabledStrategyPrefixes = emptyList(),
+                symbolMaxOrderNotional = emptyMap(),
+                strategyTradingEnvironmentPrefixes = emptyList(),
+            ),
+        )
+
+        assertTrue(violations.any { it.contains("duplicate active-order kill switch") })
+        assertTrue(violations.any { it.contains("account cash risk control") })
+        assertTrue(violations.any { it.contains("max-order-notional") })
+        assertTrue(violations.any { it.contains("max-account-pending-buy-notional") })
+        assertTrue(violations.any { it.contains("max-account-exposure-notional") })
+        assertTrue(violations.any { it.contains("max-daily-order-count") })
+        assertTrue(violations.any { it.contains("enabled-strategy-prefixes") })
+        assertTrue(violations.any { it.contains("symbol-max-order-notional") })
+        assertTrue(violations.any { it.contains("strategy-trading-environments") })
+    }
+
+    @Test
     fun `allows explicitly waived production checks`() {
         val violations = StockPurchaseRuntimeSafetyRules.validate(
             input(
@@ -159,6 +190,15 @@ class StockPurchaseRuntimeSafetyRulesTest {
         orderRiskEnabled: Boolean = true,
         sellPositionRiskEnabled: Boolean = true,
         tradingHoursRiskEnabled: Boolean = true,
+        duplicateOrderKillSwitchEnabled: Boolean = true,
+        accountCashRiskEnabled: Boolean = true,
+        maxOrderNotional: Double? = 1_000.0,
+        maxAccountPendingBuyNotional: Double? = 5_000.0,
+        maxAccountExposureNotional: Double? = 20_000.0,
+        maxDailyOrderCount: Long? = 20,
+        enabledStrategyPrefixes: Collection<String> = listOf("laor-v4-live"),
+        symbolMaxOrderNotional: Map<String, Double> = mapOf("TQQQ" to 1_000.0),
+        strategyTradingEnvironmentPrefixes: Collection<String> = listOf("laor-v4-live"),
         allowLocalBrokerEndpointInProduction: Boolean = false,
         allowMockTradingInProduction: Boolean = false,
         allowDisabledRiskControlsInProduction: Boolean = false,
@@ -173,6 +213,15 @@ class StockPurchaseRuntimeSafetyRulesTest {
         orderRiskEnabled = orderRiskEnabled,
         sellPositionRiskEnabled = sellPositionRiskEnabled,
         tradingHoursRiskEnabled = tradingHoursRiskEnabled,
+        duplicateOrderKillSwitchEnabled = duplicateOrderKillSwitchEnabled,
+        accountCashRiskEnabled = accountCashRiskEnabled,
+        maxOrderNotional = maxOrderNotional,
+        maxAccountPendingBuyNotional = maxAccountPendingBuyNotional,
+        maxAccountExposureNotional = maxAccountExposureNotional,
+        maxDailyOrderCount = maxDailyOrderCount,
+        enabledStrategyPrefixes = enabledStrategyPrefixes,
+        symbolMaxOrderNotional = symbolMaxOrderNotional,
+        strategyTradingEnvironmentPrefixes = strategyTradingEnvironmentPrefixes,
         allowLocalBrokerEndpointInProduction = allowLocalBrokerEndpointInProduction,
         allowMockTradingInProduction = allowMockTradingInProduction,
         allowDisabledRiskControlsInProduction = allowDisabledRiskControlsInProduction,
