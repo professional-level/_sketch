@@ -463,6 +463,8 @@ Operational alert counters are emitted through Micrometer as `stock.purchase.ope
 - `stock.purchase.reconciliation.cursor.failures{source}`: `1` when a reconciliation cursor source is currently failed, otherwise `0`.
 - `stock.purchase.reconciliation.cursor.unmatched.executions{source}`: unmatched execution count observed by each reconciliation cursor.
 
+Status gauges are reset on every refresh before the current snapshot is recorded, so statuses that disappear from the latest DB snapshot fall back to `0` instead of leaving stale alert signals.
+
 If metric refresh cannot read the operations snapshot, `stock.purchase.operations.metrics.refresh.failures` increments and the service continues running. Operators can disable these scheduled gauges with `akra.operations.metrics.enabled=false` during controlled diagnostics.
 
 Optional outbound alert routes:

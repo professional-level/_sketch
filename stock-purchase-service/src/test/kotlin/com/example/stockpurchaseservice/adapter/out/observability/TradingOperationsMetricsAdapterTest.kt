@@ -78,14 +78,20 @@ class TradingOperationsMetricsAdapterTest {
     }
 
     @Test
-    fun `resets stale problem and cursor gauges on next snapshot`() = runBlocking {
+    fun `resets stale status gauges on next snapshot`() = runBlocking {
         val meterRegistry = SimpleMeterRegistry()
         val statusPort = FakeTradingOperationsStatusPort(snapshot())
         val adapter = TradingOperationsMetricsAdapter(statusPort, meterRegistry)
 
         adapter.refresh()
         statusPort.snapshot = snapshot(
+            orderSubmissionStatusCounts = listOf(
+                OrderSubmissionStatusCount(OrderIntentSubmissionStatusDto.SUBMITTED, 1),
+            ),
             recentProblemSubmissions = emptyList(),
+            orderExecutionOutboxStatusCounts = listOf(
+                OutboxStatusCount("PENDING", 1),
+            ),
             reconciliationCursors = listOf(
                 reconciliationCursor(
                     status = "COMPLETED",
@@ -99,9 +105,25 @@ class TradingOperationsMetricsAdapterTest {
         assertEquals(
             0.0,
             meterRegistry.gaugeValue(
+                TradingOperationsMetricsAdapter.ORDER_SUBMISSION_STATUS_GAUGE,
+                "status",
+                "SUBMISSION_UNKNOWN",
+            ),
+        )
+        assertEquals(
+            0.0,
+            meterRegistry.gaugeValue(
                 TradingOperationsMetricsAdapter.PROBLEM_SUBMISSION_GAUGE,
                 "status",
                 "SUBMISSION_UNKNOWN",
+            ),
+        )
+        assertEquals(
+            0.0,
+            meterRegistry.gaugeValue(
+                TradingOperationsMetricsAdapter.ORDER_EXECUTION_OUTBOX_GAUGE,
+                "status",
+                "FAILED",
             ),
         )
         assertEquals(
@@ -153,20 +175,22 @@ class TradingOperationsMetricsAdapterTest {
     }
 
     private fun snapshot(
+        orderSubmissionStatusCounts: List<OrderSubmissionStatusCount> = listOf(
+            OrderSubmissionStatusCount(OrderIntentSubmissionStatusDto.SUBMITTED, 11),
+            OrderSubmissionStatusCount(OrderIntentSubmissionStatusDto.SUBMISSION_UNKNOWN, 3),
+        ),
         recentProblemSubmissions: List<OrderSubmissionProblemStatus> = listOf(problemSubmission(), problemSubmission()),
+        orderExecutionOutboxStatusCounts: List<OutboxStatusCount> = listOf(
+            OutboxStatusCount("PENDING", 2),
+            OutboxStatusCount("FAILED", 5),
+        ),
         reconciliationCursors: List<ExecutionReconciliationCursorStatus> = listOf(reconciliationCursor()),
         unmatchedExecutionCount: Long = 7,
     ): TradingOperationsStatusSnapshot {
         return TradingOperationsStatusSnapshot(
-            orderSubmissionStatusCounts = listOf(
-                OrderSubmissionStatusCount(OrderIntentSubmissionStatusDto.SUBMITTED, 11),
-                OrderSubmissionStatusCount(OrderIntentSubmissionStatusDto.SUBMISSION_UNKNOWN, 3),
-            ),
+            orderSubmissionStatusCounts = orderSubmissionStatusCounts,
             recentProblemSubmissions = recentProblemSubmissions,
-            orderExecutionOutboxStatusCounts = listOf(
-                OutboxStatusCount("PENDING", 2),
-                OutboxStatusCount("FAILED", 5),
-            ),
+            orderExecutionOutboxStatusCounts = orderExecutionOutboxStatusCounts,
             reconciliationCursors = reconciliationCursors,
             unmatchedExecutionCount = unmatchedExecutionCount,
             recentUnmatchedExecutions = listOf(

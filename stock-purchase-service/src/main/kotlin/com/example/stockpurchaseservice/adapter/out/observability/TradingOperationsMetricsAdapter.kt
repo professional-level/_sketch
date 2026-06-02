@@ -52,7 +52,9 @@ internal class TradingOperationsMetricsAdapter(
     }
 
     internal fun recordSnapshot(snapshot: TradingOperationsStatusSnapshot) {
+        resetGauges(orderSubmissionStatusGauges)
         resetGauges(problemSubmissionStatusGauges)
+        resetGauges(outboxStatusGauges)
         resetGauges(reconciliationCursorFailureGauges)
         resetGauges(reconciliationCursorUnmatchedExecutionGauges)
 
