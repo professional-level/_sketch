@@ -430,7 +430,7 @@ internal fun BrokerOrderCancelCommand.toKisUsOverseasCancelRequest(): Map<String
         "ORGN_ODNO" to originalOrderId,
         "RVSE_CNCL_DVSN_CD" to "02",
         "ORD_QTY" to quantity,
-        "OVRS_ORD_UNPR" to price.toBrokerPrice(),
+        "OVRS_ORD_UNPR" to "0",
         "MGCO_APTM_ODNO" to "",
         "ORD_SVR_DVSN_CD" to "0",
         "isMock" to isMock,

@@ -209,7 +209,7 @@ class KisBrokerGatewayAdapterTest {
         assertEquals("overseas-order-1", body["ORGN_ODNO"])
         assertEquals("02", body["RVSE_CNCL_DVSN_CD"])
         assertEquals(3, body["ORD_QTY"])
-        assertEquals("112.5", body["OVRS_ORD_UNPR"])
+        assertEquals("0", body["OVRS_ORD_UNPR"])
         assertEquals("", body["MGCO_APTM_ODNO"])
         assertEquals("0", body["ORD_SVR_DVSN_CD"])
         assertEquals(true, body["isMock"])
