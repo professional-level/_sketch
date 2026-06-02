@@ -378,6 +378,7 @@ The response includes:
 - order submission counts by `SUBMITTED`, `SUBMISSION_UNKNOWN`, `CANCEL_PENDING`, `REJECTED`, and `CANCELLED`
 - persistent `SUBMISSION_UNKNOWN` threshold seconds, recent persistent unknown count, and per-problem age/persistent flags
 - order execution outbox counts by publisher status
+- configured execution reconciliation backfill days
 - reconciliation cursor status, attempt counts, last observed execution id/time, saved fill count, unmatched execution count, and failure reason
 - total unmatched broker execution count
 - the 20 most recent unmatched broker executions

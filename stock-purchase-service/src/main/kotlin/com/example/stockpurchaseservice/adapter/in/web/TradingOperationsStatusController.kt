@@ -21,11 +21,16 @@ internal class TradingOperationsStatusController(
     private val getTradingOperationsStatusUseCase: GetTradingOperationsStatusUseCase,
     @Value("\${akra.operations.trading.persistent-submission-unknown-threshold:15m}")
     private val persistentSubmissionUnknownThreshold: Duration = Duration.ofMinutes(15),
+    @Value("\${akra.order.execution-reconciliation.backfill-days:7}")
+    private val executionReconciliationBackfillDays: Long = 7,
 ) {
 
     @GetMapping("/status")
     suspend fun status(): TradingOperationsStatusResponse {
-        return getTradingOperationsStatusUseCase.execute().toResponse(persistentSubmissionUnknownThreshold)
+        return getTradingOperationsStatusUseCase.execute().toResponse(
+            persistentSubmissionUnknownThreshold = persistentSubmissionUnknownThreshold,
+            executionReconciliationBackfillDays = executionReconciliationBackfillDays,
+        )
     }
 }
 
@@ -36,6 +41,7 @@ internal data class TradingOperationsStatusResponse(
     val recentPersistentSubmissionUnknownCount: Long,
     val recentProblemSubmissions: List<OrderSubmissionProblemStatusResponse>,
     val orderExecutionOutboxStatusCounts: List<OutboxStatusCount>,
+    val executionReconciliationBackfillDays: Long,
     val reconciliationCursors: List<ExecutionReconciliationCursorStatus>,
     val unmatchedExecutionCount: Long,
     val recentUnmatchedExecutions: List<UnmatchedExecutionStatus>,
@@ -59,6 +65,7 @@ internal data class OrderSubmissionProblemStatusResponse(
 
 private fun TradingOperationsStatusResult.toResponse(
     persistentSubmissionUnknownThreshold: Duration,
+    executionReconciliationBackfillDays: Long,
 ): TradingOperationsStatusResponse {
     val problemSubmissions = snapshot.recentProblemSubmissions.map {
         it.toResponse(generatedAt, persistentSubmissionUnknownThreshold)
@@ -70,6 +77,7 @@ private fun TradingOperationsStatusResult.toResponse(
         recentPersistentSubmissionUnknownCount = problemSubmissions.count { it.persistentSubmissionUnknown }.toLong(),
         recentProblemSubmissions = problemSubmissions,
         orderExecutionOutboxStatusCounts = snapshot.orderExecutionOutboxStatusCounts,
+        executionReconciliationBackfillDays = executionReconciliationBackfillDays,
         reconciliationCursors = snapshot.reconciliationCursors,
         unmatchedExecutionCount = snapshot.unmatchedExecutionCount,
         recentUnmatchedExecutions = snapshot.recentUnmatchedExecutions,

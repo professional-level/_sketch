@@ -29,7 +29,11 @@ class TradingOperationsStatusControllerTest {
             snapshot = snapshot(),
         )
         val useCase = FakeGetTradingOperationsStatusUseCase(result)
-        val controller = TradingOperationsStatusController(useCase, Duration.ofMinutes(15))
+        val controller = TradingOperationsStatusController(
+            getTradingOperationsStatusUseCase = useCase,
+            persistentSubmissionUnknownThreshold = Duration.ofMinutes(15),
+            executionReconciliationBackfillDays = 9,
+        )
 
         val response = controller.status()
 
@@ -54,6 +58,7 @@ class TradingOperationsStatusControllerTest {
             assertEquals(true, persistentSubmissionUnknown)
         }
         assertEquals(result.snapshot.orderExecutionOutboxStatusCounts, response.orderExecutionOutboxStatusCounts)
+        assertEquals(9, response.executionReconciliationBackfillDays)
         assertEquals(result.snapshot.reconciliationCursors, response.reconciliationCursors)
         assertEquals(result.snapshot.unmatchedExecutionCount, response.unmatchedExecutionCount)
         assertEquals(result.snapshot.recentUnmatchedExecutions, response.recentUnmatchedExecutions)
