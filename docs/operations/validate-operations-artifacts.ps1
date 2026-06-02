@@ -94,6 +94,7 @@ $files = @{
     InfraManifest = Join-Path $kubernetesDir "trading-infra.yaml"
     ExternalSecretsManifest = Join-Path $kubernetesDir "external-secrets.yaml"
     DeployScript = Join-Path $kubernetesDir "deploy-trading-runtime.ps1"
+    VerifyScript = Join-Path $kubernetesDir "verify-trading-runtime.ps1"
     VaultScript = Join-Path $vaultDir "bootstrap-akra-vault.ps1"
     VaultPolicy = Join-Path $vaultDir "akra-trading-external-secrets-policy.hcl"
     VaultReadme = Join-Path $vaultDir "README.md"
@@ -107,6 +108,7 @@ foreach ($path in $files.Values) {
 }
 
 Assert-PowerShellParses $files.DeployScript
+Assert-PowerShellParses $files.VerifyScript
 Assert-PowerShellParses $files.VaultScript
 
 $vaultDryRun = & $files.VaultScript -DryRun *>&1 | Out-String
@@ -118,6 +120,7 @@ $runtime = Get-Content -LiteralPath $files.RuntimeManifest -Raw
 $infra = Get-Content -LiteralPath $files.InfraManifest -Raw
 $externalSecrets = Get-Content -LiteralPath $files.ExternalSecretsManifest -Raw
 $deployScript = Get-Content -LiteralPath $files.DeployScript -Raw
+$verifyScript = Get-Content -LiteralPath $files.VerifyScript -Raw
 $vaultPolicy = Get-Content -LiteralPath $files.VaultPolicy -Raw
 $workflow = Get-Content -LiteralPath $files.Workflow -Raw
 
@@ -210,6 +213,16 @@ foreach ($expected in @(
     "akra-trading-schema-migration"
 )) {
     Assert-Contains "deploy-trading-runtime.ps1" $deployScript $expected
+}
+
+foreach ($expected in @(
+    "Assert-DeploymentImageTag",
+    "akra-trading-schema-migration",
+    "strategy-execution-start-requested",
+    "kafka-topics",
+    "Trading runtime Kubernetes verification passed."
+)) {
+    Assert-Contains "verify-trading-runtime.ps1" $verifyScript $expected
 }
 
 foreach ($expected in @(

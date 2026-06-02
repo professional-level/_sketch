@@ -353,6 +353,7 @@ Before enabling real orders:
 - Build immutable service images with `.github/workflows/container-images.yml` or an equivalent pipeline, then replace `REPLACE_IMAGE_TAG` with the Git SHA tag.
 - Confirm `.github/workflows/operations-validation.yml` passed for the exact commit being deployed; it validates operations manifest placeholder rendering, script syntax, Vault dry-run rendering, Kafka topic bootstrap coverage, and runtime Secret/image references.
 - Use `docs/operations/kubernetes/deploy-trading-runtime.ps1` or an equivalent rollout pipeline so image tag rendering, SQL migration ConfigMap refresh, migration Job execution, and Deployment rollout checks happen in a fixed order.
+- Run `docs/operations/kubernetes/verify-trading-runtime.ps1 -ImageTag <git-sha>` after rollout to verify Secret presence, migration Job completion, application image tags, rollout status, infra services, and Kafka topic bootstrap state without printing secret values.
 - Set `spring.profiles.active=prod` or another configured production profile.
 - Apply required DB migrations explicitly and set `spring.jpa.hibernate.ddl-auto=validate` or `none`; do not use `update` in production.
 - Point `akra.order.kis-open-api.base-url` and `akra.market-data.kis-open-api.base-url` to the deployed broker wrapper.

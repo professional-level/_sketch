@@ -97,6 +97,19 @@ applies the runtime manifest, updates the SQL migration ConfigMap, recreates and
 unsuspends the migration Job, waits for it to complete, then restarts and waits
 for the service Deployments.
 
+After rollout, verify the applied cluster state without printing secret values:
+
+```powershell
+.\verify-trading-runtime.ps1 -ImageTag <git-sha>
+```
+
+For managed MySQL/Kafka/Temporal deployments outside `trading-infra`, skip the
+checked-in infra checks:
+
+```powershell
+.\verify-trading-runtime.ps1 -ImageTag <git-sha> -SkipInfra
+```
+
 For a local dry build, stage the boot jar and build with the matching
 Dockerfile:
 
