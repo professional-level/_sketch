@@ -109,7 +109,7 @@ $env:KIS_FX_SMOKE_BASE_URL='http://localhost:8079'
 $env:KIS_FX_SMOKE_SOURCE_CURRENCY='KRW'
 $env:KIS_FX_SMOKE_BASE_CURRENCY='USD'
 $env:KIS_FX_SMOKE_MARKET_DIV_CODE='X'
-$env:KIS_FX_SMOKE_SYMBOL='USDKRW'
+$env:KIS_FX_SMOKE_SYMBOL='FX@KRW'
 $env:KIS_FX_SMOKE_INVERT='true'
 $env:KIS_FX_SMOKE_IS_MOCK='true'
 .\gradlew.bat --no-daemon :stock-purchase-service:test --tests "com.example.stockpurchaseservice.adapter.out.risk.KisWrapperFxRateSmokeTest" --rerun-tasks
@@ -224,7 +224,7 @@ akra.order.risk.currency-conversion.rates-to-base.KRW=0.00075
 # akra.order.risk.currency-conversion.kis-wrapper.path=/open-api/overseas/quotations/fx-rate
 # akra.order.risk.currency-conversion.kis-wrapper.default-market-div-code=X
 # akra.order.risk.currency-conversion.kis-wrapper.pairs.KRW-USD.market-div-code=X
-# akra.order.risk.currency-conversion.kis-wrapper.pairs.KRW-USD.symbol=USDKRW
+# akra.order.risk.currency-conversion.kis-wrapper.pairs.KRW-USD.symbol=FX@KRW
 # akra.order.risk.currency-conversion.kis-wrapper.pairs.KRW-USD.invert=true
 # akra.order.risk.currency-conversion.kis-wrapper.pairs.KRW-USD.is-mock=false
 # akra.order.risk.currency-conversion.kis-wrapper.pairs.KRW-USD.period-div-code=D

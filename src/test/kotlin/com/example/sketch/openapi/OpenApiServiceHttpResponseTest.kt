@@ -229,13 +229,13 @@ class OpenApiServiceHttpResponseTest {
             GetOverseasFxRateRequest(
                 isMock = true,
                 marketDivCode = "X",
-                symbol = "USDKRW",
+                symbol = "FX@KRW",
                 fromDate = "20260601",
                 toDate = "20260602",
             ),
         )
 
-        assertEquals("USDKRW", response.symbol)
+        assertEquals("FX@KRW", response.symbol)
         assertEquals("X", response.marketDivCode)
         assertEquals(1330.25, response.rate)
         assertEquals("20260602", response.observedDate)
@@ -244,7 +244,7 @@ class OpenApiServiceHttpResponseTest {
             assertEquals("/uapi/overseas-price/v1/quotations/inquire-daily-chartprice", url().path)
             assertEquals("FHKST03030100", headers().getFirst("tr_id"))
             assertEquals("X", url().queryValue("FID_COND_MRKT_DIV_CODE"))
-            assertEquals("USDKRW", url().queryValue("FID_INPUT_ISCD"))
+            assertEquals("FX@KRW", url().queryValue("FID_INPUT_ISCD"))
             assertEquals("20260601", url().queryValue("FID_INPUT_DATE_1"))
             assertEquals("20260602", url().queryValue("FID_INPUT_DATE_2"))
             assertEquals("D", url().queryValue("FID_PERIOD_DIV_CODE"))
@@ -279,11 +279,11 @@ class OpenApiServiceHttpResponseTest {
             GetOverseasFxRateRequest(
                 isMock = true,
                 marketDivCode = "X",
-                symbol = "USDKRW",
+                symbol = "FX@KRW",
             ),
         )
 
-        assertEquals("USDKRW", response.symbol)
+        assertEquals("FX@KRW", response.symbol)
         assertEquals("X", response.marketDivCode)
         assertNull(response.rate)
         assertEquals("0", response.diagnostic?.returnCode)

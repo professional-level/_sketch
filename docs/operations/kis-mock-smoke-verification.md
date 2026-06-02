@@ -190,3 +190,30 @@ Next action:
 
 - Confirm the KIS `FID_INPUT_ISCD` value for USD/KRW from the official API portal or a working KIS example.
 - Rerun `KisWrapperFxRateSmokeTest` with the confirmed symbol and keep the `provider=kis-wrapper` risk guard disabled until a positive quote is verified.
+
+## 2026-06-02 FX Provider Smoke With Master Symbol
+
+Environment:
+
+- root KIS wrapper: local `:bootRun` on `http://localhost:8079`
+- FX smoke test: `KisWrapperFxRateSmokeTest`
+- smoke mode: query-only, no broker order submission
+- currency pair: `KRW -> USD`
+- KIS chart query: market code `X`, symbol `FX@KRW`, period `D`, mock API
+
+Reference:
+
+- Korea Investment's official `stocks_info/overseas_index_code.py` downloads `frgn_code.mst.zip` and treats records with class code `X` as FX symbols.
+- The downloaded master file includes `FX@KRW` for Korea won / US dollar and `FX@KRWKFTC` for Korea won / US dollar.
+
+Result:
+
+- Direct wrapper checks returned a positive `ovrs_nmix_prpr` rate for both `FX@KRW` and `FX@KRWKFTC`.
+- `FX@KRW` was selected as the default `KRW-USD` smoke/config symbol because it is the shorter KMB USD/KRW master symbol.
+- `KisWrapperFxRateSmokeTest` passed with `tests=1`, `failures=0`, `errors=0`.
+- No secrets, account identifiers, tokens, or raw KIS payloads were recorded.
+
+Impact:
+
+- Broker-backed FX now has a verified mock wrapper mapping for `KRW -> USD`: market code `X`, symbol `FX@KRW`, `invert=true`.
+- Keep the risk provider default as `static` until the same mapping is verified in the target real-account environment.

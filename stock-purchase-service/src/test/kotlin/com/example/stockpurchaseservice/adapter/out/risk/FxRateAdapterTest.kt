@@ -102,7 +102,7 @@ class FxRateAdapterTest {
         val exchangeFunction = CapturingExchangeFunction(
             """
             {
-              "symbol": "USDKRW",
+              "symbol": "FX@KRW",
               "marketDivCode": "X",
               "rate": 1330.0,
               "observedDate": "20260602",
@@ -113,7 +113,7 @@ class FxRateAdapterTest {
         val properties = OrderRiskProperties.CurrencyConversionProperties().apply {
             kisWrapper.pairs["KRW-USD"] = OrderRiskProperties.KisWrapperFxRatePairProperties().apply {
                 marketDivCode = "X"
-                symbol = "USDKRW"
+                symbol = "FX@KRW"
                 invert = true
                 isMock = false
                 fromDate = "20260601"
@@ -136,7 +136,7 @@ class FxRateAdapterTest {
         assertEquals("kis-overseas-daily-chartprice", rate?.provider)
         assertEquals("/open-api/overseas/quotations/fx-rate", exchangeFunction.requests.single().url().path)
         assertEquals("X", exchangeFunction.requests.single().url().queryValue("marketDivCode"))
-        assertEquals("USDKRW", exchangeFunction.requests.single().url().queryValue("symbol"))
+        assertEquals("FX@KRW", exchangeFunction.requests.single().url().queryValue("symbol"))
         assertEquals("false", exchangeFunction.requests.single().url().queryValue("isMock"))
         assertEquals("20260601", exchangeFunction.requests.single().url().queryValue("fromDate"))
         assertEquals("20260602", exchangeFunction.requests.single().url().queryValue("toDate"))
@@ -147,7 +147,7 @@ class FxRateAdapterTest {
         val exchangeFunction = CapturingExchangeFunction(
             """
             {
-              "symbol": "USDKRW",
+              "symbol": "FX@KRW",
               "marketDivCode": "X",
               "rate": null,
               "diagnostic": {
@@ -163,7 +163,7 @@ class FxRateAdapterTest {
         val properties = OrderRiskProperties.CurrencyConversionProperties().apply {
             kisWrapper.pairs["KRW-USD"] = OrderRiskProperties.KisWrapperFxRatePairProperties().apply {
                 marketDivCode = "X"
-                symbol = "USDKRW"
+                symbol = "FX@KRW"
                 invert = true
             }
         }

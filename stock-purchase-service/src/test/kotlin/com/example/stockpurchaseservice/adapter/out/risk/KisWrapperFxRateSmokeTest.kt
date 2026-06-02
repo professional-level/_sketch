@@ -96,7 +96,7 @@ class KisWrapperFxRateSmokeTest {
                     sourceCurrency = setting("KIS_FX_SMOKE_SOURCE_CURRENCY", "KRW").uppercase(),
                     baseCurrency = setting("KIS_FX_SMOKE_BASE_CURRENCY", "USD").uppercase(),
                     marketDivCode = setting("KIS_FX_SMOKE_MARKET_DIV_CODE", "X").uppercase(),
-                    symbol = setting("KIS_FX_SMOKE_SYMBOL", "USDKRW").uppercase(),
+                    symbol = setting("KIS_FX_SMOKE_SYMBOL", "FX@KRW").uppercase(),
                     invert = setting("KIS_FX_SMOKE_INVERT", "true").toBooleanStrictOrNull() ?: true,
                     isMock = setting("KIS_FX_SMOKE_IS_MOCK", "true").toBooleanStrictOrNull() ?: true,
                     fromDate = setting("KIS_FX_SMOKE_FROM_DATE", ""),
