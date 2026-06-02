@@ -332,6 +332,12 @@ private suspend fun submitLegacySellOrder(
         OrderIntentSubmissionStatus.SUBMISSION_UNKNOWN -> order.changeOrderState(OrderState.SUBMISSION_UNKNOWN)
         OrderIntentSubmissionStatus.REJECTED -> order.changeOrderState(OrderState.SUBMIT_FAILED)
     }
+    if (result.status == OrderIntentSubmissionStatus.SUBMISSION_UNKNOWN) {
+        result.externalOrderId?.let { externalOrderId ->
+            stockOrderRepository.save(order, ExternalOrderId(externalOrderId))
+            return
+        }
+    }
     stockOrderRepository.save(order)
 }
 

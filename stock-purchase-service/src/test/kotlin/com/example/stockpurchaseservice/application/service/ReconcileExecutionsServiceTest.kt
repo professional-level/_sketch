@@ -416,6 +416,32 @@ class ReconcileExecutionsServiceTest {
     }
 
     @Test
+    fun `legacy sell scheduler records broker id when submission is unknown`() = runBlocking {
+        val stockOrderRepository = FakeStockOrderRepository(
+            notCompletedOrders = listOf(purchaseOrder(orderState = OrderState.PURCHASE_COMPLETED)),
+        )
+        val submitOrderIntentUseCase = FakeSubmitOrderIntentUseCase(
+            status = OrderIntentSubmissionStatus.SUBMISSION_UNKNOWN,
+            externalOrderId = "broker-unknown",
+        )
+        val service = CreateSellOrdersByStrategyService(
+            stockOrderRepository = stockOrderRepository,
+            submitOrderIntentUseCase = submitOrderIntentUseCase,
+        )
+
+        service.execute()
+
+        assertEquals(
+            listOf(OrderState.SELLING_WAITING, OrderState.SUBMISSION_UNKNOWN),
+            stockOrderRepository.savedStates,
+        )
+        assertEquals(
+            listOf(OrderId(UUID.fromString("00000000-0000-0000-0000-000000000010")) to "broker-unknown"),
+            stockOrderRepository.savedExternalOrderIds,
+        )
+    }
+
+    @Test
     fun `legacy sell scheduler ignores existing sell orders`() = runBlocking {
         val stockOrderRepository = FakeStockOrderRepository(
             notCompletedOrders = listOf(sellingOrder(orderState = OrderState.SELLING_IN_PROCESS)),
