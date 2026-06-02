@@ -80,6 +80,10 @@ object StrategyExecutionRuntimeSafetyRules {
         }
 
         val violations = mutableListOf<String>()
+        if (input.temporalEnabled && input.temporalTarget.isBlank()) {
+            violations += "prod/live profile must configure a non-blank Temporal target " +
+                "(akra.temporal.target)"
+        }
         if (
             input.temporalEnabled &&
             !input.allowLocalTemporalTargetInProduction &&
@@ -89,6 +93,10 @@ object StrategyExecutionRuntimeSafetyRules {
                 "(akra.temporal.target=${input.temporalTarget})"
         }
 
+        if (input.marketDataBaseUrl.isBlank()) {
+            violations += "prod/live profile must configure a non-blank market-data KIS wrapper endpoint " +
+                "(akra.market-data.kis-open-api.base-url)"
+        }
         if (!input.allowLocalMarketDataEndpointInProduction && isLocalEndpoint(input.marketDataBaseUrl)) {
             violations += "prod/live profile cannot use a local market-data KIS wrapper endpoint " +
                 "(akra.market-data.kis-open-api.base-url=${input.marketDataBaseUrl})"
@@ -101,9 +109,9 @@ object StrategyExecutionRuntimeSafetyRules {
 
         if (
             !input.allowMockOrderIntentInProduction &&
-            input.defaultOrderIntentTradingEnvironment.trim().uppercase() == "MOCK"
+            input.defaultOrderIntentTradingEnvironment.trim().uppercase() != "LIVE"
         ) {
-            violations += "prod/live profile cannot default order intents to MOCK " +
+            violations += "prod/live profile must default order intents to LIVE " +
                 "(akra.order-intent.default-trading-environment=${input.defaultOrderIntentTradingEnvironment})"
         }
 

@@ -92,6 +92,10 @@ object StockPurchaseRuntimeSafetyRules {
         }
 
         val violations = mutableListOf<String>()
+        if (input.brokerBaseUrl.isBlank()) {
+            violations += "prod/live profile must configure a non-blank KIS wrapper endpoint " +
+                "(akra.order.kis-open-api.base-url)"
+        }
         if (!input.allowLocalBrokerEndpointInProduction && isLocalEndpoint(input.brokerBaseUrl)) {
             violations += "prod/live profile cannot use a local KIS wrapper endpoint " +
                 "(akra.order.kis-open-api.base-url=${input.brokerBaseUrl})"

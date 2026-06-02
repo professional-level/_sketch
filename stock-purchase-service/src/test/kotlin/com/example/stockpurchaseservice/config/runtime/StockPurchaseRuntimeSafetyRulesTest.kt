@@ -22,6 +22,21 @@ class StockPurchaseRuntimeSafetyRulesTest {
     }
 
     @Test
+    fun `blocks blank broker endpoint in production profile`() {
+        val violations = StockPurchaseRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                brokerBaseUrl = " ",
+                domesticMockOrder = false,
+                overseasMockOrder = false,
+            ),
+        )
+
+        assertEquals(1, violations.size)
+        assertTrue(violations.single().contains("non-blank KIS wrapper endpoint"))
+    }
+
+    @Test
     fun `blocks local broker endpoint in production profile`() {
         val violations = StockPurchaseRuntimeSafetyRules.validate(
             input(

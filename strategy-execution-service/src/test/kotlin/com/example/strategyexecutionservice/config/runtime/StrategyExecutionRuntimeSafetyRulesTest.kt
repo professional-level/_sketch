@@ -21,6 +21,20 @@ class StrategyExecutionRuntimeSafetyRulesTest {
     }
 
     @Test
+    fun `blocks blank temporal target in production profile`() {
+        val violations = StrategyExecutionRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                temporalTarget = " ",
+                marketDataBaseUrl = "https://broker-wrapper.example.com",
+            ),
+        )
+
+        assertEquals(1, violations.size)
+        assertTrue(violations.single().contains("non-blank Temporal target"))
+    }
+
+    @Test
     fun `blocks local temporal target in production profile`() {
         val violations = StrategyExecutionRuntimeSafetyRules.validate(
             input(
@@ -46,6 +60,20 @@ class StrategyExecutionRuntimeSafetyRulesTest {
 
         assertEquals(1, violations.size)
         assertTrue(violations.single().contains("local Temporal target"))
+    }
+
+    @Test
+    fun `blocks blank market data endpoint in production profile`() {
+        val violations = StrategyExecutionRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("live"),
+                temporalTarget = "temporal.example.com:7233",
+                marketDataBaseUrl = " ",
+            ),
+        )
+
+        assertEquals(1, violations.size)
+        assertTrue(violations.single().contains("non-blank market-data KIS wrapper endpoint"))
     }
 
     @Test
@@ -106,18 +134,18 @@ class StrategyExecutionRuntimeSafetyRulesTest {
     }
 
     @Test
-    fun `blocks mock default order intent environment in production profile`() {
+    fun `blocks non live default order intent environment in production profile`() {
         val violations = StrategyExecutionRuntimeSafetyRules.validate(
             input(
                 activeProfiles = listOf("prod"),
                 temporalTarget = "temporal.example.com:7233",
                 marketDataBaseUrl = "https://broker-wrapper.example.com",
-                defaultOrderIntentTradingEnvironment = "MOCK",
+                defaultOrderIntentTradingEnvironment = "PAPER",
             ),
         )
 
         assertEquals(1, violations.size)
-        assertTrue(violations.single().contains("default order intents to MOCK"))
+        assertTrue(violations.single().contains("default order intents to LIVE"))
     }
 
     @Test

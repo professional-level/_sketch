@@ -266,6 +266,7 @@ Use `--no-daemon` so the test JVM sees the current smoke-test environment variab
 Blocked by default:
 
 - `akra.order.kis-open-api.base-url` points at `localhost`, `host.docker.internal`, `127.0.0.1`, `0.0.0.0`, or `::1`.
+- `akra.order.kis-open-api.base-url` is blank.
 - `akra.order.domestic.mock=true` or `akra.order.overseas.mock=true`.
 - `spring.jpa.hibernate.ddl-auto` is set to an automatic schema mutation mode such as `update`, `create`, or `create-drop`.
 - `akra.order.risk.enabled=false`.
@@ -287,9 +288,11 @@ akra.runtime.safety.allow-disabled-risk-controls-in-production=true
 `strategy-execution-service` fails startup under a production-like profile when:
 
 - `akra.temporal.enabled=true` and `akra.temporal.target` points at a local endpoint such as `localhost`, `host.docker.internal`, `127.0.0.1`, `0.0.0.0`, or `::1`.
+- `akra.temporal.enabled=true` and `akra.temporal.target` is blank.
 - `akra.market-data.kis-open-api.base-url` points at a local endpoint such as `localhost`, `host.docker.internal`, `127.0.0.1`, `0.0.0.0`, or `::1`.
+- `akra.market-data.kis-open-api.base-url` is blank.
 - `spring.jpa.hibernate.ddl-auto` is set to an automatic schema mutation mode such as `update`, `create`, or `create-drop`.
-- `akra.order-intent.default-trading-environment=MOCK`.
+- `akra.order-intent.default-trading-environment` is not `LIVE`.
 - `akra.trading-calendar.us.enabled=false`.
 - `akra.trading-calendar.us.default-us-equity-calendar-enabled=false`.
 
