@@ -87,6 +87,51 @@ class ConfiguredTradingCalendarAdapterTest {
     }
 
     @Test
+    fun `resolves order session date after regular close to next local date`() {
+        val adapter = ConfiguredTradingCalendarAdapter(TradingCalendarProperties())
+
+        val date = adapter.orderSessionDate(
+            TradingMarket.US,
+            ZonedDateTime.parse("2026-07-03T09:00:00+09:00[Asia/Seoul]"),
+        )
+
+        assertEquals(LocalDate.parse("2026-07-03"), date)
+    }
+
+    @Test
+    fun `uses early close when resolving order session date`() {
+        val adapter = ConfiguredTradingCalendarAdapter(TradingCalendarProperties())
+
+        val beforeEarlyClose = adapter.orderSessionDate(
+            TradingMarket.US,
+            ZonedDateTime.parse("2026-11-27T12:30:00-05:00[America/New_York]"),
+        )
+        val afterEarlyClose = adapter.orderSessionDate(
+            TradingMarket.US,
+            ZonedDateTime.parse("2026-11-27T14:00:00-05:00[America/New_York]"),
+        )
+
+        assertEquals(LocalDate.parse("2026-11-27"), beforeEarlyClose)
+        assertEquals(LocalDate.parse("2026-11-28"), afterEarlyClose)
+    }
+
+    @Test
+    fun `uses configured early close override when resolving order session date`() {
+        val properties = TradingCalendarProperties().apply {
+            us.earlyCloseDays = listOf("2026-11-27")
+            us.earlyCloseTimes["2026-11-27"] = "12:30"
+        }
+        val adapter = ConfiguredTradingCalendarAdapter(properties)
+
+        val date = adapter.orderSessionDate(
+            TradingMarket.US,
+            ZonedDateTime.parse("2026-11-27T12:45:00-05:00[America/New_York]"),
+        )
+
+        assertEquals(LocalDate.parse("2026-11-28"), date)
+    }
+
+    @Test
     fun `can be disabled when an external calendar owns trading day decisions`() {
         val properties = TradingCalendarProperties().apply {
             us.enabled = false

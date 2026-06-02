@@ -163,6 +163,48 @@ class RunActiveStrategyExecutionsServiceTest {
         assertEquals(emptyList(), statePort.saved)
     }
 
+    @Test
+    fun `skips daily execution when order session date is closed`() = runBlocking {
+        val statePort = FakeStrategyExecutionStatePort(
+            activeStates = listOf(
+                LaorV4ExecutionState(
+                    executionId = "laor-v4-strategy:TQQQ",
+                    symbol = LaorV4StrategySymbol.TQQQ,
+                    totalSplitCount = 20,
+                    state = LaorV4StrategyState(availableCash = 2_240.0),
+                ),
+            ),
+        )
+        val marketDataPort = FakeMarketDataPort()
+        val runStrategyExecutionUseCase = FakeRunStrategyExecutionUseCase(
+            plannedState = LaorV4State(availableCash = 2_240.0),
+        )
+        val service = RunActiveStrategyExecutionsService(
+            strategyExecutionStatePort = statePort,
+            marketDataPort = marketDataPort,
+            runStrategyExecutionUseCase = runStrategyExecutionUseCase,
+            tradingCalendarPort = FakeTradingCalendarPort(
+                closedDates = setOf(LocalDate.parse("2026-07-03")),
+                orderSessionDate = LocalDate.parse("2026-07-03"),
+            ),
+        )
+
+        val result = service.execute(
+            RunActiveStrategyExecutionsCommand(
+                executionRunId = "ACTIVE_STRATEGIES_DAILY:2026-07-02",
+                requestedAt = ZonedDateTime.parse("2026-07-02T20:00:00-04:00[America/New_York]"),
+            ),
+        )
+
+        assertEquals(1, result.activeStrategyCount)
+        assertEquals(0, result.executedStrategyCount)
+        assertEquals(0, result.createdOrderIntentCount)
+        assertEquals("US market is closed on 2026-07-03", result.skippedReason)
+        assertEquals(emptyList(), marketDataPort.requests)
+        assertEquals(emptyList(), runStrategyExecutionUseCase.commands)
+        assertEquals(emptyList(), statePort.saved)
+    }
+
     private class FakeStrategyExecutionStatePort(
         private val activeStates: List<LaorV4ExecutionState>,
     ) : StrategyExecutionStatePort {
@@ -208,9 +250,14 @@ class RunActiveStrategyExecutionsServiceTest {
 
     private class FakeTradingCalendarPort(
         private val closedDates: Set<LocalDate> = emptySet(),
+        private val orderSessionDate: LocalDate? = null,
     ) : TradingCalendarPort {
         override fun isTradingDay(market: TradingMarket, date: LocalDate): Boolean {
             return date !in closedDates
+        }
+
+        override fun orderSessionDate(market: TradingMarket, requestedAt: ZonedDateTime): LocalDate {
+            return orderSessionDate ?: requestedAt.toLocalDate()
         }
     }
 

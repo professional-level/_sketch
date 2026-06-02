@@ -26,7 +26,7 @@ class RunActiveStrategyExecutionsService(
 
     override suspend fun execute(command: RunActiveStrategyExecutionsCommand): RunActiveStrategyExecutionsResult {
         val activeStrategies = strategyExecutionStatePort.findActiveLaorV4Strategies()
-        val requestedDate = tradingCalendarPort.tradingDate(TradingMarket.US, command.requestedAt)
+        val requestedDate = tradingCalendarPort.orderSessionDate(TradingMarket.US, command.requestedAt)
         if (!tradingCalendarPort.isTradingDay(TradingMarket.US, requestedDate)) {
             return RunActiveStrategyExecutionsResult(
                 executionRunId = command.executionRunId,

@@ -34,6 +34,12 @@ internal class ConfiguredTradingCalendarAdapter(
         }
     }
 
+    override fun orderSessionDate(market: TradingMarket, requestedAt: ZonedDateTime): LocalDate {
+        return when (market) {
+            TradingMarket.US -> properties.us.orderSessionDate(requestedAt)
+        }
+    }
+
     private fun TradingCalendarProperties.MarketCalendar.isTradingDay(date: LocalDate): Boolean {
         if (!enabled) return true
         if (defaultUsEquityCalendarEnabled && !UsEquityMarketCalendar.isTradingDay(date)) return false
@@ -55,6 +61,17 @@ internal class ConfiguredTradingCalendarAdapter(
             UsEquityMarketCalendar.earlyCloseTime(date)
         } else {
             null
+        }
+    }
+
+    private fun TradingCalendarProperties.MarketCalendar.orderSessionDate(requestedAt: ZonedDateTime): LocalDate {
+        val marketDateTime = requestedAt.withZoneSameInstant(zone())
+        val localDate = marketDateTime.toLocalDate()
+        val sessionClose = earlyCloseTime(localDate) ?: UsEquityMarketCalendar.regularClose
+        return if (!isTradingDay(localDate) || !marketDateTime.toLocalTime().isBefore(sessionClose)) {
+            localDate.plusDays(1)
+        } else {
+            localDate
         }
     }
 

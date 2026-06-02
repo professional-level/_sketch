@@ -11,6 +11,10 @@ interface TradingCalendarPort {
         return requestedAt.toLocalDate()
     }
 
+    fun orderSessionDate(market: TradingMarket, requestedAt: ZonedDateTime): LocalDate {
+        return tradingDate(market, requestedAt)
+    }
+
     fun earlyCloseTime(market: TradingMarket, date: LocalDate): LocalTime? {
         return null
     }
