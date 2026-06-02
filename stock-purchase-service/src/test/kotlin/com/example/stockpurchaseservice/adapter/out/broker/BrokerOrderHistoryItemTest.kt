@@ -101,6 +101,36 @@ class BrokerOrderHistoryItemTest {
     }
 
     @Test
+    fun `does not treat rejected cancel row as original order rejection`() {
+        val status = listOf(
+            row(externalOrderId = "broker-1"),
+            row(
+                externalOrderId = "cancel-broker-1",
+                originalOrderId = "broker-1",
+                rejectionReason = "cancel request rejected",
+            ),
+        ).findStatusFor(query(externalOrderId = "broker-1"))
+
+        assertEquals(BrokerOrderStatus.SUBMITTED, status.status)
+        assertEquals("broker-1", status.externalOrderId)
+        assertEquals(null, status.reason)
+    }
+
+    @Test
+    fun `returns unknown when only rejected linked row matches original order id`() {
+        val status = listOf(
+            row(
+                externalOrderId = "cancel-broker-1",
+                originalOrderId = "broker-1",
+                rejectionReason = "cancel request rejected",
+            ),
+        ).findStatusFor(query(externalOrderId = "broker-1"))
+
+        assertEquals(BrokerOrderStatus.UNKNOWN, status.status)
+        assertEquals("broker-1", status.externalOrderId)
+    }
+
+    @Test
     fun `uses branch order number to disambiguate broker order id matches`() {
         val status = listOf(
             row(externalOrderId = "broker-1", branchOrderNumber = "00001", orderedQuantity = 1),
@@ -246,6 +276,9 @@ class BrokerOrderHistoryItemTest {
         orderedQuantity: Long = 3,
         orderedPrice: Double? = null,
         branchOrderNumber: String? = "00001",
+        rejectedQuantity: Long = 0,
+        rejectionReason: String? = null,
+        statusMessage: String? = null,
     ): BrokerOrderHistoryItem {
         return BrokerOrderHistoryItem(
             externalOrderId = externalOrderId,
@@ -259,11 +292,13 @@ class BrokerOrderHistoryItemTest {
             orderedPrice = orderedPrice,
             cumulativeFilledQuantity = cumulativeFilledQuantity,
             remainingQuantity = orderedQuantity - cumulativeFilledQuantity,
-            rejectedQuantity = 0,
+            rejectedQuantity = rejectedQuantity,
             cancelledQuantity = cancelledQuantity,
             cancelled = cancelled,
             side = side,
             averageExecutionPrice = averageExecutionPrice,
+            statusMessage = statusMessage,
+            rejectionReason = rejectionReason,
         )
     }
 

@@ -263,25 +263,7 @@ internal fun List<BrokerOrderHistoryItem>.findStatusFor(query: BrokerOrderStatus
         .narrowByBranchOrderNumber(query)
         .narrowByOrderedQuantity(query)
         .narrowBySubmittedPrice(query)
-    val terminalCandidates = candidates.filter { row ->
-        when (row.toStatus().status) {
-            BrokerOrderStatus.REJECTED,
-            BrokerOrderStatus.CANCELLED,
-            BrokerOrderStatus.FILLED -> true
-            BrokerOrderStatus.SUBMITTED,
-            BrokerOrderStatus.PARTIALLY_FILLED,
-            BrokerOrderStatus.UNKNOWN -> false
-        }
-    }
-    val selectedCandidate = when {
-        terminalCandidates.size == 1 -> terminalCandidates.single()
-        terminalCandidates.size > 1 -> null
-        query.externalOrderId != null -> {
-            candidates.filter { it.externalOrderId == query.externalOrderId }.singleOrNull()
-                ?: candidates.singleOrNull()
-        }
-        else -> candidates.singleOrNull()
-    }
+    val selectedCandidate = candidates.selectStatusCandidate(query)
 
     return when {
         candidates.isEmpty() -> BrokerOrderStatusDto(
@@ -299,6 +281,54 @@ internal fun List<BrokerOrderHistoryItem>.findStatusFor(query: BrokerOrderStatus
             externalOrderId = query.externalOrderId,
             reason = "ambiguous broker orders: ${candidates.joinToString { it.externalOrderId }}",
         )
+    }
+}
+
+private fun List<BrokerOrderHistoryItem>.selectStatusCandidate(
+    query: BrokerOrderStatusQuery,
+): BrokerOrderHistoryItem? {
+    val externalOrderId = query.externalOrderId ?: return selectSingleTerminalOrSingle()
+    return selectCandidateForExternalOrderId(externalOrderId)
+}
+
+private fun List<BrokerOrderHistoryItem>.selectCandidateForExternalOrderId(
+    externalOrderId: String,
+): BrokerOrderHistoryItem? {
+    val filledCandidate = filter { it.toStatus().status == BrokerOrderStatus.FILLED }
+        .maxWithOrNull(compareBy<BrokerOrderHistoryItem> { it.cumulativeFilledQuantity }.thenBy { it.orderedAt })
+    if (filledCandidate != null) return filledCandidate
+
+    val cancelledCandidate = filter { it.toStatus().status == BrokerOrderStatus.CANCELLED }
+        .maxWithOrNull(compareBy<BrokerOrderHistoryItem> { it.cancelledQuantity }.thenBy { it.orderedAt })
+    if (cancelledCandidate != null) return cancelledCandidate
+
+    val exactSelected = filter { it.externalOrderId == externalOrderId }.selectSingleTerminalOrSingle()
+    if (exactSelected != null) return exactSelected
+
+    return filter { row ->
+        row.externalOrderId != externalOrderId &&
+            row.originalOrderId == externalOrderId &&
+            row.toStatus().status != BrokerOrderStatus.REJECTED
+    }.selectSingleTerminalOrSingle()
+}
+
+private fun List<BrokerOrderHistoryItem>.selectSingleTerminalOrSingle(): BrokerOrderHistoryItem? {
+    val terminalCandidates = filter { it.toStatus().status.isTerminalStatus() }
+    return when {
+        terminalCandidates.size == 1 -> terminalCandidates.single()
+        terminalCandidates.size > 1 -> null
+        else -> singleOrNull()
+    }
+}
+
+private fun BrokerOrderStatus.isTerminalStatus(): Boolean {
+    return when (this) {
+        BrokerOrderStatus.REJECTED,
+        BrokerOrderStatus.CANCELLED,
+        BrokerOrderStatus.FILLED -> true
+        BrokerOrderStatus.SUBMITTED,
+        BrokerOrderStatus.PARTIALLY_FILLED,
+        BrokerOrderStatus.UNKNOWN -> false
     }
 }
 
