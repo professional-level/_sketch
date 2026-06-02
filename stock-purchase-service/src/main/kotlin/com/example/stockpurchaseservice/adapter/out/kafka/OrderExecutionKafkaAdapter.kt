@@ -80,11 +80,11 @@ internal class OrderExecutionOutboxPublisher(
             runCatching {
                 messageSender.publish(event)
             }.onSuccess {
-                outboxEventPort.markPublished(event.id, claimOwner)
-                recordPublishResult(PUBLISH_RESULT_PUBLISHED)
+                val markedPublished = outboxEventPort.markPublished(event.id, claimOwner)
+                recordPublishResult(if (markedPublished) PUBLISH_RESULT_PUBLISHED else PUBLISH_RESULT_CLAIM_LOST)
             }.onFailure { exception ->
-                outboxEventPort.markFailed(event.id, claimOwner, exception.message, nextAttemptAt(event))
-                recordPublishResult(PUBLISH_RESULT_FAILED)
+                val markedFailed = outboxEventPort.markFailed(event.id, claimOwner, exception.message, nextAttemptAt(event))
+                recordPublishResult(if (markedFailed) PUBLISH_RESULT_FAILED else PUBLISH_RESULT_CLAIM_LOST)
             }
         }
     }
@@ -115,6 +115,7 @@ internal class OrderExecutionOutboxPublisher(
         private const val OUTBOX_PUBLISH_METRIC = "stock.purchase.outbox.publish"
         private const val PUBLISH_RESULT_PUBLISHED = "published"
         private const val PUBLISH_RESULT_FAILED = "failed"
+        private const val PUBLISH_RESULT_CLAIM_LOST = "claim_lost"
         private const val DEFAULT_RETRY_INITIAL_DELAY_MS = 5_000L
         private const val DEFAULT_RETRY_MAX_DELAY_MS = 300_000L
         private const val DEFAULT_CLAIM_LEASE_MS = 60_000L

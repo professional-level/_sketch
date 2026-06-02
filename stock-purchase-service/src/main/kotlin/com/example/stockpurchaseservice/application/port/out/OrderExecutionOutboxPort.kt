@@ -6,8 +6,8 @@ import java.util.UUID
 
 interface OrderExecutionOutboxPort {
     suspend fun claimPublishable(limit: Int, claimOwner: String, claimExpiresAt: ZonedDateTime): List<OrderExecutionOutboxMessage>
-    suspend fun markPublished(id: UUID, claimOwner: String)
-    suspend fun markFailed(id: UUID, claimOwner: String, reason: String?, nextAttemptAt: ZonedDateTime)
+    suspend fun markPublished(id: UUID, claimOwner: String): Boolean
+    suspend fun markFailed(id: UUID, claimOwner: String, reason: String?, nextAttemptAt: ZonedDateTime): Boolean
 }
 
 data class OrderExecutionOutboxMessage(

@@ -111,9 +111,9 @@ internal class OrderExecutionOutboxEventRepository : AbstractReactiveRepository<
         }.awaitSuspending()
     }
 
-    suspend fun markPublishedIfClaimed(id: UUID, claimOwner: String) {
+    suspend fun markPublishedIfClaimed(id: UUID, claimOwner: String): Boolean {
         val publishedAt = ZonedDateTime.now()
-        sessionFactory.withTransaction { session, _ ->
+        val updated = sessionFactory.withTransaction { session, _ ->
             session.createMutationQuery(
                 """
                 UPDATE OrderExecutionOutboxEventEntity e
@@ -135,6 +135,7 @@ internal class OrderExecutionOutboxEventRepository : AbstractReactiveRepository<
                 .setParameter("claimOwner", claimOwner)
                 .executeUpdate()
         }.awaitSuspending()
+        return updated == 1
     }
 
     suspend fun markFailedIfClaimed(
@@ -142,8 +143,8 @@ internal class OrderExecutionOutboxEventRepository : AbstractReactiveRepository<
         claimOwner: String,
         reason: String?,
         nextAttemptAt: ZonedDateTime,
-    ) {
-        sessionFactory.withTransaction { session, _ ->
+    ): Boolean {
+        val updated = sessionFactory.withTransaction { session, _ ->
             session.createMutationQuery(
                 """
                 UPDATE OrderExecutionOutboxEventEntity e
@@ -166,5 +167,6 @@ internal class OrderExecutionOutboxEventRepository : AbstractReactiveRepository<
                 .setParameter("claimOwner", claimOwner)
                 .executeUpdate()
         }.awaitSuspending()
+        return updated == 1
     }
 }

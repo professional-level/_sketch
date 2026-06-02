@@ -66,8 +66,8 @@ internal class OrderIntentOutboxAdapter(
         }
     }
 
-    override suspend fun markPublished(id: UUID, claimOwner: String) {
-        outboxEventRepository.markPublishedIfClaimed(id, claimOwner)
+    override suspend fun markPublished(id: UUID, claimOwner: String): Boolean {
+        return outboxEventRepository.markPublishedIfClaimed(id, claimOwner)
     }
 
     override suspend fun markFailed(
@@ -75,7 +75,7 @@ internal class OrderIntentOutboxAdapter(
         claimOwner: String,
         reason: String?,
         nextAttemptAt: ZonedDateTime,
-    ) {
-        outboxEventRepository.markFailedIfClaimed(id, claimOwner, reason, nextAttemptAt)
+    ): Boolean {
+        return outboxEventRepository.markFailedIfClaimed(id, claimOwner, reason, nextAttemptAt)
     }
 }

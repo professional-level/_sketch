@@ -60,6 +60,43 @@ class OrderExecutionOutboxPublisherTest {
     }
 
     @Test
+    fun `records claim lost when published event is no longer claimed`() = runBlocking {
+        val event = outboxMessage()
+        val outboxPort = FakeOrderExecutionOutboxPort(
+            events = listOf(event),
+            markPublishedResult = false,
+        )
+        val sender = FakeOrderExecutionOutboxMessageSender()
+        val meterRegistry = SimpleMeterRegistry()
+        val publisher = OrderExecutionOutboxPublisher(outboxPort, sender, meterRegistry)
+
+        publisher.publishPendingEvents()
+
+        assertEquals(listOf(event), sender.published)
+        assertEquals(1, outboxPort.published.size)
+        assertEquals(1.0, meterRegistry.counter(OUTBOX_PUBLISH_METRIC, "result", "claim_lost").count())
+        assertEquals(0.0, meterRegistry.counter(OUTBOX_PUBLISH_METRIC, "result", "published").count())
+    }
+
+    @Test
+    fun `records claim lost when failed event is no longer claimed`() = runBlocking {
+        val event = outboxMessage()
+        val outboxPort = FakeOrderExecutionOutboxPort(
+            events = listOf(event),
+            markFailedResult = false,
+        )
+        val sender = FakeOrderExecutionOutboxMessageSender(failure = IllegalStateException("kafka down"))
+        val meterRegistry = SimpleMeterRegistry()
+        val publisher = OrderExecutionOutboxPublisher(outboxPort, sender, meterRegistry)
+
+        publisher.publishPendingEvents()
+
+        assertEquals(1, outboxPort.failed.size)
+        assertEquals(1.0, meterRegistry.counter(OUTBOX_PUBLISH_METRIC, "result", "claim_lost").count())
+        assertEquals(0.0, meterRegistry.counter(OUTBOX_PUBLISH_METRIC, "result", "failed").count())
+    }
+
+    @Test
     fun `caps outbox publish retry delay`() = runBlocking {
         val event = outboxMessage(retryCount = 10)
         val outboxPort = FakeOrderExecutionOutboxPort(events = listOf(event))
@@ -122,6 +159,8 @@ class OrderExecutionOutboxPublisherTest {
 
     private class FakeOrderExecutionOutboxPort(
         private val events: List<OrderExecutionOutboxMessage>,
+        private val markPublishedResult: Boolean = true,
+        private val markFailedResult: Boolean = true,
     ) : OrderExecutionOutboxPort {
         val published: MutableList<PublishedOutboxEvent> = mutableListOf()
         val failed: MutableList<FailedOutboxEvent> = mutableListOf()
@@ -136,12 +175,19 @@ class OrderExecutionOutboxPublisherTest {
             return events.take(limit)
         }
 
-        override suspend fun markPublished(id: UUID, claimOwner: String) {
+        override suspend fun markPublished(id: UUID, claimOwner: String): Boolean {
             published += PublishedOutboxEvent(id, claimOwner)
+            return markPublishedResult
         }
 
-        override suspend fun markFailed(id: UUID, claimOwner: String, reason: String?, nextAttemptAt: ZonedDateTime) {
+        override suspend fun markFailed(
+            id: UUID,
+            claimOwner: String,
+            reason: String?,
+            nextAttemptAt: ZonedDateTime,
+        ): Boolean {
             failed += FailedOutboxEvent(id, claimOwner, reason, nextAttemptAt)
+            return markFailedResult
         }
     }
 
