@@ -26,6 +26,7 @@ class KisTokenRuntimeSafetyValidator(
                 productionProfiles = productionProfiles.split(","),
                 tokenPersistenceEnabled = properties.persistence.enabled,
                 tokenPersistenceType = properties.persistence.type,
+                hibernateDdlAuto = environment.getProperty("spring.jpa.hibernate.ddl-auto"),
                 allowFileTokenPersistenceInProduction = allowFileTokenPersistenceInProduction,
             ),
         )
@@ -49,6 +50,7 @@ object KisTokenRuntimeSafetyRules {
         val productionProfiles: List<String>,
         val tokenPersistenceEnabled: Boolean,
         val tokenPersistenceType: String,
+        val hibernateDdlAuto: String?,
         val allowFileTokenPersistenceInProduction: Boolean,
     )
 
@@ -57,20 +59,30 @@ object KisTokenRuntimeSafetyRules {
             return emptyList()
         }
 
+        val violations = mutableListOf<String>()
         val normalizedPersistenceType = input.tokenPersistenceType.trim().lowercase()
         if (
             input.tokenPersistenceEnabled &&
             normalizedPersistenceType == "file" &&
             !input.allowFileTokenPersistenceInProduction
         ) {
-            return listOf(
+            violations +=
                 "prod/live profile cannot use local-file KIS token persistence " +
                     "(akra.kis.token.persistence.type=file); use jdbc or an external secret/token store, " +
-                    "or set akra.runtime.safety.allow-file-token-persistence-in-production=true for a controlled waiver",
-            )
+                    "or set akra.runtime.safety.allow-file-token-persistence-in-production=true for a controlled waiver"
         }
 
-        return emptyList()
+        if (!isSafeHibernateDdlAuto(input.hibernateDdlAuto)) {
+            violations += "prod/live profile cannot use Hibernate automatic DDL " +
+                "(spring.jpa.hibernate.ddl-auto=${input.hibernateDdlAuto}); apply migrations explicitly and use none or validate"
+        }
+
+        return violations
+    }
+
+    private fun isSafeHibernateDdlAuto(value: String?): Boolean {
+        val normalized = value?.trim()?.lowercase().orEmpty()
+        return normalized.isEmpty() || normalized == "none" || normalized == "validate"
     }
 
     private fun isProduction(activeProfiles: List<String>, productionProfiles: List<String>): Boolean {

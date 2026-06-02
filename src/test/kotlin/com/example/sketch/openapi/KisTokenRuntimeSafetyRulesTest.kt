@@ -47,6 +47,35 @@ class KisTokenRuntimeSafetyRulesTest {
     }
 
     @Test
+    fun `blocks Hibernate automatic DDL in production profiles`() {
+        val violations = KisTokenRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                tokenPersistenceEnabled = false,
+                tokenPersistenceType = "file",
+                hibernateDdlAuto = "update",
+            ),
+        )
+
+        assertEquals(1, violations.size)
+        assertTrue(violations.single().contains("Hibernate automatic DDL"))
+    }
+
+    @Test
+    fun `allows schema validation DDL mode in production profiles`() {
+        val violations = KisTokenRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("production"),
+                tokenPersistenceEnabled = false,
+                tokenPersistenceType = "file",
+                hibernateDdlAuto = "validate",
+            ),
+        )
+
+        assertTrue(violations.isEmpty())
+    }
+
+    @Test
     fun `allows explicitly waived local file token persistence in production profiles`() {
         val violations = KisTokenRuntimeSafetyRules.validate(
             input(
@@ -64,6 +93,7 @@ class KisTokenRuntimeSafetyRulesTest {
         activeProfiles: List<String>,
         tokenPersistenceEnabled: Boolean,
         tokenPersistenceType: String,
+        hibernateDdlAuto: String? = "validate",
         allowFileTokenPersistenceInProduction: Boolean = false,
     ) = KisTokenRuntimeSafetyRules.Input(
         activeProfiles = activeProfiles,
@@ -71,6 +101,7 @@ class KisTokenRuntimeSafetyRulesTest {
         productionProfiles = listOf("prod", "production", "live"),
         tokenPersistenceEnabled = tokenPersistenceEnabled,
         tokenPersistenceType = tokenPersistenceType,
+        hibernateDdlAuto = hibernateDdlAuto,
         allowFileTokenPersistenceInProduction = allowFileTokenPersistenceInProduction,
     )
 }

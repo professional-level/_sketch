@@ -201,7 +201,7 @@ akra.runtime.safety.allow-mock-order-intent-in-production=true
 akra.runtime.safety.allow-disabled-trading-calendar-in-production=true
 ```
 
-The root KIS wrapper fails startup under a production-like profile when `akra.kis.token.persistence.enabled=true` and `akra.kis.token.persistence.type=file`. Use JDBC token persistence, a managed token/secret store, or a controlled temporary waiver:
+The root KIS wrapper fails startup under a production-like profile when `spring.jpa.hibernate.ddl-auto` is an automatic schema mutation mode. It also fails when `akra.kis.token.persistence.enabled=true` and `akra.kis.token.persistence.type=file`. Use JDBC token persistence, a managed token/secret store, or a controlled temporary waiver:
 
 ```properties
 akra.runtime.safety.allow-file-token-persistence-in-production=true
