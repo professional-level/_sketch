@@ -296,6 +296,109 @@ class StockPurchaseRuntimeSafetyRulesTest {
     }
 
     @Test
+    fun `blocks malformed trading hours configuration in production profile`() {
+        val violations = StockPurchaseRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                brokerBaseUrl = "https://broker-wrapper.example.com",
+                domesticMockOrder = false,
+                overseasMockOrder = false,
+                tradingHoursWindows = listOf(
+                    tradingHoursWindow(
+                        market = "OVERSEAS_US",
+                        zoneId = "Mars/Base",
+                        holidays = listOf("2026-13-01"),
+                        earlyCloseDates = listOf("not-a-date"),
+                        earlyCloseTimes = mapOf("bad-date" to "noon"),
+                        regularOpen = "09:30",
+                        regularClose = "16:00",
+                        locCutoff = "late",
+                    ),
+                ),
+            ),
+        )
+
+        assertTrue(violations.any { it.contains("invalid OVERSEAS_US trading-hours zone") })
+        assertTrue(violations.any { it.contains("invalid OVERSEAS_US trading-hours holiday date") })
+        assertTrue(violations.any { it.contains("invalid OVERSEAS_US trading-hours early-close date") })
+        assertTrue(violations.any { it.contains("invalid OVERSEAS_US trading-hours early-close override date") })
+        assertTrue(violations.any { it.contains("invalid OVERSEAS_US trading-hours early-close override time") })
+        assertTrue(violations.any { it.contains("invalid OVERSEAS_US trading-hours LOC cutoff") })
+    }
+
+    @Test
+    fun `blocks trading hours windows without usable regular or early close session in production profile`() {
+        val violations = StockPurchaseRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                brokerBaseUrl = "https://broker-wrapper.example.com",
+                domesticMockOrder = false,
+                overseasMockOrder = false,
+                tradingHoursWindows = listOf(
+                    tradingHoursWindow(
+                        market = "OVERSEAS_US",
+                        regularOpen = "16:00",
+                        regularClose = "09:30",
+                        earlyCloseTime = "09:35",
+                        locCutoff = "15:50",
+                        mocCutoff = "15:50",
+                    ),
+                ),
+            ),
+        )
+
+        assertTrue(violations.any { it.contains("regular-open must be before regular-close") })
+        assertTrue(violations.any { it.contains("early close must be before regular-close") })
+    }
+
+    @Test
+    fun `blocks early close dates without common early close time in production profile`() {
+        val violations = StockPurchaseRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                brokerBaseUrl = "https://broker-wrapper.example.com",
+                domesticMockOrder = false,
+                overseasMockOrder = false,
+                tradingHoursWindows = listOf(
+                    tradingHoursWindow(
+                        market = "OVERSEAS_US",
+                        earlyCloseDates = listOf("2026-11-27"),
+                        earlyCloseTime = " ",
+                    ),
+                ),
+            ),
+        )
+
+        assertEquals(1, violations.size)
+        assertTrue(violations.single().contains("must configure OVERSEAS_US trading-hours early-close-time"))
+    }
+
+    @Test
+    fun `blocks early close cutoff that leaves no order window in production profile`() {
+        val violations = StockPurchaseRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                brokerBaseUrl = "https://broker-wrapper.example.com",
+                domesticMockOrder = false,
+                overseasMockOrder = false,
+                tradingHoursWindows = listOf(
+                    tradingHoursWindow(
+                        market = "OVERSEAS_US",
+                        regularOpen = "09:30",
+                        regularClose = "16:00",
+                        earlyCloseTimes = mapOf("2026-11-27" to "09:35"),
+                        locCutoff = "15:50",
+                        mocCutoff = "15:50",
+                    ),
+                ),
+            ),
+        )
+
+        assertEquals(2, violations.size)
+        assertTrue(violations.all { it.contains("leaves no early-close order window") })
+    }
+
+    @Test
     fun `allows explicitly waived production checks`() {
         val violations = StockPurchaseRuntimeSafetyRules.validate(
             input(
@@ -338,6 +441,18 @@ class StockPurchaseRuntimeSafetyRulesTest {
         overseasUsCurrency: String = "USD",
         staticRatesToBase: Map<String, Double> = mapOf("KRW" to 0.001),
         httpFxRateBaseUrl: String = "https://fx.example.com",
+        tradingHoursWindows: List<StockPurchaseRuntimeSafetyRules.TradingHoursWindowInput> = listOf(
+            tradingHoursWindow("DOMESTIC", zoneId = "Asia/Seoul", regularOpen = "09:00", regularClose = "15:30"),
+            tradingHoursWindow(
+                market = "OVERSEAS_US",
+                zoneId = "America/New_York",
+                regularOpen = "09:30",
+                regularClose = "16:00",
+                earlyCloseTime = "13:00",
+                locCutoff = "15:50",
+                mocCutoff = "15:50",
+            ),
+        ),
         kisWrapperFxPairKeysWithSymbol: Collection<String> = listOf("KRW-USD"),
         allowLocalBrokerEndpointInProduction: Boolean = false,
         allowMockTradingInProduction: Boolean = false,
@@ -368,9 +483,36 @@ class StockPurchaseRuntimeSafetyRulesTest {
         overseasUsCurrency = overseasUsCurrency,
         staticRatesToBase = staticRatesToBase,
         httpFxRateBaseUrl = httpFxRateBaseUrl,
+        tradingHoursWindows = tradingHoursWindows,
         kisWrapperFxPairKeysWithSymbol = kisWrapperFxPairKeysWithSymbol,
         allowLocalBrokerEndpointInProduction = allowLocalBrokerEndpointInProduction,
         allowMockTradingInProduction = allowMockTradingInProduction,
         allowDisabledRiskControlsInProduction = allowDisabledRiskControlsInProduction,
+    )
+
+    private fun tradingHoursWindow(
+        market: String,
+        enabled: Boolean = true,
+        zoneId: String = "America/New_York",
+        holidays: List<String> = emptyList(),
+        earlyCloseDates: List<String> = emptyList(),
+        earlyCloseTime: String? = null,
+        earlyCloseTimes: Map<String, String> = emptyMap(),
+        regularOpen: String = "09:30",
+        regularClose: String = "16:00",
+        locCutoff: String? = null,
+        mocCutoff: String? = null,
+    ) = StockPurchaseRuntimeSafetyRules.TradingHoursWindowInput(
+        market = market,
+        enabled = enabled,
+        zoneId = zoneId,
+        holidays = holidays,
+        earlyCloseDates = earlyCloseDates,
+        earlyCloseTime = earlyCloseTime,
+        earlyCloseTimes = earlyCloseTimes,
+        regularOpen = regularOpen,
+        regularClose = regularClose,
+        locCutoff = locCutoff,
+        mocCutoff = mocCutoff,
     )
 }

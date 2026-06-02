@@ -278,6 +278,7 @@ Blocked by default:
 - Empty `akra.order.risk.enabled-strategy-prefixes`, `symbol-max-order-notional.*`, or `strategy-trading-environments`.
 - Blank or unsupported `akra.order.risk.currency-conversion.provider`.
 - Blank `akra.order.risk.currency-conversion.base-currency`, `domestic-currency`, or `overseas-us-currency`.
+- Malformed `akra.order.risk.trading-hours.*` zone, date, regular session, early-close, or LOC/MOC cutoff settings, including early-close/cutoff combinations that leave no valid order window.
 - `provider=static` with a missing or non-positive `rates-to-base.<currency>` entry for any configured market currency that differs from the risk base currency.
 - `provider=http` with blank `akra.order.risk.currency-conversion.http.base-url`.
 - `provider=kis-wrapper` with no configured pair symbol such as `akra.order.risk.currency-conversion.kis-wrapper.pairs.KRW-USD.symbol` for a required market-currency-to-base-currency pair.
@@ -332,6 +333,7 @@ Before enabling real orders:
 - Set real-vs-mock trading flags intentionally for the account being operated.
 - Confirm `strategy-execution-service` order-intent trading environment settings and `stock-purchase-service` broker mock/live flags agree for each strategy prefix.
 - Confirm risk guard limits are set for order notional, account pending buy notional, broker account exposure/cash, symbol notional, daily order count, strategy allow-list, strategy trading environments, and FX conversion provider/rates/pairs. `stock-purchase-service` startup now enforces these settings under production-like profiles unless the disabled-risk-control waiver is explicitly set.
+- Confirm `stock-purchase-service` starts successfully under a production-like profile after any domestic or US trading-hours change; startup validation rejects malformed holidays, early-close dates/times, regular windows, and LOC/MOC cutoff combinations before orders can reach KIS.
 - Confirm broker order status lookup windows are wide enough for `SUBMISSION_UNKNOWN` and `CANCEL_PENDING` recovery without creating excessive KIS query load.
 - Configure domestic and US order windows, holidays, early-close dates, and LOC/MOC cutoffs until an exchange calendar sync is available.
 - Configure `akra.trading-calendar.us.*` in `strategy-execution-service` separately from purchase-service risk windows. The daily active-strategy run resolves the order session date from the requested timestamp and market close, then skips strategy execution when that target US session is closed. If the Temporal trigger lands before the resolved session open or after the prior session close, generated order intents use the resolved session open timestamp for `createdAt` so `stock-purchase-service` evaluates trading-hours risk against the intended order session.
