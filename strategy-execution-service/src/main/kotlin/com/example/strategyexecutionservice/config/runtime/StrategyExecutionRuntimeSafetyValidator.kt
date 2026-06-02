@@ -1,5 +1,9 @@
 package com.example.strategyexecutionservice.config.runtime
 
+import com.example.strategyexecutionservice.config.calendar.TradingCalendarProperties
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneId
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.ApplicationArguments
 import org.springframework.boot.ApplicationRunner
@@ -10,6 +14,7 @@ import org.springframework.stereotype.Component
 class StrategyExecutionRuntimeSafetyValidator(
     private val environment: Environment,
     private val properties: StrategyExecutionRuntimeSafetyProperties,
+    private val tradingCalendarProperties: TradingCalendarProperties,
     @Value("\${akra.temporal.enabled:false}")
     private val temporalEnabled: Boolean,
     @Value("\${akra.temporal.target:127.0.0.1:7233}")
@@ -18,13 +23,10 @@ class StrategyExecutionRuntimeSafetyValidator(
     private val marketDataBaseUrl: String,
     @Value("\${akra.order-intent.default-trading-environment:MOCK}")
     private val defaultOrderIntentTradingEnvironment: String,
-    @Value("\${akra.trading-calendar.us.enabled:true}")
-    private val usTradingCalendarEnabled: Boolean,
-    @Value("\${akra.trading-calendar.us.default-us-equity-calendar-enabled:true}")
-    private val defaultUsEquityCalendarEnabled: Boolean,
 ) : ApplicationRunner {
 
     override fun run(args: ApplicationArguments) {
+        val usCalendar = tradingCalendarProperties.us
         val violations = StrategyExecutionRuntimeSafetyRules.validate(
             StrategyExecutionRuntimeSafetyRules.Input(
                 activeProfiles = environment.activeProfiles.toList(),
@@ -35,8 +37,15 @@ class StrategyExecutionRuntimeSafetyValidator(
                 marketDataBaseUrl = marketDataBaseUrl,
                 hibernateDdlAuto = environment.getProperty("spring.jpa.hibernate.ddl-auto"),
                 defaultOrderIntentTradingEnvironment = defaultOrderIntentTradingEnvironment,
-                usTradingCalendarEnabled = usTradingCalendarEnabled,
-                defaultUsEquityCalendarEnabled = defaultUsEquityCalendarEnabled,
+                usTradingCalendarEnabled = usCalendar.enabled,
+                defaultUsEquityCalendarEnabled = usCalendar.defaultUsEquityCalendarEnabled,
+                usTradingCalendarZoneId = usCalendar.zoneId,
+                usTradingCalendarRegularOpen = usCalendar.regularOpen,
+                usTradingCalendarRegularClose = usCalendar.regularClose,
+                usTradingCalendarHolidays = usCalendar.holidays,
+                usTradingCalendarEarlyCloseDays = usCalendar.earlyCloseDays,
+                usTradingCalendarEarlyCloseTime = usCalendar.earlyCloseTime,
+                usTradingCalendarEarlyCloseTimes = usCalendar.earlyCloseTimes.toMap(),
                 allowLocalTemporalTargetInProduction = properties.allowLocalTemporalTargetInProduction,
                 allowLocalMarketDataEndpointInProduction = properties.allowLocalMarketDataEndpointInProduction,
                 allowMockOrderIntentInProduction = properties.allowMockOrderIntentInProduction,
@@ -68,6 +77,13 @@ object StrategyExecutionRuntimeSafetyRules {
         val defaultOrderIntentTradingEnvironment: String,
         val usTradingCalendarEnabled: Boolean,
         val defaultUsEquityCalendarEnabled: Boolean,
+        val usTradingCalendarZoneId: String,
+        val usTradingCalendarRegularOpen: String,
+        val usTradingCalendarRegularClose: String,
+        val usTradingCalendarHolidays: List<String>,
+        val usTradingCalendarEarlyCloseDays: List<String>,
+        val usTradingCalendarEarlyCloseTime: String?,
+        val usTradingCalendarEarlyCloseTimes: Map<String, String>,
         val allowLocalTemporalTargetInProduction: Boolean,
         val allowLocalMarketDataEndpointInProduction: Boolean,
         val allowMockOrderIntentInProduction: Boolean,
@@ -125,7 +141,130 @@ object StrategyExecutionRuntimeSafetyRules {
             }
         }
 
+        if (input.usTradingCalendarEnabled) {
+            validateUsTradingCalendar(input, violations)
+        }
+
         return violations
+    }
+
+    private fun validateUsTradingCalendar(input: Input, violations: MutableList<String>) {
+        if (parseZoneId(input.usTradingCalendarZoneId) == null) {
+            violations += "prod/live profile has invalid US trading calendar zone " +
+                "(akra.trading-calendar.us.zone-id=${input.usTradingCalendarZoneId})"
+        }
+
+        val regularOpen = parseLocalTime(input.usTradingCalendarRegularOpen)
+        if (regularOpen == null) {
+            violations += "prod/live profile has invalid US trading calendar regular-open " +
+                "(akra.trading-calendar.us.regular-open=${input.usTradingCalendarRegularOpen})"
+        }
+
+        val regularClose = parseLocalTime(input.usTradingCalendarRegularClose)
+        if (regularClose == null) {
+            violations += "prod/live profile has invalid US trading calendar regular-close " +
+                "(akra.trading-calendar.us.regular-close=${input.usTradingCalendarRegularClose})"
+        }
+
+        if (regularOpen != null && regularClose != null && !regularOpen.isBefore(regularClose)) {
+            violations += "prod/live profile US trading calendar regular-open must be before regular-close " +
+                "(akra.trading-calendar.us.regular-open=${input.usTradingCalendarRegularOpen}, " +
+                "akra.trading-calendar.us.regular-close=${input.usTradingCalendarRegularClose})"
+        }
+
+        input.usTradingCalendarHolidays.forEach { value ->
+            if (parseLocalDate(value) == null) {
+                violations += "prod/live profile has invalid US trading calendar holiday date " +
+                    "(akra.trading-calendar.us.holidays[]=$value)"
+            }
+        }
+
+        input.usTradingCalendarEarlyCloseDays.forEach { value ->
+            if (parseLocalDate(value) == null) {
+                violations += "prod/live profile has invalid US trading calendar early-close date " +
+                    "(akra.trading-calendar.us.early-close-days[]=$value)"
+            }
+        }
+
+        input.usTradingCalendarEarlyCloseTime
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { value ->
+                val earlyCloseTime = parseLocalTime(value)
+                if (earlyCloseTime == null) {
+                    violations += "prod/live profile has invalid US trading calendar early-close time " +
+                        "(akra.trading-calendar.us.early-close-time=$value)"
+                } else {
+                    validateEarlyCloseTime(
+                        property = "akra.trading-calendar.us.early-close-time",
+                        value = value,
+                        earlyCloseTime = earlyCloseTime,
+                        regularOpen = regularOpen,
+                        regularClose = regularClose,
+                        violations = violations,
+                    )
+                }
+            }
+
+        input.usTradingCalendarEarlyCloseTimes.forEach { (date, time) ->
+            if (parseLocalDate(date) == null) {
+                violations += "prod/live profile has invalid US trading calendar early-close override date " +
+                    "(akra.trading-calendar.us.early-close-times[$date])"
+            }
+
+            val earlyCloseTime = parseLocalTime(time)
+            if (earlyCloseTime == null) {
+                violations += "prod/live profile has invalid US trading calendar early-close override time " +
+                    "(akra.trading-calendar.us.early-close-times[$date]=$time)"
+            } else {
+                validateEarlyCloseTime(
+                    property = "akra.trading-calendar.us.early-close-times[$date]",
+                    value = time,
+                    earlyCloseTime = earlyCloseTime,
+                    regularOpen = regularOpen,
+                    regularClose = regularClose,
+                    violations = violations,
+                )
+            }
+        }
+    }
+
+    private fun validateEarlyCloseTime(
+        property: String,
+        value: String,
+        earlyCloseTime: LocalTime,
+        regularOpen: LocalTime?,
+        regularClose: LocalTime?,
+        violations: MutableList<String>,
+    ) {
+        if (
+            regularOpen != null &&
+            regularClose != null &&
+            (!earlyCloseTime.isAfter(regularOpen) || !earlyCloseTime.isBefore(regularClose))
+        ) {
+            violations += "prod/live profile US trading calendar early-close time must be after regular-open " +
+                "and before regular-close ($property=$value, " +
+                "akra.trading-calendar.us.regular-open=$regularOpen, " +
+                "akra.trading-calendar.us.regular-close=$regularClose)"
+        }
+    }
+
+    private fun parseZoneId(value: String): ZoneId? {
+        return value.trim().takeIf { it.isNotEmpty() }?.let {
+            runCatching { ZoneId.of(it) }.getOrNull()
+        }
+    }
+
+    private fun parseLocalDate(value: String): LocalDate? {
+        return value.trim().takeIf { it.isNotEmpty() }?.let {
+            runCatching { LocalDate.parse(it) }.getOrNull()
+        }
+    }
+
+    private fun parseLocalTime(value: String): LocalTime? {
+        return value.trim().takeIf { it.isNotEmpty() }?.let {
+            runCatching { LocalTime.parse(it) }.getOrNull()
+        }
     }
 
     private fun isSafeHibernateDdlAuto(value: String?): Boolean {

@@ -179,6 +179,87 @@ class StrategyExecutionRuntimeSafetyRulesTest {
     }
 
     @Test
+    fun `blocks invalid us trading calendar zone in production profile`() {
+        val violations = StrategyExecutionRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                temporalTarget = "temporal.example.com:7233",
+                marketDataBaseUrl = "https://broker-wrapper.example.com",
+                usTradingCalendarZoneId = "Mars/Base",
+            ),
+        )
+
+        assertEquals(1, violations.size)
+        assertTrue(violations.single().contains("invalid US trading calendar zone"))
+    }
+
+    @Test
+    fun `blocks invalid us trading calendar regular session in production profile`() {
+        val violations = StrategyExecutionRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                temporalTarget = "temporal.example.com:7233",
+                marketDataBaseUrl = "https://broker-wrapper.example.com",
+                usTradingCalendarRegularOpen = "16:00",
+                usTradingCalendarRegularClose = "09:30",
+            ),
+        )
+
+        assertEquals(1, violations.size)
+        assertTrue(violations.single().contains("regular-open must be before regular-close"))
+    }
+
+    @Test
+    fun `blocks malformed us trading calendar dates in production profile`() {
+        val violations = StrategyExecutionRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                temporalTarget = "temporal.example.com:7233",
+                marketDataBaseUrl = "https://broker-wrapper.example.com",
+                usTradingCalendarHolidays = listOf("2026-13-01"),
+                usTradingCalendarEarlyCloseDays = listOf("not-a-date"),
+            ),
+        )
+
+        assertEquals(2, violations.size)
+        assertTrue(violations.any { it.contains("invalid US trading calendar holiday date") })
+        assertTrue(violations.any { it.contains("invalid US trading calendar early-close date") })
+    }
+
+    @Test
+    fun `blocks malformed us trading calendar early close times in production profile`() {
+        val violations = StrategyExecutionRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                temporalTarget = "temporal.example.com:7233",
+                marketDataBaseUrl = "https://broker-wrapper.example.com",
+                usTradingCalendarEarlyCloseTime = "market-close",
+                usTradingCalendarEarlyCloseTimes = mapOf("2026-11-27" to "noon"),
+            ),
+        )
+
+        assertEquals(2, violations.size)
+        assertTrue(violations.any { it.contains("invalid US trading calendar early-close time") })
+        assertTrue(violations.any { it.contains("invalid US trading calendar early-close override time") })
+    }
+
+    @Test
+    fun `blocks us trading calendar early close outside regular session in production profile`() {
+        val violations = StrategyExecutionRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                temporalTarget = "temporal.example.com:7233",
+                marketDataBaseUrl = "https://broker-wrapper.example.com",
+                usTradingCalendarEarlyCloseTime = "08:00",
+                usTradingCalendarEarlyCloseTimes = mapOf("2026-11-27" to "16:00"),
+            ),
+        )
+
+        assertEquals(2, violations.size)
+        assertTrue(violations.all { it.contains("after regular-open and before regular-close") })
+    }
+
+    @Test
     fun `allows explicitly waived production checks`() {
         val violations = StrategyExecutionRuntimeSafetyRules.validate(
             input(
@@ -188,6 +269,9 @@ class StrategyExecutionRuntimeSafetyRulesTest {
                 hibernateDdlAuto = "validate",
                 defaultOrderIntentTradingEnvironment = "MOCK",
                 usTradingCalendarEnabled = false,
+                usTradingCalendarZoneId = "invalid",
+                usTradingCalendarRegularOpen = "invalid",
+                usTradingCalendarRegularClose = "invalid",
                 allowLocalTemporalTargetInProduction = true,
                 allowLocalMarketDataEndpointInProduction = true,
                 allowMockOrderIntentInProduction = true,
@@ -206,6 +290,13 @@ class StrategyExecutionRuntimeSafetyRulesTest {
         defaultOrderIntentTradingEnvironment: String = "LIVE",
         usTradingCalendarEnabled: Boolean = true,
         defaultUsEquityCalendarEnabled: Boolean = true,
+        usTradingCalendarZoneId: String = "America/New_York",
+        usTradingCalendarRegularOpen: String = "09:30",
+        usTradingCalendarRegularClose: String = "16:00",
+        usTradingCalendarHolidays: List<String> = emptyList(),
+        usTradingCalendarEarlyCloseDays: List<String> = emptyList(),
+        usTradingCalendarEarlyCloseTime: String? = null,
+        usTradingCalendarEarlyCloseTimes: Map<String, String> = emptyMap(),
         allowLocalTemporalTargetInProduction: Boolean = false,
         allowLocalMarketDataEndpointInProduction: Boolean = false,
         allowMockOrderIntentInProduction: Boolean = false,
@@ -221,6 +312,13 @@ class StrategyExecutionRuntimeSafetyRulesTest {
         defaultOrderIntentTradingEnvironment = defaultOrderIntentTradingEnvironment,
         usTradingCalendarEnabled = usTradingCalendarEnabled,
         defaultUsEquityCalendarEnabled = defaultUsEquityCalendarEnabled,
+        usTradingCalendarZoneId = usTradingCalendarZoneId,
+        usTradingCalendarRegularOpen = usTradingCalendarRegularOpen,
+        usTradingCalendarRegularClose = usTradingCalendarRegularClose,
+        usTradingCalendarHolidays = usTradingCalendarHolidays,
+        usTradingCalendarEarlyCloseDays = usTradingCalendarEarlyCloseDays,
+        usTradingCalendarEarlyCloseTime = usTradingCalendarEarlyCloseTime,
+        usTradingCalendarEarlyCloseTimes = usTradingCalendarEarlyCloseTimes,
         allowLocalTemporalTargetInProduction = allowLocalTemporalTargetInProduction,
         allowLocalMarketDataEndpointInProduction = allowLocalMarketDataEndpointInProduction,
         allowMockOrderIntentInProduction = allowMockOrderIntentInProduction,

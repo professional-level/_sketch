@@ -300,6 +300,7 @@ akra.runtime.safety.allow-disabled-risk-controls-in-production=true
 - `akra.order-intent.default-trading-environment` is not `LIVE`.
 - `akra.trading-calendar.us.enabled=false`.
 - `akra.trading-calendar.us.default-us-equity-calendar-enabled=false`.
+- `akra.trading-calendar.us.zone-id`, `regular-open`, `regular-close`, `holidays[]`, `early-close-days[]`, or `early-close-times[...]` contain malformed values, or an early-close time falls outside the regular session.
 
 Temporary waiver properties:
 
@@ -334,6 +335,7 @@ Before enabling real orders:
 - Confirm broker order status lookup windows are wide enough for `SUBMISSION_UNKNOWN` and `CANCEL_PENDING` recovery without creating excessive KIS query load.
 - Configure domestic and US order windows, holidays, early-close dates, and LOC/MOC cutoffs until an exchange calendar sync is available.
 - Configure `akra.trading-calendar.us.*` in `strategy-execution-service` separately from purchase-service risk windows. The daily active-strategy run resolves the order session date from the requested timestamp and market close, then skips strategy execution when that target US session is closed. If the Temporal trigger lands before the resolved session open or after the prior session close, generated order intents use the resolved session open timestamp for `createdAt` so `stock-purchase-service` evaluates trading-hours risk against the intended order session.
+- Confirm `strategy-execution-service` starts successfully under a production-like profile after any trading-calendar change; startup validation now rejects malformed zone/date/time values and early-close times outside the regular session.
 - Confirm the legacy `stock-purchase-service` scheduler gate is acceptable for the deployment. By default it runs sell-order creation and simulation when any enabled market's configured order window is open, and it runs submission recovery plus reconciliation when any enabled market is on a configured trading date. Jobs skip only when every enabled market is outside its configured order window or trading date. Disabling `akra.order.risk.trading-hours.enabled` restores the old weekday-only scheduler behavior.
 - Confirm `application-secret.properties` is not included in the built artifact or Git diff, or omit it entirely and inject the KIS values at runtime. The root KIS wrapper blocks this property source by default under production-like profiles.
 
