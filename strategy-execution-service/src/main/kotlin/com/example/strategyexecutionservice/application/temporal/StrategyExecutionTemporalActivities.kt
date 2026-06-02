@@ -19,6 +19,7 @@ data class RunActiveStrategyExecutionsWorkflowInput(
     val requestedAt: String = "",
     val executionRunIdPrefix: String = "ACTIVE_STRATEGIES_DAILY",
     val timeZone: String = "Asia/Seoul",
+    val traceContext: TemporalTraceContext = TemporalTraceContext(),
 )
 
 data class RunActiveStrategyExecutionsWorkflowResult(
@@ -37,7 +38,18 @@ data class RunLaorV4StrategyWorkflowInput(
     val firstBuyLimitMultiplier: Double = 1.12,
     val state: LaorV4StrategyWorkflowState = LaorV4StrategyWorkflowState(),
     val market: StrategyMarketWorkflowSnapshot = StrategyMarketWorkflowSnapshot(),
+    val traceContext: TemporalTraceContext = TemporalTraceContext(),
 )
+
+data class TemporalTraceContext(
+    val traceId: String = "",
+    val spanId: String = "",
+    val traceParent: String = "",
+) {
+    fun isEmpty(): Boolean {
+        return traceId.isBlank() && spanId.isBlank() && traceParent.isBlank()
+    }
+}
 
 data class LaorV4StrategyWorkflowState(
     val mode: String = "NORMAL",

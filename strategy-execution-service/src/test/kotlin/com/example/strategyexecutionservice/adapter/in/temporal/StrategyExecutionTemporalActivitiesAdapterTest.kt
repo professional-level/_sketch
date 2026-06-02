@@ -10,10 +10,14 @@ import com.example.strategyexecutionservice.application.temporal.LaorV4StrategyW
 import com.example.strategyexecutionservice.application.temporal.RunActiveStrategyExecutionsWorkflowInput
 import com.example.strategyexecutionservice.application.temporal.RunLaorV4StrategyWorkflowInput
 import com.example.strategyexecutionservice.application.temporal.StrategyMarketWorkflowSnapshot
+import com.example.strategyexecutionservice.application.temporal.TemporalTraceContext
 import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategyMode
 import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategySymbol
+import common.observability.TraceContext
+import org.slf4j.MDC
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 class StrategyExecutionTemporalActivitiesAdapterTest {
 
@@ -92,6 +96,35 @@ class StrategyExecutionTemporalActivitiesAdapterTest {
     }
 
     @Test
+    fun `restores temporal trace context while running active strategy activity`() {
+        val activeUseCase = FakeRunActiveStrategyExecutionsUseCase()
+        val useCase = FakeRunStrategyExecutionUseCase()
+        val adapter = StrategyExecutionTemporalActivitiesAdapter(activeUseCase, useCase)
+
+        MDC.put(TraceContext.TRACE_ID_KEY, "previous-trace")
+        try {
+            adapter.runActiveStrategyExecutions(
+                RunActiveStrategyExecutionsWorkflowInput(
+                    executionRunId = "ACTIVE_STRATEGIES_DAILY:2026-06-02",
+                    requestedAt = "2026-06-02T09:00:00+09:00",
+                    traceContext = TemporalTraceContext(
+                        traceId = TRACE_ID,
+                        spanId = SPAN_ID,
+                        traceParent = TRACE_PARENT,
+                    ),
+                ),
+            )
+        } finally {
+            assertEquals("previous-trace", MDC.get(TraceContext.TRACE_ID_KEY))
+            assertNull(MDC.get(TraceContext.SPAN_ID_KEY))
+            assertNull(MDC.get(TraceContext.TRACEPARENT_KEY))
+            MDC.clear()
+        }
+
+        assertEquals(Triple(TRACE_ID, SPAN_ID, TRACE_PARENT), activeUseCase.observedTrace)
+    }
+
+    @Test
     fun `creates daily execution run id when scheduled activity input omits it`() {
         val activeUseCase = FakeRunActiveStrategyExecutionsUseCase()
         val useCase = FakeRunStrategyExecutionUseCase()
@@ -111,11 +144,17 @@ class StrategyExecutionTemporalActivitiesAdapterTest {
 
     private class FakeRunActiveStrategyExecutionsUseCase : RunActiveStrategyExecutionsUseCase {
         val commands: MutableList<RunActiveStrategyExecutionsCommand> = mutableListOf()
+        var observedTrace: Triple<String?, String?, String?>? = null
 
         override suspend fun execute(
             command: RunActiveStrategyExecutionsCommand,
         ): RunActiveStrategyExecutionsResult {
             commands += command
+            observedTrace = Triple(
+                MDC.get(TraceContext.TRACE_ID_KEY),
+                MDC.get(TraceContext.SPAN_ID_KEY),
+                MDC.get(TraceContext.TRACEPARENT_KEY),
+            )
             return RunActiveStrategyExecutionsResult(
                 executionRunId = command.executionRunId,
                 activeStrategyCount = 2,
@@ -136,5 +175,11 @@ class StrategyExecutionTemporalActivitiesAdapterTest {
                 createdOrderIntentCount = 2,
             )
         }
+    }
+
+    private companion object {
+        const val TRACE_ID = "4bf92f3577b34da6a3ce929d0e0e4736"
+        const val SPAN_ID = "00f067aa0ba902b7"
+        const val TRACE_PARENT = "00-$TRACE_ID-$SPAN_ID-01"
     }
 }

@@ -14,8 +14,10 @@ import com.example.strategyexecutionservice.application.temporal.RunLaorV4Strate
 import com.example.strategyexecutionservice.application.temporal.RunLaorV4StrategyWorkflowResult
 import com.example.strategyexecutionservice.application.temporal.StrategyExecutionTemporalActivities
 import com.example.strategyexecutionservice.application.temporal.StrategyMarketWorkflowSnapshot
+import com.example.strategyexecutionservice.application.temporal.TemporalTraceContext
 import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategyMode
 import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategySymbol
+import common.observability.TraceContext
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import kotlinx.coroutines.runBlocking
@@ -30,25 +32,29 @@ class StrategyExecutionTemporalActivitiesAdapter(
         input: RunActiveStrategyExecutionsWorkflowInput,
     ): RunActiveStrategyExecutionsWorkflowResult {
         return runBlocking {
-            val result = runActiveStrategyExecutionsUseCase.execute(input.toCommand())
-            RunActiveStrategyExecutionsWorkflowResult(
-                executionRunId = result.executionRunId,
-                activeStrategyCount = result.activeStrategyCount,
-                executedStrategyCount = result.executedStrategyCount,
-                createdOrderIntentCount = result.createdOrderIntentCount,
-                skippedReason = result.skippedReason,
-            )
+            input.traceContext.withMdc {
+                val result = runActiveStrategyExecutionsUseCase.execute(input.toCommand())
+                RunActiveStrategyExecutionsWorkflowResult(
+                    executionRunId = result.executionRunId,
+                    activeStrategyCount = result.activeStrategyCount,
+                    executedStrategyCount = result.executedStrategyCount,
+                    createdOrderIntentCount = result.createdOrderIntentCount,
+                    skippedReason = result.skippedReason,
+                )
+            }
         }
     }
 
     override fun runLaorV4Strategy(input: RunLaorV4StrategyWorkflowInput): RunLaorV4StrategyWorkflowResult {
         return runBlocking {
-            val result = runStrategyExecutionUseCase.execute(input.toCommand())
-            RunLaorV4StrategyWorkflowResult(
-                executionId = result.executionId,
-                executionRunId = result.executionRunId,
-                createdOrderIntentCount = result.createdOrderIntentCount,
-            )
+            input.traceContext.withMdc {
+                val result = runStrategyExecutionUseCase.execute(input.toCommand())
+                RunLaorV4StrategyWorkflowResult(
+                    executionId = result.executionId,
+                    executionRunId = result.executionRunId,
+                    createdOrderIntentCount = result.createdOrderIntentCount,
+                )
+            }
         }
     }
 
@@ -95,5 +101,18 @@ class StrategyExecutionTemporalActivitiesAdapter(
             previousClose = previousClose,
             recentClosePrices = recentClosePrices,
         )
+    }
+}
+
+private suspend fun <T> TemporalTraceContext.withMdc(block: suspend () -> T): T {
+    val context = TraceContext.fromHeaders(
+        traceParent = traceParent,
+        traceId = traceId,
+        spanId = spanId,
+    )
+    return if (context.isEmpty()) {
+        block()
+    } else {
+        context.withMdc(block)
     }
 }
