@@ -127,7 +127,11 @@ internal class OrderRiskControlAdapter(
         if (limit <= 0) return null
 
         val window = command.marketDayWindow()
-        val currentCount = orderRiskSubmissionReader.countBrokerSubmittedBetween(window.first, window.second)
+        val currentCount = orderRiskSubmissionReader.countBrokerSubmittedBetween(
+            market = command.market.toEntity(),
+            from = window.first,
+            to = window.second,
+        )
         return if (currentCount >= limit) {
             "daily broker order count $currentCount reached limit $limit"
         } else {
@@ -229,6 +233,7 @@ internal class OrderRiskControlAdapter(
 
         val window = command.marketDayWindow()
         val exists = orderRiskSubmissionReader.existsActiveDuplicate(
+            market = command.market.toEntity(),
             strategyExecutionId = command.strategyExecutionId,
             symbol = command.symbol,
             side = command.side.toEntity(),

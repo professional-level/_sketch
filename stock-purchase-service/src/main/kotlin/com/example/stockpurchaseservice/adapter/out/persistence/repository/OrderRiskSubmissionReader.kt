@@ -6,11 +6,13 @@ import java.time.ZonedDateTime
 
 internal interface OrderRiskSubmissionReader {
     suspend fun countBrokerSubmittedBetween(
+        market: OrderIntentSubmissionMarket,
         from: ZonedDateTime,
         to: ZonedDateTime,
     ): Long
 
     suspend fun existsActiveDuplicate(
+        market: OrderIntentSubmissionMarket,
         strategyExecutionId: String,
         symbol: String,
         side: OrderIntentSubmissionSide,

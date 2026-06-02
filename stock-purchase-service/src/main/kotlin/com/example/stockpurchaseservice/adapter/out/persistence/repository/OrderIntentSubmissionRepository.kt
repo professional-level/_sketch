@@ -79,6 +79,7 @@ internal class OrderIntentSubmissionRepository :
     }
 
     override suspend fun countBrokerSubmittedBetween(
+        market: OrderIntentSubmissionMarket,
         from: ZonedDateTime,
         to: ZonedDateTime,
     ): Long {
@@ -89,10 +90,12 @@ internal class OrderIntentSubmissionRepository :
                 FROM OrderIntentSubmissionEntity o
                 WHERE o.submittedAt >= :from
                   AND o.submittedAt < :to
+                  AND (o.market = :market OR o.market IS NULL)
                   AND o.status IN (:statuses)
                 """.trimIndent(),
                 java.lang.Long::class.java,
             )
+                .setParameter("market", market)
                 .setParameter("from", from)
                 .setParameter("to", to)
                 .setParameter("statuses", BROKER_SUBMITTED_STATUSES)
@@ -101,6 +104,7 @@ internal class OrderIntentSubmissionRepository :
     }
 
     override suspend fun existsActiveDuplicate(
+        market: OrderIntentSubmissionMarket,
         strategyExecutionId: String,
         symbol: String,
         side: OrderIntentSubmissionSide,
@@ -115,6 +119,7 @@ internal class OrderIntentSubmissionRepository :
                 FROM OrderIntentSubmissionEntity o
                 WHERE o.strategyExecutionId = :strategyExecutionId
                   AND o.symbol = :symbol
+                  AND (o.market = :market OR o.market IS NULL)
                   AND o.side = :side
                   AND o.orderTag = :orderTag
                   AND o.submittedAt >= :from
@@ -123,6 +128,7 @@ internal class OrderIntentSubmissionRepository :
                 """.trimIndent(),
                 java.lang.Long::class.java,
             )
+                .setParameter("market", market)
                 .setParameter("strategyExecutionId", strategyExecutionId)
                 .setParameter("symbol", symbol)
                 .setParameter("side", side)

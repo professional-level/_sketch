@@ -277,6 +277,7 @@ class OrderRiskControlAdapterTest {
         val (from, to) = reader.countBrokerSubmittedWindows.single()
         assertEquals(ZonedDateTime.parse("2026-06-01T00:00:00-04:00[America/New_York]"), from)
         assertEquals(ZonedDateTime.parse("2026-06-02T00:00:00-04:00[America/New_York]"), to)
+        assertEquals(listOf(OrderIntentSubmissionMarket.OVERSEAS_US), reader.countBrokerSubmittedMarkets)
     }
 
     @Test
@@ -300,6 +301,7 @@ class OrderRiskControlAdapterTest {
         val (from, to) = reader.activeDuplicateWindows.single()
         assertEquals(ZonedDateTime.parse("2026-06-01T00:00:00-04:00[America/New_York]"), from)
         assertEquals(ZonedDateTime.parse("2026-06-02T00:00:00-04:00[America/New_York]"), to)
+        assertEquals(listOf(OrderIntentSubmissionMarket.OVERSEAS_US), reader.activeDuplicateMarkets)
     }
 
     @Test
@@ -838,18 +840,23 @@ class OrderRiskControlAdapterTest {
     ) : OrderRiskSubmissionReader {
         val activeBuyNotionalMarkets: MutableList<OrderIntentSubmissionMarket> = mutableListOf()
         val activeSellQuantityRequests: MutableList<Pair<String, OrderIntentSubmissionMarket>> = mutableListOf()
+        val countBrokerSubmittedMarkets: MutableList<OrderIntentSubmissionMarket> = mutableListOf()
         val countBrokerSubmittedWindows: MutableList<Pair<ZonedDateTime, ZonedDateTime>> = mutableListOf()
+        val activeDuplicateMarkets: MutableList<OrderIntentSubmissionMarket> = mutableListOf()
         val activeDuplicateWindows: MutableList<Pair<ZonedDateTime, ZonedDateTime>> = mutableListOf()
 
         override suspend fun countBrokerSubmittedBetween(
+            market: OrderIntentSubmissionMarket,
             from: ZonedDateTime,
             to: ZonedDateTime,
         ): Long {
+            countBrokerSubmittedMarkets += market
             countBrokerSubmittedWindows += Pair(from, to)
             return brokerSubmittedCount
         }
 
         override suspend fun existsActiveDuplicate(
+            market: OrderIntentSubmissionMarket,
             strategyExecutionId: String,
             symbol: String,
             side: OrderIntentSubmissionSide,
@@ -857,6 +864,7 @@ class OrderRiskControlAdapterTest {
             from: ZonedDateTime,
             to: ZonedDateTime,
         ): Boolean {
+            activeDuplicateMarkets += market
             activeDuplicateWindows += Pair(from, to)
             return duplicateExists
         }
