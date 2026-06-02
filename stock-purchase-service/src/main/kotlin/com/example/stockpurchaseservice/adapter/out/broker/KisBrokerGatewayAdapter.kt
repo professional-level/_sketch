@@ -644,7 +644,7 @@ private fun ZonedDateTime.toKisDate(): String {
 
 private fun JsonNode.toBrokerAccountSnapshot(query: BrokerAccountSnapshotQuery): BrokerAccountSnapshot {
     val rows = rows("output1", "OUTPUT1", "output", "OUTPUT")
-    val summary = nodeOrNull("output2", "OUTPUT2")
+    val summary = summaryNode("output2", "OUTPUT2")
     val orderableCashAmount = summary?.textOrNull(
         "ovrs_ord_psbl_amt",
         "OVRS_ORD_PSBL_AMT",
@@ -709,7 +709,7 @@ private fun JsonNode.toBrokerAccountSnapshot(query: BrokerAccountSnapshotQuery):
 
 private fun JsonNode.toDomesticBrokerAccountSnapshot(): BrokerAccountSnapshot {
     val rows = rows("output1", "OUTPUT1", "output", "OUTPUT")
-    val summary = nodeOrNull("output2", "OUTPUT2")
+    val summary = summaryNode("output2", "OUTPUT2")
     val orderableCashAmount = summary?.textOrNull(
         "ord_psbl_cash",
         "ORD_PSBL_CASH",
@@ -776,6 +776,15 @@ private fun JsonNode.nodeOrNull(vararg fieldNames: String): JsonNode? {
         .asSequence()
         .map { path(it) }
         .firstOrNull { !it.isMissingNode && !it.isNull }
+}
+
+private fun JsonNode.summaryNode(vararg fieldNames: String): JsonNode? {
+    val node = nodeOrNull(*fieldNames) ?: return null
+    return when {
+        node.isObject -> node
+        node.isArray -> node.firstOrNull { it.isObject }
+        else -> null
+    }
 }
 
 private fun BrokerAccountSnapshot.mergeSummaryFrom(next: BrokerAccountSnapshot): BrokerAccountSnapshot {

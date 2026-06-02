@@ -653,7 +653,7 @@ stock-search-service
 
 - `stock-purchase-service` exposes `GET /operations/trading/account-snapshot` for broker-backed account position checks.
 - Supported markets are `OVERSEAS_US` and `DOMESTIC`; the adapter calls the root KIS wrapper's overseas or domestic `/trading/inquire-balance` endpoint.
-- The response reports domestic/overseas positions, optional KIS summary fields, legacy `availableCashAmount`, `cashCurrency`, and separated `orderableCashAmount`, `settledCashAmount`, and `withdrawableCashAmount` when KIS provides those aliases.
+- The response reports domestic/overseas positions, optional KIS summary fields, legacy `availableCashAmount`, `cashCurrency`, and separated `orderableCashAmount`, `settledCashAmount`, and `withdrawableCashAmount` when KIS provides those aliases. Balance summary parsing accepts KIS `output2` as either an object or an array whose first object contains the summary buckets.
 - Risk guard cash checks prefer `orderableCashAmount` and fall back to the legacy `availableCashAmount` only for compatibility with older account snapshot providers. Order notional, pending buy notional, broker exposure, and orderable cash are normalized to the configured risk base currency through an `FxRatePort`; the default provider uses static `rates-to-base`, an optional HTTP provider can fetch operator-managed live rates, and `provider=kis-wrapper` can call the root wrapper's KIS overseas daily chart price endpoint for configured currency pairs. KIS symbol mapping verification and broader account cash/exposure modeling remain hardening work.
 
 ## Open Questions

@@ -787,6 +787,52 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `domestic account snapshot maps output2 array summary`() {
+        val exchangeFunction = StubExchangeFunction(
+            responses = listOf(
+                """
+                {
+                  "rt_cd": "0",
+                  "ctx_area_fk100": "",
+                  "ctx_area_nk100": "",
+                  "output1": [],
+                  "output2": [
+                    {
+                      "ORD_PSBL_CASH": "1200000",
+                      "DNCA_TOT_AMT": "1250000",
+                      "WDRW_PSBL_AMT": "1100000",
+                      "TOT_PCHS_AMT": "210000",
+                      "SCTS_EVLU_AMT": "216000",
+                      "TOT_EVLU_PFLS_AMT": "6000"
+                    }
+                  ]
+                }
+                """.trimIndent(),
+            ),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        val snapshot = adapter.findAccountSnapshot(
+            BrokerAccountSnapshotQuery(
+                market = StockOrderMarket.DOMESTIC,
+                isMock = true,
+            ),
+        )
+
+        assertEquals(1_200_000.0, snapshot.availableCashAmount)
+        assertEquals(1_200_000.0, snapshot.orderableCashAmount)
+        assertEquals(1_250_000.0, snapshot.settledCashAmount)
+        assertEquals(1_100_000.0, snapshot.withdrawableCashAmount)
+        assertEquals(210_000.0, snapshot.totalPurchaseAmount)
+        assertEquals(216_000.0, snapshot.totalEvaluationAmount)
+        assertEquals(6_000.0, snapshot.totalProfitLossAmount)
+    }
+
+    @Test
     fun `overseas account snapshot maps uppercase top level balance aliases`() {
         val exchangeFunction = StubExchangeFunction(
             responses = listOf(
@@ -850,6 +896,54 @@ class KisBrokerGatewayAdapterTest {
             assertEquals(360.0, evaluationAmount)
             assertEquals(22.5, profitLossAmount)
         }
+    }
+
+    @Test
+    fun `overseas account snapshot maps output2 array summary`() {
+        val exchangeFunction = StubExchangeFunction(
+            responses = listOf(
+                """
+                {
+                  "rt_cd": "0",
+                  "ctx_area_fk200": "",
+                  "ctx_area_nk200": "",
+                  "output1": [],
+                  "output2": [
+                    {
+                      "ord_psbl_frcr_amt": "1250.25",
+                      "frcr_dncl_amt": "1300.00",
+                      "ovrs_wdrw_psbl_amt": "1200.50",
+                      "pchs_amt_smtl": "337.5",
+                      "frcr_evlu_amt2": "360.0",
+                      "evlu_pfls_amt_smtl": "22.5"
+                    }
+                  ]
+                }
+                """.trimIndent(),
+            ),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        val snapshot = adapter.findAccountSnapshot(
+            BrokerAccountSnapshotQuery(
+                market = StockOrderMarket.OVERSEAS_US,
+                exchange = "NASD",
+                currency = "USD",
+                isMock = false,
+            ),
+        )
+
+        assertEquals(1250.25, snapshot.availableCashAmount)
+        assertEquals(1250.25, snapshot.orderableCashAmount)
+        assertEquals(1300.0, snapshot.settledCashAmount)
+        assertEquals(1200.5, snapshot.withdrawableCashAmount)
+        assertEquals(337.5, snapshot.totalPurchaseAmount)
+        assertEquals(360.0, snapshot.totalEvaluationAmount)
+        assertEquals(22.5, snapshot.totalProfitLossAmount)
     }
 
     @Test
