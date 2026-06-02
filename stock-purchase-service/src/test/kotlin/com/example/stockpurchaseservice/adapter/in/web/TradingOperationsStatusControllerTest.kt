@@ -13,6 +13,7 @@ import com.example.stockpurchaseservice.application.port.out.OutboxStatusCount
 import com.example.stockpurchaseservice.application.port.out.StockOrderMarket
 import com.example.stockpurchaseservice.application.port.out.TradingOperationsStatusSnapshot
 import com.example.stockpurchaseservice.application.port.out.UnmatchedExecutionStatus
+import java.time.Duration
 import java.time.ZonedDateTime
 import java.util.UUID
 import kotlinx.coroutines.runBlocking
@@ -28,14 +29,30 @@ class TradingOperationsStatusControllerTest {
             snapshot = snapshot(),
         )
         val useCase = FakeGetTradingOperationsStatusUseCase(result)
-        val controller = TradingOperationsStatusController(useCase)
+        val controller = TradingOperationsStatusController(useCase, Duration.ofMinutes(15))
 
         val response = controller.status()
 
         assertEquals(1, useCase.callCount)
         assertEquals(result.generatedAt, response.generatedAt)
         assertEquals(result.snapshot.orderSubmissionStatusCounts, response.orderSubmissionStatusCounts)
-        assertEquals(result.snapshot.recentProblemSubmissions, response.recentProblemSubmissions)
+        assertEquals(900L, response.persistentSubmissionUnknownThresholdSeconds)
+        assertEquals(1L, response.recentPersistentSubmissionUnknownCount)
+        with(response.recentProblemSubmissions.single()) {
+            assertEquals("00000000-0000-0000-0000-000000000001", orderIntentId)
+            assertEquals("laor-v4:TQQQ", strategyExecutionId)
+            assertEquals("TQQQ", symbol)
+            assertEquals("OVERSEAS_US", market)
+            assertEquals("BUY", side)
+            assertEquals("LOC", orderType)
+            assertEquals("SUBMISSION_UNKNOWN", status)
+            assertEquals("broker status lookup failed", statusReason)
+            assertEquals("broker-1", externalOrderId)
+            assertEquals(ZonedDateTime.parse("2026-06-02T09:30:00+09:00[Asia/Seoul]"), submittedAt)
+            assertEquals(ZonedDateTime.parse("2026-06-02T09:31:00+09:00[Asia/Seoul]"), lastStatusCheckedAt)
+            assertEquals(1800L, ageSeconds)
+            assertEquals(true, persistentSubmissionUnknown)
+        }
         assertEquals(result.snapshot.orderExecutionOutboxStatusCounts, response.orderExecutionOutboxStatusCounts)
         assertEquals(result.snapshot.reconciliationCursors, response.reconciliationCursors)
         assertEquals(result.snapshot.unmatchedExecutionCount, response.unmatchedExecutionCount)
