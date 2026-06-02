@@ -102,6 +102,32 @@ data class OverseasDailyPriceCandle(
     val close: Double,
 )
 
+data class GetOverseasFxRateRequest(
+    val isMock: Boolean = true,
+    val marketDivCode: String = "KX",
+    val symbol: String = "",
+    val fromDate: String = ZonedDateTime.now(ZoneId.of("Asia/Seoul")).minusDays(7).toDefaultDateStringFormat(),
+    val toDate: String = ZonedDateTime.now(ZoneId.of("Asia/Seoul")).toDefaultDateStringFormat(),
+    val periodDivCode: String = "D",
+) {
+    init {
+        require(marketDivCode.isNotBlank()) { "marketDivCode must not be blank" }
+        require(symbol.isNotBlank()) { "symbol must not be blank" }
+        require(fromDate.isNotBlank()) { "fromDate must not be blank" }
+        require(toDate.isNotBlank()) { "toDate must not be blank" }
+        require(periodDivCode.isNotBlank()) { "periodDivCode must not be blank" }
+    }
+}
+
+data class OverseasFxRateResponse(
+    val symbol: String,
+    val marketDivCode: String,
+    val rate: Double,
+    val observedDate: String? = null,
+    val provider: String = "kis-overseas-daily-chartprice",
+    val rawField: String? = null,
+)
+
 data class OverseasStockOrderRequest(
     val PDNO: String,
     val OVRS_EXCG_CD: String = "NASD",

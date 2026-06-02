@@ -44,6 +44,10 @@ enum class RequestType(
         requestURI = "/uapi/overseas-price/v1/quotations/dailyprice",
         type = HttpMethod.GET,
     ),
+    GET_OVERSEAS_DAILY_CHART_PRICE(
+        requestURI = "/uapi/overseas-price/v1/quotations/inquire-daily-chartprice",
+        type = HttpMethod.GET,
+    ),
     POST_STOCK_ORDER(
         requestURI = "/uapi/domestic-stock/v1/trading/order-cash", // 주식주문(현금) URI
         type = HttpMethod.POST,
@@ -102,6 +106,8 @@ enum class QueryParameter(
     FID_COND_MRKT_DIV_CODE("J"), // 주식
     FID_INPUT_ISCD(emptyQueryParam), // 종목번호 6자리 ex) 삼성전자: 005930 or 입력 종목코드
     FID_INPUT_DATE_1(emptyQueryParam), // 기준일 기준일 (ex 0020240308) or 입력날짜 	""(공란) 입력 TODO: 날짜별 api로 만들 수 있는지 검증 필요
+    FID_INPUT_DATE_2(emptyQueryParam),
+    FID_PERIOD_DIV_CODE("D"),
     FID_COND_SCR_DIV_CODE(emptyQueryParam), // 조건 화면 분류 코드
     FID_DIV_CLS_CODE(emptyQueryParam), // 분류 구분 코드 0(전체) 1(보통주) 2(우선주)
     FID_BLNG_CLS_CODE(emptyQueryParam), // 소속 구분 코드	0 : 평균거래량 1:거래증가율 2:평균거래회전율 3:거래금액순 4:평균거래금액회전율 TODO: 3이지만 동적 처리 필요
@@ -217,6 +223,21 @@ enum class QueryParameter(
                     requireNotNull(additionalInfo[EXCD])
                     requireNotNull(additionalInfo[SYMB])
                     listOf(AUTH, EXCD, SYMB, GUBN, BYMD, MODP)
+                }
+
+                RequestType.GET_OVERSEAS_DAILY_CHART_PRICE -> {
+                    requireNotNull(additionalInfo[FID_COND_MRKT_DIV_CODE])
+                    requireNotNull(additionalInfo[FID_INPUT_ISCD])
+                    requireNotNull(additionalInfo[FID_INPUT_DATE_1])
+                    requireNotNull(additionalInfo[FID_INPUT_DATE_2])
+                    requireNotNull(additionalInfo[FID_PERIOD_DIV_CODE])
+                    listOf(
+                        FID_COND_MRKT_DIV_CODE,
+                        FID_INPUT_ISCD,
+                        FID_INPUT_DATE_1,
+                        FID_INPUT_DATE_2,
+                        FID_PERIOD_DIV_CODE,
+                    )
                 }
 
                 RequestType.POST_STOCK_ORDER -> emptyList()

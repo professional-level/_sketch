@@ -95,6 +95,64 @@ class FxRateAdapterTest {
         assertNull(adapter.getRateToBase("KRW", "USD"))
     }
 
+    @Test
+    fun `kis wrapper fx rate adapter maps configured pair and inverts broker rate`() {
+        val exchangeFunction = CapturingExchangeFunction(
+            """
+            {
+              "symbol": "USDKRW",
+              "marketDivCode": "KX",
+              "rate": 1330.0,
+              "observedDate": "20260602",
+              "provider": "kis-overseas-daily-chartprice"
+            }
+            """.trimIndent(),
+        )
+        val properties = OrderRiskProperties.CurrencyConversionProperties().apply {
+            kisWrapper.pairs["KRW-USD"] = OrderRiskProperties.KisWrapperFxRatePairProperties().apply {
+                marketDivCode = "KX"
+                symbol = "USDKRW"
+                invert = true
+                isMock = false
+                fromDate = "20260601"
+                toDate = "20260602"
+            }
+        }
+        val adapter = KisWrapperFxRateAdapter(
+            webClient = WebClient.builder()
+                .baseUrl("http://kis-wrapper.test")
+                .exchangeFunction(exchangeFunction)
+                .build(),
+            properties = properties,
+        )
+
+        val rate = adapter.getRateToBase("KRW", "USD")
+
+        assertEquals("KRW", rate?.sourceCurrency)
+        assertEquals("USD", rate?.baseCurrency)
+        assertEquals(1.0 / 1330.0, rate?.rateToBase)
+        assertEquals("kis-overseas-daily-chartprice", rate?.provider)
+        assertEquals("/open-api/overseas/quotations/fx-rate", exchangeFunction.requests.single().url().path)
+        assertEquals("KX", exchangeFunction.requests.single().url().queryValue("marketDivCode"))
+        assertEquals("USDKRW", exchangeFunction.requests.single().url().queryValue("symbol"))
+        assertEquals("false", exchangeFunction.requests.single().url().queryValue("isMock"))
+        assertEquals("20260601", exchangeFunction.requests.single().url().queryValue("fromDate"))
+        assertEquals("20260602", exchangeFunction.requests.single().url().queryValue("toDate"))
+    }
+
+    @Test
+    fun `kis wrapper fx rate adapter returns null when pair is not configured`() {
+        val adapter = KisWrapperFxRateAdapter(
+            webClient = WebClient.builder()
+                .baseUrl("http://kis-wrapper.test")
+                .exchangeFunction(CapturingExchangeFunction("""{"rate":1330.0}"""))
+                .build(),
+            properties = OrderRiskProperties.CurrencyConversionProperties(),
+        )
+
+        assertNull(adapter.getRateToBase("KRW", "USD"))
+    }
+
     private class CapturingExchangeFunction(
         private val body: String,
     ) : ExchangeFunction {
@@ -109,5 +167,17 @@ class FxRateAdapterTest {
                     .build(),
             )
         }
+    }
+
+    private fun java.net.URI.queryValue(name: String): String? {
+        return rawQuery.orEmpty()
+            .split("&")
+            .mapNotNull { part ->
+                val pieces = part.split("=", limit = 2)
+                pieces.firstOrNull()?.takeIf { it == name }?.let {
+                    java.net.URLDecoder.decode(pieces.getOrElse(1) { "" }, Charsets.UTF_8)
+                }
+            }
+            .firstOrNull()
     }
 }

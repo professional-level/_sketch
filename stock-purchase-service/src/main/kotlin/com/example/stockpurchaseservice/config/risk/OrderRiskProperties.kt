@@ -37,6 +37,7 @@ class OrderRiskProperties {
         var overseasUsCurrency: String = "USD"
         var ratesToBase: MutableMap<String, Double> = mutableMapOf()
         var http: HttpFxRateProperties = HttpFxRateProperties()
+        var kisWrapper: KisWrapperFxRateProperties = KisWrapperFxRateProperties()
     }
 
     class HttpFxRateProperties {
@@ -45,6 +46,23 @@ class OrderRiskProperties {
         var sourceCurrencyParam: String = "sourceCurrency"
         var baseCurrencyParam: String = "baseCurrency"
         var timeout: Duration = Duration.ofSeconds(3)
+    }
+
+    class KisWrapperFxRateProperties {
+        var path: String = "/open-api/overseas/quotations/fx-rate"
+        var timeout: Duration = Duration.ofSeconds(5)
+        var defaultMarketDivCode: String = "KX"
+        var pairs: MutableMap<String, KisWrapperFxRatePairProperties> = mutableMapOf()
+    }
+
+    class KisWrapperFxRatePairProperties {
+        var marketDivCode: String = ""
+        var symbol: String = ""
+        var invert: Boolean = false
+        var isMock: Boolean = true
+        var fromDate: String = ""
+        var toDate: String = ""
+        var periodDivCode: String = "D"
     }
 
     class TradingHoursProperties {

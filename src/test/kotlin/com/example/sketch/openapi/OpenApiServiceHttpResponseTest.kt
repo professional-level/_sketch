@@ -206,6 +206,51 @@ class OpenApiServiceHttpResponseTest {
     }
 
     @Test
+    fun `sends official chart price query and normalizes overseas fx rate`() = runTest {
+        val exchangeFunction = SingleResponseExchangeFunction(
+            status = HttpStatus.OK,
+            body = """
+            {
+              "rt_cd": "0",
+              "msg_cd": "MCA00000",
+              "msg1": "ok",
+              "output1": {
+                "ovrs_nmix_prpr": "1,330.25",
+                "stck_bsop_date": "20260602"
+              },
+              "output2": []
+            }
+            """.trimIndent(),
+        )
+        val service = openApiService(exchangeFunction)
+
+        val response = service.getOverseasFxRate(
+            GetOverseasFxRateRequest(
+                isMock = true,
+                marketDivCode = "KX",
+                symbol = "USDKRW",
+                fromDate = "20260601",
+                toDate = "20260602",
+            ),
+        )
+
+        assertEquals("USDKRW", response.symbol)
+        assertEquals("KX", response.marketDivCode)
+        assertEquals(1330.25, response.rate)
+        assertEquals("20260602", response.observedDate)
+        assertEquals("ovrs_nmix_prpr", response.rawField)
+        with(exchangeFunction.requests.single()) {
+            assertEquals("/uapi/overseas-price/v1/quotations/inquire-daily-chartprice", url().path)
+            assertEquals("FHKST03030100", headers().getFirst("tr_id"))
+            assertEquals("KX", url().queryValue("FID_COND_MRKT_DIV_CODE"))
+            assertEquals("USDKRW", url().queryValue("FID_INPUT_ISCD"))
+            assertEquals("20260601", url().queryValue("FID_INPUT_DATE_1"))
+            assertEquals("20260602", url().queryValue("FID_INPUT_DATE_2"))
+            assertEquals("D", url().queryValue("FID_PERIOD_DIV_CODE"))
+        }
+    }
+
+    @Test
     fun `sends official tr id and query fields for mock overseas balance`() = runTest {
         val exchangeFunction = SingleResponseExchangeFunction.success()
         val service = openApiService(exchangeFunction)

@@ -12,7 +12,9 @@ import com.example.sketch.configure.QueryParameter.CANO
 import com.example.sketch.configure.QueryParameter.EXCD
 import com.example.sketch.configure.QueryParameter.FNCG_AMT_AUTO_RDPT_YN
 import com.example.sketch.configure.QueryParameter.FID_INPUT_DATE_1
+import com.example.sketch.configure.QueryParameter.FID_INPUT_DATE_2
 import com.example.sketch.configure.QueryParameter.FID_INPUT_ISCD
+import com.example.sketch.configure.QueryParameter.FID_PERIOD_DIV_CODE
 import com.example.sketch.configure.QueryParameter.FUND_STTL_ICLD_YN
 import com.example.sketch.configure.QueryParameter.GUBN
 import com.example.sketch.configure.QueryParameter.INQR_DVSN
@@ -278,6 +280,41 @@ class OpenApiService(
             previousClose = previousClose,
             recentClosePrices = candles.take(count).map { it.close },
             candles = candles.take(count),
+        )
+    }
+
+    suspend fun getOverseasFxRate(request: GetOverseasFxRateRequest): OverseasFxRateResponse {
+        val token = getToken(isMock = request.isMock)
+        val info = RequestType.GET_OVERSEAS_DAILY_CHART_PRICE
+        val headers = build(token = token, trId = "FHKST03030100")
+            .build()
+            .withMockCredentialIfNeeded(request.isMock)
+        val queryParameters = QueryParameter.forType(
+            info,
+            mapOf(
+                QueryParameter.FID_COND_MRKT_DIV_CODE to request.marketDivCode.uppercase(),
+                FID_INPUT_ISCD to request.symbol.uppercase(),
+                FID_INPUT_DATE_1 to request.fromDate,
+                FID_INPUT_DATE_2 to request.toDate,
+                FID_PERIOD_DIV_CODE to request.periodDivCode.uppercase(),
+            ),
+        )
+
+        val response = executeHttpRequest(
+            info = info,
+            headers = headers,
+            queryParameters = queryParameters,
+            isMockApi = request.isMock,
+        )
+        val quote = response.firstFxRateCandidate()
+            ?: throw IllegalStateException("overseas fx rate response has no rate")
+
+        return OverseasFxRateResponse(
+            symbol = request.symbol.uppercase(),
+            marketDivCode = request.marketDivCode.uppercase(),
+            rate = quote.rate,
+            observedDate = quote.observedDate,
+            rawField = quote.rawField,
         )
     }
 
@@ -739,3 +776,76 @@ private fun JsonNode?.isKisBusinessResponse(): Boolean {
         isObject &&
         listOf("rt_cd", "rtCd", "RT_CD").any { path(it).asText("").isNotBlank() }
 }
+
+private data class FxRateCandidate(
+    val rate: Double,
+    val observedDate: String?,
+    val rawField: String,
+)
+
+private fun JsonNode.firstFxRateCandidate(): FxRateCandidate? {
+    val candidates = listOf(path("output1")) + path("output2").asObjectList()
+    return candidates
+        .asSequence()
+        .filter { it.isObject }
+        .mapNotNull { node ->
+            FX_RATE_FIELD_ALIASES.firstNotNullOfOrNull { field ->
+                node.textOrNull(field)
+                    ?.toPositiveDoubleOrNull()
+                    ?.let { rate ->
+                        FxRateCandidate(
+                            rate = rate,
+                            observedDate = FX_RATE_DATE_ALIASES.firstNotNullOfOrNull(node::textOrNull),
+                            rawField = field,
+                        )
+                    }
+            }
+        }
+        .firstOrNull()
+}
+
+private fun JsonNode.asObjectList(): List<JsonNode> {
+    return when {
+        isArray -> elements().asSequence().filter { it.isObject }.toList()
+        isObject -> listOf(this)
+        else -> emptyList()
+    }
+}
+
+private fun JsonNode.textOrNull(field: String): String? {
+    return path(field).asText("").trim().takeIf { it.isNotBlank() }
+}
+
+private fun String.toPositiveDoubleOrNull(): Double? {
+    return replace(",", "").toDoubleOrNull()?.takeIf { it > 0.0 }
+}
+
+private val FX_RATE_FIELD_ALIASES = listOf(
+    "ovrs_nmix_prpr",
+    "OVRS_NMIX_PRPR",
+    "ovrs_nmix_prdy_clpr",
+    "OVRS_NMIX_PRDY_CLPR",
+    "clos",
+    "CLOS",
+    "exrt",
+    "EXRT",
+    "bass_exrt",
+    "BASS_EXRT",
+    "frst_bltn_exrt",
+    "FRST_BLTN_EXRT",
+    "t_rate",
+    "T_RATE",
+    "rate",
+    "rateToBase",
+    "exchangeRate",
+)
+
+private val FX_RATE_DATE_ALIASES = listOf(
+    "stck_bsop_date",
+    "STCK_BSOP_DATE",
+    "xymd",
+    "XYMD",
+    "date",
+    "bas_dt",
+    "BAS_DT",
+)

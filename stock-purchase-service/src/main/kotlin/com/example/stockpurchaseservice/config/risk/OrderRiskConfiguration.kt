@@ -2,7 +2,9 @@ package com.example.stockpurchaseservice.config.risk
 
 import com.example.stockpurchaseservice.adapter.out.risk.ConfiguredFxRateAdapter
 import com.example.stockpurchaseservice.adapter.out.risk.HttpFxRateAdapter
+import com.example.stockpurchaseservice.adapter.out.risk.KisWrapperFxRateAdapter
 import com.example.stockpurchaseservice.application.port.out.FxRatePort
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.context.annotation.Bean
@@ -38,6 +40,22 @@ class OrderRiskConfiguration {
             webClient = WebClient.builder()
                 .baseUrl(properties.currencyConversion.http.baseUrl)
                 .build(),
+            properties = properties.currencyConversion,
+        )
+    }
+
+    @Bean
+    @ConditionalOnProperty(
+        prefix = "akra.order.risk.currency-conversion",
+        name = ["provider"],
+        havingValue = "kis-wrapper",
+    )
+    fun kisWrapperFxRatePort(
+        @Qualifier("stockApiClient") stockApiClient: WebClient,
+        properties: OrderRiskProperties,
+    ): FxRatePort {
+        return KisWrapperFxRateAdapter(
+            webClient = stockApiClient,
             properties = properties.currencyConversion,
         )
     }

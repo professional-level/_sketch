@@ -10,6 +10,7 @@ import com.example.common.endpoint.Endpoint.GET_EXECUTION_ORDERS
 import com.example.common.endpoint.Endpoint.GET_FOREIGNER_TRADE_TREND
 import com.example.common.endpoint.Endpoint.GET_OVERSEAS_EXECUTION_ORDERS
 import com.example.common.endpoint.Endpoint.GET_OVERSEAS_DAILY_PRICE
+import com.example.common.endpoint.Endpoint.GET_OVERSEAS_FX_RATE
 import com.example.common.endpoint.Endpoint.GET_OVERSEAS_STOCK_BALANCE
 import com.example.common.endpoint.Endpoint.GET_PROGRAM_TRADE_INFO_PER_INDIVIDUAL
 import com.example.common.endpoint.Endpoint.GET_PROGRAM_TRADE_INFO_PER_INDIVIDUAL_AT_ONE_DAY
@@ -146,6 +147,13 @@ class OpenApiController(
             exchange = exchange,
             count = count,
         )
+    }
+
+    @GetMapping(GET_OVERSEAS_FX_RATE)
+    suspend fun getOverseasFxRate(
+        @ModelAttribute request: GetOverseasFxRateRequest,
+    ): OverseasFxRateResponse {
+        return service.getOverseasFxRate(request)
     }
 
     @PostMapping(POST_STOCK_ORDER)

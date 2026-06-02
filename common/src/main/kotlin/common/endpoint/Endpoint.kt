@@ -9,6 +9,7 @@ object Endpoint {
     const val GET_QUOTATIONS_OF_VOLUME_RANK = "/quotations/volume-rank"
     const val GET_FOREIGNER_TRADE_TREND ="/quotations/foreigner-trade-trend/{stockId}"
     const val GET_OVERSEAS_DAILY_PRICE = "/overseas/quotations/dailyprice/{symbol}"
+    const val GET_OVERSEAS_FX_RATE = "/overseas/quotations/fx-rate"
     const val POST_STOCK_ORDER ="/trading/order-cash"
     const val POST_STOCK_ORDER_CANCEL = "/trading/order-rvsecncl"
     const val GET_STOCK_ORDER_CANCELABLE = "/trading/inquire-psbl-rvsecncl"
