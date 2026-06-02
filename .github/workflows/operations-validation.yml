@@ -7,14 +7,18 @@ on:
       - main
       - codex/trading-service-boundaries
     paths:
+      - ".github/workflows/container-images.yml"
       - ".github/workflows/operations-validation.yml"
       - "docs/operations/**"
+      - "gradlew"
   pull_request:
     branches:
       - main
     paths:
+      - ".github/workflows/container-images.yml"
       - ".github/workflows/operations-validation.yml"
       - "docs/operations/**"
+      - "gradlew"
 
 permissions:
   contents: read
