@@ -89,7 +89,7 @@ $env:JAVA_HOME='C:\path\to\jdk17'
 $env:Path="$env:JAVA_HOME\bin;$env:Path"
 $env:KIS_BROKER_SMOKE_ENABLED='true'
 $env:KIS_BROKER_SMOKE_BASE_URL='http://localhost:8079'
-.\gradlew.bat :stock-purchase-service:test --tests "com.example.stockpurchaseservice.adapter.out.broker.KisBrokerGatewaySmokeTest"
+.\gradlew.bat --no-daemon :stock-purchase-service:test --tests "com.example.stockpurchaseservice.adapter.out.broker.KisBrokerGatewaySmokeTest" --rerun-tasks
 ```
 
 This verifies:
@@ -109,10 +109,12 @@ $env:KIS_BROKER_SMOKE_PRICE='1'
 $env:KIS_BROKER_SMOKE_QUANTITY='1'
 $env:KIS_BROKER_SMOKE_HISTORY_ATTEMPTS='6'
 $env:KIS_BROKER_SMOKE_HISTORY_POLL_SECONDS='5'
-.\gradlew.bat :stock-purchase-service:test --tests "com.example.stockpurchaseservice.adapter.out.broker.KisBrokerGatewaySmokeTest"
+.\gradlew.bat --no-daemon :stock-purchase-service:test --tests "com.example.stockpurchaseservice.adapter.out.broker.KisBrokerGatewaySmokeTest" --rerun-tasks
 ```
 
 Run the submit/cancel smoke only during a KIS mock overseas order window. Use a small quantity and a deliberately low buy limit price so the mock order is likely to remain cancelable. If KIS rejects the order, fills it immediately, or does not expose it in history within the polling window, treat the smoke as failed and inspect the wrapper logs plus KIS response payload before retrying.
+
+Use `--no-daemon` so the test JVM sees the current smoke-test environment variables, and use `--rerun-tasks` so Gradle does not report a stale up-to-date result.
 
 ## Startup Safety Checks
 
