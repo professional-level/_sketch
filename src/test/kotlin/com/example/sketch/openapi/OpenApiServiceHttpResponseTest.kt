@@ -1,17 +1,25 @@
 package com.example.sketch.openapi
 
 import com.example.sketch.configure.Property
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import kotlinx.coroutines.test.runTest
+import org.springframework.http.codec.HttpMessageWriter
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
+import org.springframework.http.server.reactive.ServerHttpRequest
+import org.springframework.mock.http.client.reactive.MockClientHttpRequest
+import org.springframework.web.reactive.function.BodyInserter
 import org.springframework.web.reactive.function.client.ClientRequest
 import org.springframework.web.reactive.function.client.ClientResponse
 import org.springframework.web.reactive.function.client.ExchangeFunction
+import org.springframework.web.reactive.function.client.ExchangeStrategies
 import org.springframework.web.reactive.function.client.WebClient
 import reactor.core.publisher.Mono
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
+import java.util.Optional
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -94,6 +102,17 @@ class OpenApiServiceHttpResponseTest {
             assertEquals("TTTT1002U", headers().getFirst("tr_id"))
             assertEquals("real-app-key", headers().getFirst("appkey"))
             assertEquals("real-app-secret", headers().getFirst("appsecret"))
+            with(bodyAsJson()) {
+                assertEquals("00000000", text("CANO"))
+                assertEquals("01", text("ACNT_PRDT_CD"))
+                assertEquals("NASD", text("OVRS_EXCG_CD"))
+                assertEquals("TQQQ", text("PDNO"))
+                assertEquals("1", text("ORD_QTY"))
+                assertEquals("112.5", text("OVRS_ORD_UNPR"))
+                assertEquals("34", text("ORD_DVSN"))
+                assertEquals("", text("SLL_TYPE"))
+                assertEquals("0", text("ORD_SVR_DVSN_CD"))
+            }
         }
     }
 
@@ -118,6 +137,15 @@ class OpenApiServiceHttpResponseTest {
             assertEquals("VTTT1006U", headers().getFirst("tr_id"))
             assertEquals("mock-app-key", headers().getFirst("appkey"))
             assertEquals("mock-app-secret", headers().getFirst("appsecret"))
+            with(bodyAsJson()) {
+                assertEquals("00000000", text("CANO"))
+                assertEquals("01", text("ACNT_PRDT_CD"))
+                assertEquals("TQQQ", text("PDNO"))
+                assertEquals("1", text("ORD_QTY"))
+                assertEquals("112.5", text("OVRS_ORD_UNPR"))
+                assertEquals("00", text("SLL_TYPE"))
+                assertEquals("00", text("ORD_DVSN"))
+            }
         }
     }
 
@@ -138,6 +166,17 @@ class OpenApiServiceHttpResponseTest {
         with(exchangeFunction.requests.single()) {
             assertEquals("/uapi/overseas-stock/v1/trading/order-rvsecncl", url().path)
             assertEquals("VTTT1004U", headers().getFirst("tr_id"))
+            with(bodyAsJson()) {
+                assertEquals("00000000", text("CANO"))
+                assertEquals("01", text("ACNT_PRDT_CD"))
+                assertEquals("NASD", text("OVRS_EXCG_CD"))
+                assertEquals("TQQQ", text("PDNO"))
+                assertEquals("broker-order-1", text("ORGN_ODNO"))
+                assertEquals("02", text("RVSE_CNCL_DVSN_CD"))
+                assertEquals("1", text("ORD_QTY"))
+                assertEquals("0", text("OVRS_ORD_UNPR"))
+                assertEquals("0", text("ORD_SVR_DVSN_CD"))
+            }
         }
     }
 
@@ -259,6 +298,18 @@ class OpenApiServiceHttpResponseTest {
             .firstOrNull()
     }
 
+    private fun ClientRequest.bodyAsJson(): JsonNode {
+        val mockRequest = MockClientHttpRequest(method(), url())
+        mockRequest.headers.putAll(headers())
+        body().insert(mockRequest, TEST_BODY_INSERTER_CONTEXT).block()
+        val body = mockRequest.bodyAsString.block().orEmpty()
+        return OBJECT_MAPPER.readTree(body)
+    }
+
+    private fun JsonNode.text(fieldName: String): String {
+        return path(fieldName).asText()
+    }
+
     private class PreloadedTokenStore(
         vararg tokens: Pair<KisTokenScope, CachedKisAccessToken>,
     ) : KisAccessTokenStore {
@@ -278,5 +329,19 @@ class OpenApiServiceHttpResponseTest {
     private companion object {
         val TEST_NOW: Instant = Instant.parse("2026-06-02T00:00:00Z")
         val TEST_CLOCK: Clock = Clock.fixed(TEST_NOW, ZoneOffset.UTC)
+        val OBJECT_MAPPER = jacksonObjectMapper()
+        val TEST_BODY_INSERTER_CONTEXT = object : BodyInserter.Context {
+            override fun messageWriters(): List<HttpMessageWriter<*>> {
+                return ExchangeStrategies.withDefaults().messageWriters()
+            }
+
+            override fun serverRequest(): Optional<ServerHttpRequest> {
+                return Optional.empty()
+            }
+
+            override fun hints(): Map<String, Any> {
+                return emptyMap()
+            }
+        }
     }
 }
