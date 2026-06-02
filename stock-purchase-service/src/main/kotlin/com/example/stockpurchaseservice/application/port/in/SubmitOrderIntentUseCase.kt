@@ -22,6 +22,7 @@ data class SubmitOrderIntentCommand(
     val orderTag: String,
     val createdAt: ZonedDateTime,
     val tradingEnvironment: OrderTradingEnvironment? = null,
+    val exchange: String = DEFAULT_OVERSEAS_ORDER_EXCHANGE,
 ) {
     init {
         require(idempotencyKey.isNotBlank()) { "idempotencyKey must not be blank" }
@@ -38,6 +39,8 @@ data class SubmitOrderIntentCommand(
 
 data class SubmitOrderIntentResult(
     val status: OrderIntentSubmissionStatus,
+    val externalOrderId: String? = null,
+    val branchOrderNumber: String? = null,
 )
 
 enum class OrderIntentSubmissionStatus {
@@ -57,3 +60,5 @@ enum class OrderIntentType {
     MOC,
     LIMIT,
 }
+
+const val DEFAULT_OVERSEAS_ORDER_EXCHANGE = "NASD"

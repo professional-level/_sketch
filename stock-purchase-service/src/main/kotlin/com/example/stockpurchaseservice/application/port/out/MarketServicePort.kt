@@ -1,6 +1,7 @@
 package com.example.stockpurchaseservice.application.port.out
 
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
+import com.example.stockpurchaseservice.application.port.`in`.DEFAULT_OVERSEAS_ORDER_EXCHANGE
 import java.time.ZonedDateTime
 import java.util.UUID
 
@@ -82,7 +83,9 @@ data class BrokerOrderStatusQuery(
     val internalOrderId: UUID,
     val externalOrderId: String?,
     val symbol: String,
+    val exchange: String = DEFAULT_OVERSEAS_ORDER_EXCHANGE,
     val side: OrderIntentSide,
+    val orderedQuantity: Long? = null,
     val market: StockOrderMarket,
     val submittedAt: ZonedDateTime? = null,
 )
@@ -92,10 +95,17 @@ data class BrokerOrderStatusDto(
     val externalOrderId: String? = null,
     val reason: String? = null,
     val checkedAt: ZonedDateTime = ZonedDateTime.now(),
+    val orderedQuantity: Long? = null,
+    val cumulativeFilledQuantity: Long? = null,
+    val remainingQuantity: Long? = null,
+    val averageExecutionPrice: Double? = null,
+    val brokerReportedAt: ZonedDateTime? = null,
 )
 
 enum class BrokerOrderStatus {
     SUBMITTED,
+    PARTIALLY_FILLED,
+    FILLED,
     REJECTED,
     CANCELLED,
     UNKNOWN,
@@ -108,6 +118,7 @@ data class PurchaseOrderDto(
     val quantity: Int,
     val market: StockOrderMarket = StockOrderMarket.DOMESTIC,
     val orderType: StockOrderType = StockOrderType.LIMIT,
+    val exchange: String = DEFAULT_OVERSEAS_ORDER_EXCHANGE,
 )
 
 data class SellingOrderDto(
@@ -117,6 +128,7 @@ data class SellingOrderDto(
     val quantity: Int,
     val market: StockOrderMarket = StockOrderMarket.DOMESTIC,
     val orderType: StockOrderType = StockOrderType.LIMIT,
+    val exchange: String = DEFAULT_OVERSEAS_ORDER_EXCHANGE,
 )
 
 data class CancelOrderDto(
@@ -129,6 +141,7 @@ data class CancelOrderDto(
     val orderType: StockOrderType = StockOrderType.LIMIT,
     val price: Double = 0.0,
     val cancelAll: Boolean = true,
+    val exchange: String = DEFAULT_OVERSEAS_ORDER_EXCHANGE,
 )
 
 enum class StockOrderMarket {

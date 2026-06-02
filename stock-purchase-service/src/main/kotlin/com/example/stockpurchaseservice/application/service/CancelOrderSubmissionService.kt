@@ -97,6 +97,7 @@ class CancelOrderSubmissionService(
             orderType = orderType.toStockOrderType(),
             price = price,
             cancelAll = cancelAll,
+            exchange = originalSubmission?.exchange?.takeIf { it.isNotBlank() } ?: exchange,
         )
     }
 

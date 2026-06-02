@@ -40,6 +40,31 @@ class BrokerOrderHistoryItemTest {
     }
 
     @Test
+    fun `maps partially filled row to partially filled status`() {
+        val status = listOf(
+            row(cumulativeFilledQuantity = 1),
+        ).findStatusFor(query(externalOrderId = "broker-1"))
+
+        assertEquals(BrokerOrderStatus.PARTIALLY_FILLED, status.status)
+        assertEquals(3L, status.orderedQuantity)
+        assertEquals(1L, status.cumulativeFilledQuantity)
+        assertEquals(2L, status.remainingQuantity)
+        assertEquals(ORDERED_AT, status.brokerReportedAt)
+    }
+
+    @Test
+    fun `maps filled row to filled status`() {
+        val status = listOf(
+            row(cumulativeFilledQuantity = 3),
+        ).findStatusFor(query(externalOrderId = "broker-1"))
+
+        assertEquals(BrokerOrderStatus.FILLED, status.status)
+        assertEquals(3L, status.orderedQuantity)
+        assertEquals(3L, status.cumulativeFilledQuantity)
+        assertEquals(0L, status.remainingQuantity)
+    }
+
+    @Test
     fun `prefers terminal cancel row matched by original broker order id`() {
         val status = listOf(
             row(externalOrderId = "broker-1"),
@@ -65,13 +90,40 @@ class BrokerOrderHistoryItemTest {
         assertEquals(BrokerOrderStatus.UNKNOWN, status.status)
     }
 
-    private fun query(externalOrderId: String?): BrokerOrderStatusQuery {
+    @Test
+    fun `uses ordered quantity to disambiguate lookup without broker order id`() {
+        val status = listOf(
+            row(externalOrderId = "broker-1", orderedQuantity = 1, cumulativeFilledQuantity = 1),
+            row(externalOrderId = "broker-2", orderedQuantity = 3, cumulativeFilledQuantity = 3),
+        ).findStatusFor(query(externalOrderId = null, orderedQuantity = 3))
+
+        assertEquals(BrokerOrderStatus.FILLED, status.status)
+        assertEquals("broker-2", status.externalOrderId)
+        assertEquals(3L, status.orderedQuantity)
+        assertEquals(3L, status.cumulativeFilledQuantity)
+    }
+
+    @Test
+    fun `keeps broader candidates when broker rows do not expose matching ordered quantity`() {
+        val status = listOf(
+            row(externalOrderId = "broker-1", orderedQuantity = 0),
+        ).findStatusFor(query(externalOrderId = null, orderedQuantity = 3))
+
+        assertEquals(BrokerOrderStatus.SUBMITTED, status.status)
+        assertEquals("broker-1", status.externalOrderId)
+    }
+
+    private fun query(
+        externalOrderId: String?,
+        orderedQuantity: Long? = null,
+    ): BrokerOrderStatusQuery {
         return BrokerOrderStatusQuery(
             orderIntentId = UUID.randomUUID(),
             internalOrderId = UUID.randomUUID(),
             externalOrderId = externalOrderId,
             symbol = "TQQQ",
             side = OrderIntentSide.BUY,
+            orderedQuantity = orderedQuantity,
             market = StockOrderMarket.OVERSEAS_US,
             submittedAt = ORDERED_AT,
         )
@@ -85,6 +137,7 @@ class BrokerOrderHistoryItemTest {
         cancelled: Boolean = false,
         side: OrderIntentSide? = OrderIntentSide.BUY,
         averageExecutionPrice: Double? = null,
+        orderedQuantity: Long = 3,
     ): BrokerOrderHistoryItem {
         return BrokerOrderHistoryItem(
             externalOrderId = externalOrderId,
@@ -93,9 +146,9 @@ class BrokerOrderHistoryItemTest {
             symbol = "TQQQ",
             stockName = "TQQQ",
             orderedAt = ORDERED_AT,
-            orderedQuantity = 3,
+            orderedQuantity = orderedQuantity,
             cumulativeFilledQuantity = cumulativeFilledQuantity,
-            remainingQuantity = 3 - cumulativeFilledQuantity,
+            remainingQuantity = orderedQuantity - cumulativeFilledQuantity,
             rejectedQuantity = 0,
             cancelledQuantity = cancelledQuantity,
             cancelled = cancelled,

@@ -2,6 +2,7 @@ package com.example.stockpurchaseservice.application.port.out
 
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentType
+import com.example.stockpurchaseservice.application.port.`in`.DEFAULT_OVERSEAS_ORDER_EXCHANGE
 import java.time.ZonedDateTime
 import java.util.UUID
 
@@ -21,6 +22,7 @@ data class OrderIntentSubmissionDto(
     val idempotencyKey: String,
     val strategyExecutionId: String,
     val symbol: String,
+    val exchange: String = DEFAULT_OVERSEAS_ORDER_EXCHANGE,
     val market: StockOrderMarket? = null,
     val side: OrderIntentSide,
     val orderType: OrderIntentType,

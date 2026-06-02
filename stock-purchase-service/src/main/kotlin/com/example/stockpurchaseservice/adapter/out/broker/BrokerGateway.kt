@@ -1,6 +1,7 @@
 package com.example.stockpurchaseservice.adapter.out.broker
 
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
+import com.example.stockpurchaseservice.application.port.`in`.DEFAULT_OVERSEAS_ORDER_EXCHANGE
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatus
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatusDto
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatusQuery
@@ -26,6 +27,7 @@ internal data class BrokerOrderCommand(
     val market: StockOrderMarket,
     val side: OrderIntentSide,
     val symbol: String,
+    val exchange: String = DEFAULT_OVERSEAS_ORDER_EXCHANGE,
     val orderType: StockOrderType,
     val price: Double,
     val quantity: Int,
@@ -36,6 +38,7 @@ internal data class BrokerOrderCancelCommand(
     val internalOrderId: UUID,
     val market: StockOrderMarket,
     val symbol: String,
+    val exchange: String = DEFAULT_OVERSEAS_ORDER_EXCHANGE,
     val originalOrderId: String,
     val branchOrderNumber: String?,
     val orderType: StockOrderType,
@@ -54,6 +57,7 @@ internal data class BrokerOrderCancelCommand(
 internal data class BrokerOrderHistoryQuery(
     val market: StockOrderMarket,
     val symbol: String = "",
+    val exchange: String = DEFAULT_OVERSEAS_ORDER_EXCHANGE,
     val externalOrderId: String = "",
     val from: ZonedDateTime = ZonedDateTime.now(BROKER_ORDER_ZONE),
     val to: ZonedDateTime = from,
@@ -72,7 +76,7 @@ internal data class BrokerOrderHistoryPage(
 
 internal data class BrokerAccountSnapshotQuery(
     val market: StockOrderMarket,
-    val exchange: String = "NASD",
+    val exchange: String = DEFAULT_OVERSEAS_ORDER_EXCHANGE,
     val currency: String = "USD",
     val isMock: Boolean,
     val pageCursor: BrokerOrderHistoryPageCursor = BrokerOrderHistoryPageCursor.EMPTY,
@@ -166,6 +170,8 @@ internal data class BrokerOrderHistoryItem(
                 statusMessage.containsStatusToken(CANCELLED_ENGLISH_US) ||
                 statusMessage.containsStatusToken(CANCELLED_ENGLISH_UK) -> BrokerOrderStatus.CANCELLED
             cancelled || cancelledQuantity > 0 -> BrokerOrderStatus.CANCELLED
+            cumulativeFilledQuantity > 0 && isFullyFilled() -> BrokerOrderStatus.FILLED
+            cumulativeFilledQuantity > 0 -> BrokerOrderStatus.PARTIALLY_FILLED
             else -> BrokerOrderStatus.SUBMITTED
         }
         return BrokerOrderStatusDto(
@@ -173,13 +179,27 @@ internal data class BrokerOrderHistoryItem(
             externalOrderId = externalOrderId,
             reason = statusReason(status),
             checkedAt = checkedAt,
+            orderedQuantity = orderedQuantity,
+            cumulativeFilledQuantity = cumulativeFilledQuantity,
+            remainingQuantity = remainingQuantity,
+            averageExecutionPrice = averageExecutionPrice,
+            brokerReportedAt = orderedAt,
         )
+    }
+
+    private fun isFullyFilled(): Boolean {
+        return when {
+            orderedQuantity > 0 -> cumulativeFilledQuantity >= orderedQuantity
+            else -> remainingQuantity <= 0
+        }
     }
 
     private fun statusReason(status: BrokerOrderStatus): String? {
         return when (status) {
             BrokerOrderStatus.REJECTED -> rejectionReason ?: statusMessage ?: "broker rejected quantity=$rejectedQuantity"
             BrokerOrderStatus.CANCELLED -> statusMessage ?: "broker cancelled quantity=$cancelledQuantity"
+            BrokerOrderStatus.PARTIALLY_FILLED -> "broker partially filled quantity=$cumulativeFilledQuantity remaining=$remainingQuantity"
+            BrokerOrderStatus.FILLED -> "broker filled quantity=$cumulativeFilledQuantity"
             BrokerOrderStatus.SUBMITTED,
             BrokerOrderStatus.UNKNOWN -> null
         }
@@ -187,7 +207,7 @@ internal data class BrokerOrderHistoryItem(
 }
 
 internal fun List<BrokerOrderHistoryItem>.findStatusFor(query: BrokerOrderStatusQuery): BrokerOrderStatusDto {
-    val candidates = filter { row ->
+    val baseCandidates = filter { row ->
         when {
             query.externalOrderId != null -> row.matchesExternalOrderId(query.externalOrderId)
             else -> row.symbol.equals(query.symbol, ignoreCase = true) &&
@@ -195,11 +215,14 @@ internal fun List<BrokerOrderHistoryItem>.findStatusFor(query: BrokerOrderStatus
                 (query.submittedAt?.toLocalDate()?.let { row.orderedAt.toLocalDate() == it } ?: true)
         }
     }
+    val candidates = baseCandidates.narrowByOrderedQuantity(query)
     val terminalCandidates = candidates.filter { row ->
         when (row.toStatus().status) {
             BrokerOrderStatus.REJECTED,
-            BrokerOrderStatus.CANCELLED -> true
+            BrokerOrderStatus.CANCELLED,
+            BrokerOrderStatus.FILLED -> true
             BrokerOrderStatus.SUBMITTED,
+            BrokerOrderStatus.PARTIALLY_FILLED,
             BrokerOrderStatus.UNKNOWN -> false
         }
     }
@@ -227,6 +250,16 @@ internal fun List<BrokerOrderHistoryItem>.findStatusFor(query: BrokerOrderStatus
             reason = "ambiguous broker orders: ${candidates.joinToString { it.externalOrderId }}",
         )
     }
+}
+
+private fun List<BrokerOrderHistoryItem>.narrowByOrderedQuantity(
+    query: BrokerOrderStatusQuery,
+): List<BrokerOrderHistoryItem> {
+    if (query.externalOrderId != null) return this
+    val orderedQuantity = query.orderedQuantity ?: return this
+    return filter { it.orderedQuantity == orderedQuantity }
+        .takeIf { it.isNotEmpty() }
+        ?: this
 }
 
 private fun BrokerOrderHistoryItem.matchesExternalOrderId(externalOrderId: String): Boolean {

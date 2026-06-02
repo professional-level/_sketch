@@ -37,6 +37,7 @@ class KisBrokerGatewayAdapterTest {
         val command = brokerCommand(
             side = OrderIntentSide.BUY,
             symbol = "tqqq",
+            exchange = "NYSE",
             price = 112.5,
             quantity = 3,
             orderType = StockOrderType.LOC,
@@ -46,13 +47,36 @@ class KisBrokerGatewayAdapterTest {
         val body = command.toKisUsOverseasOrderRequest()
 
         assertEquals("TQQQ", body["PDNO"])
-        assertEquals("NASD", body["OVRS_EXCG_CD"])
+        assertEquals("NYSE", body["OVRS_EXCG_CD"])
         assertEquals(3, body["ORD_QTY"])
         assertEquals("112.5", body["OVRS_ORD_UNPR"])
         assertEquals("34", body["ORD_DVSN"])
         assertEquals(null, body["SLL_TYPE"])
         assertEquals("0", body["ORD_SVR_DVSN_CD"])
         assertEquals(false, body["isMock"])
+    }
+
+    @Test
+    fun `builds us overseas cancel request using configured exchange code`() {
+        val command = brokerCancelCommand(
+            market = StockOrderMarket.OVERSEAS_US,
+            symbol = "BRK.B",
+            exchange = "NYSE",
+            originalOrderId = "overseas-order-1",
+            branchOrderNumber = null,
+            price = 450.25,
+            quantity = 1,
+            orderType = StockOrderType.LIMIT,
+            cancelAll = true,
+            isMock = false,
+        )
+
+        val body = command.toKisUsOverseasCancelRequest()
+
+        assertEquals("NYSE", body["OVRS_EXCG_CD"])
+        assertEquals("BRK.B", body["PDNO"])
+        assertEquals("overseas-order-1", body["ORGN_ODNO"])
+        assertEquals("02", body["RVSE_CNCL_DVSN_CD"])
     }
 
     @Test
@@ -234,6 +258,70 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `overseas cancel matches order history by original broker order id`() {
+        val exchangeFunction = ResponseExchangeFunction(
+            responses = listOf(
+                jsonResponse(
+                    """
+                    {
+                      "rt_cd": "0",
+                      "ctx_area_fk200": "",
+                      "ctx_area_nk200": "",
+                      "output": [
+                        {
+                          "odno": "overseas-revised-order-1",
+                          "orgn_odno": "overseas-order-1",
+                          "pdno": "TQQQ",
+                          "prdt_name": "ProShares UltraPro QQQ",
+                          "ord_dt": "20260602",
+                          "ord_tmd": "093000",
+                          "ft_ord_qty": "3",
+                          "ft_ccld_qty": "1",
+                          "nccs_qty": "2",
+                          "sll_buy_dvsn_cd": "02"
+                        }
+                      ]
+                    }
+                    """.trimIndent(),
+                ),
+                protobufResponse(
+                    ApiResponse.StockOrder.newBuilder()
+                        .setRtCd("0")
+                        .setOutput(
+                            ApiResponse.Output.newBuilder()
+                                .setODNO("overseas-cancel-1")
+                                .build(),
+                        )
+                        .build(),
+                ),
+            ),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        val submission = adapter.cancelOrder(
+            brokerCancelCommand(
+                market = StockOrderMarket.OVERSEAS_US,
+                symbol = "TQQQ",
+                originalOrderId = "overseas-order-1",
+                branchOrderNumber = null,
+                price = 112.5,
+                quantity = 2,
+                orderType = StockOrderType.LOC,
+                isMock = false,
+            ),
+        )
+
+        assertEquals("overseas-cancel-1", submission.externalOrderId)
+        assertEquals(2, exchangeFunction.requests.size)
+        assertEquals("/open-api/overseas/trading/inquire-ccnl", exchangeFunction.requests[0].url().path)
+        assertEquals("/open-api/overseas/trading/order-rvsecncl", exchangeFunction.requests[1].url().path)
+    }
+
+    @Test
     fun `overseas cancel rejects when order is not found in history`() {
         val exchangeFunction = ResponseExchangeFunction(
             responses = listOf(
@@ -399,6 +487,33 @@ class KisBrokerGatewayAdapterTest {
         assertEquals("20260602", exchangeFunction.requests[0].queryValue("ordEndDt"))
         assertEquals("FK1", exchangeFunction.requests[1].queryValue("ctxAreaFk200"))
         assertEquals("NK1", exchangeFunction.requests[1].queryValue("ctxAreaNk200"))
+    }
+
+    @Test
+    fun `overseas order history sends configured exchange code`() {
+        val exchangeFunction = StubExchangeFunction(
+            responses = listOf(
+                """
+                {
+                  "rt_cd": "0",
+                  "ctx_area_fk200": "",
+                  "ctx_area_nk200": "",
+                  "output": []
+                }
+                """.trimIndent(),
+            ),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        adapter.findOrderHistory(
+            historyQuery().copy(exchange = "NYSE"),
+        )
+
+        assertEquals("NYSE", exchangeFunction.requests.single().queryValue("ovrsExcgCd"))
     }
 
     @Test
@@ -1000,6 +1115,27 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `maps domestic status and rejection reason fields to rejected status`() {
+        val adapter = domesticHistoryAdapter(
+            domesticHistoryResponse(
+                domesticRow(
+                    orderId = "status-rejected-domestic-order",
+                    orderedQuantity = "3",
+                    filledQuantity = "0",
+                    remainingQuantity = "0",
+                    statusName = "Rejected",
+                    rejectionReason = "insufficient quantity",
+                ),
+            ),
+        )
+
+        val status = adapter.findOrderHistory(domesticHistoryQuery()).single().toStatus()
+
+        assertEquals(BrokerOrderStatus.REJECTED, status.status)
+        assertEquals("insufficient quantity", status.reason)
+    }
+
+    @Test
     fun `maps domestic cancel fields to cancelled status`() {
         val adapter = domesticHistoryAdapter(
             domesticHistoryResponse(
@@ -1021,7 +1157,7 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
-    fun `maps domestic partial fill as cumulative execution and submitted status`() {
+    fun `maps domestic partial fill as cumulative execution and partially filled status`() {
         val adapter = domesticHistoryAdapter(
             domesticHistoryResponse(
                 domesticRow(
@@ -1036,8 +1172,12 @@ class KisBrokerGatewayAdapterTest {
 
         val item = adapter.findOrderHistory(domesticHistoryQuery()).single()
         val execution = item.toExecutionDto()
+        val status = item.toStatus()
 
-        assertEquals(BrokerOrderStatus.SUBMITTED, item.toStatus().status)
+        assertEquals(BrokerOrderStatus.PARTIALLY_FILLED, status.status)
+        assertEquals(3L, status.orderedQuantity)
+        assertEquals(1L, status.cumulativeFilledQuantity)
+        assertEquals(2L, status.remainingQuantity)
         checkNotNull(execution)
         assertEquals("005930", execution.stockId)
         assertEquals("partial-domestic-order", execution.externalOrderId)
@@ -1048,7 +1188,7 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
-    fun `maps domestic full fill as cumulative execution and submitted status`() {
+    fun `maps domestic full fill as cumulative execution and filled status`() {
         val adapter = domesticHistoryAdapter(
             domesticHistoryResponse(
                 domesticRow(
@@ -1063,8 +1203,12 @@ class KisBrokerGatewayAdapterTest {
 
         val item = adapter.findOrderHistory(domesticHistoryQuery()).single()
         val execution = item.toExecutionDto()
+        val status = item.toStatus()
 
-        assertEquals(BrokerOrderStatus.SUBMITTED, item.toStatus().status)
+        assertEquals(BrokerOrderStatus.FILLED, status.status)
+        assertEquals(3L, status.orderedQuantity)
+        assertEquals(3L, status.cumulativeFilledQuantity)
+        assertEquals(0L, status.remainingQuantity)
         checkNotNull(execution)
         assertEquals("filled-domestic-order", execution.externalOrderId)
         assertEquals(3, execution.quantity)
@@ -1159,7 +1303,7 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
-    fun `maps overseas partial fill as cumulative execution and submitted status`() {
+    fun `maps overseas partial fill as cumulative execution and partially filled status`() {
         val adapter = overseasHistoryAdapter(
             """
             {
@@ -1187,8 +1331,12 @@ class KisBrokerGatewayAdapterTest {
 
         val item = adapter.findOrderHistory(historyQuery()).single()
         val execution = item.toExecutionDto()
+        val status = item.toStatus()
 
-        assertEquals(BrokerOrderStatus.SUBMITTED, item.toStatus().status)
+        assertEquals(BrokerOrderStatus.PARTIALLY_FILLED, status.status)
+        assertEquals(3L, status.orderedQuantity)
+        assertEquals(1L, status.cumulativeFilledQuantity)
+        assertEquals(2L, status.remainingQuantity)
         checkNotNull(execution)
         assertEquals("partial-order", execution.externalOrderId)
         assertEquals(1, execution.quantity)
@@ -1826,6 +1974,8 @@ class KisBrokerGatewayAdapterTest {
         cancelled: Boolean = false,
         side: OrderIntentSide = OrderIntentSide.BUY,
         averagePrice: String = "",
+        statusName: String = "",
+        rejectionReason: String = "",
     ): DailyExecutionOrdersResponseOuterClass.DailyExecutionOrdersOutput1 {
         return DailyExecutionOrdersResponseOuterClass.DailyExecutionOrdersOutput1.newBuilder()
             .setOrdDt("20260602")
@@ -1842,6 +1992,8 @@ class KisBrokerGatewayAdapterTest {
             .setCnclCfrmQty(cancelledQuantity)
             .setRmnQty(remainingQuantity)
             .setRjctQty(rejectedQuantity)
+            .setPrcsStatName(statusName)
+            .setRjctRsonName(rejectionReason)
             .build()
     }
 
@@ -1855,6 +2007,7 @@ class KisBrokerGatewayAdapterTest {
     private fun brokerCommand(
         side: OrderIntentSide,
         symbol: String,
+        exchange: String = "NASD",
         price: Double,
         quantity: Int,
         orderType: StockOrderType,
@@ -1865,6 +2018,7 @@ class KisBrokerGatewayAdapterTest {
             market = StockOrderMarket.OVERSEAS_US,
             side = side,
             symbol = symbol,
+            exchange = exchange,
             orderType = orderType,
             price = price,
             quantity = quantity,
@@ -1875,6 +2029,7 @@ class KisBrokerGatewayAdapterTest {
     private fun brokerCancelCommand(
         market: StockOrderMarket,
         symbol: String,
+        exchange: String = "NASD",
         originalOrderId: String,
         branchOrderNumber: String?,
         price: Double,
@@ -1887,6 +2042,7 @@ class KisBrokerGatewayAdapterTest {
             internalOrderId = UUID.randomUUID(),
             market = market,
             symbol = symbol,
+            exchange = exchange,
             originalOrderId = originalOrderId,
             branchOrderNumber = branchOrderNumber,
             orderType = orderType,

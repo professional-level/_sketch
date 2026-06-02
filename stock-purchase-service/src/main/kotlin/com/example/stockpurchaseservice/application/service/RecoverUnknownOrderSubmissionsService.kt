@@ -41,7 +41,9 @@ class RecoverUnknownOrderSubmissionsService(
     private suspend fun recover(submission: OrderIntentSubmissionDto) {
         val status = lookupStatus(submission, RecoveryMode.UNKNOWN_SUBMISSION) ?: return
         when (status.status) {
-            BrokerOrderStatus.SUBMITTED -> markSubmitted(submission, status)
+            BrokerOrderStatus.SUBMITTED,
+            BrokerOrderStatus.PARTIALLY_FILLED,
+            BrokerOrderStatus.FILLED -> markSubmitted(submission, status)
             BrokerOrderStatus.REJECTED -> markRejected(submission, status)
             BrokerOrderStatus.CANCELLED -> markCancelled(submission, status)
             BrokerOrderStatus.UNKNOWN -> {
@@ -62,7 +64,9 @@ class RecoverUnknownOrderSubmissionsService(
         when (status.status) {
             BrokerOrderStatus.CANCELLED -> markCancelled(submission, status)
             BrokerOrderStatus.REJECTED -> markRejected(submission, status)
+            BrokerOrderStatus.FILLED -> markSubmittedWithoutRepublishing(submission, status)
             BrokerOrderStatus.SUBMITTED,
+            BrokerOrderStatus.PARTIALLY_FILLED,
             BrokerOrderStatus.UNKNOWN -> {
                 val pending = submission.copy(
                     statusReason = status.reason ?: submission.statusReason,
@@ -132,6 +136,19 @@ class RecoverUnknownOrderSubmissionsService(
         orderExecutionEventPort.publishSubmitted(recovered.toSubmittedMessage())
     }
 
+    private suspend fun markSubmittedWithoutRepublishing(
+        submission: OrderIntentSubmissionDto,
+        status: BrokerOrderStatusDto,
+    ) {
+        val externalOrderId = status.externalOrderId ?: submission.externalOrderId ?: return
+        val recovered = submission.copy(
+            externalOrderId = externalOrderId,
+            statusReason = status.reason,
+            lastStatusCheckedAt = status.checkedAt,
+        )
+        orderIntentSubmissionPort.saveSubmitted(recovered)
+    }
+
     private suspend fun markRejected(
         submission: OrderIntentSubmissionDto,
         status: BrokerOrderStatusDto,
@@ -164,7 +181,9 @@ class RecoverUnknownOrderSubmissionsService(
             internalOrderId = internalOrderId,
             externalOrderId = externalOrderId,
             symbol = symbol,
+            exchange = exchange,
             side = side,
+            orderedQuantity = quantity,
             market = market ?: symbol.toStockOrderMarket(),
             submittedAt = submittedAt,
         )

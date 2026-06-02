@@ -445,7 +445,7 @@ class OpenApiServiceHttpResponseTest {
     }
 
     @Test
-    fun `sends official fields and blank cursor for domestic cancelable lookup`() = runTest {
+    fun `sends official fields and blank cursor for mock domestic cancelable lookup`() = runTest {
         val exchangeFunction = SingleResponseExchangeFunction.success()
         val service = openApiService(exchangeFunction)
 
@@ -453,7 +453,7 @@ class OpenApiServiceHttpResponseTest {
 
         with(exchangeFunction.requests.single()) {
             assertEquals("/uapi/domestic-stock/v1/trading/inquire-psbl-rvsecncl", url().path)
-            assertEquals("TTTC0084R", headers().getFirst("tr_id"))
+            assertEquals("VTTC0084R", headers().getFirst("tr_id"))
             assertEquals("00000000", url().queryValue("CANO"))
             assertEquals("01", url().queryValue("ACNT_PRDT_CD"))
             assertEquals("1", url().queryValue("INQR_DVSN_1"))
@@ -461,6 +461,19 @@ class OpenApiServiceHttpResponseTest {
             assertEquals("", url().queryValue("CTX_AREA_FK100"))
             assertEquals("", url().queryValue("CTX_AREA_NK100"))
             assertFalse(url().rawQuery.orEmpty().contains("%22%22"))
+        }
+    }
+
+    @Test
+    fun `sends official tr id for real domestic cancelable lookup`() = runTest {
+        val exchangeFunction = SingleResponseExchangeFunction.success()
+        val service = openApiService(exchangeFunction)
+
+        service.getStockOrderCancelable(GetStockOrderCancelableRequest(isMock = false))
+
+        with(exchangeFunction.requests.single()) {
+            assertEquals("/uapi/domestic-stock/v1/trading/inquire-psbl-rvsecncl", url().path)
+            assertEquals("TTTC0084R", headers().getFirst("tr_id"))
         }
     }
 

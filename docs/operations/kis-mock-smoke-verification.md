@@ -1,4 +1,4 @@
-# KIS Mock Smoke Verification
+# KIS Broker Smoke Verification
 
 This file records operator-run smoke checks against the root KIS wrapper and the `stock-purchase-service` broker gateway. Do not include app keys, account numbers, access tokens, or raw broker payloads here.
 
@@ -217,3 +217,31 @@ Impact:
 
 - Broker-backed FX now has a verified mock wrapper mapping for `KRW -> USD`: market code `X`, symbol `FX@KRW`, `invert=true`.
 - Keep the risk provider default as `static` until the same mapping is verified in the target real-account environment.
+
+## Real Account Query-Only Smoke Template
+
+No real-account smoke result is recorded yet. Use this section only after running the query-only test against a wrapper configured with runtime-injected real KIS credentials and account settings.
+
+Command shape:
+
+```powershell
+$env:KIS_BROKER_REAL_QUERY_SMOKE_ENABLED='true'
+$env:KIS_BROKER_SMOKE_BASE_URL='http://localhost:8079'
+$env:KIS_BROKER_SMOKE_SYMBOL='TQQQ'
+$env:KIS_BROKER_SMOKE_EXCHANGE='NASD'
+$env:KIS_BROKER_SMOKE_CURRENCY='USD'
+Remove-Item Env:\KIS_BROKER_SMOKE_ENABLED -ErrorAction SilentlyContinue
+Remove-Item Env:\KIS_BROKER_SMOKE_SUBMIT_ENABLED -ErrorAction SilentlyContinue
+.\gradlew.bat --no-daemon :stock-purchase-service:test --tests "com.example.stockpurchaseservice.adapter.out.broker.KisBrokerGatewaySmokeTest" --rerun-tasks
+```
+
+Expected coverage:
+
+- real overseas account snapshot through `/open-api/overseas/trading/inquire-balance`
+- real overseas order history through `/open-api/overseas/trading/inquire-ccnl`
+- same `KisBrokerGatewayAdapter` mapping path used by `stock-purchase-service`
+
+Recording rule:
+
+- Record only pass/fail, route, market, configured public symbol/exchange/currency, and redacted broker return/message codes.
+- Do not record account numbers, account tails, app keys, app secrets, access tokens, raw KIS payloads, or position-level holdings.

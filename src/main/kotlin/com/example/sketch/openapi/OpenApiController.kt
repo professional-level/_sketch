@@ -394,6 +394,13 @@ internal fun OpenApiResponse.toDailyExecutionOrdersResponse(): DailyExecutionOrd
                 cpbcOrdpMtrlDvsnCd = item.text("cpbc_ordp_mtrl_dvsn_cd", "CPBC_ORDP_MTRL_DVSN_CD")
                 ordOrgno = item.text("ord_orgno", "ORD_ORGNO")
                 rsvnOrdEndDt = item.text("rsvn_ord_end_dt", "RSVN_ORD_END_DT")
+                prcsStatName = item.text("prcs_stat_name", "PRCS_STAT_NAME")
+                ordStatName = item.text("ord_stat_name", "ORD_STAT_NAME")
+                rvseCnclDvsnName = item.text("rvse_cncl_dvsn_name", "RVSE_CNCL_DVSN_NAME")
+                rjctRson = item.text("rjct_rson", "RJCT_RSON")
+                rjctRsonName = item.text("rjct_rson_name", "RJCT_RSON_NAME")
+                rjctRsonCn = item.text("rjct_rson_cn", "RJCT_RSON_CN")
+                rjctRsonCdName = item.text("rjct_rson_cd_name", "RJCT_RSON_CD_NAME")
             }
         }
 

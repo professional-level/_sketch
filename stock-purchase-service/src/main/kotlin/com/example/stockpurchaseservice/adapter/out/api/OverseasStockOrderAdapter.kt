@@ -29,6 +29,7 @@ import java.time.ZonedDateTime
 internal class OverseasStockOrderAdapter(
     private val brokerGateway: BrokerGateway,
     @Value("\${akra.order.overseas.mock:true}") private val isMockOrder: Boolean,
+    @Value("\${akra.order.overseas.default-exchange:NASD}") private val defaultExchange: String = "NASD",
     @Value("\${akra.order.status-lookup.backfill-days:1}") private val statusLookupBackfillDays: Long = 1,
     @Value("\${akra.order.status-lookup.forward-days:1}") private val statusLookupForwardDays: Long = 1,
 ) : OverseasStockOrderPort {
@@ -55,6 +56,7 @@ internal class OverseasStockOrderAdapter(
             BrokerOrderHistoryQuery(
                 market = StockOrderMarket.OVERSEAS_US,
                 symbol = "%",
+                exchange = defaultExchange,
                 from = query.from,
                 to = query.to,
                 isMock = isMockOrder,
@@ -71,6 +73,7 @@ internal class OverseasStockOrderAdapter(
             BrokerOrderHistoryQuery(
                 market = StockOrderMarket.OVERSEAS_US,
                 symbol = query.symbol,
+                exchange = query.exchange.ifBlank { defaultExchange },
                 from = lookupWindow.from,
                 to = lookupWindow.to,
                 isMock = isMockOrder,
@@ -120,6 +123,7 @@ internal class OverseasStockOrderAdapter(
             market = StockOrderMarket.OVERSEAS_US,
             side = side,
             symbol = stockId,
+            exchange = exchange.ifBlank { defaultExchange },
             orderType = orderType,
             price = price,
             quantity = quantity,
@@ -133,6 +137,7 @@ internal class OverseasStockOrderAdapter(
             market = StockOrderMarket.OVERSEAS_US,
             side = side,
             symbol = stockId,
+            exchange = exchange.ifBlank { defaultExchange },
             orderType = orderType,
             price = price,
             quantity = quantity,
@@ -145,6 +150,7 @@ internal class OverseasStockOrderAdapter(
             internalOrderId = orderId,
             market = StockOrderMarket.OVERSEAS_US,
             symbol = stockId,
+            exchange = exchange.ifBlank { defaultExchange },
             originalOrderId = originalOrderId,
             branchOrderNumber = branchOrderNumber,
             orderType = orderType,

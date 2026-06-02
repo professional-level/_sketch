@@ -41,7 +41,7 @@ class CancelOrderSubmissionServiceTest {
         val marketPort = FakeMarketServicePort()
         val processedEventPort = FakeProcessedEventPort()
         val submissionPort = FakeOrderIntentSubmissionPort(
-            originalSubmission(externalOrderId = "broker-order-1"),
+            originalSubmission(externalOrderId = "broker-order-1", exchange = "NYSE"),
         )
         val service = CancelOrderSubmissionService(
             marketPort,
@@ -60,6 +60,7 @@ class CancelOrderSubmissionServiceTest {
                 orderType = OrderIntentType.LOC,
                 price = 112.5,
                 cancelAll = false,
+                exchange = "AMEX",
             ),
         )
 
@@ -77,6 +78,7 @@ class CancelOrderSubmissionServiceTest {
             assertEquals(StockOrderType.LOC, orderType)
             assertEquals(112.5, price)
             assertEquals(false, cancelAll)
+            assertEquals("NYSE", exchange)
         }
     }
 
@@ -241,6 +243,7 @@ class CancelOrderSubmissionServiceTest {
         orderType: OrderIntentType = OrderIntentType.LIMIT,
         price: Double = 0.0,
         cancelAll: Boolean = true,
+        exchange: String = "NASD",
     ): CancelOrderSubmissionCommand {
         return CancelOrderSubmissionCommand(
             eventId = eventId,
@@ -253,6 +256,7 @@ class CancelOrderSubmissionServiceTest {
             orderType = orderType,
             price = price,
             cancelAll = cancelAll,
+            exchange = exchange,
             requestedAt = ZonedDateTime.parse("2026-06-02T09:00:00+09:00"),
         )
     }
@@ -261,12 +265,14 @@ class CancelOrderSubmissionServiceTest {
         externalOrderId: String,
         symbol: String = "TQQQ",
         branchOrderNumber: String? = null,
+        exchange: String = "NASD",
     ): OrderIntentSubmissionDto {
         return OrderIntentSubmissionDto(
             orderIntentId = UUID.fromString("00000000-0000-0000-0000-000000000111"),
             idempotencyKey = "order:$symbol:$externalOrderId",
             strategyExecutionId = "strategy:$symbol",
             symbol = symbol,
+            exchange = exchange,
             side = OrderIntentSide.BUY,
             orderType = OrderIntentType.LIMIT,
             submittedPrice = 100.0,

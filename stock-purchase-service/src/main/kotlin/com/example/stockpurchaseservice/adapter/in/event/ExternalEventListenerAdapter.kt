@@ -5,6 +5,7 @@ import com.example.common.ExternalApiAdapter
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentType
 import com.example.stockpurchaseservice.application.port.`in`.SubmitOrderIntentCommand
+import com.example.stockpurchaseservice.application.port.`in`.DEFAULT_OVERSEAS_ORDER_EXCHANGE
 import com.example.stockpurchaseservice.application.port.`in`.SubmitOrderIntentUseCase
 import com.example.stockpurchaseservice.application.port.out.OrderTradingEnvironment
 import common.ConsumerGroupId.PURCHASE_SERVICE
@@ -67,6 +68,7 @@ fun Event.OrderIntentCreatedEvent.toCommand(): SubmitOrderIntentCommand {
         orderTag = event.orderTag,
         createdAt = event.createdAt.toZonedDateTime(),
         tradingEnvironment = event.tradingEnvironment.convert(),
+        exchange = event.exchange.ifBlank { DEFAULT_OVERSEAS_ORDER_EXCHANGE },
     )
 }
 

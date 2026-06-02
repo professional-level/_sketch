@@ -129,7 +129,11 @@ class OpenApiControllerMappingTest {
                   "cncl_yn": "N",
                   "cncl_cfrm_qty": "0",
                   "rmn_qty": "6",
-                  "rjct_qty": "0"
+                  "rjct_qty": "0",
+                  "prcs_stat_name": "Processed",
+                  "ord_stat_name": "Accepted",
+                  "rvse_cncl_dvsn_name": "",
+                  "rjct_rson_name": "Not rejected"
                 }
               ],
               "output2": {
@@ -161,6 +165,9 @@ class OpenApiControllerMappingTest {
             assertEquals("0", rjctQty)
             assertEquals("0", cnclCfrmQty)
             assertEquals("69900", avgPrvs)
+            assertEquals("Processed", prcsStatName)
+            assertEquals("Accepted", ordStatName)
+            assertEquals("Not rejected", rjctRsonName)
         }
         assertEquals("10", response.output2.totOrdQty)
         assertEquals("4", response.output2.totCcldQty)

@@ -2,6 +2,7 @@ package com.example.stockpurchaseservice.adapter.out.persistence.entity
 
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentType
+import com.example.stockpurchaseservice.application.port.`in`.DEFAULT_OVERSEAS_ORDER_EXCHANGE
 import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionDto
 import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionStatusDto
 import com.example.stockpurchaseservice.application.port.out.OrderTradingEnvironment
@@ -34,6 +35,8 @@ internal class OrderIntentSubmissionEntity private constructor(
     val strategyExecutionId: String,
     @Column(nullable = false)
     val symbol: String,
+    @Column
+    val exchange: String?,
     @Enumerated(EnumType.STRING)
     @Column
     val market: OrderIntentSubmissionMarket?,
@@ -74,6 +77,7 @@ internal class OrderIntentSubmissionEntity private constructor(
             idempotencyKey = idempotencyKey,
             strategyExecutionId = strategyExecutionId,
             symbol = symbol,
+            exchange = exchange?.takeIf { it.isNotBlank() } ?: DEFAULT_OVERSEAS_ORDER_EXCHANGE,
             market = market?.toDto(),
             side = side.toDto(),
             orderType = orderType.toDto(),
@@ -98,6 +102,7 @@ internal class OrderIntentSubmissionEntity private constructor(
                 idempotencyKey = dto.idempotencyKey,
                 strategyExecutionId = dto.strategyExecutionId,
                 symbol = dto.symbol,
+                exchange = dto.exchange,
                 market = dto.market?.let(OrderIntentSubmissionMarket::from),
                 side = OrderIntentSubmissionSide.from(dto.side),
                 orderType = OrderIntentSubmissionType.from(dto.orderType),

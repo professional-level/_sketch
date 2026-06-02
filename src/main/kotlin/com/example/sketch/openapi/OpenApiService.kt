@@ -410,7 +410,7 @@ class OpenApiService(
     suspend fun getStockOrderCancelable(request: GetStockOrderCancelableRequest): OpenApiResponse {
         val token = getToken(isMock = request.isMock)
         val info = RequestType.GET_STOCK_ORDER_CANCELABLE
-        val headers = build(token = token, trId = "TTTC0084R")
+        val headers = build(token = token, trId = if (request.isMock) "VTTC0084R" else "TTTC0084R")
             .addHeader(HeaderBuilder.HeaderKey.CUSTOMER_TYPE, "P")
             .build()
             .withMockCredentialIfNeeded(request.isMock)

@@ -39,6 +39,7 @@ class OrderCancellationControllerTest {
                 orderType = OrderIntentType.LOC,
                 price = 112.5,
                 cancelAll = false,
+                exchange = "NYSE",
             ),
         )
 
@@ -54,6 +55,7 @@ class OrderCancellationControllerTest {
             assertEquals(OrderIntentType.LOC, orderType)
             assertEquals(112.5, price)
             assertEquals(false, cancelAll)
+            assertEquals("NYSE", exchange)
             assertEquals(ZonedDateTime.ofInstant(fixedClock().instant(), fixedClock().zone), requestedAt)
         }
     }

@@ -33,6 +33,7 @@ class StockOrderBrokerGatewayAdapterTest {
             quantity = 3,
             market = StockOrderMarket.OVERSEAS_US,
             orderType = StockOrderType.LOC,
+            exchange = "NYSE",
         )
 
         val result = adapter.buyStock(order)
@@ -43,6 +44,7 @@ class StockOrderBrokerGatewayAdapterTest {
             assertEquals(StockOrderMarket.OVERSEAS_US, market)
             assertEquals(OrderIntentSide.BUY, side)
             assertEquals("TQQQ", symbol)
+            assertEquals("NYSE", exchange)
             assertEquals(StockOrderType.LOC, orderType)
             assertEquals(112.5, price)
             assertEquals(3, quantity)
@@ -109,6 +111,7 @@ class StockOrderBrokerGatewayAdapterTest {
             orderType = StockOrderType.LOC,
             price = 112.5,
             cancelAll = false,
+            exchange = "AMEX",
         )
 
         adapter.cancelOrder(order)
@@ -117,6 +120,7 @@ class StockOrderBrokerGatewayAdapterTest {
             assertEquals(order.orderId, internalOrderId)
             assertEquals(StockOrderMarket.OVERSEAS_US, market)
             assertEquals("TQQQ", symbol)
+            assertEquals("AMEX", exchange)
             assertEquals("overseas-order-1", originalOrderId)
             assertEquals(null, branchOrderNumber)
             assertEquals(3, quantity)
@@ -139,6 +143,7 @@ class StockOrderBrokerGatewayAdapterTest {
                 internalOrderId = UUID.fromString("00000000-0000-0000-0000-000000000012"),
                 externalOrderId = "broker-order-1",
                 symbol = "TQQQ",
+                exchange = "NYSE",
                 side = OrderIntentSide.BUY,
                 market = StockOrderMarket.OVERSEAS_US,
                 submittedAt = submittedAt,
@@ -148,6 +153,7 @@ class StockOrderBrokerGatewayAdapterTest {
         with(brokerGateway.historyQueries.single()) {
             assertEquals(StockOrderMarket.OVERSEAS_US, market)
             assertEquals("TQQQ", symbol)
+            assertEquals("NYSE", exchange)
             assertEquals("", externalOrderId)
             assertEquals(submittedAt.minusDays(1), from)
             assertEquals(submittedAt.plusDays(1), to)

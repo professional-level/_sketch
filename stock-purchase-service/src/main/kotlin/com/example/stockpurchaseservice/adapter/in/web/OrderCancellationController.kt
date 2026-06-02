@@ -45,6 +45,7 @@ internal data class CancelOrderSubmissionRequest(
     val orderType: OrderIntentType = OrderIntentType.LIMIT,
     val price: Double = 0.0,
     val cancelAll: Boolean = true,
+    val exchange: String = "NASD",
     val requestedAt: ZonedDateTime? = null,
 ) {
     fun toCommand(clock: Clock): CancelOrderSubmissionCommand {
@@ -62,6 +63,7 @@ internal data class CancelOrderSubmissionRequest(
             orderType = orderType,
             price = price,
             cancelAll = cancelAll,
+            exchange = exchange,
             requestedAt = requestedAt ?: ZonedDateTime.now(clock),
         )
     }

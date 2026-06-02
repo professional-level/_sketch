@@ -36,14 +36,46 @@ class RecoverUnknownOrderSubmissionsServiceTest {
 
     @Test
     fun `recovers unknown submission to submitted event`() = runBlocking {
+        val submissionPort = FakeOrderIntentSubmissionPort(listOf(submission(exchange = "NYSE")))
+        val eventPort = FakeOrderExecutionEventPort()
+        val marketService = FakeMarketServicePort(
+            status = BrokerOrderStatusDto(
+                status = BrokerOrderStatus.SUBMITTED,
+                externalOrderId = "broker-1",
+                checkedAt = CHECKED_AT,
+            ),
+        )
+        val service = RecoverUnknownOrderSubmissionsService(
+            marketService = marketService,
+            orderIntentSubmissionPort = submissionPort,
+            orderExecutionEventPort = eventPort,
+            operationalAlertPort = FakeOperationalAlertPort(),
+        )
+
+        service.execute()
+
+        assertEquals("broker-1", submissionPort.submitted.single().externalOrderId)
+        assertEquals("NYSE", marketService.queries.single().exchange)
+        assertEquals(3L, marketService.queries.single().orderedQuantity)
+        assertEquals("broker-1", eventPort.submitted.single().brokerOrderId)
+        assertEquals(emptyList(), eventPort.rejected)
+        assertEquals(emptyList(), eventPort.cancelled)
+    }
+
+    @Test
+    fun `recovers unknown partially filled submission to submitted event`() = runBlocking {
         val submissionPort = FakeOrderIntentSubmissionPort(listOf(submission()))
         val eventPort = FakeOrderExecutionEventPort()
         val service = RecoverUnknownOrderSubmissionsService(
             marketService = FakeMarketServicePort(
                 status = BrokerOrderStatusDto(
-                    status = BrokerOrderStatus.SUBMITTED,
+                    status = BrokerOrderStatus.PARTIALLY_FILLED,
                     externalOrderId = "broker-1",
                     checkedAt = CHECKED_AT,
+                    orderedQuantity = 3,
+                    cumulativeFilledQuantity = 1,
+                    remainingQuantity = 2,
+                    averageExecutionPrice = 112.5,
                 ),
             ),
             orderIntentSubmissionPort = submissionPort,
@@ -54,6 +86,7 @@ class RecoverUnknownOrderSubmissionsServiceTest {
         service.execute()
 
         assertEquals("broker-1", submissionPort.submitted.single().externalOrderId)
+        assertEquals(CHECKED_AT, submissionPort.submitted.single().lastStatusCheckedAt)
         assertEquals("broker-1", eventPort.submitted.single().brokerOrderId)
         assertEquals(emptyList(), eventPort.rejected)
         assertEquals(emptyList(), eventPort.cancelled)
@@ -249,12 +282,16 @@ class RecoverUnknownOrderSubmissionsServiceTest {
         assertEquals("broker status lookup failed: KIS lookup timeout", alertPort.submissionUnknown.single().reason)
     }
 
-    private fun submission(externalOrderId: String? = null): OrderIntentSubmissionDto {
+    private fun submission(
+        externalOrderId: String? = null,
+        exchange: String = "NASD",
+    ): OrderIntentSubmissionDto {
         return OrderIntentSubmissionDto(
             orderIntentId = ORDER_INTENT_ID,
             idempotencyKey = "unknown-buy",
             strategyExecutionId = "laor-v4-strategy:TQQQ",
             symbol = "TQQQ",
+            exchange = exchange,
             side = OrderIntentSide.BUY,
             orderType = OrderIntentType.LOC,
             submittedPrice = 112.0,
@@ -270,6 +307,7 @@ class RecoverUnknownOrderSubmissionsServiceTest {
         private val statusProvider: (BrokerOrderStatusQuery) -> BrokerOrderStatusDto,
     ) : MarketServicePort {
         constructor(status: BrokerOrderStatusDto) : this({ status })
+        val queries: MutableList<BrokerOrderStatusQuery> = mutableListOf()
 
         override fun buyStock(order: PurchaseOrderDto): BrokerOrderSubmissionDto {
             return BrokerOrderSubmissionDto(externalOrderId = "broker-buy")
@@ -282,6 +320,7 @@ class RecoverUnknownOrderSubmissionsServiceTest {
         override fun findExecutionListAtOneDay(): List<ExecutedStockDto> = emptyList()
 
         override fun findOrderSubmissionStatus(query: BrokerOrderStatusQuery): BrokerOrderStatusDto {
+            queries += query
             assertEquals(ORDER_INTENT_ID, query.orderIntentId)
             assertEquals(INTERNAL_ORDER_ID, query.internalOrderId)
             return statusProvider(query)

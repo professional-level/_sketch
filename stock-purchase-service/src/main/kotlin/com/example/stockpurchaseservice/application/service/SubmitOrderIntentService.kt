@@ -60,7 +60,11 @@ class SubmitOrderIntentService(
             orderIntentSubmissionPort.saveSubmitted(submission)
             orderExecutionEventPort.publishSubmitted(command.toSubmittedMessage(submission))
             processedEventPort.markSuccess(command.eventId)
-            SubmitOrderIntentResult(OrderIntentSubmissionStatus.SUBMITTED)
+            SubmitOrderIntentResult(
+                status = OrderIntentSubmissionStatus.SUBMITTED,
+                externalOrderId = submission.externalOrderId,
+                branchOrderNumber = submission.branchOrderNumber,
+            )
         } catch (exception: BrokerOrderSubmissionUnknownException) {
             val unknownSubmission = command.toUnknownSubmission(
                 exception = exception,
@@ -72,7 +76,10 @@ class SubmitOrderIntentService(
                 operationalAlertPort.alertSubmissionUnknown(command.toSubmissionUnknownAlert(unknownSubmission, exception.message))
             }
             processedEventPort.markSuccess(command.eventId)
-            SubmitOrderIntentResult(OrderIntentSubmissionStatus.SUBMISSION_UNKNOWN)
+            SubmitOrderIntentResult(
+                status = OrderIntentSubmissionStatus.SUBMISSION_UNKNOWN,
+                externalOrderId = unknownSubmission.externalOrderId,
+            )
         } catch (exception: BrokerOrderRejectedException) {
             val reason = exception.message ?: "broker order rejected"
             val rejectedSubmission = command.toRejectedSubmission(
@@ -121,6 +128,7 @@ class SubmitOrderIntentService(
                     quantity = quantity,
                     market = market,
                     orderType = orderType,
+                    exchange = command.exchange,
                 ),
             )
 
@@ -132,6 +140,7 @@ class SubmitOrderIntentService(
                     quantity = quantity,
                     market = market,
                     orderType = orderType,
+                    exchange = command.exchange,
                 ),
             )
         }
@@ -141,6 +150,7 @@ class SubmitOrderIntentService(
             idempotencyKey = command.idempotencyKey,
             strategyExecutionId = command.strategyExecutionId,
             symbol = command.symbol,
+            exchange = command.exchange,
             market = market,
             side = command.side,
             orderType = command.orderType,
@@ -177,6 +187,7 @@ class SubmitOrderIntentService(
             idempotencyKey = idempotencyKey,
             strategyExecutionId = strategyExecutionId,
             symbol = symbol,
+            exchange = exchange,
             market = market,
             side = side,
             orderType = orderType,
@@ -203,6 +214,7 @@ class SubmitOrderIntentService(
             idempotencyKey = idempotencyKey,
             strategyExecutionId = strategyExecutionId,
             symbol = symbol,
+            exchange = exchange,
             market = market,
             side = side,
             orderType = orderType,

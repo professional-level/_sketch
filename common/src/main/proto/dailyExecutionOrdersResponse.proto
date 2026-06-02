@@ -35,6 +35,13 @@ message DailyExecutionOrdersOutput1 {
   string cpbc_ordp_mtrl_dvsn_cd = 31;
   string ord_orgno = 32;
   string rsvn_ord_end_dt = 33;
+  string prcs_stat_name = 34;
+  string ord_stat_name = 35;
+  string rvse_cncl_dvsn_name = 36;
+  string rjct_rson = 37;
+  string rjct_rson_name = 38;
+  string rjct_rson_cn = 39;
+  string rjct_rson_cd_name = 40;
 }
 
 message DailyExecutionOrdersOutput2 {

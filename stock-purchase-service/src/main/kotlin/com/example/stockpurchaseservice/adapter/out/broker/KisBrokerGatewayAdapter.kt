@@ -124,6 +124,7 @@ internal class KisBrokerGatewayAdapter(
             BrokerOrderHistoryQuery(
                 market = StockOrderMarket.OVERSEAS_US,
                 symbol = command.symbol,
+                exchange = command.exchange,
                 externalOrderId = command.originalOrderId,
                 isMock = command.isMock,
             ),
@@ -135,7 +136,8 @@ internal class KisBrokerGatewayAdapter(
         val status = order.toStatus()
         when (status.status) {
             BrokerOrderStatus.REJECTED,
-            BrokerOrderStatus.CANCELLED -> {
+            BrokerOrderStatus.CANCELLED,
+            BrokerOrderStatus.FILLED -> {
                 val reason = status.reason?.let { " reason=$it" }.orEmpty()
                 throw BrokerOrderRejectedException(
                     message = "overseas order is not cancelable: " +
@@ -144,6 +146,7 @@ internal class KisBrokerGatewayAdapter(
             }
 
             BrokerOrderStatus.SUBMITTED,
+            BrokerOrderStatus.PARTIALLY_FILLED,
             BrokerOrderStatus.UNKNOWN -> Unit
         }
 
@@ -379,7 +382,7 @@ internal fun BrokerOrderCommand.toKisDomesticOrderRequest(): Map<String, Any> {
 internal fun BrokerOrderCommand.toKisUsOverseasOrderRequest(): Map<String, Any> {
     val baseRequest = mapOf(
         "PDNO" to symbol.uppercase(),
-        "OVRS_EXCG_CD" to exchangeForUsStock(symbol),
+        "OVRS_EXCG_CD" to exchange.toKisUsExchangeCode(),
         "ORD_QTY" to quantity,
         "OVRS_ORD_UNPR" to price.toBrokerPrice(),
         "ORD_DVSN" to orderType.toKisUsOrderDivision(side, isMock),
@@ -415,7 +418,7 @@ internal fun BrokerOrderCancelCommand.toKisDomesticCancelRequest(): Map<String, 
 
 internal fun BrokerOrderCancelCommand.toKisUsOverseasCancelRequest(): Map<String, Any> {
     return mapOf(
-        "OVRS_EXCG_CD" to exchangeForUsStock(symbol),
+        "OVRS_EXCG_CD" to exchange.toKisUsExchangeCode(),
         "PDNO" to symbol.uppercase(),
         "ORGN_ODNO" to originalOrderId,
         "RVSE_CNCL_DVSN_CD" to "02",
@@ -551,7 +554,7 @@ private fun JsonNode.toKisCancelableOrderItem(): KisCancelableOrderItem? {
 }
 
 private fun BrokerOrderHistoryItem.matches(command: BrokerOrderCancelCommand): Boolean {
-    val sameOrder = externalOrderId == command.originalOrderId
+    val sameOrder = externalOrderId == command.originalOrderId || originalOrderId == command.originalOrderId
     val sameSymbol = symbol.isBlank() || symbol.equals(command.symbol, ignoreCase = true)
     return sameOrder && sameSymbol
 }
@@ -607,7 +610,7 @@ internal fun BrokerOrderHistoryQuery.toKisOverseasExecutionOrderQuery(): Map<Str
         "ordEndDt" to to.toKisDate(),
         "sllBuyDvsn" to "00",
         "ccldNccsDvsn" to "00",
-        "ovrsExcgCd" to if (isMock) "" else "NASD",
+        "ovrsExcgCd" to if (isMock) "" else exchange.uppercase(),
         "sortSqn" to "DS",
         "ordDt" to "",
         "ordGnoBrno" to "",
@@ -842,6 +845,18 @@ private fun DailyExecutionOrdersResponseOuterClass.DailyExecutionOrdersOutput1.t
         cancelled = cnclYn.equals("Y", ignoreCase = true),
         side = sllBuyDvsnCd.toOrderIntentSide(),
         averageExecutionPrice = avgPrvs.toDoubleValue(),
+        statusMessage = joinedText(
+            ccldCndtName,
+            prcsStatName,
+            ordStatName,
+            rvseCnclDvsnName,
+        ),
+        rejectionReason = joinedText(
+            rjctRson,
+            rjctRsonName,
+            rjctRsonCn,
+            rjctRsonCdName,
+        ),
     )
 }
 
@@ -1046,11 +1061,12 @@ private fun StockOrderType.toKisUsOrderDivision(side: OrderIntentSide, isMock: B
     }
 }
 
-private fun exchangeForUsStock(symbol: String): String {
-    return when (symbol.uppercase()) {
-        "TQQQ", "SOXL" -> "NASD"
-        else -> "NASD"
+private fun String.toKisUsExchangeCode(): String {
+    val exchange = trim().uppercase().ifBlank { DEFAULT_US_EXCHANGE }
+    require(exchange in SUPPORTED_US_EXCHANGES) {
+        "unsupported US overseas exchange: $exchange"
     }
+    return exchange
 }
 
 private fun Double.toBrokerPrice(): String {
@@ -1058,3 +1074,6 @@ private fun Double.toBrokerPrice(): String {
         .stripTrailingZeros()
         .toPlainString()
 }
+
+private const val DEFAULT_US_EXCHANGE = "NASD"
+private val SUPPORTED_US_EXCHANGES = setOf("NASD", "NYSE", "AMEX")

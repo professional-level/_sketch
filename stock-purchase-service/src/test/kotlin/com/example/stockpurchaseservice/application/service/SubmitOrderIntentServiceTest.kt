@@ -70,14 +70,18 @@ class SubmitOrderIntentServiceTest {
                 price = 112.0,
                 quantity = 3,
                 orderTag = "FIRST_BUY",
+                exchange = "NYSE",
                 createdAt = ZonedDateTime.parse("2026-05-30T09:00:00+09:00"),
             ),
         )
 
         assertEquals(OrderIntentSubmissionStatus.SUBMITTED, result.status)
+        assertEquals("broker-buy-1", result.externalOrderId)
+        assertEquals("branch-buy-1", result.branchOrderNumber)
         assertEquals(eventId, processedEventPort.succeeded.single())
         assertEquals(eventId, submissionPort.saved.single().orderIntentId)
         assertEquals(StockOrderMarket.OVERSEAS_US, submissionPort.saved.single().market)
+        assertEquals("NYSE", submissionPort.saved.single().exchange)
         assertEquals("branch-buy-1", submissionPort.saved.single().branchOrderNumber)
         assertEquals("broker-buy-1", eventPort.submitted.single().brokerOrderId)
         with(marketPort.buyOrders.single()) {
@@ -86,6 +90,7 @@ class SubmitOrderIntentServiceTest {
             assertEquals(3, quantity)
             assertEquals(StockOrderMarket.OVERSEAS_US, market)
             assertEquals(StockOrderType.LOC, orderType)
+            assertEquals("NYSE", exchange)
         }
     }
 
@@ -190,6 +195,7 @@ class SubmitOrderIntentServiceTest {
                 quantity = 3,
                 orderTag = "FIRST_BUY",
                 createdAt = ZonedDateTime.parse("2026-05-30T09:00:00+09:00"),
+                exchange = "NYSE",
             ),
         )
 
@@ -236,6 +242,7 @@ class SubmitOrderIntentServiceTest {
                 price = 112.0,
                 quantity = 3,
                 orderTag = "FIRST_BUY",
+                exchange = "NYSE",
                 createdAt = ZonedDateTime.parse("2026-05-30T09:00:00+09:00"),
             ),
         )

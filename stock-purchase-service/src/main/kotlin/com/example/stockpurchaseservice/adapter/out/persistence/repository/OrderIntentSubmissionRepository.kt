@@ -133,6 +133,32 @@ internal class OrderIntentSubmissionRepository :
         return notional.doubleValue()
     }
 
+    override suspend fun sumActiveSellQuantity(
+        symbol: String,
+        market: OrderIntentSubmissionMarket,
+    ): Long {
+        val quantity = sessionFactory.withSession { session ->
+            session.createQuery(
+                """
+                SELECT COALESCE(SUM(o.quantity), 0)
+                FROM OrderIntentSubmissionEntity o
+                WHERE UPPER(o.symbol) = :symbol
+                  AND o.side = :side
+                  AND (o.market = :market OR o.market IS NULL)
+                  AND o.status IN (:statuses)
+                """.trimIndent(),
+                java.lang.Number::class.java,
+            )
+                .setParameter("symbol", symbol.trim().uppercase())
+                .setParameter("side", OrderIntentSubmissionSide.SELL)
+                .setParameter("market", market)
+                .setParameter("statuses", ACTIVE_EXPOSURE_STATUSES)
+                .singleResult
+        }.awaitSuspending()
+
+        return quantity.longValue()
+    }
+
     suspend fun update(entity: OrderIntentSubmissionEntity) {
         sessionFactory.withSession { session ->
             session.merge(entity).flatMap { session.flush() }

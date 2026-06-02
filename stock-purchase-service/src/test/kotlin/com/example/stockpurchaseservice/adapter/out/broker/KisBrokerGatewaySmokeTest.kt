@@ -18,16 +18,16 @@ import kotlin.test.assertTrue
 import kotlin.test.fail
 
 @Tag("kis-smoke")
-@EnabledIfEnvironmentVariable(named = "KIS_BROKER_SMOKE_ENABLED", matches = "true")
 class KisBrokerGatewaySmokeTest {
 
     @Test
+    @EnabledIfEnvironmentVariable(named = "KIS_BROKER_SMOKE_ENABLED", matches = "true")
     fun `mock account snapshot and order history smoke`() {
         val config = SmokeConfig.fromEnvironment()
         assumeTrue(!config.submitEnabled, "Run query-only smoke separately before submit smoke to avoid KIS rate limit noise")
         val adapter = brokerGateway(config)
 
-        val snapshot = runBrokerSmokeQueryStep("mock account snapshot", config) {
+        val snapshot = runBrokerSmokeQueryStep("mock account snapshot", "mock", config) {
             adapter.findAccountSnapshot(
                 BrokerAccountSnapshotQuery(
                     market = StockOrderMarket.OVERSEAS_US,
@@ -37,8 +37,8 @@ class KisBrokerGatewaySmokeTest {
                 ),
             )
         }
-        val history = runBrokerSmokeQueryStep("mock order history", config) {
-            adapter.findOrderHistory(config.historyQuery())
+        val history = runBrokerSmokeQueryStep("mock order history", "mock", config) {
+            adapter.findOrderHistory(config.historyQuery(isMock = true))
         }
 
         assertEquals(StockOrderMarket.OVERSEAS_US, snapshot.market)
@@ -48,6 +48,34 @@ class KisBrokerGatewaySmokeTest {
     }
 
     @Test
+    @EnabledIfEnvironmentVariable(named = "KIS_BROKER_REAL_QUERY_SMOKE_ENABLED", matches = "true")
+    fun `real account snapshot and order history query-only smoke`() {
+        val config = SmokeConfig.fromEnvironment()
+        assumeTrue(!config.submitEnabled, "Unset KIS_BROKER_SMOKE_SUBMIT_ENABLED for real query-only smoke")
+        val adapter = brokerGateway(config)
+
+        val snapshot = runBrokerSmokeQueryStep("real account snapshot", "real", config) {
+            adapter.findAccountSnapshot(
+                BrokerAccountSnapshotQuery(
+                    market = StockOrderMarket.OVERSEAS_US,
+                    exchange = config.exchange,
+                    currency = config.currency,
+                    isMock = false,
+                ),
+            )
+        }
+        val history = runBrokerSmokeQueryStep("real order history", "real", config) {
+            adapter.findOrderHistory(config.historyQuery(isMock = false))
+        }
+
+        assertEquals(StockOrderMarket.OVERSEAS_US, snapshot.market)
+        assertEquals(config.exchange, snapshot.exchange)
+        assertEquals(config.currency, snapshot.currency)
+        assertTrue(history.all { it.externalOrderId.isNotBlank() })
+    }
+
+    @Test
+    @EnabledIfEnvironmentVariable(named = "KIS_BROKER_SMOKE_ENABLED", matches = "true")
     fun `mock submit query and cancel smoke`() {
         val config = SmokeConfig.fromEnvironment()
         assumeTrue(config.submitEnabled, "Set KIS_BROKER_SMOKE_SUBMIT_ENABLED=true to place a mock order")
@@ -118,6 +146,7 @@ class KisBrokerGatewaySmokeTest {
 
     private fun <T> runBrokerSmokeQueryStep(
         step: String,
+        brokerEnvironment: String,
         config: SmokeConfig,
         block: () -> T,
     ): T {
@@ -125,7 +154,7 @@ class KisBrokerGatewaySmokeTest {
             block()
         } catch (exception: RuntimeException) {
             fail(
-                "$step failed during KIS mock broker smoke: " +
+                "$step failed during KIS $brokerEnvironment broker smoke: " +
                     "exception=${exception::class.java.simpleName}, " +
                     "message=${exception.message}, " +
                     "cause=${exception.cause?.javaClass?.simpleName}, " +
@@ -149,7 +178,7 @@ class KisBrokerGatewaySmokeTest {
         externalOrderId: String,
     ): BrokerOrderHistoryItem? {
         repeat(config.historyAttempts) {
-            val match = adapter.findOrderHistory(config.historyQuery())
+            val match = adapter.findOrderHistory(config.historyQuery(isMock = true))
                 .firstOrNull { it.externalOrderId == externalOrderId }
             if (match != null) return match
             Thread.sleep(config.historyPollInterval.toMillis())
@@ -182,14 +211,15 @@ class KisBrokerGatewaySmokeTest {
                 ")"
         }
 
-        fun historyQuery(): BrokerOrderHistoryQuery {
+        fun historyQuery(isMock: Boolean): BrokerOrderHistoryQuery {
             val now = ZonedDateTime.now(BROKER_ORDER_ZONE)
             return BrokerOrderHistoryQuery(
                 market = StockOrderMarket.OVERSEAS_US,
                 symbol = symbol,
+                exchange = exchange,
                 from = now.minusDays(1),
                 to = now.plusDays(1),
-                isMock = true,
+                isMock = isMock,
             )
         }
 

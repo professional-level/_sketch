@@ -20,6 +20,7 @@ data class CancelOrderSubmissionCommand(
     val orderType: OrderIntentType = OrderIntentType.LIMIT,
     val price: Double = 0.0,
     val cancelAll: Boolean = true,
+    val exchange: String = DEFAULT_OVERSEAS_ORDER_EXCHANGE,
     val requestedAt: ZonedDateTime,
 ) {
     init {
