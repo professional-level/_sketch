@@ -1235,7 +1235,7 @@ private fun WebClient.submitStockOrder(
         )
     }
 
-    val externalOrderId = order.output.getODNO().takeIf { it.isNotBlank() }
+    val externalOrderId = order.output.getODNO().toBrokerOrderIdOrNull()
         ?: throw BrokerOrderSubmissionUnknownException(
             message = "stock order accepted but broker order id is missing",
         )

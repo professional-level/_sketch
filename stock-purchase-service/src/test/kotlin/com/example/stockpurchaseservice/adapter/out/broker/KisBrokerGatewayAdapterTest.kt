@@ -2436,6 +2436,45 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `throws submission unknown when accepted order response has all zero broker order id`() {
+        val exchangeFunction = ResponseExchangeFunction(
+            responses = listOf(
+                protobufResponse(
+                    ApiResponse.StockOrder.newBuilder()
+                        .setRtCd("0")
+                        .setOutput(
+                            ApiResponse.Output.newBuilder()
+                                .setODNO("0000000000")
+                                .build(),
+                        )
+                        .build(),
+                ),
+            ),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        val exception = assertFailsWith<BrokerOrderSubmissionUnknownException> {
+            adapter.submitOrder(
+                brokerCommand(
+                    side = OrderIntentSide.BUY,
+                    symbol = "TQQQ",
+                    price = 112.5,
+                    quantity = 3,
+                    orderType = StockOrderType.LOC,
+                    isMock = false,
+                ),
+            )
+        }
+
+        assertEquals(null, exception.externalOrderId)
+        assertEquals(1, exchangeFunction.requests.size)
+    }
+
+    @Test
     fun `throws broker rejected when stock order response has nonzero return code`() {
         val exchangeFunction = ResponseExchangeFunction(
             responses = listOf(
