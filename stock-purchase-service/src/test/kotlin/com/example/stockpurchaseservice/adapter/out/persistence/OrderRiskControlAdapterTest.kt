@@ -322,6 +322,29 @@ class OrderRiskControlAdapterTest {
     }
 
     @Test
+    fun `daily order count includes current market when configured markets omit it`() = runBlocking {
+        val properties = OrderRiskProperties().apply {
+            tradingHours.enabled = false
+            maxDailyOrderCount = 2
+            dailyOrderCount.markets = listOf(StockOrderMarket.DOMESTIC)
+        }
+        val reader = FakeOrderRiskSubmissionReader(
+            brokerSubmittedCountByMarket = mapOf(
+                OrderIntentSubmissionMarket.OVERSEAS_US to 2,
+            ),
+        )
+
+        val result = adapter(properties, reader).assess(command())
+
+        assertFalse(result.accepted)
+        assertContains(result.reason ?: "", "daily broker order count 2 reached limit 2")
+        assertEquals(
+            listOf(OrderIntentSubmissionMarket.DOMESTIC, OrderIntentSubmissionMarket.OVERSEAS_US),
+            reader.countBrokerSubmittedAcrossMarketWindows.map { it.market },
+        )
+    }
+
+    @Test
     fun `rejects order when daily broker order count reaches configured limit`() = runBlocking {
         val properties = OrderRiskProperties().apply {
             tradingHours.enabled = false
@@ -473,6 +496,41 @@ class OrderRiskControlAdapterTest {
         assertFalse(result.accepted)
         assertContains(result.reason ?: "", "account exposure notional 1050.0 USD exceeds limit 1000.0 USD")
         assertContains(result.reason ?: "", "(current=800.0 USD active=150.0 USD order=100.0 USD)")
+    }
+
+    @Test
+    fun `account exposure includes current market when configured markets omit it`() = runBlocking {
+        val properties = OrderRiskProperties().apply {
+            maxAccountExposureNotional = 1_000.0
+            accountExposure.markets = listOf(StockOrderMarket.DOMESTIC)
+            currencyConversion.ratesToBase["KRW"] = 0.001
+        }
+        val marketService = FakeMarketServicePort(
+            snapshotsByMarket = mapOf(
+                StockOrderMarket.DOMESTIC to AccountSnapshotDto(
+                    market = StockOrderMarket.DOMESTIC,
+                    exchange = "KRX",
+                    currency = "KRW",
+                    positions = emptyList(),
+                    totalEvaluationAmount = 0.0,
+                ),
+                StockOrderMarket.OVERSEAS_US to AccountSnapshotDto(
+                    market = StockOrderMarket.OVERSEAS_US,
+                    exchange = "NASD",
+                    currency = "USD",
+                    positions = emptyList(),
+                    totalEvaluationAmount = 950.0,
+                ),
+            ),
+        )
+
+        val result = adapter(properties, marketService = marketService).assess(
+            command(quantity = 1, limitPrice = 100.0),
+        )
+
+        assertFalse(result.accepted)
+        assertContains(result.reason ?: "", "account exposure notional 1050.0 USD exceeds limit 1000.0 USD")
+        assertEquals(listOf(StockOrderMarket.DOMESTIC, StockOrderMarket.OVERSEAS_US), marketService.queries.map { it.market })
     }
 
     @Test

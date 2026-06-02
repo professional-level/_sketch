@@ -412,7 +412,7 @@ akra.order.risk.trading-hours.overseas-us.moc-cutoff=15:50
 ```
 
 `symbol-max-order-notional` keys are matched after trimming and uppercasing, so operator configuration remains stable across ticker casing differences.
-Daily order count and duplicate active-order checks are scoped by market. Legacy submission rows without a stored market are still included in both market scopes until they age out of the risk window.
+Daily order count and duplicate active-order checks are scoped by market. Account exposure and daily order count assessment always include the current order's market, even when the configured market list omits it. Legacy submission rows without a stored market are still included in both market scopes until they age out of the risk window.
 
 ## Observability Checks
 

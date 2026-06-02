@@ -393,17 +393,21 @@ internal class OrderRiskControlAdapter(
     private fun OrderRiskProperties.AccountExposureProperties.marketsForAssessment(
         currentMarket: StockOrderMarket,
     ): List<StockOrderMarket> {
-        return markets
-            .distinct()
-            .ifEmpty { listOf(currentMarket) }
+        return markets.distinct().includeCurrentMarket(currentMarket)
     }
 
     private fun OrderRiskProperties.DailyOrderCountProperties.marketsForAssessment(
         currentMarket: StockOrderMarket,
     ): List<StockOrderMarket> {
-        return markets
-            .distinct()
-            .ifEmpty { listOf(currentMarket) }
+        return markets.distinct().includeCurrentMarket(currentMarket)
+    }
+
+    private fun List<StockOrderMarket>.includeCurrentMarket(currentMarket: StockOrderMarket): List<StockOrderMarket> {
+        return if (currentMarket in this) {
+            this
+        } else {
+            this + currentMarket
+        }
     }
 
     private fun String.normalizedCurrency(): String {
