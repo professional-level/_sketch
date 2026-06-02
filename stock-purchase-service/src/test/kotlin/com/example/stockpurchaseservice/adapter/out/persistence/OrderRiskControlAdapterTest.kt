@@ -249,6 +249,21 @@ class OrderRiskControlAdapterTest {
     }
 
     @Test
+    fun `rejects order when symbol order notional limit is non positive`() = runBlocking {
+        val properties = OrderRiskProperties().apply {
+            maxOrderNotional = 1_000.0
+            symbolMaxOrderNotional["TQQQ"] = 0.0
+        }
+
+        val result = adapter(properties).assess(
+            command(symbol = "TQQQ", quantity = 1, limitPrice = 100.0),
+        )
+
+        assertFalse(result.accepted)
+        assertContains(result.reason ?: "", "invalid symbol max order notional for TQQQ: 0.0")
+    }
+
+    @Test
     fun `accepts buy when projected pending buy notional equals account limit`() = runBlocking {
         val properties = OrderRiskProperties().apply {
             maxAccountPendingBuyNotional = 1_000.0

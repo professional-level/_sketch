@@ -108,7 +108,11 @@ internal class OrderRiskControlAdapter(
     }
 
     private fun orderNotionalReason(command: OrderRiskAssessmentCommand): String? {
-        val limit = command.symbolMaxOrderNotional() ?: properties.maxOrderNotional
+        val symbolLimit = command.symbolMaxOrderNotional()
+        if (symbolLimit != null && symbolLimit <= 0.0) {
+            return "invalid symbol max order notional for ${command.symbol}: $symbolLimit"
+        }
+        val limit = symbolLimit ?: properties.maxOrderNotional
         if (limit == null || limit <= 0.0) return null
         val rawNotional = command.estimatedNotional ?: return null
         val notional = rawNotional
