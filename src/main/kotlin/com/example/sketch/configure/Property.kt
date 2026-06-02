@@ -111,7 +111,7 @@ object KisSecretPropertyResolver {
         require(!configured.isNullOrBlank()) {
             "Missing required KIS secret property. Provide one of: ${keys.joinToString()}"
         }
-        require(!configured.startsWith("REPLACE_WITH_")) {
+        require(!configured.isPlaceholderSecret()) {
             "KIS secret property is still a placeholder. Provide a real value for one of: ${keys.joinToString()}"
         }
         return configured
@@ -134,7 +134,7 @@ object KisSecretPropertyResolver {
         require(!account.isPlaceholderAccount()) {
             "KIS real account property is still a placeholder. Omit account/account_tail or provide a real account value."
         }
-        require(!accountTail.startsWith("REPLACE_WITH_", ignoreCase = true)) {
+        require(!accountTail.isPlaceholderSecret()) {
             "KIS real account tail property is still a placeholder. Omit account/account_tail or provide a real account tail."
         }
     }
@@ -144,6 +144,14 @@ object KisSecretPropertyResolver {
         return normalized.startsWith("REPLACE_WITH_") ||
             normalized == "REDACTED" ||
             normalized.all { it == '0' }
+    }
+
+    private fun String.isPlaceholderSecret(): Boolean {
+        val normalized = trim().uppercase()
+        return normalized.startsWith("REPLACE_WITH_") ||
+            normalized == "REDACTED" ||
+            normalized == "CHANGE_ME" ||
+            normalized == "TODO"
     }
 
     private fun String?.configuredOrNull(): String? {

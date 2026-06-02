@@ -99,7 +99,24 @@ class KisSecretPropertyResolverTest {
     fun `fails when a required secret still has a template placeholder`() {
         val properties = mapOf(
             "base_url" to "https://openapi.koreainvestment.com:9443",
-            "app_key" to "REPLACE_WITH_REAL_APP_KEY",
+            "app_key" to "replace_with_real_app_key",
+        )
+
+        val exception = assertFailsWith<IllegalArgumentException> {
+            KisSecretPropertyResolver.resolve(properties::get)
+        }
+
+        assertEquals(
+            "KIS secret property is still a placeholder. Provide a real value for one of: app_key, kis.app-key, kis.app.key, KIS_APP_KEY",
+            exception.message,
+        )
+    }
+
+    @Test
+    fun `fails when a required secret is redacted placeholder text`() {
+        val properties = mapOf(
+            "base_url" to "https://openapi.koreainvestment.com:9443",
+            "app_key" to "REDACTED",
         )
 
         val exception = assertFailsWith<IllegalArgumentException> {
