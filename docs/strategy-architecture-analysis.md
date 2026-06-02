@@ -550,7 +550,7 @@ broker API 자체가 idempotency key를 지원하지 않는다면, purchase-serv
 - Kafka와 Temporal activity 경계의 MDC trace propagation은 적용됐다. Temporal SDK interceptor, OpenTelemetry exporter wiring, 운영 대시보드 UI는 아직 남아 있다.
 - 단발성 전략의 entry buy는 execution-service로 들어왔지만, sell policy와 completion lifecycle은 추가 정리가 필요하다.
 - daily execution schedule은 설정 기반 US trading calendar를 거쳐 실행된다. 주말과 설정된 휴장일은 active strategy 실행을 skip하며, 휴장일 데이터 자동 동기화와 조기폐장/LOC/MOC 마감 시간 정책은 남아 있다.
-- outbox 저장과 Kafka 발행은 분리되었고, publisher 실패 시 `nextAttemptAt` 기반 exponential backoff로 재시도한다. 운영 수준의 transaction boundary와 multi-instance publisher lease/claim 정책은 추가 hardening이 필요하다.
+- outbox 저장과 Kafka 발행은 분리되었고, publisher 실패 시 `nextAttemptAt` 기반 exponential backoff로 재시도한다. 여러 publisher 인스턴스가 동시에 실행될 때는 `PROCESSING` claim lease로 row 중복 발행을 줄인다. 운영 수준의 DB transaction boundary와 Kafka exactly-once 수준의 보장은 추가 hardening이 필요하다.
 
 ## Migration From Legacy Flow
 
@@ -595,7 +595,7 @@ stock-search-service
 11. 완료: Temporal schedule로 daily execution trigger를 붙인다.
 12. 완료: stock-purchase reconciliation에 durable cursor, unmatched execution 저장, KIS wrapper 기반 주문/체결 조회 매핑, cursor 기준 날짜 범위 backfill, KIS 조회 cursor pagination, 조회성 호출 retry/backoff, wrapper 호출 rate-limit/circuit breaker를 추가한다.
 13. 완료: 주문 lifecycle을 `SUBMISSION_UNKNOWN` 복구, `CANCEL_PENDING` 취소 요청 확정 대기, `OrderCancelled` 발행까지 확장하고, direct sell event 경로를 order intent lifecycle로 통일한다.
-14. 완료: 발행 측 outbox 적용 범위를 strategy-execution과 stock-purchase의 publisher까지 확장하고, publisher 실패 재시도에 `nextAttemptAt` 기반 exponential backoff를 적용한다.
+14. 완료: 발행 측 outbox 적용 범위를 strategy-execution과 stock-purchase의 publisher까지 확장하고, publisher 실패 재시도에 `nextAttemptAt` 기반 exponential backoff와 `PROCESSING` claim lease를 적용한다.
 15. 부분 완료: stock-purchase-service 내부 주문/조회 KIS 계약을 broker gateway anti-corruption layer로 분리한다. 주문 제출 transient 실패와 broker order id 누락은 `SUBMISSION_UNKNOWN` 복구 흐름으로 보내고, wrapper 호출 rate-limit/circuit breaker를 둔다. root wrapper의 국내 주문체결조회 응답 정규화, stock-purchase의 해외 주문체결/잔고 top-level alias 매핑, token은 fixture test, real/mock scope별 만료 기반 cache, optional local-file persistence, optional JDBC shared token store, JDBC refresh TTL lock으로 보강했다. 모의투자 query/submit/query/cancel smoke test 경계와 runbook은 추가했지만, 별도 broker wrapper service 배포, secret manager 연동, 실제 KIS 모의/실계좌 실행 증적은 남아 있다.
 16. 부분 완료: stock-purchase-service의 broker 제출 전 risk guard를 추가한다. 주문 단위/종목별 금액 한도, 활성 매수 주문 기준 계좌 pending exposure 한도, KIS 해외 계좌 스냅샷 기반 계좌 exposure 한도, KIS 해외 available cash 기반 현금 사용 한도, 하루 broker 제출 건수 한도, 중복 주문 kill switch, 전략 prefix disable, 전략 prefix별 mock/live broker route 검증은 적용됐다. 국내 잔고, 엄밀한 settled cash 구분, 다통화/환율 반영, order intent 계약 수준의 trading environment 명시는 남아 있다.
 17. 부분 완료: 운영 관측성을 추가한다. 주문 제출 실패, `SUBMISSION_UNKNOWN` 지속, reconciliation 실패, 미매칭 broker execution은 log 기반 alert port, Micrometer counter, optional generic webhook, Slack incoming webhook, PagerDuty Events API v2로 노출하고, 알림 payload에 현재 trace context를 포함하며, 라오어 전략별 T/현금/보유/평단 조회 API를 추가했다. Kafka와 Temporal activity 경계의 MDC trace propagation은 적용됐고, Temporal SDK interceptor, OpenTelemetry exporter wiring, 대시보드 UI는 남아 있다.

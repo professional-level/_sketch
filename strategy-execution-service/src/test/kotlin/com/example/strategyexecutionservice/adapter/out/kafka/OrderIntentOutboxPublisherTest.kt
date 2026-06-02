@@ -26,9 +26,11 @@ class OrderIntentOutboxPublisherTest {
 
         publisher.publishPendingEvents()
 
+        val claimRequest = outboxPort.claimRequests.single()
         assertEquals(listOf(event), sender.published)
-        assertEquals(listOf(event.id), outboxPort.publishedIds)
+        assertEquals(listOf(PublishedOutboxEvent(event.id, claimRequest.claimOwner)), outboxPort.published)
         assertEquals(emptyList(), outboxPort.failed)
+        assertEquals(ClaimRequest(limit = 50, claimExpiresAt = null), claimRequest.withoutOwner())
     }
 
     @Test
@@ -41,11 +43,13 @@ class OrderIntentOutboxPublisherTest {
 
         publisher.publishPendingEvents()
 
-        assertEquals(emptyList(), outboxPort.publishedIds)
+        val claimRequest = outboxPort.claimRequests.single()
+        assertEquals(emptyList(), outboxPort.published)
         assertEquals(
-            listOf(FailedOutboxEvent(event.id, "kafka down", FIXED_NOW.plusSeconds(5))),
+            listOf(FailedOutboxEvent(event.id, claimRequest.claimOwner, "kafka down", FIXED_NOW.plusSeconds(5))),
             outboxPort.failed,
         )
+        assertEquals(FIXED_NOW.plusSeconds(60), claimRequest.claimExpiresAt)
     }
 
     @Test
@@ -63,8 +67,9 @@ class OrderIntentOutboxPublisherTest {
 
         publisher.publishPendingEvents()
 
+        val claimRequest = outboxPort.claimRequests.single()
         assertEquals(
-            listOf(FailedOutboxEvent(event.id, "kafka down", FIXED_NOW.plusSeconds(60))),
+            listOf(FailedOutboxEvent(event.id, claimRequest.claimOwner, "kafka down", FIXED_NOW.plusSeconds(60))),
             outboxPort.failed,
         )
     }
@@ -110,27 +115,49 @@ class OrderIntentOutboxPublisherTest {
     private class FakeOrderIntentOutboxPort(
         private val events: List<OrderIntentOutboxMessage>,
     ) : OrderIntentOutboxPort {
-        val publishedIds: MutableList<UUID> = mutableListOf()
+        val published: MutableList<PublishedOutboxEvent> = mutableListOf()
         val failed: MutableList<FailedOutboxEvent> = mutableListOf()
+        val claimRequests: MutableList<ClaimRequest> = mutableListOf()
 
-        override suspend fun findUnpublished(limit: Int): List<OrderIntentOutboxMessage> {
+        override suspend fun claimPublishable(
+            limit: Int,
+            claimOwner: String,
+            claimExpiresAt: ZonedDateTime,
+        ): List<OrderIntentOutboxMessage> {
+            claimRequests += ClaimRequest(limit, claimOwner, claimExpiresAt)
             return events.take(limit)
         }
 
-        override suspend fun markPublished(id: UUID) {
-            publishedIds += id
+        override suspend fun markPublished(id: UUID, claimOwner: String) {
+            published += PublishedOutboxEvent(id, claimOwner)
         }
 
-        override suspend fun markFailed(id: UUID, reason: String?, nextAttemptAt: ZonedDateTime) {
-            failed += FailedOutboxEvent(id, reason, nextAttemptAt)
+        override suspend fun markFailed(id: UUID, claimOwner: String, reason: String?, nextAttemptAt: ZonedDateTime) {
+            failed += FailedOutboxEvent(id, claimOwner, reason, nextAttemptAt)
         }
     }
 
+    private data class PublishedOutboxEvent(
+        val id: UUID,
+        val claimOwner: String?,
+    )
+
     private data class FailedOutboxEvent(
         val id: UUID,
+        val claimOwner: String?,
         val reason: String?,
         val nextAttemptAt: ZonedDateTime,
     )
+
+    private data class ClaimRequest(
+        val limit: Int,
+        val claimOwner: String? = null,
+        val claimExpiresAt: ZonedDateTime? = null,
+    ) {
+        fun withoutOwner(): ClaimRequest {
+            return copy(claimOwner = null, claimExpiresAt = null)
+        }
+    }
 
     private class FakeOrderIntentOutboxMessageSender(
         private val failure: RuntimeException? = null,

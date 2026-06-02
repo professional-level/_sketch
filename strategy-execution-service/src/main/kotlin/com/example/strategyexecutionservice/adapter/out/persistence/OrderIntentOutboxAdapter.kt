@@ -38,8 +38,12 @@ internal class OrderIntentOutboxAdapter(
         }
     }
 
-    override suspend fun findUnpublished(limit: Int): List<OrderIntentOutboxMessage> {
-        return outboxEventRepository.findUnpublished(limit).map { event ->
+    override suspend fun claimPublishable(
+        limit: Int,
+        claimOwner: String,
+        claimExpiresAt: ZonedDateTime,
+    ): List<OrderIntentOutboxMessage> {
+        return outboxEventRepository.claimPublishable(limit, claimOwner, claimExpiresAt).map { event ->
             OrderIntentOutboxMessage(
                 id = event.id,
                 topic = MessageTopic.fromOrThrow(event.topic.topicName),
@@ -53,15 +57,16 @@ internal class OrderIntentOutboxAdapter(
         }
     }
 
-    override suspend fun markPublished(id: UUID) {
-        val event = outboxEventRepository.findById(id).awaitSuspending() ?: return
-        event.published()
-        outboxEventRepository.update(event)
+    override suspend fun markPublished(id: UUID, claimOwner: String) {
+        outboxEventRepository.markPublishedIfClaimed(id, claimOwner)
     }
 
-    override suspend fun markFailed(id: UUID, reason: String?, nextAttemptAt: ZonedDateTime) {
-        val event = outboxEventRepository.findById(id).awaitSuspending() ?: return
-        event.failed(reason, nextAttemptAt)
-        outboxEventRepository.update(event)
+    override suspend fun markFailed(
+        id: UUID,
+        claimOwner: String,
+        reason: String?,
+        nextAttemptAt: ZonedDateTime,
+    ) {
+        outboxEventRepository.markFailedIfClaimed(id, claimOwner, reason, nextAttemptAt)
     }
 }

@@ -237,9 +237,10 @@ Local sketch profiles currently use Hibernate `ddl-auto=update`, but production-
 ```text
 docs/operations/sql/20260602_add_outbox_trace_columns.mysql.sql
 docs/operations/sql/20260602_add_outbox_next_attempt_at.mysql.sql
+docs/operations/sql/20260602_add_outbox_claim_lease.mysql.sql
 ```
 
-These migrations add nullable `traceId`, `spanId`, `traceParent`, and `nextAttemptAt` columns to both outbox tables:
+These migrations add nullable `traceId`, `spanId`, `traceParent`, `nextAttemptAt`, `claimOwner`, and `claimExpiresAt` columns to both outbox tables:
 
 - `strategy-execution-service`: `order_intent_outbox_event`
 - `stock-purchase-service`: `order_execution_outbox_event`
@@ -248,11 +249,11 @@ Operational sequence:
 
 1. Stop outbox publishers or drain traffic so new outbox rows are not being written during the schema change.
 2. Run the preflight query in the SQL file and confirm the target columns do not already exist.
-3. Apply the `ALTER TABLE` statements in both migration files.
-4. Run the post-apply verification queries and confirm six nullable `VARCHAR(255)` trace columns plus two nullable `DATETIME(6)` retry-scheduling columns.
+3. Apply the `ALTER TABLE` statements in the migration files.
+4. Run the post-apply verification queries and confirm six nullable `VARCHAR(255)` trace columns, two nullable `DATETIME(6)` retry-scheduling columns, two nullable `VARCHAR(255)` claim owner columns, and two nullable `DATETIME(6)` claim expiry columns.
 5. Start `strategy-execution-service` and `stock-purchase-service`.
 
-Outbox publishers use `akra.outbox.publish-retry-initial-delay-ms` and `akra.outbox.publish-retry-max-delay-ms` to calculate exponential backoff after Kafka publish failures. Failed rows are republished only after `nextAttemptAt`, so repeated Kafka outages should not produce tight retry loops.
+Outbox publishers use `akra.outbox.publish-retry-initial-delay-ms` and `akra.outbox.publish-retry-max-delay-ms` to calculate exponential backoff after Kafka publish failures. Failed rows are republished only after `nextAttemptAt`, so repeated Kafka outages should not produce tight retry loops. Before publishing, each instance claims rows with `PROCESSING`, `claimOwner`, and `claimExpiresAt`; expired claims are eligible for another instance to reclaim.
 
 `stock-purchase-service` also exposes an operator status endpoint for dashboard polling or manual checks:
 

@@ -46,12 +46,24 @@ internal class OrderExecutionOutboxEventEntity private constructor(
     var failureReason: String?,
     @Column(name = "nextAttemptAt")
     var nextAttemptAt: ZonedDateTime?,
+    @Column(name = "claimOwner")
+    var claimOwner: String?,
+    @Column(name = "claimExpiresAt")
+    var claimExpiresAt: ZonedDateTime?,
 ) {
+    fun claimed(owner: String, expiresAt: ZonedDateTime) {
+        status = OrderExecutionOutboxEventStatus.PROCESSING
+        claimOwner = owner
+        claimExpiresAt = expiresAt
+    }
+
     fun published() {
         status = OrderExecutionOutboxEventStatus.PUBLISHED
         publishedAt = ZonedDateTime.now()
         failureReason = null
         nextAttemptAt = null
+        claimOwner = null
+        claimExpiresAt = null
     }
 
     fun failed(reason: String?, nextAttemptAt: ZonedDateTime) {
@@ -59,6 +71,8 @@ internal class OrderExecutionOutboxEventEntity private constructor(
         retryCount += 1
         failureReason = reason
         this.nextAttemptAt = nextAttemptAt
+        claimOwner = null
+        claimExpiresAt = null
     }
 
     companion object {
@@ -87,6 +101,8 @@ internal class OrderExecutionOutboxEventEntity private constructor(
                 publishedAt = null,
                 failureReason = null,
                 nextAttemptAt = null,
+                claimOwner = null,
+                claimExpiresAt = null,
             )
         }
     }
@@ -94,6 +110,7 @@ internal class OrderExecutionOutboxEventEntity private constructor(
 
 internal enum class OrderExecutionOutboxEventStatus {
     PENDING,
+    PROCESSING,
     PUBLISHED,
     FAILED,
 }

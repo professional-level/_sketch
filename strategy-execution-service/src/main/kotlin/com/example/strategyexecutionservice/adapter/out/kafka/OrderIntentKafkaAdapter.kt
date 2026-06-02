@@ -13,6 +13,7 @@ import java.nio.charset.StandardCharsets
 import java.time.Clock
 import java.time.Duration
 import java.time.ZonedDateTime
+import java.util.UUID
 
 @ExternalApiAdapter
 internal class OrderIntentKafkaAdapter(
@@ -60,18 +61,25 @@ internal class OrderIntentOutboxPublisher(
     private val retryInitialDelayMs: Long = DEFAULT_RETRY_INITIAL_DELAY_MS,
     @Value("\${akra.outbox.publish-retry-max-delay-ms:300000}")
     private val retryMaxDelayMs: Long = DEFAULT_RETRY_MAX_DELAY_MS,
+    @Value("\${akra.outbox.publish-claim-lease-ms:60000}")
+    private val claimLeaseMs: Long = DEFAULT_CLAIM_LEASE_MS,
 ) {
     internal var clock: Clock = Clock.systemDefaultZone()
+    private val claimOwner: String = "strategy-execution-service-${UUID.randomUUID()}"
 
     @Scheduled(fixedDelayString = "\${akra.outbox.publish-fixed-delay-ms:5000}")
     suspend fun publishPendingEvents() {
-        outboxEventPort.findUnpublished(limit = 50).forEach { event ->
+        outboxEventPort.claimPublishable(
+            limit = 50,
+            claimOwner = claimOwner,
+            claimExpiresAt = claimExpiresAt(),
+        ).forEach { event ->
             runCatching {
                 messageSender.publish(event)
             }.onSuccess {
-                outboxEventPort.markPublished(event.id)
+                outboxEventPort.markPublished(event.id, claimOwner)
             }.onFailure { exception ->
-                outboxEventPort.markFailed(event.id, exception.message, nextAttemptAt(event))
+                outboxEventPort.markFailed(event.id, claimOwner, exception.message, nextAttemptAt(event))
             }
         }
     }
@@ -87,9 +95,14 @@ internal class OrderIntentOutboxPublisher(
         return Duration.ofMillis((initialDelay * multiplier).coerceAtMost(maxDelay))
     }
 
+    private fun claimExpiresAt(): ZonedDateTime {
+        return ZonedDateTime.now(clock).plus(Duration.ofMillis(claimLeaseMs.coerceAtLeast(1)))
+    }
+
     companion object {
         private const val DEFAULT_RETRY_INITIAL_DELAY_MS = 5_000L
         private const val DEFAULT_RETRY_MAX_DELAY_MS = 300_000L
+        private const val DEFAULT_CLAIM_LEASE_MS = 60_000L
         private const val MAX_RETRY_SHIFT = 30
     }
 }

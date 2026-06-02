@@ -5,9 +5,9 @@ import java.time.ZonedDateTime
 import java.util.UUID
 
 interface OrderExecutionOutboxPort {
-    suspend fun findUnpublished(limit: Int): List<OrderExecutionOutboxMessage>
-    suspend fun markPublished(id: UUID)
-    suspend fun markFailed(id: UUID, reason: String?, nextAttemptAt: ZonedDateTime)
+    suspend fun claimPublishable(limit: Int, claimOwner: String, claimExpiresAt: ZonedDateTime): List<OrderExecutionOutboxMessage>
+    suspend fun markPublished(id: UUID, claimOwner: String)
+    suspend fun markFailed(id: UUID, claimOwner: String, reason: String?, nextAttemptAt: ZonedDateTime)
 }
 
 data class OrderExecutionOutboxMessage(
