@@ -119,6 +119,8 @@ When the submit/cancel smoke is rejected by KIS, the failure message includes th
 
 For KIS query endpoints, the wrapper also preserves non-2xx JSON business responses when the body contains `rt_cd`. Non-KIS transport failures still remain HTTP failures. This distinction is important during smoke tests because it lets the downstream adapter report a broker return code instead of losing the diagnostic body behind a generic wrapper 500.
 
+`stock-purchase-service` preserves KIS query business failures with broker return code, message code, and `msg1`. KIS per-second transaction limit `EGW00201` is classified as `BrokerOrderTemporaryUnavailableException`, not as an order rejection. Other non-zero query responses are classified as `BrokerOrderQueryFailedException`. Treat `EGW00201` as a retry/backoff or rate-limit tuning signal before diagnosing account permission or order lifecycle state.
+
 Use `--no-daemon` so the test JVM sees the current smoke-test environment variables, and use `--rerun-tasks` so Gradle does not report a stale up-to-date result.
 
 ## Startup Safety Checks

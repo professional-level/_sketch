@@ -4,8 +4,10 @@ import ApiResponse
 import DailyExecutionOrdersResponseOuterClass
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatus
+import com.example.stockpurchaseservice.application.port.out.BrokerOrderQueryFailedException
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderRejectedException
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderSubmissionUnknownException
+import com.example.stockpurchaseservice.application.port.out.BrokerOrderTemporaryUnavailableException
 import com.example.stockpurchaseservice.application.port.out.ExecutionQuantityModeDto
 import com.example.stockpurchaseservice.application.port.out.ExecutionTypeDto
 import com.example.stockpurchaseservice.application.port.out.StockOrderMarket
@@ -645,6 +647,94 @@ class KisBrokerGatewayAdapterTest {
         assertEquals(2, exchangeFunction.requests.size)
         assertEquals("FK1", exchangeFunction.requests[1].queryValue("ctxAreaFk200"))
         assertEquals("NK1", exchangeFunction.requests[1].queryValue("ctxAreaNk200"))
+    }
+
+    @Test
+    fun `overseas account snapshot maps kis rate limit to temporary unavailable`() {
+        val exchangeFunction = StubExchangeFunction(
+            responses = listOf(
+                """
+                {
+                  "rt_cd": "1",
+                  "msg_cd": "EGW00201",
+                  "msg1": "per-second transaction limit exceeded"
+                }
+                """.trimIndent(),
+            ),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        val exception = assertFailsWith<BrokerOrderTemporaryUnavailableException> {
+            adapter.findAccountSnapshot(
+                BrokerAccountSnapshotQuery(
+                    market = StockOrderMarket.OVERSEAS_US,
+                    exchange = "NASD",
+                    currency = "USD",
+                    isMock = false,
+                ),
+            )
+        }
+
+        assertEquals("1", exception.brokerReturnCode)
+        assertEquals("EGW00201", exception.brokerMessageCode)
+        assertEquals("per-second transaction limit exceeded", exception.brokerMessage)
+        assertEquals(
+            "overseas balance lookup failed: EGW00201 per-second transaction limit exceeded",
+            exception.message,
+        )
+    }
+
+    @Test
+    fun `overseas order history maps kis business error to query failed`() {
+        val exchangeFunction = StubExchangeFunction(
+            responses = listOf(
+                """
+                {
+                  "RT_CD": "1",
+                  "MSG_CD": "APBK9999",
+                  "MSG1": "invalid account scope"
+                }
+                """.trimIndent(),
+            ),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        val exception = assertFailsWith<BrokerOrderQueryFailedException> {
+            adapter.findOrderHistory(historyQuery())
+        }
+
+        assertEquals("1", exception.brokerReturnCode)
+        assertEquals("APBK9999", exception.brokerMessageCode)
+        assertEquals("invalid account scope", exception.brokerMessage)
+        assertEquals("overseas execution lookup failed: APBK9999 invalid account scope", exception.message)
+    }
+
+    @Test
+    fun `domestic order history maps kis business error to query failed`() {
+        val adapter = domesticHistoryAdapter(
+            DailyExecutionOrdersResponseOuterClass.DailyExecutionOrdersResponse.newBuilder()
+                .setRtCd("1")
+                .setMsgCd("APBK0001")
+                .setMsg1("domestic query rejected")
+                .build(),
+        )
+
+        val exception = assertFailsWith<BrokerOrderQueryFailedException> {
+            adapter.findOrderHistory(domesticHistoryQuery())
+        }
+
+        assertEquals("1", exception.brokerReturnCode)
+        assertEquals("APBK0001", exception.brokerMessageCode)
+        assertEquals("domestic query rejected", exception.brokerMessage)
+        assertEquals("domestic execution lookup failed: APBK0001 domestic query rejected", exception.message)
     }
 
     @Test

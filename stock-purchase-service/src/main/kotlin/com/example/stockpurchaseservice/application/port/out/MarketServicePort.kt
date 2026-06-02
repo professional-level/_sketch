@@ -62,6 +62,17 @@ class BrokerOrderRejectedException(
 
 class BrokerOrderTemporaryUnavailableException(
     message: String,
+    val brokerReturnCode: String? = null,
+    val brokerMessageCode: String? = null,
+    val brokerMessage: String? = null,
+    cause: Throwable? = null,
+) : RuntimeException(message, cause)
+
+class BrokerOrderQueryFailedException(
+    message: String,
+    val brokerReturnCode: String? = null,
+    val brokerMessageCode: String? = null,
+    val brokerMessage: String? = null,
     cause: Throwable? = null,
 ) : RuntimeException(message, cause)
 

@@ -16,10 +16,12 @@ import com.example.stockpurchaseservice.adapter.out.api.awaitExternalApi
 import com.example.stockpurchaseservice.adapter.out.api.getExternalApi
 import com.example.stockpurchaseservice.adapter.out.api.isTransientExternalApiFailure
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
+import com.example.stockpurchaseservice.application.port.out.BrokerOrderQueryFailedException
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderRejectedException
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatus
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderSubmissionDto
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderSubmissionUnknownException
+import com.example.stockpurchaseservice.application.port.out.BrokerOrderTemporaryUnavailableException
 import com.example.stockpurchaseservice.application.port.out.StockOrderMarket
 import com.example.stockpurchaseservice.application.port.out.StockOrderType
 import com.example.stockpurchaseservice.config.broker.KisBrokerGatewayProperties
@@ -215,7 +217,12 @@ internal class KisBrokerGatewayAdapter(
                 callOptions = properties.toQueryCallOptions(),
             )
             if (response.rtCd.isNotBlank() && response.rtCd != "0") {
-                throw RuntimeException("domestic execution lookup failed: ${response.msgCd} ${response.msg1}".trim())
+                throwKisBrokerBusinessFailure(
+                    operation = "domestic execution lookup",
+                    returnCode = response.rtCd,
+                    messageCode = response.msgCd,
+                    brokerMessage = response.msg1,
+                )
             }
             BrokerOrderHistoryPage(
                 items = response.output1List.mapNotNull { it.toBrokerHistoryItem() },
@@ -237,10 +244,11 @@ internal class KisBrokerGatewayAdapter(
             )
             val returnCode = response.textOrNull("rt_cd", "rtCd", "RT_CD").orEmpty()
             if (returnCode.isNotBlank() && returnCode != "0") {
-                throw RuntimeException(
-                    "overseas execution lookup failed: ${
-                        response.textOrNull("msg_cd", "msgCd", "MSG_CD").orEmpty()
-                    } ${response.textOrNull("msg1", "msg_1", "MSG1").orEmpty()}".trim(),
+                throwKisBrokerBusinessFailure(
+                    operation = "overseas execution lookup",
+                    returnCode = returnCode,
+                    messageCode = response.textOrNull("msg_cd", "msgCd", "MSG_CD"),
+                    brokerMessage = response.textOrNull("msg1", "msg_1", "MSG1"),
                 )
             }
             BrokerOrderHistoryPage(
@@ -263,10 +271,11 @@ internal class KisBrokerGatewayAdapter(
             )
             val returnCode = response.textOrNull("rt_cd", "rtCd", "RT_CD").orEmpty()
             if (returnCode.isNotBlank() && returnCode != "0") {
-                throw RuntimeException(
-                    "overseas balance lookup failed: ${
-                        response.textOrNull("msg_cd", "msgCd", "MSG_CD").orEmpty()
-                    } ${response.textOrNull("msg1", "msg_1", "MSG1").orEmpty()}".trim(),
+                throwKisBrokerBusinessFailure(
+                    operation = "overseas balance lookup",
+                    returnCode = returnCode,
+                    messageCode = response.textOrNull("msg_cd", "msgCd", "MSG_CD"),
+                    brokerMessage = response.textOrNull("msg1", "msg_1", "MSG1"),
                 )
             }
             BrokerAccountSnapshotPage(
@@ -287,6 +296,10 @@ internal class KisBrokerGatewayAdapter(
 }
 
 internal const val OPEN_API_PREFIX = "/open-api"
+
+private val TEMPORARY_KIS_MESSAGE_CODES = setOf(
+    "EGW00201",
+)
 
 internal fun BrokerOrderCommand.toKisDomesticOrderRequest(): Map<String, Any> {
     return mapOf(
@@ -376,10 +389,11 @@ private fun WebClient.fetchDomesticCancelableOrderPage(
     )
     val returnCode = response.path("rt_cd").asText("")
     if (returnCode.isNotBlank() && returnCode != "0") {
-        throw RuntimeException(
-            "domestic cancelable order lookup failed: ${
-                response.path("msg_cd").asText()
-            } ${response.path("msg1").asText()}".trim(),
+        throwKisBrokerBusinessFailure(
+            operation = "domestic cancelable order lookup",
+            returnCode = returnCode,
+            messageCode = response.textOrNull("msg_cd", "msgCd", "MSG_CD"),
+            brokerMessage = response.textOrNull("msg1", "msg_1", "MSG1"),
         )
     }
     val output = response.path("output")
@@ -401,6 +415,48 @@ private data class KisCancelableOrderPage(
     val items: List<KisCancelableOrderItem>,
     val nextCursor: BrokerOrderHistoryPageCursor,
 )
+
+private data class KisBrokerBusinessFailure(
+    val operation: String,
+    val returnCode: String,
+    val messageCode: String?,
+    val brokerMessage: String?,
+) {
+    val message: String =
+        "$operation failed: ${listOfNotNull(messageCode, brokerMessage).joinToString(" ")}"
+            .trim()
+
+    fun toException(): RuntimeException {
+        if (messageCode in TEMPORARY_KIS_MESSAGE_CODES) {
+            return BrokerOrderTemporaryUnavailableException(
+                message = message,
+                brokerReturnCode = returnCode,
+                brokerMessageCode = messageCode,
+                brokerMessage = brokerMessage,
+            )
+        }
+        return BrokerOrderQueryFailedException(
+            message = message,
+            brokerReturnCode = returnCode,
+            brokerMessageCode = messageCode,
+            brokerMessage = brokerMessage,
+        )
+    }
+}
+
+private fun throwKisBrokerBusinessFailure(
+    operation: String,
+    returnCode: String,
+    messageCode: String?,
+    brokerMessage: String?,
+): Nothing {
+    throw KisBrokerBusinessFailure(
+        operation = operation,
+        returnCode = returnCode,
+        messageCode = messageCode?.takeIf { it.isNotBlank() },
+        brokerMessage = brokerMessage?.takeIf { it.isNotBlank() },
+    ).toException()
+}
 
 private data class BrokerAccountSnapshotPage(
     val snapshot: BrokerAccountSnapshot,

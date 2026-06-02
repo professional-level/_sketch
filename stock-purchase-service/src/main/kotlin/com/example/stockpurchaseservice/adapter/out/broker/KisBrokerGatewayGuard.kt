@@ -108,6 +108,7 @@ internal class KisBrokerGatewayGuard(
     private fun Throwable.isCircuitBreakerFailure(): Boolean {
         return when (this) {
             is BrokerOrderSubmissionUnknownException -> cause?.isTransientExternalApiFailure(properties.transientHttpStatuses) == true
+            is BrokerOrderTemporaryUnavailableException -> true
             else -> isTransientExternalApiFailure(properties.transientHttpStatuses)
         }
     }
