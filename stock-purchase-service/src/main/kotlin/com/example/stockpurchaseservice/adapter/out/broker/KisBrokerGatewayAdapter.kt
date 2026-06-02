@@ -549,7 +549,16 @@ private fun JsonNode.toKisCancelableOrderItem(): KisCancelableOrderItem? {
         orderId = orderId,
         originalOrderId = originalOrderId,
         symbol = textOrNull("pdno", "PDNO").orEmpty(),
-        possibleQuantity = longValue("psbl_qty", "PSBL_QTY", "ord_psbl_qty", "ORD_PSBL_QTY"),
+        possibleQuantity = longValue(
+            "psbl_qty",
+            "PSBL_QTY",
+            "ord_psbl_qty",
+            "ORD_PSBL_QTY",
+            "rvse_cncl_psbl_qty",
+            "RVSE_CNCL_PSBL_QTY",
+            "psbl_rvse_cncl_qty",
+            "PSBL_RVSE_CNCL_QTY",
+        ),
     )
 }
 
