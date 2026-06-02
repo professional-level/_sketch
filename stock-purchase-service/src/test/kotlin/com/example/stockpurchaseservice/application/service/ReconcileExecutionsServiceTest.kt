@@ -179,6 +179,33 @@ class ReconcileExecutionsServiceTest {
     }
 
     @Test
+    fun `marks reconciliation failed when fill save fails after outbox publish`() = runBlocking {
+        val executionFillPort = FakeExecutionFillPort(
+            saveFailure = IllegalStateException("fill store unavailable"),
+        )
+        val eventPort = FakeOrderExecutionEventPort()
+        val reconciliationStatePort = FakeExecutionReconciliationStatePort()
+        val service = service(
+            marketPort = FakeMarketServicePort(
+                executions = listOf(execution(externalExecutionId = "exec-1", quantity = 30)),
+            ),
+            executionFillPort = executionFillPort,
+            submissionPort = FakeOrderIntentSubmissionPort(
+                submissions = listOf(submission(quantity = 100)),
+            ),
+            eventPort = eventPort,
+            reconciliationStatePort = reconciliationStatePort,
+        )
+
+        runCatching { service.execute() }
+
+        assertEquals(30, eventPort.partiallyFilled.single().filledQuantity)
+        assertEquals(emptyList<String>(), executionFillPort.savedExternalExecutionIds)
+        assertEquals(emptyList<ExecutionReconciliationResultDto>(), reconciliationStatePort.completed)
+        assertEquals(listOf<String?>("fill store unavailable"), reconciliationStatePort.failedReasons)
+    }
+
+    @Test
     fun `publishes only new delta when broker execution quantity is cumulative`() = runBlocking {
         val eventPort = FakeOrderExecutionEventPort()
         val service = service(
@@ -761,6 +788,7 @@ class ReconcileExecutionsServiceTest {
         private val duplicateExecutionIds: Set<String> = emptySet(),
         private val initialQuantitiesByExternalOrderId: Map<String, Long> = emptyMap(),
         private val failFirstSave: Boolean = false,
+        private val saveFailure: RuntimeException? = null,
     ) : ExecutionFillPort {
         private val saved: MutableList<ExecutionFillDto> = mutableListOf()
         private var saveAttemptCount: Int = 0
@@ -775,6 +803,7 @@ class ReconcileExecutionsServiceTest {
             if (exists(fill.externalExecutionId)) return false
             saveAttemptCount += 1
             if (failFirstSave && saveAttemptCount == 1) return false
+            saveFailure?.let { throw it }
 
             saved += fill
             return true

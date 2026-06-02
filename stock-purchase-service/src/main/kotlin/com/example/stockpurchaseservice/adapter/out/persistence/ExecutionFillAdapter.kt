@@ -22,7 +22,9 @@ internal class ExecutionFillAdapter(
         return runCatching {
             executionFillRepository.save(ExecutionFillEntity.from(fill)).awaitSuspending()
             true
-        }.getOrDefault(false)
+        }.getOrElse { exception ->
+            if (executionFillRepository.exists(fill.externalExecutionId)) false else throw exception
+        }
     }
 
     override suspend fun sumQuantityByExternalOrderId(externalOrderId: String): Long {
