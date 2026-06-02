@@ -270,13 +270,13 @@ internal class KisBrokerGatewayAdapter(
                 responseType = JsonNode::class.java,
                 callOptions = properties.toQueryCallOptions(),
             )
-            val returnCode = response.textOrNull("rt_cd", "rtCd", "RT_CD").orEmpty()
+            val returnCode = response.kisReturnCode()
             if (returnCode.isNotBlank() && returnCode != "0") {
                 throwKisBrokerBusinessFailure(
                     operation = "overseas execution lookup",
                     returnCode = returnCode,
-                    messageCode = response.textOrNull("msg_cd", "msgCd", "MSG_CD"),
-                    brokerMessage = response.textOrNull("msg1", "msg_1", "MSG1"),
+                    messageCode = response.kisMessageCode(),
+                    brokerMessage = response.kisMessage(),
                 )
             }
             BrokerOrderHistoryPage(
@@ -305,13 +305,13 @@ internal class KisBrokerGatewayAdapter(
                 responseType = JsonNode::class.java,
                 callOptions = properties.toQueryCallOptions(),
             )
-            val returnCode = response.textOrNull("rt_cd", "rtCd", "RT_CD").orEmpty()
+            val returnCode = response.kisReturnCode()
             if (returnCode.isNotBlank() && returnCode != "0") {
                 throwKisBrokerBusinessFailure(
                     operation = "domestic balance lookup",
                     returnCode = returnCode,
-                    messageCode = response.textOrNull("msg_cd", "msgCd", "MSG_CD"),
-                    brokerMessage = response.textOrNull("msg1", "msg_1", "MSG1"),
+                    messageCode = response.kisMessageCode(),
+                    brokerMessage = response.kisMessage(),
                 )
             }
             BrokerAccountSnapshotPage(
@@ -332,13 +332,13 @@ internal class KisBrokerGatewayAdapter(
                 responseType = JsonNode::class.java,
                 callOptions = properties.toQueryCallOptions(),
             )
-            val returnCode = response.textOrNull("rt_cd", "rtCd", "RT_CD").orEmpty()
+            val returnCode = response.kisReturnCode()
             if (returnCode.isNotBlank() && returnCode != "0") {
                 throwKisBrokerBusinessFailure(
                     operation = "overseas balance lookup",
                     returnCode = returnCode,
-                    messageCode = response.textOrNull("msg_cd", "msgCd", "MSG_CD"),
-                    brokerMessage = response.textOrNull("msg1", "msg_1", "MSG1"),
+                    messageCode = response.kisMessageCode(),
+                    brokerMessage = response.kisMessage(),
                 )
             }
             BrokerAccountSnapshotPage(
@@ -453,13 +453,13 @@ private fun WebClient.fetchDomesticCancelableOrderPage(
         responseType = JsonNode::class.java,
         callOptions = callOptions,
     )
-    val returnCode = response.textOrNull("rt_cd", "rtCd", "RT_CD").orEmpty()
+    val returnCode = response.kisReturnCode()
     if (returnCode.isNotBlank() && returnCode != "0") {
         throwKisBrokerBusinessFailure(
             operation = "domestic cancelable order lookup",
             returnCode = returnCode,
-            messageCode = response.textOrNull("msg_cd", "msgCd", "MSG_CD"),
-            brokerMessage = response.textOrNull("msg1", "msg_1", "MSG1"),
+            messageCode = response.kisMessageCode(),
+            brokerMessage = response.kisMessage(),
         )
     }
     val rows = response.rows("output", "OUTPUT", "output1", "OUTPUT1")
@@ -1007,6 +1007,18 @@ private fun JsonNode.textOrNull(vararg fieldNames: String): String? {
         .asSequence()
         .map { path(it).asText("").trim() }
         .firstOrNull { it.isNotBlank() }
+}
+
+private fun JsonNode.kisReturnCode(): String {
+    return textOrNull("rt_cd", "rtCd", "rtCode", "RT_CD", "RT_CODE").orEmpty()
+}
+
+private fun JsonNode.kisMessageCode(): String? {
+    return textOrNull("msg_cd", "msgCd", "msgCode", "MSG_CD", "MSG_CODE")
+}
+
+private fun JsonNode.kisMessage(): String? {
+    return textOrNull("msg1", "msg_1", "msg", "message", "MSG1", "MSG")
 }
 
 private fun JsonNode.longValue(vararg fieldNames: String): Long {

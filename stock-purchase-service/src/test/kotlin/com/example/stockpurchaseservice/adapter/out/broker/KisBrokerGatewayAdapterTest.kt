@@ -1016,9 +1016,9 @@ class KisBrokerGatewayAdapterTest {
             responses = listOf(
                 """
                 {
-                  "rt_cd": "1",
-                  "msg_cd": "EGW00201",
-                  "msg1": "per-second transaction limit exceeded"
+                  "rtCode": "1",
+                  "msgCode": "EGW00201",
+                  "message": "per-second transaction limit exceeded"
                 }
                 """.trimIndent(),
             ),
@@ -1059,9 +1059,9 @@ class KisBrokerGatewayAdapterTest {
             responses = listOf(
                 """
                 {
-                  "rt_cd": "1",
-                  "msg_cd": "EGW00201",
-                  "msg1": "per-second transaction limit exceeded"
+                  "rtCode": "1",
+                  "msgCode": "EGW00201",
+                  "message": "per-second transaction limit exceeded"
                 }
                 """.trimIndent(),
                 """
@@ -1117,9 +1117,9 @@ class KisBrokerGatewayAdapterTest {
             responses = listOf(
                 """
                 {
-                  "RT_CD": "1",
-                  "MSG_CD": "APBK9999",
-                  "MSG1": "invalid account scope"
+                  "RT_CODE": "1",
+                  "MSG_CODE": "APBK9999",
+                  "MSG": "invalid account scope"
                 }
                 """.trimIndent(),
             ),
@@ -2164,9 +2164,9 @@ class KisBrokerGatewayAdapterTest {
                 jsonResponse(
                     """
                     {
-                      "RT_CD": "1",
-                      "MSG_CD": "APBK0001",
-                      "MSG1": "cancelable lookup rejected"
+                      "RT_CODE": "1",
+                      "MSG_CODE": "APBK0001",
+                      "MSG": "cancelable lookup rejected"
                     }
                     """.trimIndent(),
                 ),

@@ -107,9 +107,9 @@ class OpenApiControllerMappingTest {
         val response = ParseJsonResponse.parseJsonString(
             """
             {
-              "rt_cd": "0",
-              "msg_cd": "APBK003",
-              "msg1": "accepted",
+              "rtCode": "0",
+              "msgCode": "APBK003",
+              "message": "accepted",
               "OUTPUT": [
                 {
                   "KRX_FWDG_ORD_ORGNO": "00004",
@@ -287,9 +287,9 @@ class OpenApiControllerMappingTest {
         val response = ParseJsonResponse.parseJsonString(
             """
             {
-              "RT_CD": "1",
-              "MSG_CD": "APBK0001",
-              "MSG1": "domestic query rejected"
+              "rtCode": "1",
+              "MSG_CODE": "APBK0001",
+              "message": "domestic query rejected"
             }
             """.trimIndent(),
         ).toDailyExecutionOrdersResponse()

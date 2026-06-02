@@ -236,9 +236,9 @@ internal fun OpenApiResponse.toPostStockOrderResponse(): ApiResponse.StockOrder 
     val outputNode = responseNode.summaryObjectNode("output", "OUTPUT", "output1", "OUTPUT1") ?: responseNode
 
     return stockOrder {
-        rtCd = responseNode.text("rt_cd", "rtCd", "RT_CD")
-        msgCd = responseNode.text("msg_cd", "msgCd", "MSG_CD")
-        msg1 = responseNode.text("msg1", "msg_1", "MSG1")
+        rtCd = responseNode.text("rt_cd", "rtCd", "rtCode", "RT_CD", "RT_CODE")
+        msgCd = responseNode.text("msg_cd", "msgCd", "msgCode", "MSG_CD", "MSG_CODE")
+        msg1 = responseNode.text("msg1", "msg_1", "msg", "message", "MSG1", "MSG")
         output = output {
             kRXFWDGORDORGNO = outputNode.text(
                 "KRX_FWDG_ORD_ORGNO",
@@ -352,9 +352,9 @@ internal fun OpenApiResponse.toDailyExecutionOrdersResponse(): DailyExecutionOrd
     return dailyExecutionOrdersResponse {
         ctxAreaFk100 = this@toDailyExecutionOrdersResponse.text("ctx_area_fk100", "ctxAreaFk100", "CTX_AREA_FK100")
         ctxAreaNk100 = this@toDailyExecutionOrdersResponse.text("ctx_area_nk100", "ctxAreaNk100", "CTX_AREA_NK100")
-        rtCd = this@toDailyExecutionOrdersResponse.text("rt_cd", "rtCd", "RT_CD")
-        msgCd = this@toDailyExecutionOrdersResponse.text("msg_cd", "msgCd", "MSG_CD")
-        msg1 = this@toDailyExecutionOrdersResponse.text("msg1", "msg_1", "MSG1")
+        rtCd = this@toDailyExecutionOrdersResponse.text("rt_cd", "rtCd", "rtCode", "RT_CD", "RT_CODE")
+        msgCd = this@toDailyExecutionOrdersResponse.text("msg_cd", "msgCd", "msgCode", "MSG_CD", "MSG_CODE")
+        msg1 = this@toDailyExecutionOrdersResponse.text("msg1", "msg_1", "msg", "message", "MSG1", "MSG")
 
         this@toDailyExecutionOrdersResponse.elements("output1", "OUTPUT1").forEach { item ->
             output1 += dailyExecutionOrdersOutput1 {
