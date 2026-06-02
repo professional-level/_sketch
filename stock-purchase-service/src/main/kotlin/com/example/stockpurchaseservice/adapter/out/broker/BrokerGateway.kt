@@ -93,7 +93,9 @@ internal data class BrokerCancelableOrderItem(
         val requestedOrderId = query.originalOrderId.trim()
         val sameOrder = requestedOrderId.isBlank() || orderId == requestedOrderId || originalOrderId == requestedOrderId
         val requestedBranch = query.branchOrderNumber?.trim()
-        val sameBranch = requestedBranch.isNullOrBlank() || branchOrderNumber?.trim() == requestedBranch
+        val rowBranch = branchOrderNumber?.trim()?.takeIf { it.isNotBlank() }
+        val branchUnavailableForMatchedOrder = rowBranch == null && requestedOrderId.isNotBlank() && sameOrder
+        val sameBranch = requestedBranch.isNullOrBlank() || branchUnavailableForMatchedOrder || rowBranch == requestedBranch
         val sameSymbol = query.symbol.isBlank() || symbol.isBlank() || symbol.equals(query.symbol, ignoreCase = true)
         return sameOrder && sameBranch && sameSymbol
     }
