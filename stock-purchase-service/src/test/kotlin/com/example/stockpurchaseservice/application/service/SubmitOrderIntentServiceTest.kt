@@ -548,13 +548,14 @@ class SubmitOrderIntentServiceTest {
         val riskPort = FakeOrderRiskControlPort(
             result = OrderRiskAssessmentResult.rejected("order notional exceeds limit"),
         )
+        val alertPort = FakeOperationalAlertPort()
         val service = SubmitOrderIntentService(
             marketPort,
             processedEventPort,
             submissionPort,
             eventPort,
             riskPort,
-            FakeOperationalAlertPort(),
+            alertPort,
         )
         val eventId = UUID.randomUUID()
 
@@ -583,6 +584,8 @@ class SubmitOrderIntentServiceTest {
         assertEquals(eventId, processedEventPort.succeeded.single())
         assertEquals("order notional exceeds limit", submissionPort.rejected.single().statusReason)
         assertEquals("order notional exceeds limit", eventPort.rejected.single().reason)
+        assertEquals("order notional exceeds limit", alertPort.orderSubmissionFailed.single().reason)
+        assertEquals(eventId, alertPort.orderSubmissionFailed.single().orderIntentId)
         assertEquals(emptyList(), eventPort.submitted)
     }
 

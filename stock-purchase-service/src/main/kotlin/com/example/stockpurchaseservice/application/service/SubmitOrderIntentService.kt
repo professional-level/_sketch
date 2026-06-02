@@ -197,6 +197,9 @@ class SubmitOrderIntentService(
     ): SubmitOrderIntentResult {
         orderIntentSubmissionPort.saveRejected(command.toRejectedSubmission(orderId, reason))
         orderExecutionEventPort.publishRejected(command.toRejectedMessage(reason))
+        runCatching {
+            operationalAlertPort.alertOrderSubmissionFailed(command.toFailureAlert(reason))
+        }
         processedEventPort.markSuccess(command.eventId)
         return SubmitOrderIntentResult(OrderIntentSubmissionStatus.REJECTED)
     }
@@ -284,6 +287,10 @@ class SubmitOrderIntentService(
     }
 
     private fun SubmitOrderIntentCommand.toFailureAlert(exception: Throwable): OrderSubmissionFailureAlert {
+        return toFailureAlert(exception.message ?: exception::class.java.simpleName)
+    }
+
+    private fun SubmitOrderIntentCommand.toFailureAlert(reason: String): OrderSubmissionFailureAlert {
         return OrderSubmissionFailureAlert(
             orderIntentId = eventId,
             idempotencyKey = idempotencyKey,
@@ -292,7 +299,7 @@ class SubmitOrderIntentService(
             side = side,
             orderType = orderType,
             orderTag = orderTag,
-            reason = exception.message ?: exception::class.java.simpleName,
+            reason = reason,
             occurredAt = ZonedDateTime.now(),
         )
     }
