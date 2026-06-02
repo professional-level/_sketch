@@ -1334,6 +1334,34 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `maps domestic side name fallback as selling execution`() {
+        val adapter = domesticHistoryAdapter(
+            domesticHistoryResponse(
+                DailyExecutionOrdersResponseOuterClass.DailyExecutionOrdersOutput1.newBuilder()
+                    .setOrdDt("20260602")
+                    .setOrdGnoBrno("00001")
+                    .setOdno("side-name-domestic-sell")
+                    .setSllBuyDvsnCd("")
+                    .setSllBuyDvsnCdName("SELL")
+                    .setPdno("005930")
+                    .setPrdtName("Samsung Electronics")
+                    .setOrdQty("3")
+                    .setOrdTmd("093000")
+                    .setTotCcldQty("3")
+                    .setAvgPrvs("71300")
+                    .setRmnQty("0")
+                    .build(),
+            ),
+        )
+
+        val execution = adapter.findOrderHistory(domesticHistoryQuery()).single().toExecutionDto()
+
+        checkNotNull(execution)
+        assertEquals(ExecutionTypeDto.SELLING, execution.type)
+        assertEquals("side-name-domestic-sell", execution.externalOrderId)
+    }
+
+    @Test
     fun `overseas order status lookup leaves unsupported broker order id query blank`() {
         val query = BrokerOrderHistoryQuery(
             market = StockOrderMarket.OVERSEAS_US,

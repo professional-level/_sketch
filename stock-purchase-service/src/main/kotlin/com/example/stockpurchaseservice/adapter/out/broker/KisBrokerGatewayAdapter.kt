@@ -862,7 +862,7 @@ private fun DailyExecutionOrdersResponseOuterClass.DailyExecutionOrdersOutput1.t
         rejectedQuantity = rjctQty.toLongValue(),
         cancelledQuantity = cnclCfrmQty.toLongValue(),
         cancelled = cnclYn.equals("Y", ignoreCase = true),
-        side = sllBuyDvsnCd.toOrderIntentSide(),
+        side = sllBuyDvsnCd.toOrderIntentSide() ?: sllBuyDvsnCdName.toOrderIntentSide(),
         averageExecutionPrice = avgPrvs.toDoubleValue(),
         statusMessage = joinedText(
             ccldCndtName,
