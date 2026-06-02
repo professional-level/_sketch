@@ -12,4 +12,6 @@ interface GetStrategyExecutionOperationsStatusUseCase {
 data class StrategyExecutionOperationsStatusResult(
     val generatedAt: ZonedDateTime,
     val snapshot: StrategyExecutionOperationsStatusSnapshot,
+    val activeLaorV4Strategies: List<LaorV4StrategyExecutionView> = emptyList(),
+    val activeFinalPriceBatingV1Strategies: List<FinalPriceBatingV1StrategyExecutionView> = emptyList(),
 )
