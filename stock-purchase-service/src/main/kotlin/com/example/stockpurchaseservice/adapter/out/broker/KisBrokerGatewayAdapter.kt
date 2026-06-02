@@ -899,7 +899,7 @@ private fun DailyExecutionOrdersResponseOuterClass.DailyExecutionOrdersOutput1.t
     val orderId = odno.toBrokerOrderIdOrNull() ?: return null
     return BrokerOrderHistoryItem(
         externalOrderId = orderId,
-        externalExecutionId = ccldNo.takeIf { it.isNotBlank() },
+        externalExecutionId = ccldNo.toBrokerExecutionIdOrNull(),
         originalOrderId = orgnOdno.toBrokerOrderIdOrNull(),
         branchOrderNumber = ordGnoBrno.takeIf { it.isNotBlank() }
             ?: ordOrgno.takeIf { it.isNotBlank() },
@@ -1070,7 +1070,7 @@ private fun JsonNode.toBrokerHistoryItem(): BrokerOrderHistoryItem? {
             "cntr_no",
             "cntrNo",
             "CNTR_NO",
-        ),
+        ).toBrokerExecutionIdOrNull(),
         originalOrderId = textOrNull("orgn_odno", "orgnOdno", "ORGN_ODNO").toBrokerOrderIdOrNull(),
         branchOrderNumber = textOrNull(
             "ord_gno_brno",
@@ -1170,6 +1170,10 @@ private fun JsonNode.textOrNull(): String? {
 private fun String?.toBrokerOrderIdOrNull(): String? {
     val value = this?.trim()?.takeIf(String::isNotBlank) ?: return null
     return value.takeUnless { it.all { character -> character == '0' } }
+}
+
+private fun String?.toBrokerExecutionIdOrNull(): String? {
+    return toBrokerOrderIdOrNull()
 }
 
 private fun joinedText(vararg values: String?): String? {

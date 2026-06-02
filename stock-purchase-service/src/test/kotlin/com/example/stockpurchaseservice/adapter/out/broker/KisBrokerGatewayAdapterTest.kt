@@ -1724,6 +1724,31 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `ignores domestic all zero execution id placeholder`() {
+        val adapter = domesticHistoryAdapter(
+            domesticHistoryResponse(
+                domesticRow(
+                    orderId = "domestic-zero-execution-id-order",
+                    executionId = "0000000000",
+                    orderedQuantity = "3",
+                    filledQuantity = "1",
+                    remainingQuantity = "2",
+                    averagePrice = "71200.5",
+                ),
+            ),
+        )
+
+        val item = adapter.findOrderHistory(domesticHistoryQuery()).single()
+        val execution = item.toExecutionDto()
+        val status = item.toStatus()
+
+        assertEquals(BrokerOrderStatus.PARTIALLY_FILLED, status.status)
+        assertEquals("domestic-zero-execution-id-order:1:PURCHASE", status.externalExecutionId)
+        checkNotNull(execution)
+        assertEquals("domestic-zero-execution-id-order:1:PURCHASE", execution.externalExecutionId)
+    }
+
+    @Test
     fun `maps domestic full fill as cumulative execution and filled status`() {
         val adapter = domesticHistoryAdapter(
             domesticHistoryResponse(
@@ -1980,6 +2005,42 @@ class KisBrokerGatewayAdapterTest {
         assertEquals(1, execution.quantity)
         assertEquals(112.5, execution.averageExecutionPrice)
         assertEquals(ExecutionQuantityModeDto.CUMULATIVE, execution.quantityMode)
+    }
+
+    @Test
+    fun `ignores overseas all zero execution id placeholder`() {
+        val adapter = overseasHistoryAdapter(
+            """
+            {
+              "rt_cd": "0",
+              "ctx_area_fk200": "",
+              "ctx_area_nk200": "",
+              "output": [
+                {
+                  "ODNO": "overseas-zero-execution-id-order",
+                  "PDNO": "TQQQ",
+                  "ORD_DT": "20260602",
+                  "ORD_TMD": "093000",
+                  "ORD_QTY": "3",
+                  "CCLD_NO": "0000000000",
+                  "TOT_CCLD_QTY": "1",
+                  "RMN_QTY": "2",
+                  "SLL_BUY_DVSN_NAME": "BUY",
+                  "AVG_PRVS": "112.5"
+                }
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        val item = adapter.findOrderHistory(historyQuery()).single()
+        val execution = item.toExecutionDto()
+        val status = item.toStatus()
+
+        assertEquals(BrokerOrderStatus.PARTIALLY_FILLED, status.status)
+        assertEquals("overseas-zero-execution-id-order:1:PURCHASE", status.externalExecutionId)
+        checkNotNull(execution)
+        assertEquals("overseas-zero-execution-id-order:1:PURCHASE", execution.externalExecutionId)
     }
 
     @Test
