@@ -2029,6 +2029,47 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `maps overseas prefixed quantity aliases as cumulative execution`() {
+        val adapter = overseasHistoryAdapter(
+            """
+            {
+              "rt_cd": "0",
+              "ctx_area_fk200": "",
+              "ctx_area_nk200": "",
+              "output": [
+                {
+                  "ODNO": "prefixed-quantity-order",
+                  "PDNO": "TQQQ",
+                  "PRDT_ENG_NAME": "ProShares UltraPro QQQ",
+                  "ORD_DT": "20260602",
+                  "ORD_TMD": "093000",
+                  "OVRS_ORD_QTY": "5",
+                  "OVRS_CCLD_QTY": "2",
+                  "OVRS_NCCS_QTY": "3",
+                  "OVRS_CCLD_UNPR": "113.75",
+                  "SLL_BUY_DVSN_NAME": "BUY"
+                }
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        val item = adapter.findOrderHistory(historyQuery()).single()
+        val execution = item.toExecutionDto()
+        val status = item.toStatus()
+
+        assertEquals(BrokerOrderStatus.PARTIALLY_FILLED, status.status)
+        assertEquals(5L, item.orderedQuantity)
+        assertEquals(2L, item.cumulativeFilledQuantity)
+        assertEquals(3L, item.remainingQuantity)
+        assertEquals(113.75, item.averageExecutionPrice)
+        checkNotNull(execution)
+        assertEquals("prefixed-quantity-order", execution.externalOrderId)
+        assertEquals(2, execution.quantity)
+        assertEquals(113.75, execution.averageExecutionPrice)
+    }
+
+    @Test
     fun `ignores overseas all zero original order id placeholder`() {
         val adapter = overseasHistoryAdapter(
             """

@@ -946,6 +946,9 @@ private fun JsonNode.toBrokerHistoryItem(): BrokerOrderHistoryItem? {
         "ft_ord_qty",
         "ftOrdQty",
         "FT_ORD_QTY",
+        "ovrs_ord_qty",
+        "ovrsOrdQty",
+        "OVRS_ORD_QTY",
         "ord_qty",
         "ordQty",
         "ORD_QTY",
@@ -974,6 +977,9 @@ private fun JsonNode.toBrokerHistoryItem(): BrokerOrderHistoryItem? {
         "ft_ccld_qty",
         "ftCcldQty",
         "FT_CCLD_QTY",
+        "ovrs_ccld_qty",
+        "ovrsCcldQty",
+        "OVRS_CCLD_QTY",
         "tot_ccld_qty",
         "totCcldQty",
         "TOT_CCLD_QTY",
@@ -981,7 +987,17 @@ private fun JsonNode.toBrokerHistoryItem(): BrokerOrderHistoryItem? {
         "ccldQty",
         "CCLD_QTY",
     )
-    val remainingQuantity = longValue("nccs_qty", "nccsQty", "NCCS_QTY", "rmn_qty", "rmnQty", "RMN_QTY")
+    val remainingQuantity = longValue(
+        "nccs_qty",
+        "nccsQty",
+        "NCCS_QTY",
+        "ovrs_nccs_qty",
+        "ovrsNccsQty",
+        "OVRS_NCCS_QTY",
+        "rmn_qty",
+        "rmnQty",
+        "RMN_QTY",
+    )
     val statusName = textOrNull(
         "prcs_stat_name",
         "prcsStatName",
