@@ -92,3 +92,71 @@ Next action:
 
 - Retry submit/query/cancel with a KIS mock account that is enabled for overseas mock orders.
 - If KIS mock balance continues returning HTTP 500, capture a redacted wrapper-side response sample. The wrapper now preserves non-2xx KIS JSON business responses when the body contains `rt_cd`, so the downstream adapter can classify the broker error instead of receiving only a transport 500.
+
+## 2026-06-02 Query-Only Smoke Timeout Recheck
+
+Environment:
+
+- root KIS wrapper: local `:bootRun` on `http://localhost:8079`
+- broker gateway test: `KisBrokerGatewaySmokeTest`
+- smoke mode: query-only, `KIS_BROKER_SMOKE_SUBMIT_ENABLED` unset
+
+Result:
+
+- `mock account snapshot and order history smoke()` failed before order history lookup.
+- Failure point: overseas mock account snapshot lookup.
+- Failure type: `IllegalStateException`, caused by `TimeoutException` from the 5 second blocking WebClient wait.
+- JUnit XML summary: `tests=2`, `skipped=1`, `failures=1`, `errors=0`.
+- `mock submit query and cancel smoke()` was skipped, so submit/cancel was not attempted after the query baseline failed.
+- Wrapper startup completed successfully and no wrapper stderr output or query-time `ERROR` log entry was observed.
+
+Impact:
+
+- The broker gateway contract tests still compile and run with smoke disabled.
+- Accepted-order submit/query/cancel remains unverified until the mock balance/history query baseline is stable again.
+
+Next action:
+
+- Investigate the root wrapper to KIS mock overseas balance path for endpoint timeout, credential/account scope, or upstream availability before attempting submit/cancel again.
+
+## 2026-06-02 Query-Only Smoke Retry After Timeout
+
+Environment:
+
+- root KIS wrapper: local `:bootRun` on `http://localhost:8079`
+- broker gateway test: `KisBrokerGatewaySmokeTest`
+- smoke mode: query-only, `KIS_BROKER_SMOKE_SUBMIT_ENABLED` unset
+
+Result:
+
+- `mock account snapshot and order history smoke()` passed on retry.
+- `mock submit query and cancel smoke()` skipped because submit smoke was intentionally disabled.
+- JUnit XML summary: `tests=2`, `skipped=1`, `failures=0`, `errors=0`.
+
+Impact:
+
+- The timeout was not reproduced on the immediate retry.
+- Query-only baseline was considered healthy enough to attempt opt-in mock submit smoke.
+
+## 2026-06-02 Submit Smoke Reattempt With Query Test Isolated
+
+Environment:
+
+- root KIS wrapper: local `:bootRun` on `http://localhost:8079`
+- broker gateway test: `KisBrokerGatewaySmokeTest`
+- smoke mode: submit/query/cancel, `KIS_BROKER_SMOKE_SUBMIT_ENABLED=true`
+- order input: mock overseas buy, `TQQQ`, `NASD`, `USD`, quantity `1`, limit price `1`
+
+Result:
+
+- Initial combined submit run also executed the query-only smoke and the account snapshot lookup hit KIS rate limit `EGW00201`.
+- The smoke test now skips the query-only account/history check when submit smoke is enabled, so submit diagnostics are not mixed with broker query rate-limit noise.
+- `mock submit query and cancel smoke()` reached the broker submit boundary.
+- KIS rejected the mock submit as a business rejection with return code `1`, message code `40910000`, and broker message meaning the configured account cannot place mock investment orders.
+- Final isolated submit JUnit XML summary: `tests=2`, `skipped=1`, `failures=1`, `errors=0`.
+- No broker order id was issued, so accepted-order history visibility and cancel submission remain unverified.
+
+Next action:
+
+- Use a KIS mock account that is enabled for overseas mock orders, then rerun submit/query/cancel smoke.
+- Keep query-only smoke and submit smoke as separate executions to avoid KIS per-second transaction limits.

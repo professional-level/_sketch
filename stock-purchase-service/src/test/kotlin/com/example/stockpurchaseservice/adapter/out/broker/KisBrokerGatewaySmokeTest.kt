@@ -24,17 +24,22 @@ class KisBrokerGatewaySmokeTest {
     @Test
     fun `mock account snapshot and order history smoke`() {
         val config = SmokeConfig.fromEnvironment()
+        assumeTrue(!config.submitEnabled, "Run query-only smoke separately before submit smoke to avoid KIS rate limit noise")
         val adapter = brokerGateway(config)
 
-        val snapshot = adapter.findAccountSnapshot(
-            BrokerAccountSnapshotQuery(
-                market = StockOrderMarket.OVERSEAS_US,
-                exchange = config.exchange,
-                currency = config.currency,
-                isMock = true,
-            ),
-        )
-        val history = adapter.findOrderHistory(config.historyQuery())
+        val snapshot = runBrokerSmokeQueryStep("mock account snapshot", config) {
+            adapter.findAccountSnapshot(
+                BrokerAccountSnapshotQuery(
+                    market = StockOrderMarket.OVERSEAS_US,
+                    exchange = config.exchange,
+                    currency = config.currency,
+                    isMock = true,
+                ),
+            )
+        }
+        val history = runBrokerSmokeQueryStep("mock order history", config) {
+            adapter.findOrderHistory(config.historyQuery())
+        }
 
         assertEquals(StockOrderMarket.OVERSEAS_US, snapshot.market)
         assertEquals(config.exchange, snapshot.exchange)
@@ -107,6 +112,25 @@ class KisBrokerGatewaySmokeTest {
                     "messageCode=${exception.brokerMessageCode}, " +
                     "brokerMessage=${exception.brokerMessage}, " +
                     "config=${config.redacted()}, command=$command",
+            )
+        }
+    }
+
+    private fun <T> runBrokerSmokeQueryStep(
+        step: String,
+        config: SmokeConfig,
+        block: () -> T,
+    ): T {
+        return try {
+            block()
+        } catch (exception: RuntimeException) {
+            fail(
+                "$step failed during KIS mock broker smoke: " +
+                    "exception=${exception::class.java.simpleName}, " +
+                    "message=${exception.message}, " +
+                    "cause=${exception.cause?.javaClass?.simpleName}, " +
+                    "causeMessage=${exception.cause?.message}, " +
+                    "config=${config.redacted()}",
             )
         }
     }
