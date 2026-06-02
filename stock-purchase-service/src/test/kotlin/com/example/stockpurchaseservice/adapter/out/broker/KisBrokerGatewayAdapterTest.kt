@@ -322,6 +322,132 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `overseas cancel uses branch order number to disambiguate duplicate broker order ids`() {
+        val exchangeFunction = ResponseExchangeFunction(
+            responses = listOf(
+                jsonResponse(
+                    """
+                    {
+                      "rt_cd": "0",
+                      "ctx_area_fk200": "",
+                      "ctx_area_nk200": "",
+                      "output": [
+                        {
+                          "odno": "overseas-order-1",
+                          "ord_gno_brno": "99999",
+                          "pdno": "TQQQ",
+                          "ord_dt": "20260602",
+                          "ord_tmd": "093000",
+                          "ft_ord_qty": "3",
+                          "ft_ccld_qty": "2",
+                          "nccs_qty": "1",
+                          "sll_buy_dvsn_cd": "02"
+                        },
+                        {
+                          "odno": "overseas-order-1",
+                          "ORD_GNO_BRNO": "00001",
+                          "pdno": "TQQQ",
+                          "ord_dt": "20260602",
+                          "ord_tmd": "093100",
+                          "ft_ord_qty": "3",
+                          "ft_ccld_qty": "1",
+                          "nccs_qty": "2",
+                          "sll_buy_dvsn_cd": "02"
+                        }
+                      ]
+                    }
+                    """.trimIndent(),
+                ),
+                protobufResponse(
+                    ApiResponse.StockOrder.newBuilder()
+                        .setRtCd("0")
+                        .setOutput(
+                            ApiResponse.Output.newBuilder()
+                                .setODNO("overseas-cancel-1")
+                                .build(),
+                        )
+                        .build(),
+                ),
+            ),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        val submission = adapter.cancelOrder(
+            brokerCancelCommand(
+                market = StockOrderMarket.OVERSEAS_US,
+                symbol = "TQQQ",
+                originalOrderId = "overseas-order-1",
+                branchOrderNumber = "00001",
+                price = 112.5,
+                quantity = 2,
+                orderType = StockOrderType.LOC,
+                isMock = false,
+            ),
+        )
+
+        assertEquals("overseas-cancel-1", submission.externalOrderId)
+        assertEquals(2, exchangeFunction.requests.size)
+        assertEquals("/open-api/overseas/trading/order-rvsecncl", exchangeFunction.requests[1].url().path)
+    }
+
+    @Test
+    fun `overseas cancel rejects when explicit branch order number does not match history`() {
+        val exchangeFunction = ResponseExchangeFunction(
+            responses = listOf(
+                jsonResponse(
+                    """
+                    {
+                      "rt_cd": "0",
+                      "ctx_area_fk200": "",
+                      "ctx_area_nk200": "",
+                      "output": [
+                        {
+                          "odno": "overseas-order-1",
+                          "ord_gno_brno": "99999",
+                          "pdno": "TQQQ",
+                          "ord_dt": "20260602",
+                          "ord_tmd": "093000",
+                          "ft_ord_qty": "3",
+                          "ft_ccld_qty": "1",
+                          "nccs_qty": "2",
+                          "sll_buy_dvsn_cd": "02"
+                        }
+                      ]
+                    }
+                    """.trimIndent(),
+                ),
+            ),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        val exception = assertFailsWith<BrokerOrderRejectedException> {
+            adapter.cancelOrder(
+                brokerCancelCommand(
+                    market = StockOrderMarket.OVERSEAS_US,
+                    symbol = "TQQQ",
+                    originalOrderId = "overseas-order-1",
+                    branchOrderNumber = "00001",
+                    price = 112.5,
+                    quantity = 2,
+                    orderType = StockOrderType.LOC,
+                    isMock = false,
+                ),
+            )
+        }
+
+        assertEquals("overseas order is not cancelable: overseas-order-1", exception.message)
+        assertEquals(1, exchangeFunction.requests.size)
+    }
+
+    @Test
     fun `overseas cancel rejects when order is not found in history`() {
         val exchangeFunction = ResponseExchangeFunction(
             responses = listOf(

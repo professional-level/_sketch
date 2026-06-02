@@ -570,8 +570,15 @@ private fun JsonNode.toKisCancelableOrderItem(): KisCancelableOrderItem? {
 
 private fun BrokerOrderHistoryItem.matches(command: BrokerOrderCancelCommand): Boolean {
     val sameOrder = externalOrderId == command.originalOrderId || originalOrderId == command.originalOrderId
+    val sameBranch = matchesBranchOrderNumber(command.branchOrderNumber)
     val sameSymbol = symbol.isBlank() || symbol.equals(command.symbol, ignoreCase = true)
-    return sameOrder && sameSymbol
+    return sameOrder && sameBranch && sameSymbol
+}
+
+private fun BrokerOrderHistoryItem.matchesBranchOrderNumber(branchOrderNumber: String?): Boolean {
+    val requested = branchOrderNumber?.trim()?.takeIf { it.isNotBlank() } ?: return true
+    val actual = this.branchOrderNumber?.trim()?.takeIf { it.isNotBlank() } ?: return true
+    return actual == requested
 }
 
 private fun BrokerOrderHistoryQuery.toKisDomesticExecutionOrderQuery(): Map<String, String> {
