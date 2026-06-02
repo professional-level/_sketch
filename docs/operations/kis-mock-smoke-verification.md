@@ -36,6 +36,37 @@ Remaining:
 - Run opt-in mock submit/query/cancel smoke during a KIS mock overseas order window.
 - Preserve a redacted execution note for submit/cancel once it succeeds.
 
+## 2026-06-02 Query-Only Smoke Recheck
+
+Environment:
+
+- root KIS wrapper: local `:bootRun` on `http://localhost:8079`
+- broker gateway test: `KisBrokerGatewaySmokeTest`
+- smoke mode: query-only, `KIS_BROKER_SMOKE_SUBMIT_ENABLED` unset
+- wrapper build includes KIS non-2xx JSON business body preservation for query endpoints
+
+Command shape:
+
+```powershell
+$env:KIS_BROKER_SMOKE_ENABLED='true'
+$env:KIS_BROKER_SMOKE_BASE_URL='http://localhost:8079'
+Remove-Item Env:\KIS_BROKER_SMOKE_SUBMIT_ENABLED -ErrorAction SilentlyContinue
+.\gradlew.bat --no-daemon :stock-purchase-service:test --tests "com.example.stockpurchaseservice.adapter.out.broker.KisBrokerGatewaySmokeTest" --rerun-tasks
+```
+
+Result:
+
+- `mock account snapshot and order history smoke()` passed.
+- `mock submit query and cancel smoke()` skipped because submit smoke was intentionally disabled.
+- JUnit XML summary: `tests=2`, `skipped=1`, `failures=0`, `errors=0`.
+- Wrapper log showed startup warnings only; no query-time `ERROR` entries were observed during this recheck.
+
+Coverage:
+
+- Reconfirmed overseas mock balance lookup through the root wrapper.
+- Reconfirmed overseas mock order history lookup through the root wrapper.
+- Confirmed the query-only path is stable again after preserving KIS query error bodies.
+
 ## 2026-06-02 Submit Smoke Attempt
 
 Environment:
