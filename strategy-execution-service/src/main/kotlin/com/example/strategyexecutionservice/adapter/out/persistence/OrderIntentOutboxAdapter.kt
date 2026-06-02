@@ -23,18 +23,27 @@ internal class OrderIntentOutboxAdapter(
     override suspend fun publishAll(orderIntents: List<OrderIntentMessage>) {
         orderIntents.forEach { orderIntent ->
             val traceContext = TraceContext.current()
-            outboxEventRepository.save(
-                OrderIntentOutboxEventEntity.pending(
-                    id = orderIntent.eventId,
-                    topic = MessageTopic.ORDER_INTENT_CREATED,
-                    messageKey = orderIntent.strategyExecutionId,
-                    eventType = "OrderIntentCreatedEvent",
-                    payload = serializer.serialize(orderIntent),
-                    traceId = traceContext.traceId,
-                    spanId = traceContext.spanId,
-                    traceParent = traceContext.traceParent,
-                ),
-            ).awaitSuspending()
+            val event = OrderIntentOutboxEventEntity.pending(
+                id = orderIntent.eventId,
+                topic = MessageTopic.ORDER_INTENT_CREATED,
+                messageKey = orderIntent.strategyExecutionId,
+                eventType = "OrderIntentCreatedEvent",
+                payload = serializer.serialize(orderIntent),
+                traceId = traceContext.traceId,
+                spanId = traceContext.spanId,
+                traceParent = traceContext.traceParent,
+            )
+            saveIfNew(event)
+        }
+    }
+
+    private suspend fun saveIfNew(event: OrderIntentOutboxEventEntity) {
+        if (outboxEventRepository.exists(event.id)) return
+
+        runCatching {
+            outboxEventRepository.save(event).awaitSuspending()
+        }.onFailure { exception ->
+            if (!outboxEventRepository.exists(event.id)) throw exception
         }
     }
 

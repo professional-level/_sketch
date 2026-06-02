@@ -13,6 +13,10 @@ import java.util.UUID
 @ApplicationScoped
 @Repository
 internal class OrderIntentOutboxEventRepository : AbstractReactiveRepository<OrderIntentOutboxEventEntity, UUID>() {
+    suspend fun exists(id: UUID): Boolean {
+        return findById(id).awaitSuspending() != null
+    }
+
     suspend fun claimPublishable(
         limit: Int,
         claimOwner: String,
