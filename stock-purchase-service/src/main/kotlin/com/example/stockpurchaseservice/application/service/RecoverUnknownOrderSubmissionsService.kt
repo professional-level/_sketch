@@ -14,7 +14,9 @@ import com.example.stockpurchaseservice.application.port.out.OrderRejectedMessag
 import com.example.stockpurchaseservice.application.port.out.OrderSubmittedMessage
 import com.example.stockpurchaseservice.application.port.out.OperationalAlertPort
 import com.example.stockpurchaseservice.application.port.out.SubmissionUnknownAlert
+import com.example.stockpurchaseservice.application.port.out.StockOrderPort
 import com.example.stockpurchaseservice.application.port.out.StockOrderMarket
+import com.example.stockpurchaseservice.application.repository.OrderStateDto
 import java.nio.charset.StandardCharsets
 import java.time.Clock
 import java.time.ZonedDateTime
@@ -26,6 +28,7 @@ class RecoverUnknownOrderSubmissionsService(
     private val orderIntentSubmissionPort: OrderIntentSubmissionPort,
     private val orderExecutionEventPort: OrderExecutionEventPort,
     private val operationalAlertPort: OperationalAlertPort,
+    private val stockOrderPort: StockOrderPort? = null,
 ) : RecoverUnknownOrderSubmissionsUseCase {
     internal var clock: Clock = Clock.systemDefaultZone()
 
@@ -133,6 +136,7 @@ class RecoverUnknownOrderSubmissionsService(
             lastStatusCheckedAt = status.checkedAt,
         )
         orderIntentSubmissionPort.saveSubmitted(recovered)
+        syncRecoveredLegacySellOrder(recovered, externalOrderId, OrderStateDto.SELLING_IN_PROCESS)
         orderExecutionEventPort.publishSubmitted(recovered.toSubmittedMessage())
     }
 
@@ -158,6 +162,11 @@ class RecoverUnknownOrderSubmissionsService(
             lastStatusCheckedAt = status.checkedAt,
         )
         orderIntentSubmissionPort.saveRejected(recovered)
+        syncRecoveredLegacySellOrder(
+            submission = recovered,
+            externalOrderId = status.externalOrderId ?: submission.externalOrderId,
+            targetState = OrderStateDto.SUBMIT_FAILED,
+        )
         orderExecutionEventPort.publishRejected(recovered.toRejectedMessage(status))
     }
 
@@ -172,7 +181,25 @@ class RecoverUnknownOrderSubmissionsService(
             lastStatusCheckedAt = status.checkedAt,
         )
         orderIntentSubmissionPort.saveCancelled(recovered)
+        syncRecoveredLegacySellOrder(recovered, externalOrderId, OrderStateDto.SUBMIT_FAILED)
         orderExecutionEventPort.publishCancelled(recovered.toCancelledMessage(status, externalOrderId))
+    }
+
+    private suspend fun syncRecoveredLegacySellOrder(
+        submission: OrderIntentSubmissionDto,
+        externalOrderId: String?,
+        targetState: OrderStateDto,
+    ) {
+        val port = stockOrderPort ?: return
+        val legacyOrderId = submission.legacySellOrderId() ?: return
+        val order = port.findById(legacyOrderId) ?: return
+        val nextState = order.orderState.nextRecoveredLegacySellState(targetState)
+        if (nextState != null && nextState != order.orderState) {
+            port.save(order.copy(orderState = nextState))
+        }
+        if (!externalOrderId.isNullOrBlank() && port.findByExternalOrderId(externalOrderId) == null) {
+            runCatching { port.saveExternalOrderId(legacyOrderId, externalOrderId) }
+        }
     }
 
     private fun OrderIntentSubmissionDto.toQuery(): BrokerOrderStatusQuery {
@@ -247,6 +274,37 @@ class RecoverUnknownOrderSubmissionsService(
 
     private fun deterministicEventId(seed: String): UUID {
         return UUID.nameUUIDFromBytes(seed.toByteArray(StandardCharsets.UTF_8))
+    }
+
+    private fun OrderIntentSubmissionDto.legacySellOrderId(): UUID? {
+        if (!idempotencyKey.startsWith("legacy-sell:")) return null
+        return idempotencyKey
+            .split(":")
+            .asSequence()
+            .drop(1)
+            .mapNotNull { token -> runCatching { UUID.fromString(token) }.getOrNull() }
+            .firstOrNull()
+    }
+
+    private fun OrderStateDto.nextRecoveredLegacySellState(targetState: OrderStateDto): OrderStateDto? {
+        return when (targetState) {
+            OrderStateDto.SELLING_IN_PROCESS -> when (this) {
+                OrderStateDto.SELLING_WAITING,
+                OrderStateDto.SUBMISSION_UNKNOWN -> OrderStateDto.SELLING_IN_PROCESS
+                OrderStateDto.SELLING_IN_PROCESS,
+                OrderStateDto.SELLING_COMPLETED -> this
+                else -> null
+            }
+            OrderStateDto.SUBMIT_FAILED -> when (this) {
+                OrderStateDto.SELLING_WAITING,
+                OrderStateDto.SELLING_IN_PROCESS,
+                OrderStateDto.SUBMISSION_UNKNOWN -> OrderStateDto.SUBMIT_FAILED
+                OrderStateDto.SUBMIT_FAILED,
+                OrderStateDto.SELLING_COMPLETED -> this
+                else -> null
+            }
+            else -> null
+        }
     }
 
     private fun String.toStockOrderMarket(): StockOrderMarket {

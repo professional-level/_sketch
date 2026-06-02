@@ -22,7 +22,11 @@ import com.example.stockpurchaseservice.application.port.out.OrderSubmissionFail
 import com.example.stockpurchaseservice.application.port.out.PurchaseOrderDto
 import com.example.stockpurchaseservice.application.port.out.ReconciliationFailureAlert
 import com.example.stockpurchaseservice.application.port.out.SellingOrderDto
+import com.example.stockpurchaseservice.application.port.out.StockOrderPort
 import com.example.stockpurchaseservice.application.port.out.SubmissionUnknownAlert
+import com.example.stockpurchaseservice.application.repository.OrderDto
+import com.example.stockpurchaseservice.application.repository.OrderStateDto
+import com.example.stockpurchaseservice.application.repository.StrategyTypeDto
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
@@ -61,6 +65,43 @@ class RecoverUnknownOrderSubmissionsServiceTest {
         assertEquals("broker-1", eventPort.submitted.single().brokerOrderId)
         assertEquals(emptyList(), eventPort.rejected)
         assertEquals(emptyList(), eventPort.cancelled)
+    }
+
+    @Test
+    fun `recovers legacy sell unknown submission to stock order mapping`() = runBlocking {
+        val submissionPort = FakeOrderIntentSubmissionPort(
+            listOf(
+                submission(
+                    idempotencyKey = "legacy-sell:legacy-final-price:TQQQ:$LEGACY_ORDER_ID:3:112.0",
+                    side = OrderIntentSide.SELL,
+                    orderTag = "FINAL_PRICE_BATING_V1_SELL",
+                ),
+            ),
+        )
+        val stockOrderPort = FakeStockOrderPort(
+            order = orderDto(orderState = OrderStateDto.SUBMISSION_UNKNOWN),
+        )
+        val eventPort = FakeOrderExecutionEventPort()
+        val service = RecoverUnknownOrderSubmissionsService(
+            marketService = FakeMarketServicePort(
+                status = BrokerOrderStatusDto(
+                    status = BrokerOrderStatus.SUBMITTED,
+                    externalOrderId = "broker-sell",
+                    checkedAt = CHECKED_AT,
+                ),
+            ),
+            orderIntentSubmissionPort = submissionPort,
+            orderExecutionEventPort = eventPort,
+            operationalAlertPort = FakeOperationalAlertPort(),
+            stockOrderPort = stockOrderPort,
+        )
+
+        service.execute()
+
+        assertEquals("broker-sell", submissionPort.submitted.single().externalOrderId)
+        assertEquals(OrderStateDto.SELLING_IN_PROCESS, stockOrderPort.saved.single().orderState)
+        assertEquals(LEGACY_ORDER_ID to "broker-sell", stockOrderPort.savedExternalOrderIds.single())
+        assertEquals("broker-sell", eventPort.submitted.single().brokerOrderId)
     }
 
     @Test
@@ -286,18 +327,21 @@ class RecoverUnknownOrderSubmissionsServiceTest {
     private fun submission(
         externalOrderId: String? = null,
         exchange: String = "NASD",
+        idempotencyKey: String = "unknown-buy",
+        side: OrderIntentSide = OrderIntentSide.BUY,
+        orderTag: String = "FIRST_BUY",
     ): OrderIntentSubmissionDto {
         return OrderIntentSubmissionDto(
             orderIntentId = ORDER_INTENT_ID,
-            idempotencyKey = "unknown-buy",
+            idempotencyKey = idempotencyKey,
             strategyExecutionId = "laor-v4-strategy:TQQQ",
             symbol = "TQQQ",
             exchange = exchange,
-            side = OrderIntentSide.BUY,
+            side = side,
             orderType = OrderIntentType.LOC,
             submittedPrice = 112.0,
             quantity = 3,
-            orderTag = "FIRST_BUY",
+            orderTag = orderTag,
             internalOrderId = INTERNAL_ORDER_ID,
             externalOrderId = externalOrderId,
             submittedAt = ZonedDateTime.parse("2026-05-30T09:00:00+09:00"),
@@ -391,6 +435,57 @@ class RecoverUnknownOrderSubmissionsServiceTest {
         override suspend fun publishPartiallyFilled(event: OrderPartiallyFilledMessage) = Unit
     }
 
+    private fun orderDto(orderState: OrderStateDto): OrderDto {
+        return OrderDto(
+            id = LEGACY_ORDER_ID,
+            strategyId = "legacy-final-price:TQQQ",
+            stockId = "TQQQ",
+            stockName = "TQQQ",
+            requestedAt = ZonedDateTime.parse("2026-05-30T09:00:00+09:00"),
+            strategyType = StrategyTypeDto.FINAL_PRICE_BATING_V1,
+            purchasedAt = ZonedDateTime.parse("2026-05-30T09:00:00+09:00"),
+            sellingAt = null,
+            purchasePrice = 100.0,
+            sellingPrice = 112.0,
+            quantity = 3,
+            orderState = orderState,
+        )
+    }
+
+    private class FakeStockOrderPort(
+        private var order: OrderDto?,
+    ) : StockOrderPort {
+        val saved: MutableList<OrderDto> = mutableListOf()
+        val savedExternalOrderIds: MutableList<Pair<UUID, String>> = mutableListOf()
+
+        override suspend fun findById(id: UUID): OrderDto? {
+            return order?.takeIf { it.id == id }
+        }
+
+        override suspend fun save(order: OrderDto) {
+            this.order = order
+            saved += order
+        }
+
+        override suspend fun existsByStrategyId(strategyId: String): Boolean = false
+
+        override suspend fun findAllWithNotCompleted(): List<OrderDto> = emptyList()
+
+        override suspend fun findAllWithPurchaseWaiting(): List<OrderDto> = emptyList()
+
+        override suspend fun findByStockIdAndQuantity(stockId: String, quantity: Int): OrderDto? = null
+
+        override suspend fun saveExternalOrderId(internalOrderId: UUID, externalOrderId: String) {
+            savedExternalOrderIds += internalOrderId to externalOrderId
+        }
+
+        override suspend fun findByExternalOrderId(value: String): OrderDto? {
+            return savedExternalOrderIds
+                .firstOrNull { it.second == value }
+                ?.let { order }
+        }
+    }
+
     private class FakeOperationalAlertPort : OperationalAlertPort {
         val orderSubmissionFailed: MutableList<OrderSubmissionFailureAlert> = mutableListOf()
         val submissionUnknown: MutableList<SubmissionUnknownAlert> = mutableListOf()
@@ -412,6 +507,7 @@ class RecoverUnknownOrderSubmissionsServiceTest {
     companion object {
         private val ORDER_INTENT_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000001")
         private val INTERNAL_ORDER_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000002")
+        private val LEGACY_ORDER_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000010")
         private val CHECKED_AT: ZonedDateTime = ZonedDateTime.parse("2026-06-02T09:00:00+09:00")
     }
 }
