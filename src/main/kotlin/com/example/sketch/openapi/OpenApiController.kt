@@ -405,7 +405,7 @@ internal fun OpenApiResponse.toDailyExecutionOrdersResponse(): DailyExecutionOrd
             }
         }
 
-        val output2Object = this@toDailyExecutionOrdersResponse.objectNode("output2", "OUTPUT2")
+        val output2Object = this@toDailyExecutionOrdersResponse.summaryObjectNode("output2", "OUTPUT2")
         output2 = dailyExecutionOrdersOutput2 {
             totOrdQty = output2Object?.text("tot_ord_qty", "TOT_ORD_QTY").orEmpty()
             totCcldQty = output2Object?.text("tot_ccld_qty", "TOT_CCLD_QTY").orEmpty()
@@ -430,6 +430,15 @@ private fun JsonNode.objectNode(vararg fieldNames: String): JsonNode? {
         .asSequence()
         .map { path(it) }
         .firstOrNull { !it.isMissingNode && !it.isNull }
+}
+
+private fun JsonNode.summaryObjectNode(vararg fieldNames: String): JsonNode? {
+    val node = objectNode(*fieldNames) ?: return null
+    return when {
+        node.isObject -> node
+        node.isArray -> node.firstOrNull { it.isObject }
+        else -> null
+    }
 }
 
 data class GetProgramTradeInfoPerIndividualRequest(

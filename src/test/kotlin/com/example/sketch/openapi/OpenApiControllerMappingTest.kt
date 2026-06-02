@@ -220,6 +220,35 @@ class OpenApiControllerMappingTest {
     }
 
     @Test
+    fun `maps daily execution output2 array summary`() {
+        val response = ParseJsonResponse.parseJsonString(
+            """
+            {
+              "rt_cd": "0",
+              "msg_cd": "MCA00000",
+              "msg1": "ok",
+              "output1": [],
+              "OUTPUT2": [
+                {
+                  "TOT_ORD_QTY": "10",
+                  "TOT_CCLD_QTY": "4",
+                  "TOT_CCLD_AMT": "279600",
+                  "PRSM_TLEX_SMTL": "0",
+                  "PCHS_AVG_PRIC": "69900"
+                }
+              ]
+            }
+            """.trimIndent(),
+        ).toDailyExecutionOrdersResponse()
+
+        assertEquals("10", response.output2.totOrdQty)
+        assertEquals("4", response.output2.totCcldQty)
+        assertEquals("279600", response.output2.totCcldAmt)
+        assertEquals("0", response.output2.prsmTlexSmtl)
+        assertEquals("69900", response.output2.pchsAvgPric)
+    }
+
+    @Test
     fun `maps empty daily execution response without output nodes`() {
         val response = ParseJsonResponse.parseJsonString(
             """
