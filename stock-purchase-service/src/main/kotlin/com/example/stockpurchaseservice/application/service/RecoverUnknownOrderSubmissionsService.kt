@@ -79,10 +79,19 @@ class RecoverUnknownOrderSubmissionsService(
             BrokerOrderStatus.FILLED -> markSubmittedWithoutRepublishing(submission, status)?.let { recovered ->
                 recoverFillFromStatus(recovered, status)
             }
+            BrokerOrderStatus.PARTIALLY_FILLED -> {
+                val pending = submission.copy(
+                    externalOrderId = status.externalOrderId ?: submission.externalOrderId,
+                    statusReason = status.reason ?: submission.statusReason,
+                    lastStatusCheckedAt = status.checkedAt,
+                )
+                orderIntentSubmissionPort.saveCancelPending(pending)
+                recoverFillFromStatus(pending, status)
+            }
             BrokerOrderStatus.SUBMITTED,
-            BrokerOrderStatus.PARTIALLY_FILLED,
             BrokerOrderStatus.UNKNOWN -> {
                 val pending = submission.copy(
+                    externalOrderId = status.externalOrderId ?: submission.externalOrderId,
                     statusReason = status.reason ?: submission.statusReason,
                     lastStatusCheckedAt = status.checkedAt,
                 )

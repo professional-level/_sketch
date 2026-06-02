@@ -349,6 +349,50 @@ class RecoverUnknownOrderSubmissionsServiceTest {
     }
 
     @Test
+    fun `recovers cancel pending partially filled submission without republishing submitted event`() = runBlocking {
+        val pending = submission(externalOrderId = "broker-1").copy(
+            status = OrderIntentSubmissionStatusDto.CANCEL_PENDING,
+            statusReason = "cancel request accepted by broker",
+        )
+        val submissionPort = FakeOrderIntentSubmissionPort(
+            unknownSubmissions = emptyList(),
+            cancelPendingSubmissions = listOf(pending),
+        )
+        val eventPort = FakeOrderExecutionEventPort()
+        val executionFillPort = FakeExecutionFillPort()
+        val service = RecoverUnknownOrderSubmissionsService(
+            marketService = FakeMarketServicePort(
+                status = BrokerOrderStatusDto(
+                    status = BrokerOrderStatus.PARTIALLY_FILLED,
+                    externalOrderId = "broker-1",
+                    externalExecutionId = "cancel-exec-1",
+                    checkedAt = CHECKED_AT,
+                    orderedQuantity = 3,
+                    cumulativeFilledQuantity = 1,
+                    remainingQuantity = 2,
+                    averageExecutionPrice = 112.5,
+                    brokerReportedAt = BROKER_REPORTED_AT,
+                ),
+            ),
+            orderIntentSubmissionPort = submissionPort,
+            orderExecutionEventPort = eventPort,
+            operationalAlertPort = FakeOperationalAlertPort(),
+            executionFillPort = executionFillPort,
+        )
+
+        service.execute()
+
+        assertEquals(OrderIntentSubmissionStatusDto.CANCEL_PENDING, submissionPort.cancelPending.single().status)
+        assertEquals(CHECKED_AT, submissionPort.cancelPending.single().lastStatusCheckedAt)
+        assertEquals("broker-1", eventPort.partiallyFilled.single().brokerOrderId)
+        assertEquals(1L, eventPort.partiallyFilled.single().filledQuantity)
+        assertEquals("cancel-exec-1", executionFillPort.saved.single().externalExecutionId)
+        assertEquals(emptyList(), eventPort.submitted)
+        assertEquals(emptyList(), eventPort.filled)
+        assertEquals(emptyList(), eventPort.cancelled)
+    }
+
+    @Test
     fun `recovers cancel pending submission to cancelled event`() = runBlocking {
         val pending = submission(externalOrderId = "broker-1").copy(
             status = OrderIntentSubmissionStatusDto.CANCEL_PENDING,
