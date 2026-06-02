@@ -533,20 +533,23 @@ private data class KisCancelableOrderItem(
 ) {
     fun matches(command: BrokerOrderCancelCommand): Boolean {
         val sameOrder = orderId == command.originalOrderId || originalOrderId == command.originalOrderId
-        val sameBranch = command.branchOrderNumber.isNullOrBlank() || branchOrderNumber == command.branchOrderNumber
+        val requestedBranch = command.branchOrderNumber?.trim()
+        val sameBranch = requestedBranch.isNullOrBlank() || branchOrderNumber?.trim() == requestedBranch
         val sameSymbol = symbol.isBlank() || symbol.equals(command.symbol, ignoreCase = true)
         return sameOrder && sameBranch && sameSymbol
     }
 }
 
 private fun JsonNode.toKisCancelableOrderItem(): KisCancelableOrderItem? {
-    val orderId = textOrNull("odno", "ODNO", "ord_no", "ORD_NO", "order_no", "ORDER_NO").orEmpty()
+    val orderId = textOrNull("odno", "ODNO", "ordNo", "ord_no", "ORD_NO", "orderNo", "order_no", "ORDER_NO")
+        .orEmpty()
     val originalOrderId = textOrNull("orgn_odno", "ORGN_ODNO", "orgnOdno")
     val matchableOrderId = orderId.ifBlank { originalOrderId.orEmpty() }
     if (matchableOrderId.isBlank()) return null
     return KisCancelableOrderItem(
         branchOrderNumber = textOrNull(
             "ord_gno_brno",
+            "ordGnoBrno",
             "ORD_GNO_BRNO",
             "krx_fwdg_ord_orgno",
             "KRX_FWDG_ORD_ORGNO",
@@ -554,15 +557,19 @@ private fun JsonNode.toKisCancelableOrderItem(): KisCancelableOrderItem? {
         ),
         orderId = orderId,
         originalOrderId = originalOrderId,
-        symbol = textOrNull("pdno", "PDNO", "prdt_code", "PRDT_CODE").orEmpty(),
+        symbol = textOrNull("pdno", "PDNO", "prdt_code", "prdtCode", "PRDT_CODE").orEmpty(),
         possibleQuantity = longValue(
             "psbl_qty",
+            "psblQty",
             "PSBL_QTY",
             "ord_psbl_qty",
+            "ordPsblQty",
             "ORD_PSBL_QTY",
             "rvse_cncl_psbl_qty",
+            "rvseCnclPsblQty",
             "RVSE_CNCL_PSBL_QTY",
             "psbl_rvse_cncl_qty",
+            "psblRvseCnclQty",
             "PSBL_RVSE_CNCL_QTY",
         ),
     )

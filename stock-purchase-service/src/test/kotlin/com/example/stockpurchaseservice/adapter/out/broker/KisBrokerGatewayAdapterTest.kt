@@ -2378,6 +2378,64 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `domestic cancelable lookup maps camel case order and quantity aliases`() {
+        val exchangeFunction = ResponseExchangeFunction(
+            responses = listOf(
+                jsonResponse(
+                    """
+                    {
+                      "rtCd": "0",
+                      "ctxAreaFk100": "",
+                      "ctxAreaNk100": "",
+                      "output1": [
+                        {
+                          "ordGnoBrno": "00001",
+                          "ordNo": "revised-domestic-order-1",
+                          "orgnOdno": "domestic-order-1",
+                          "prdtCode": "005930",
+                          "psblQty": "2"
+                        }
+                      ]
+                    }
+                    """.trimIndent(),
+                ),
+                protobufResponse(
+                    ApiResponse.StockOrder.newBuilder()
+                        .setRtCd("0")
+                        .setOutput(
+                            ApiResponse.Output.newBuilder()
+                                .setODNO("cancel-order-1")
+                                .build(),
+                        )
+                        .build(),
+                ),
+            ),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        val submission = adapter.cancelOrder(
+            brokerCancelCommand(
+                market = StockOrderMarket.DOMESTIC,
+                symbol = "005930",
+                originalOrderId = "domestic-order-1",
+                branchOrderNumber = "00001",
+                price = 0.0,
+                quantity = 2,
+                orderType = StockOrderType.LIMIT,
+                isMock = false,
+            ),
+        )
+
+        assertEquals("cancel-order-1", submission.externalOrderId)
+        assertEquals(2, exchangeFunction.requests.size)
+        assertEquals("/open-api/trading/order-rvsecncl", exchangeFunction.requests[1].url().path)
+    }
+
+    @Test
     fun `domestic cancelable lookup preserves uppercase kis business failure`() {
         val exchangeFunction = ResponseExchangeFunction(
             responses = listOf(
