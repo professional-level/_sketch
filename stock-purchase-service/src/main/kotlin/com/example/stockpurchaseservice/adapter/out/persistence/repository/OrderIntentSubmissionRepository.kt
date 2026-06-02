@@ -26,6 +26,15 @@ internal class OrderIntentSubmissionRepository :
         }.awaitSuspending().firstOrNull()
     }
 
+    suspend fun findByIdempotencyKey(idempotencyKey: String): OrderIntentSubmissionEntity? {
+        return sessionFactory.withSession { session ->
+            session.createQuery(
+                "FROM OrderIntentSubmissionEntity o WHERE o.idempotencyKey = :idempotencyKey",
+                OrderIntentSubmissionEntity::class.java,
+            ).setParameter("idempotencyKey", idempotencyKey).resultList
+        }.awaitSuspending().firstOrNull()
+    }
+
     suspend fun findByStatus(status: OrderIntentSubmissionStatus): List<OrderIntentSubmissionEntity> {
         return sessionFactory.withSession { session ->
             session.createQuery(

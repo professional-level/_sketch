@@ -44,7 +44,7 @@ class SubmitOrderIntentService(
     override suspend fun execute(command: SubmitOrderIntentCommand): SubmitOrderIntentResult {
         val started = processedEventPort.tryStart(command.eventId, command.idempotencyKey)
         if (!started) {
-            return SubmitOrderIntentResult(OrderIntentSubmissionStatus.SKIPPED_DUPLICATE)
+            return duplicateResult(command.idempotencyKey)
         }
 
         return try {
@@ -109,6 +109,30 @@ class SubmitOrderIntentService(
             }
             processedEventPort.markFailed(command.eventId, exception.message)
             throw exception
+        }
+    }
+
+    private suspend fun duplicateResult(idempotencyKey: String): SubmitOrderIntentResult {
+        val existing = orderIntentSubmissionPort.findByIdempotencyKey(idempotencyKey)
+        return when (existing?.status) {
+            OrderIntentSubmissionStatusDto.SUBMITTED,
+            OrderIntentSubmissionStatusDto.CANCEL_PENDING,
+            OrderIntentSubmissionStatusDto.CANCELLED -> SubmitOrderIntentResult(
+                status = OrderIntentSubmissionStatus.SKIPPED_DUPLICATE,
+                externalOrderId = existing.externalOrderId,
+                branchOrderNumber = existing.branchOrderNumber,
+            )
+            OrderIntentSubmissionStatusDto.SUBMISSION_UNKNOWN -> SubmitOrderIntentResult(
+                status = OrderIntentSubmissionStatus.SUBMISSION_UNKNOWN,
+                externalOrderId = existing.externalOrderId,
+                branchOrderNumber = existing.branchOrderNumber,
+            )
+            OrderIntentSubmissionStatusDto.REJECTED -> SubmitOrderIntentResult(
+                status = OrderIntentSubmissionStatus.REJECTED,
+                externalOrderId = existing.externalOrderId,
+                branchOrderNumber = existing.branchOrderNumber,
+            )
+            null -> SubmitOrderIntentResult(OrderIntentSubmissionStatus.SKIPPED_DUPLICATE)
         }
     }
 

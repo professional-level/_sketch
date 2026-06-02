@@ -19,6 +19,7 @@ import com.example.stockpurchaseservice.application.port.out.OrderFilledMessage
 import com.example.stockpurchaseservice.application.port.out.OrderPartiallyFilledMessage
 import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionDto
 import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionPort
+import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionStatusDto
 import com.example.stockpurchaseservice.application.port.out.OrderRejectedMessage
 import com.example.stockpurchaseservice.application.port.out.OrderRiskAssessmentCommand
 import com.example.stockpurchaseservice.application.port.out.OrderRiskAssessmentResult
@@ -160,6 +161,49 @@ class SubmitOrderIntentServiceTest {
         )
 
         assertEquals(OrderIntentSubmissionStatus.SKIPPED_DUPLICATE, result.status)
+        assertEquals(emptyList(), marketPort.sellOrders)
+        assertEquals(emptyList(), eventPort.submitted)
+    }
+
+    @Test
+    fun `returns existing broker ids when duplicate order intent was already submitted`() = runBlocking {
+        val marketPort = FakeMarketServicePort()
+        val processedEventPort = FakeProcessedEventPort(startResult = false)
+        val eventPort = FakeOrderExecutionEventPort()
+        val submissionPort = FakeOrderIntentSubmissionPort(
+            existingSubmission = submission(
+                idempotencyKey = "duplicate-submitted",
+                externalOrderId = "broker-existing",
+                branchOrderNumber = "branch-existing",
+            ),
+        )
+        val service = SubmitOrderIntentService(
+            marketPort,
+            processedEventPort,
+            submissionPort,
+            eventPort,
+            FakeOrderRiskControlPort(),
+            FakeOperationalAlertPort(),
+        )
+
+        val result = service.execute(
+            SubmitOrderIntentCommand(
+                eventId = UUID.randomUUID(),
+                idempotencyKey = "duplicate-submitted",
+                strategyExecutionId = "laor-v4-strategy:TQQQ",
+                symbol = "TQQQ",
+                side = OrderIntentSide.SELL,
+                orderType = OrderIntentType.LIMIT,
+                price = 112.0,
+                quantity = 1,
+                orderTag = "TARGET_SELL",
+                createdAt = ZonedDateTime.parse("2026-05-30T09:00:00+09:00"),
+            ),
+        )
+
+        assertEquals(OrderIntentSubmissionStatus.SKIPPED_DUPLICATE, result.status)
+        assertEquals("broker-existing", result.externalOrderId)
+        assertEquals("branch-existing", result.branchOrderNumber)
         assertEquals(emptyList(), marketPort.sellOrders)
         assertEquals(emptyList(), eventPort.submitted)
     }
@@ -436,7 +480,33 @@ class SubmitOrderIntentServiceTest {
         }
     }
 
-    private class FakeOrderIntentSubmissionPort : OrderIntentSubmissionPort {
+    private fun submission(
+        idempotencyKey: String,
+        externalOrderId: String?,
+        branchOrderNumber: String? = null,
+        status: OrderIntentSubmissionStatusDto = OrderIntentSubmissionStatusDto.SUBMITTED,
+    ): OrderIntentSubmissionDto {
+        return OrderIntentSubmissionDto(
+            orderIntentId = UUID.randomUUID(),
+            idempotencyKey = idempotencyKey,
+            strategyExecutionId = "laor-v4-strategy:TQQQ",
+            symbol = "TQQQ",
+            side = OrderIntentSide.SELL,
+            orderType = OrderIntentType.LIMIT,
+            submittedPrice = 112.0,
+            quantity = 1,
+            orderTag = "TARGET_SELL",
+            internalOrderId = UUID.randomUUID(),
+            externalOrderId = externalOrderId,
+            branchOrderNumber = branchOrderNumber,
+            submittedAt = ZonedDateTime.parse("2026-05-30T09:00:00+09:00"),
+            status = status,
+        )
+    }
+
+    private class FakeOrderIntentSubmissionPort(
+        private val existingSubmission: OrderIntentSubmissionDto? = null,
+    ) : OrderIntentSubmissionPort {
         val saved: MutableList<OrderIntentSubmissionDto> = mutableListOf()
         val unknown: MutableList<OrderIntentSubmissionDto> = mutableListOf()
         val rejected: MutableList<OrderIntentSubmissionDto> = mutableListOf()
@@ -462,6 +532,10 @@ class SubmitOrderIntentServiceTest {
 
         override suspend fun findByExternalOrderId(externalOrderId: String): OrderIntentSubmissionDto? {
             return saved.firstOrNull { it.externalOrderId == externalOrderId }
+        }
+
+        override suspend fun findByIdempotencyKey(idempotencyKey: String): OrderIntentSubmissionDto? {
+            return existingSubmission?.takeIf { it.idempotencyKey == idempotencyKey }
         }
 
         override suspend fun findUnknownSubmissions(): List<OrderIntentSubmissionDto> = unknown

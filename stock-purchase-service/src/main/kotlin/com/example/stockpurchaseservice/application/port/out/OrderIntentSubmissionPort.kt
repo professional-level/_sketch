@@ -13,6 +13,7 @@ interface OrderIntentSubmissionPort {
     suspend fun saveCancelled(submission: OrderIntentSubmissionDto)
     suspend fun saveCancelPending(submission: OrderIntentSubmissionDto)
     suspend fun findByExternalOrderId(externalOrderId: String): OrderIntentSubmissionDto?
+    suspend fun findByIdempotencyKey(idempotencyKey: String): OrderIntentSubmissionDto? = null
     suspend fun findUnknownSubmissions(): List<OrderIntentSubmissionDto>
     suspend fun findCancelPendingSubmissions(): List<OrderIntentSubmissionDto>
 }

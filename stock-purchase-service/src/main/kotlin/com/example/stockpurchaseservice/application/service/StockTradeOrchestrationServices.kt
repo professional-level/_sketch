@@ -330,11 +330,19 @@ private suspend fun submitLegacySellOrder(
     }
 
     when (result.status) {
-        OrderIntentSubmissionStatus.SUBMITTED,
-        OrderIntentSubmissionStatus.SKIPPED_DUPLICATE -> {
+        OrderIntentSubmissionStatus.SUBMITTED -> {
             order.changeOrderState(OrderState.SELLING_IN_PROCESS)
             result.externalOrderId?.let { externalOrderId ->
                 stockOrderRepository.save(order, ExternalOrderId(externalOrderId))
+                return
+            }
+        }
+        OrderIntentSubmissionStatus.SKIPPED_DUPLICATE -> {
+            if (result.externalOrderId == null) {
+                order.changeOrderState(OrderState.SUBMISSION_UNKNOWN)
+            } else {
+                order.changeOrderState(OrderState.SELLING_IN_PROCESS)
+                stockOrderRepository.save(order, ExternalOrderId(result.externalOrderId))
                 return
             }
         }

@@ -48,6 +48,10 @@ internal class OrderIntentSubmissionAdapter(
         return orderIntentSubmissionRepository.findByExternalOrderId(externalOrderId)?.toDto()
     }
 
+    override suspend fun findByIdempotencyKey(idempotencyKey: String): OrderIntentSubmissionDto? {
+        return orderIntentSubmissionRepository.findByIdempotencyKey(idempotencyKey)?.toDto()
+    }
+
     override suspend fun findUnknownSubmissions(): List<OrderIntentSubmissionDto> {
         return orderIntentSubmissionRepository
             .findByStatus(OrderIntentSubmissionStatus.SUBMISSION_UNKNOWN)

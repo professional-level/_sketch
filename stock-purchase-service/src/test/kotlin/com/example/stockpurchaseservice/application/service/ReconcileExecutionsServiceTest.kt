@@ -469,6 +469,29 @@ class ReconcileExecutionsServiceTest {
     }
 
     @Test
+    fun `legacy sell scheduler keeps duplicate without broker id recoverable`() = runBlocking {
+        val stockOrderRepository = FakeStockOrderRepository(
+            notCompletedOrders = listOf(purchaseOrder(orderState = OrderState.PURCHASE_COMPLETED)),
+        )
+        val submitOrderIntentUseCase = FakeSubmitOrderIntentUseCase(
+            status = OrderIntentSubmissionStatus.SKIPPED_DUPLICATE,
+            externalOrderId = null,
+        )
+        val service = CreateSellOrdersByStrategyService(
+            stockOrderRepository = stockOrderRepository,
+            submitOrderIntentUseCase = submitOrderIntentUseCase,
+        )
+
+        service.execute()
+
+        assertEquals(
+            listOf(OrderState.SELLING_WAITING, OrderState.SUBMISSION_UNKNOWN),
+            stockOrderRepository.savedStates,
+        )
+        assertEquals(emptyList(), stockOrderRepository.savedExternalOrderIds)
+    }
+
+    @Test
     fun `legacy sell scheduler ignores existing sell orders`() = runBlocking {
         val stockOrderRepository = FakeStockOrderRepository(
             notCompletedOrders = listOf(sellingOrder(orderState = OrderState.SELLING_IN_PROCESS)),
