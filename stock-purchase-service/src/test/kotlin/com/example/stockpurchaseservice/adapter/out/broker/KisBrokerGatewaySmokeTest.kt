@@ -78,6 +78,60 @@ class KisBrokerGatewaySmokeTest {
     }
 
     @Test
+    @EnabledIfEnvironmentVariable(named = "KIS_BROKER_DOMESTIC_QUERY_SMOKE_ENABLED", matches = "true")
+    fun `mock domestic account snapshot and order history query-only smoke`() {
+        val config = SmokeConfig.fromEnvironment()
+        assumeTrue(!config.submitEnabled, "Run domestic query-only smoke separately before submit smoke")
+        val adapter = brokerGateway(config)
+
+        val snapshot = runBrokerSmokeQueryStep("mock domestic account snapshot", "mock-domestic", config) {
+            adapter.findAccountSnapshot(
+                BrokerAccountSnapshotQuery(
+                    market = StockOrderMarket.DOMESTIC,
+                    exchange = config.domesticExchange,
+                    currency = config.domesticCurrency,
+                    isMock = true,
+                ),
+            )
+        }
+        val history = runBrokerSmokeQueryStep("mock domestic order history", "mock-domestic", config) {
+            adapter.findOrderHistory(config.domesticHistoryQuery(isMock = true))
+        }
+
+        assertEquals(StockOrderMarket.DOMESTIC, snapshot.market)
+        assertEquals(config.domesticExchange, snapshot.exchange)
+        assertEquals(config.domesticCurrency, snapshot.currency)
+        assertTrue(history.all { it.externalOrderId.isNotBlank() })
+    }
+
+    @Test
+    @EnabledIfEnvironmentVariable(named = "KIS_BROKER_REAL_DOMESTIC_QUERY_SMOKE_ENABLED", matches = "true")
+    fun `real domestic account snapshot and order history query-only smoke`() {
+        val config = SmokeConfig.fromEnvironment()
+        assumeTrue(!config.submitEnabled, "Unset KIS_BROKER_SMOKE_SUBMIT_ENABLED for real domestic query-only smoke")
+        val adapter = brokerGateway(config)
+
+        val snapshot = runBrokerSmokeQueryStep("real domestic account snapshot", "real-domestic", config) {
+            adapter.findAccountSnapshot(
+                BrokerAccountSnapshotQuery(
+                    market = StockOrderMarket.DOMESTIC,
+                    exchange = config.domesticExchange,
+                    currency = config.domesticCurrency,
+                    isMock = false,
+                ),
+            )
+        }
+        val history = runBrokerSmokeQueryStep("real domestic order history", "real-domestic", config) {
+            adapter.findOrderHistory(config.domesticHistoryQuery(isMock = false))
+        }
+
+        assertEquals(StockOrderMarket.DOMESTIC, snapshot.market)
+        assertEquals(config.domesticExchange, snapshot.exchange)
+        assertEquals(config.domesticCurrency, snapshot.currency)
+        assertTrue(history.all { it.externalOrderId.isNotBlank() })
+    }
+
+    @Test
     @EnabledIfEnvironmentVariable(named = "KIS_BROKER_SMOKE_ENABLED", matches = "true")
     fun `mock submit query and cancel smoke`() {
         val config = SmokeConfig.fromEnvironment()
@@ -233,6 +287,9 @@ class KisBrokerGatewaySmokeTest {
         val symbol: String,
         val exchange: String,
         val currency: String,
+        val domesticSymbol: String,
+        val domesticExchange: String,
+        val domesticCurrency: String,
         val price: Double,
         val quantity: Int,
         val submitEnabled: Boolean,
@@ -245,6 +302,9 @@ class KisBrokerGatewaySmokeTest {
                 "symbol=$symbol, " +
                 "exchange=$exchange, " +
                 "currency=$currency, " +
+                "domesticSymbol=$domesticSymbol, " +
+                "domesticExchange=$domesticExchange, " +
+                "domesticCurrency=$domesticCurrency, " +
                 "price=$price, " +
                 "quantity=$quantity, " +
                 "submitEnabled=$submitEnabled, " +
@@ -265,6 +325,18 @@ class KisBrokerGatewaySmokeTest {
             )
         }
 
+        fun domesticHistoryQuery(isMock: Boolean): BrokerOrderHistoryQuery {
+            val now = ZonedDateTime.now(BROKER_ORDER_ZONE)
+            return BrokerOrderHistoryQuery(
+                market = StockOrderMarket.DOMESTIC,
+                symbol = domesticSymbol,
+                exchange = domesticExchange,
+                from = now.minusDays(1),
+                to = now.plusDays(1),
+                isMock = isMock,
+            )
+        }
+
         companion object {
             fun fromEnvironment(): SmokeConfig {
                 return SmokeConfig(
@@ -272,6 +344,9 @@ class KisBrokerGatewaySmokeTest {
                     symbol = setting("KIS_BROKER_SMOKE_SYMBOL", "TQQQ").uppercase(),
                     exchange = setting("KIS_BROKER_SMOKE_EXCHANGE", "NASD").uppercase(),
                     currency = setting("KIS_BROKER_SMOKE_CURRENCY", "USD").uppercase(),
+                    domesticSymbol = setting("KIS_BROKER_SMOKE_DOMESTIC_SYMBOL", "005930"),
+                    domesticExchange = setting("KIS_BROKER_SMOKE_DOMESTIC_EXCHANGE", "KRX").uppercase(),
+                    domesticCurrency = setting("KIS_BROKER_SMOKE_DOMESTIC_CURRENCY", "KRW").uppercase(),
                     price = setting("KIS_BROKER_SMOKE_PRICE", "1").toDouble(),
                     quantity = setting("KIS_BROKER_SMOKE_QUANTITY", "1").toInt(),
                     submitEnabled = setting("KIS_BROKER_SMOKE_SUBMIT_ENABLED", "false").toBooleanStrictOrNull()

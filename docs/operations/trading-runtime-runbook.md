@@ -112,6 +112,23 @@ This verifies:
 - overseas mock order history through `/open-api/overseas/trading/inquire-ccnl`
 - JSON/protobuf mapping through the same `KisBrokerGatewayAdapter` used by `stock-purchase-service`
 
+Domestic mock query-only smoke:
+
+```powershell
+# Optional when the shell does not already use JDK 17.
+$env:JAVA_HOME='C:\path\to\jdk17'
+$env:Path="$env:JAVA_HOME\bin;$env:Path"
+$env:KIS_BROKER_DOMESTIC_QUERY_SMOKE_ENABLED='true'
+$env:KIS_BROKER_SMOKE_BASE_URL='http://localhost:8079'
+$env:KIS_BROKER_SMOKE_DOMESTIC_SYMBOL='005930'
+$env:KIS_BROKER_SMOKE_DOMESTIC_EXCHANGE='KRX'
+$env:KIS_BROKER_SMOKE_DOMESTIC_CURRENCY='KRW'
+Remove-Item Env:\KIS_BROKER_SMOKE_SUBMIT_ENABLED -ErrorAction SilentlyContinue
+.\gradlew.bat --no-daemon :stock-purchase-service:test --tests "com.example.stockpurchaseservice.adapter.out.broker.KisBrokerGatewaySmokeTest" --rerun-tasks
+```
+
+This verifies domestic mock account snapshot through `/open-api/trading/inquire-balance` and domestic mock order history through `/open-api/trading/inquire-daily-ccld`.
+
 Real-account query-only smoke:
 
 ```powershell
@@ -128,6 +145,23 @@ Remove-Item Env:\KIS_BROKER_SMOKE_SUBMIT_ENABLED -ErrorAction SilentlyContinue
 ```
 
 This verifies the real-account overseas balance and order-history wrapper routes without placing broker orders. The smoke does not supply credentials itself; the running root wrapper must receive real KIS credentials and the real account number from runtime-injected secrets. Keep the execution note redacted: record pass/fail, route, market, and message codes only, never app keys, access tokens, account numbers, account tails, or raw KIS payloads.
+
+Real-account domestic query-only smoke:
+
+```powershell
+# Optional when the shell does not already use JDK 17.
+$env:JAVA_HOME='C:\path\to\jdk17'
+$env:Path="$env:JAVA_HOME\bin;$env:Path"
+$env:KIS_BROKER_REAL_DOMESTIC_QUERY_SMOKE_ENABLED='true'
+$env:KIS_BROKER_SMOKE_BASE_URL='http://localhost:8079'
+$env:KIS_BROKER_SMOKE_DOMESTIC_SYMBOL='005930'
+$env:KIS_BROKER_SMOKE_DOMESTIC_EXCHANGE='KRX'
+$env:KIS_BROKER_SMOKE_DOMESTIC_CURRENCY='KRW'
+Remove-Item Env:\KIS_BROKER_SMOKE_SUBMIT_ENABLED -ErrorAction SilentlyContinue
+.\gradlew.bat --no-daemon :stock-purchase-service:test --tests "com.example.stockpurchaseservice.adapter.out.broker.KisBrokerGatewaySmokeTest" --rerun-tasks
+```
+
+This verifies the real-account domestic balance and daily execution-history wrapper routes without placing broker orders. Record only redacted route, market, pass/fail, and message-code evidence.
 
 FX provider smoke:
 
