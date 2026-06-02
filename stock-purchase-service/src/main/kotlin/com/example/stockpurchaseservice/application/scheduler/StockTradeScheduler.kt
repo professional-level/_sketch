@@ -11,6 +11,7 @@ import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
 
@@ -82,21 +83,56 @@ internal class TradingHoursStockTradeScheduleGate(
 
         val zone = overseasUs.zoneId.toZoneIdOrNull() ?: return false
         val localDate = now.withZoneSameInstant(zone).toLocalDate()
+        val localTime = now.withZoneSameInstant(zone).toLocalTime()
         if (overseasUs.weekdaysOnly && localDate.dayOfWeek in CLOSED_WEEKDAYS) return false
         if (overseasUs.isConfiguredHoliday(localDate)) return false
         if (overseasUs.defaultUsEquityCalendarEnabled && UsEquityMarketCalendar.isMarketHoliday(localDate)) {
             return false
         }
 
-        return true
+        val open = overseasUs.regularOpen.toLocalTimeOrNull() ?: return false
+        val regularClose = overseasUs.regularClose.toLocalTimeOrNull() ?: return false
+        val close = overseasUs.effectiveClose(localDate, regularClose) ?: return false
+        if (!close.isAfter(open)) return false
+
+        return !localTime.isBefore(open) && localTime.isBefore(close)
     }
 
     private fun OrderRiskProperties.MarketTradingHours.isConfiguredHoliday(date: LocalDate): Boolean {
         return date in holidays.mapNotNull { it.toLocalDateOrNull() }.toSet()
     }
 
+    private fun OrderRiskProperties.MarketTradingHours.effectiveClose(
+        date: LocalDate,
+        regularCloseTime: LocalTime,
+    ): LocalTime? {
+        val configuredEarlyCloseTime = earlyCloseTimeFor(date)
+        if (configuredEarlyCloseTime == null) {
+            return if (defaultUsEquityCalendarEnabled) {
+                UsEquityMarketCalendar.earlyCloseTime(date) ?: regularCloseTime
+            } else {
+                regularCloseTime
+            }
+        }
+        if (configuredEarlyCloseTime.isNullOrBlank()) return null
+        return configuredEarlyCloseTime.toLocalTimeOrNull()
+    }
+
+    private fun OrderRiskProperties.MarketTradingHours.earlyCloseTimeFor(date: LocalDate): String? {
+        val dateKey = date.toString()
+        if (earlyCloseTimes.containsKey(dateKey)) {
+            return earlyCloseTimes[dateKey]
+        }
+        val earlyCloseDates = earlyCloseDates.mapNotNull { it.toLocalDateOrNull() }.toSet()
+        return earlyCloseTime.takeIf { date in earlyCloseDates }
+    }
+
     private fun String.toZoneIdOrNull(): ZoneId? {
         return runCatching { ZoneId.of(trim()) }.getOrNull()
+    }
+
+    private fun String.toLocalTimeOrNull(): LocalTime? {
+        return runCatching { LocalTime.parse(trim()) }.getOrNull()
     }
 
     private fun String.toLocalDateOrNull(): LocalDate? {

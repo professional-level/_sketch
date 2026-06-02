@@ -33,6 +33,33 @@ class StockTradeSchedulerTest {
     }
 
     @Test
+    fun `trading gate blocks before overseas us market open`() {
+        val gate = TradingHoursStockTradeScheduleGate(OrderRiskProperties())
+
+        val shouldRun = gate.shouldRunAt(ZonedDateTime.parse("2026-07-06T09:29:00-04:00[America/New_York]"))
+
+        assertFalse(shouldRun)
+    }
+
+    @Test
+    fun `trading gate blocks after overseas us market close`() {
+        val gate = TradingHoursStockTradeScheduleGate(OrderRiskProperties())
+
+        val shouldRun = gate.shouldRunAt(ZonedDateTime.parse("2026-07-06T16:00:00-04:00[America/New_York]"))
+
+        assertFalse(shouldRun)
+    }
+
+    @Test
+    fun `trading gate blocks after default overseas us early close`() {
+        val gate = TradingHoursStockTradeScheduleGate(OrderRiskProperties())
+
+        val shouldRun = gate.shouldRunAt(ZonedDateTime.parse("2026-11-27T13:01:00-05:00[America/New_York]"))
+
+        assertFalse(shouldRun)
+    }
+
+    @Test
     fun `trading gate falls back to existing scheduler behavior when disabled`() {
         val properties = OrderRiskProperties().apply {
             tradingHours.enabled = false
