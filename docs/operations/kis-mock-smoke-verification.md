@@ -160,3 +160,4 @@ Next action:
 
 - Use a KIS mock account that is enabled for overseas mock orders, then rerun submit/query/cancel smoke.
 - Keep query-only smoke and submit smoke as separate executions to avoid KIS per-second transaction limits.
+- Run `KisWrapperFxRateSmokeTest` against a running root wrapper to verify the configured `provider=kis-wrapper` currency-pair mapping before enabling broker-backed FX in risk checks.

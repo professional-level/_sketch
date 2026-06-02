@@ -98,6 +98,25 @@ This verifies:
 - overseas mock order history through `/open-api/overseas/trading/inquire-ccnl`
 - JSON/protobuf mapping through the same `KisBrokerGatewayAdapter` used by `stock-purchase-service`
 
+FX provider smoke:
+
+```powershell
+# Optional when the shell does not already use JDK 17.
+$env:JAVA_HOME='C:\path\to\jdk17'
+$env:Path="$env:JAVA_HOME\bin;$env:Path"
+$env:KIS_FX_SMOKE_ENABLED='true'
+$env:KIS_FX_SMOKE_BASE_URL='http://localhost:8079'
+$env:KIS_FX_SMOKE_SOURCE_CURRENCY='KRW'
+$env:KIS_FX_SMOKE_BASE_CURRENCY='USD'
+$env:KIS_FX_SMOKE_MARKET_DIV_CODE='KX'
+$env:KIS_FX_SMOKE_SYMBOL='USDKRW'
+$env:KIS_FX_SMOKE_INVERT='true'
+$env:KIS_FX_SMOKE_IS_MOCK='true'
+.\gradlew.bat --no-daemon :stock-purchase-service:test --tests "com.example.stockpurchaseservice.adapter.out.risk.KisWrapperFxRateSmokeTest" --rerun-tasks
+```
+
+The FX smoke is query-only and does not place orders. It verifies the same `provider=kis-wrapper` path used by the risk guard. If KIS uses a different quote symbol for the desired currency pair, adjust `KIS_FX_SMOKE_SYMBOL`, `KIS_FX_SMOKE_MARKET_DIV_CODE`, and `KIS_FX_SMOKE_INVERT` before recording the result.
+
 Submit/query/cancel smoke is opt-in because it places a mock order:
 
 ```powershell
