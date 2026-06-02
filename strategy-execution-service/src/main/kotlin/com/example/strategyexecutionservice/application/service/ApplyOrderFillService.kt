@@ -26,7 +26,9 @@ class ApplyOrderFillService(
 
     override suspend fun execute(command: ApplyOrderFillCommand): ApplyOrderFillResult {
         val current = strategyExecutionStatePort.findLaorV4Strategy(command.strategyExecutionId)
-            ?: return ApplyOrderFillResult(command.strategyExecutionId, ApplyOrderFillStatus.STRATEGY_NOT_FOUND)
+        if (current == null) {
+            return applyFinalPriceBatingFill(command)
+        }
 
         if (!orderEventPort.tryRecord(command.toRecord())) {
             return ApplyOrderFillResult(command.strategyExecutionId, ApplyOrderFillStatus.SKIPPED_DUPLICATE)
@@ -76,6 +78,51 @@ class ApplyOrderFillService(
         )
 
         return ApplyOrderFillResult(command.strategyExecutionId, ApplyOrderFillStatus.APPLIED)
+    }
+
+    private suspend fun applyFinalPriceBatingFill(command: ApplyOrderFillCommand): ApplyOrderFillResult {
+        val current = strategyExecutionStatePort.findFinalPriceBatingV1Strategy(command.strategyExecutionId)
+            ?: return ApplyOrderFillResult(command.strategyExecutionId, ApplyOrderFillStatus.STRATEGY_NOT_FOUND)
+
+        if (!orderEventPort.tryRecord(command.toRecord())) {
+            return ApplyOrderFillResult(command.strategyExecutionId, ApplyOrderFillStatus.SKIPPED_DUPLICATE)
+        }
+
+        if (current.status == StrategyExecutionLifecycleStatus.COMPLETED) {
+            return ApplyOrderFillResult(command.strategyExecutionId, ApplyOrderFillStatus.IGNORED_COMPLETED)
+        }
+
+        val nextFilledQuantity = (current.filledQuantity + command.filledQuantity).coerceAtMost(current.quantity)
+        val addedQuantity = nextFilledQuantity - current.filledQuantity
+        val nextAverageFilledPrice = weightedAverage(
+            currentQuantity = current.filledQuantity,
+            currentAverage = current.averageFilledPrice,
+            addedQuantity = addedQuantity,
+            addedPrice = command.filledPrice,
+        )
+        val completed = command.fillKind == OrderFillKind.FILLED || nextFilledQuantity >= current.quantity
+        strategyExecutionStatePort.saveFinalPriceBatingV1Strategy(
+            current.copy(
+                filledQuantity = nextFilledQuantity,
+                averageFilledPrice = nextAverageFilledPrice,
+                status = if (completed) StrategyExecutionLifecycleStatus.COMPLETED else current.status,
+                completedAt = if (completed) command.filledAt else current.completedAt,
+            ),
+        )
+
+        return ApplyOrderFillResult(command.strategyExecutionId, ApplyOrderFillStatus.APPLIED)
+    }
+
+    private fun weightedAverage(
+        currentQuantity: Long,
+        currentAverage: Double?,
+        addedQuantity: Long,
+        addedPrice: Double,
+    ): Double {
+        if (addedQuantity <= 0) return currentAverage ?: addedPrice
+        if (currentQuantity <= 0 || currentAverage == null) return addedPrice
+        val totalQuantity = currentQuantity + addedQuantity
+        return ((currentAverage * currentQuantity) + (addedPrice * addedQuantity)) / totalQuantity
     }
 }
 

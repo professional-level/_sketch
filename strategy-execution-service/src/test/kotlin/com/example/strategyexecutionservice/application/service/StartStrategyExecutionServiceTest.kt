@@ -15,6 +15,7 @@ import com.example.strategyexecutionservice.application.port.out.MarketDataPort
 import com.example.strategyexecutionservice.application.port.out.OrderIntentMessage
 import com.example.strategyexecutionservice.application.port.out.OrderIntentPort
 import com.example.strategyexecutionservice.application.port.out.OrderTradingEnvironment
+import com.example.strategyexecutionservice.application.port.out.FinalPriceBatingV1ExecutionState
 import com.example.strategyexecutionservice.application.port.out.StrategyExecutionStatePort
 import com.example.strategyexecutionservice.application.port.out.StrategyMarketDataSnapshot
 import com.example.strategyexecutionservice.domain.strategy.execution.OrderSide
@@ -29,9 +30,10 @@ class StartStrategyExecutionServiceTest {
 
     @Test
     fun `starts final price bating by publishing single buy order intent`() = runBlocking {
+        val statePort = FakeStrategyExecutionStatePort()
         val orderIntentPort = FakeOrderIntentPort()
         val service = StartStrategyExecutionService(
-            strategyExecutionStatePort = FakeStrategyExecutionStatePort(),
+            strategyExecutionStatePort = statePort,
             registerLaorV4StrategyExecutionUseCase = FakeRegisterLaorUseCase(),
             runStrategyExecutionUseCase = FakeRunStrategyExecutionUseCase(),
             marketDataPort = FakeMarketDataPort(),
@@ -64,6 +66,52 @@ class StartStrategyExecutionServiceTest {
             assertEquals(2, quantity)
             assertEquals("ENTRY_BUY", orderTag)
             assertEquals(OrderTradingEnvironment.MOCK, tradingEnvironment)
+        }
+        with(statePort.finalPriceStates.single()) {
+            assertEquals("FinalPriceBatingV1:005930", executionId)
+            assertEquals("005930", symbol)
+            assertEquals("KRX", market)
+            assertEquals(140_000.0, budget)
+            assertEquals(70_000.0, targetBuyPrice)
+            assertEquals(2, quantity)
+            assertEquals(0, filledQuantity)
+        }
+    }
+
+    @Test
+    fun `starts final price bating without order when budget cannot buy one share`() = runBlocking {
+        val statePort = FakeStrategyExecutionStatePort()
+        val orderIntentPort = FakeOrderIntentPort()
+        val service = StartStrategyExecutionService(
+            strategyExecutionStatePort = statePort,
+            registerLaorV4StrategyExecutionUseCase = FakeRegisterLaorUseCase(),
+            runStrategyExecutionUseCase = FakeRunStrategyExecutionUseCase(),
+            marketDataPort = FakeMarketDataPort(),
+            orderIntentPort = orderIntentPort,
+        )
+
+        val result = service.execute(
+            StartStrategyExecutionCommand.FinalPriceBatingV1(
+                executionId = "FinalPriceBatingV1:005930",
+                idempotencyKey = "FINAL_PRICE_BATING_V1:005930:2026-06-02",
+                strategyVersion = "v1",
+                symbol = "005930",
+                market = "KRX",
+                budget = 10_000.0,
+                targetBuyPrice = 70_000.0,
+                quantityPolicy = "BUDGET_DIVIDED_BY_TARGET_BUY_PRICE",
+                requestedAt = ZonedDateTime.parse("2026-06-02T09:00:00+09:00"),
+            ),
+        )
+
+        assertEquals(StartStrategyExecutionStatus.STARTED, result.status)
+        assertEquals(0, result.createdOrderIntentCount)
+        assertEquals(emptyList(), orderIntentPort.published)
+        with(statePort.finalPriceStates.single()) {
+            assertEquals(0, quantity)
+            assertEquals(0, filledQuantity)
+            assertEquals(com.example.strategyexecutionservice.application.port.out.StrategyExecutionLifecycleStatus.COMPLETED, status)
+            assertEquals(ZonedDateTime.parse("2026-06-02T09:00:00+09:00"), completedAt)
         }
     }
 
@@ -100,10 +148,19 @@ class StartStrategyExecutionServiceTest {
     private class FakeStrategyExecutionStatePort(
         private val startResult: Boolean = true,
     ) : StrategyExecutionStatePort {
+        val finalPriceStates: MutableList<FinalPriceBatingV1ExecutionState> = mutableListOf()
+
         override suspend fun tryMarkStartRequested(idempotencyKey: String): Boolean = startResult
         override suspend fun findLaorV4Strategy(executionId: String): LaorV4ExecutionState? = null
         override suspend fun findActiveLaorV4Strategies(): List<LaorV4ExecutionState> = emptyList()
         override suspend fun saveLaorV4Strategy(state: LaorV4ExecutionState) = Unit
+        override suspend fun findFinalPriceBatingV1Strategy(executionId: String): FinalPriceBatingV1ExecutionState? {
+            return finalPriceStates.lastOrNull { it.executionId == executionId }
+        }
+
+        override suspend fun saveFinalPriceBatingV1Strategy(state: FinalPriceBatingV1ExecutionState) {
+            finalPriceStates += state
+        }
     }
 
     private class FakeRegisterLaorUseCase : RegisterLaorV4StrategyExecutionUseCase {

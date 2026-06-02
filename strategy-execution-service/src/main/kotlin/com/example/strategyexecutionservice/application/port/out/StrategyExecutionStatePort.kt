@@ -10,6 +10,32 @@ interface StrategyExecutionStatePort {
     suspend fun findLaorV4Strategy(executionId: String): LaorV4ExecutionState?
     suspend fun findActiveLaorV4Strategies(): List<LaorV4ExecutionState>
     suspend fun saveLaorV4Strategy(state: LaorV4ExecutionState)
+    suspend fun findFinalPriceBatingV1Strategy(executionId: String): FinalPriceBatingV1ExecutionState?
+    suspend fun saveFinalPriceBatingV1Strategy(state: FinalPriceBatingV1ExecutionState)
+}
+
+data class FinalPriceBatingV1ExecutionState(
+    val executionId: String,
+    val symbol: String,
+    val market: String,
+    val budget: Double,
+    val targetBuyPrice: Double,
+    val quantity: Long,
+    val status: StrategyExecutionLifecycleStatus = StrategyExecutionLifecycleStatus.ACTIVE,
+    val filledQuantity: Long = 0,
+    val averageFilledPrice: Double? = null,
+    val startedAt: ZonedDateTime,
+    val completedAt: ZonedDateTime? = null,
+) {
+    init {
+        require(executionId.isNotBlank()) { "executionId must not be blank" }
+        require(symbol.isNotBlank()) { "symbol must not be blank" }
+        require(market.isNotBlank()) { "market must not be blank" }
+        require(budget > 0.0) { "budget must be positive" }
+        require(targetBuyPrice > 0.0) { "targetBuyPrice must be positive" }
+        require(quantity >= 0) { "quantity must not be negative" }
+        require(filledQuantity >= 0) { "filledQuantity must not be negative" }
+    }
 }
 
 data class LaorV4ExecutionState(

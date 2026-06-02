@@ -13,13 +13,16 @@ import com.example.strategyexecutionservice.application.port.`in`.StartStrategyE
 import com.example.strategyexecutionservice.application.port.`in`.StartStrategyExecutionStatus
 import com.example.strategyexecutionservice.application.port.`in`.StartStrategyExecutionUseCase
 import com.example.strategyexecutionservice.application.port.out.MarketDataPort
+import com.example.strategyexecutionservice.application.port.out.FinalPriceBatingV1ExecutionState
 import com.example.strategyexecutionservice.application.port.out.OrderIntentMessage
 import com.example.strategyexecutionservice.application.port.out.OrderIntentPort
+import com.example.strategyexecutionservice.application.port.out.StrategyExecutionLifecycleStatus
 import com.example.strategyexecutionservice.application.port.out.StrategyExecutionStatePort
 import com.example.strategyexecutionservice.domain.strategy.execution.OrderSide
 import com.example.strategyexecutionservice.domain.strategy.execution.OrderType
 import com.example.strategyexecutionservice.domain.strategy.execution.StrategyExecutionType
 import java.nio.charset.StandardCharsets
+import java.time.ZonedDateTime
 import java.util.UUID
 import kotlin.math.floor
 
@@ -97,12 +100,23 @@ class StartStrategyExecutionService(
     ): StartStrategyExecutionResult {
         val quantity = floor(command.budget / command.targetBuyPrice).toLong()
         if (quantity <= 0) {
+            strategyExecutionStatePort.saveFinalPriceBatingV1Strategy(
+                command.toFinalPriceBatingState(
+                    quantity = 0,
+                    status = StrategyExecutionLifecycleStatus.COMPLETED,
+                    completedAt = command.requestedAt,
+                ),
+            )
             return StartStrategyExecutionResult(
                 executionId = command.executionId,
                 status = StartStrategyExecutionStatus.STARTED,
                 createdOrderIntentCount = 0,
             )
         }
+
+        strategyExecutionStatePort.saveFinalPriceBatingV1Strategy(
+            command.toFinalPriceBatingState(quantity = quantity),
+        )
 
         val idempotencyKey = "${command.idempotencyKey}:ENTRY_BUY:0"
         orderIntentPort.publishAll(
@@ -128,6 +142,24 @@ class StartStrategyExecutionService(
             executionId = command.executionId,
             status = StartStrategyExecutionStatus.STARTED,
             createdOrderIntentCount = 1,
+        )
+    }
+
+    private fun StartStrategyExecutionCommand.FinalPriceBatingV1.toFinalPriceBatingState(
+        quantity: Long,
+        status: StrategyExecutionLifecycleStatus = StrategyExecutionLifecycleStatus.ACTIVE,
+        completedAt: ZonedDateTime? = null,
+    ): FinalPriceBatingV1ExecutionState {
+        return FinalPriceBatingV1ExecutionState(
+            executionId = executionId,
+            symbol = symbol,
+            market = market,
+            budget = budget,
+            targetBuyPrice = targetBuyPrice,
+            quantity = quantity,
+            status = status,
+            startedAt = requestedAt,
+            completedAt = completedAt,
         )
     }
 }

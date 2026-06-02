@@ -550,7 +550,7 @@ broker API 자체가 idempotency key를 지원하지 않는다면, purchase-serv
 - `stock-purchase-service`와 `strategy-execution-service`는 production-like profile에서 로컬 broker/Temporal endpoint나 mock 주문 설정이 남아 있으면 startup validation으로 실패한다.
 - root sketch app의 KIS secret key 이름은 `src/main/resources/application-secret.properties.example` 템플릿으로 문서화했고, classpath secret 파일 없이 런타임 환경변수/secret source로도 주입할 수 있다. 운영 재시작 절차는 `docs/operations/trading-runtime-runbook.md`에 정리했다.
 - Kafka와 Temporal activity 경계의 MDC trace propagation은 적용됐다. Temporal SDK interceptor, OpenTelemetry exporter wiring, 운영 대시보드 UI는 아직 남아 있다.
-- 단발성 전략의 entry buy는 execution-service로 들어왔지만, sell policy와 completion lifecycle은 추가 정리가 필요하다.
+- 단발성 전략의 entry buy와 완전 체결 시 `COMPLETED` lifecycle은 execution-service로 들어왔지만, sell policy는 추가 정리가 필요하다.
 - daily execution schedule은 설정 기반 US trading calendar를 거쳐 실행된다. 주말과 설정된 휴장일은 active strategy 실행을 skip하며, stock-purchase-service 주문 guard는 설정 기반 조기폐장과 날짜별 조기폐장 시간 override를 적용한다. 휴장일/조기폐장 데이터 자동 동기화와 broker live-market acceptance 검증은 남아 있다.
 - outbox 저장과 Kafka 발행은 분리되었고, publisher 실패 시 `nextAttemptAt` 기반 exponential backoff로 재시도한다. 여러 publisher 인스턴스가 동시에 실행될 때는 `PROCESSING` claim lease로 row 중복 발행을 줄인다. 운영 수준의 DB transaction boundary와 Kafka exactly-once 수준의 보장은 추가 hardening이 필요하다.
 
@@ -587,7 +587,7 @@ stock-search-service
 1. 완료: `StrategyExecutionStartRequested` proto/event 계약을 추가한다.
 2. 완료: `stock-search-service`가 기존 저장 이벤트 대신 start request를 outbox로 발행한다.
 3. 완료: `strategy-execution-service`에 start request consumer를 추가한다.
-4. 부분 완료: 단발성 전략도 execution-service에서 entry buy intent를 만들 수 있다. sell policy와 completion lifecycle은 남아 있다.
+4. 부분 완료: 단발성 전략도 execution-service에서 entry buy intent를 만들고, fill event를 누적 기록해 완전 체결 시 `COMPLETED`로 닫을 수 있다. sell policy는 남아 있다.
 5. 완료: `strategy-execution-service`가 첫 실행에서 `OrderIntentCreated`를 발행한다.
 6. 완료: purchase-service가 broker order id를 저장하고 internal order intent submission과 매핑한다.
 7. 완료: purchase-service가 `OrderSubmitted`, `OrderRejected`, `OrderCancelled`, `OrderFilled`, `OrderPartiallyFilled`를 발행한다.

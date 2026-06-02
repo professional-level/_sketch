@@ -5,6 +5,7 @@ import com.example.strategyexecutionservice.application.port.`in`.RunActiveStrat
 import com.example.strategyexecutionservice.application.port.`in`.RunStrategyExecutionCommand
 import com.example.strategyexecutionservice.application.port.`in`.RunStrategyExecutionResult
 import com.example.strategyexecutionservice.application.port.`in`.RunStrategyExecutionUseCase
+import com.example.strategyexecutionservice.application.port.out.FinalPriceBatingV1ExecutionState
 import com.example.strategyexecutionservice.application.port.out.LaorV4ExecutionState
 import com.example.strategyexecutionservice.application.port.out.MarketDataPort
 import com.example.strategyexecutionservice.application.port.out.StrategyExecutionStatePort
@@ -182,6 +183,12 @@ class RunActiveStrategyExecutionsServiceTest {
         override suspend fun saveLaorV4Strategy(state: LaorV4ExecutionState) {
             saved += state
         }
+
+        override suspend fun findFinalPriceBatingV1Strategy(executionId: String): FinalPriceBatingV1ExecutionState? {
+            return null
+        }
+
+        override suspend fun saveFinalPriceBatingV1Strategy(state: FinalPriceBatingV1ExecutionState) = Unit
     }
 
     private class FakeMarketDataPort : MarketDataPort {

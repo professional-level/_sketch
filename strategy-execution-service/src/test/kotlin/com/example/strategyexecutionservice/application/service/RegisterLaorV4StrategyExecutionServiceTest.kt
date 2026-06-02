@@ -2,6 +2,7 @@ package com.example.strategyexecutionservice.application.service
 
 import com.example.strategyexecutionservice.application.port.`in`.RegisterLaorV4StrategyExecutionCommand
 import com.example.strategyexecutionservice.application.port.`in`.RegisterLaorV4StrategyExecutionStatus
+import com.example.strategyexecutionservice.application.port.out.FinalPriceBatingV1ExecutionState
 import com.example.strategyexecutionservice.application.port.out.LaorV4ExecutionState
 import com.example.strategyexecutionservice.application.port.out.StrategyExecutionStatePort
 import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategyState
@@ -90,5 +91,11 @@ class RegisterLaorV4StrategyExecutionServiceTest {
             states += state
             saveCount += 1
         }
+
+        override suspend fun findFinalPriceBatingV1Strategy(executionId: String): FinalPriceBatingV1ExecutionState? {
+            return null
+        }
+
+        override suspend fun saveFinalPriceBatingV1Strategy(state: FinalPriceBatingV1ExecutionState) = Unit
     }
 }
