@@ -18,7 +18,13 @@ Apply these MySQL migrations explicitly before running production-like profiles 
 20260602_add_final_price_bating_v1_sell_lifecycle_columns.mysql.sql
 ```
 
-## 3. Stock Purchase Service Base State
+## 3. Stock Search Service Base State
+
+```text
+20260602_create_stock_search_base_tables.mysql.sql
+```
+
+## 4. Stock Purchase Service Base State
 
 ```text
 20260602_create_stock_purchase_order_base_tables.mysql.sql
@@ -26,7 +32,7 @@ Apply these MySQL migrations explicitly before running production-like profiles 
 20260602_create_stock_purchase_reconciliation_tables.mysql.sql
 ```
 
-## 4. Cross-Service Operational Columns
+## 5. Cross-Service Operational Columns
 
 ```text
 20260602_add_outbox_trace_columns.mysql.sql

@@ -261,6 +261,22 @@ Use `--no-daemon` so the test JVM sees the current smoke-test environment variab
 
 ## Startup Safety Checks
 
+`stock-search-service` fails startup under a production-like profile when unsafe local defaults are still active.
+
+Blocked by default:
+
+- `akra.temporal.enabled=true` and `akra.temporal.target` points at a local endpoint such as `localhost`, `host.docker.internal`, `127.0.0.1`, `0.0.0.0`, or `::1`.
+- `akra.temporal.enabled=true` and `akra.temporal.target` is blank.
+- `spring.jpa.hibernate.ddl-auto` is set to an automatic schema mutation mode such as `update`, `create`, or `create-drop`.
+- A local `application-secret.properties` property source is loaded.
+
+Temporary waiver properties exist for controlled tests only:
+
+```properties
+akra.runtime.safety.allow-local-temporal-target-in-production=true
+akra.runtime.safety.allow-application-secret-property-source-in-production=true
+```
+
 `stock-purchase-service` fails startup under a production-like profile (`prod`, `production`, or `live`) when unsafe local defaults are still active.
 
 Blocked by default:
@@ -332,7 +348,8 @@ Before enabling real orders:
 - Set `spring.profiles.active=prod` or another configured production profile.
 - Apply required DB migrations explicitly and set `spring.jpa.hibernate.ddl-auto=validate` or `none`; do not use `update` in production.
 - Point `akra.order.kis-open-api.base-url` and `akra.market-data.kis-open-api.base-url` to the deployed broker wrapper.
-- Point `akra.temporal.target` to the managed Temporal frontend.
+- Point each service's `akra.temporal.target` to the managed Temporal frontend.
+- Confirm `stock-search-service` starts successfully under a production-like profile before enabling strategy discovery schedules; startup validation rejects local Temporal targets, automatic DDL, and local secret property sources.
 - Use JDBC or managed external storage for shared KIS tokens; do not use local-file token persistence for multi-instance production deployments.
 - Set real-vs-mock trading flags intentionally for the account being operated.
 - Confirm `strategy-execution-service` order-intent trading environment settings and `stock-purchase-service` broker mock/live flags agree for each strategy prefix.
@@ -512,15 +529,16 @@ The response includes order-intent outbox publisher counts, processed start-requ
 
 ## DB Schema Migration
 
-Local sketch profiles currently use Hibernate `ddl-auto=update`, but production-like environments should not rely on automatic DDL. The root KIS wrapper, `stock-purchase-service`, and `strategy-execution-service` now fail startup under production-like profiles unless `spring.jpa.hibernate.ddl-auto` is empty, `none`, or `validate`. Use `docs/operations/sql/MIGRATION_MANIFEST.md` as the full ordered manifest, including KIS token persistence tables. Before deploying the Kafka outbox persistence, trace propagation, retry scheduling, KIS branch-order persistence, and final-price lifecycle persistence build, apply:
+Local sketch profiles currently use Hibernate `ddl-auto=update`, but production-like environments should not rely on automatic DDL. The root KIS wrapper, `stock-search-service`, `stock-purchase-service`, and `strategy-execution-service` now fail startup under production-like profiles unless `spring.jpa.hibernate.ddl-auto` is empty, `none`, or `validate`. Use `docs/operations/sql/MIGRATION_MANIFEST.md` as the full ordered manifest, including KIS token persistence tables. Before deploying the Kafka outbox persistence, trace propagation, retry scheduling, KIS branch-order persistence, and final-price lifecycle persistence build, apply:
 
 ```text
 docs/operations/sql/20260602_create_strategy_execution_outbox_base.mysql.sql
 docs/operations/sql/20260602_create_strategy_execution_state_tables.mysql.sql
-docs/operations/sql/20260602_create_stock_purchase_order_base_tables.mysql.sql
-docs/operations/sql/20260602_create_stock_purchase_legacy_order_tables.mysql.sql
 docs/operations/sql/20260602_create_final_price_bating_v1_strategy_execution.mysql.sql
 docs/operations/sql/20260602_add_final_price_bating_v1_sell_lifecycle_columns.mysql.sql
+docs/operations/sql/20260602_create_stock_search_base_tables.mysql.sql
+docs/operations/sql/20260602_create_stock_purchase_order_base_tables.mysql.sql
+docs/operations/sql/20260602_create_stock_purchase_legacy_order_tables.mysql.sql
 docs/operations/sql/20260602_create_stock_purchase_reconciliation_tables.mysql.sql
 docs/operations/sql/20260602_add_outbox_trace_columns.mysql.sql
 docs/operations/sql/20260602_add_outbox_next_attempt_at.mysql.sql
@@ -531,7 +549,7 @@ docs/operations/sql/20260602_add_order_intent_submission_trading_environment.mys
 docs/operations/sql/20260602_add_order_intent_submission_market.mysql.sql
 ```
 
-These migrations create `strategy-execution-service` `order_intent_outbox_event` and `stock-purchase-service` `order_execution_outbox_event` so Kafka outbox rows survive restarts before publisher retry. They create `strategy-execution-service` `strategy_execution_start_request`, `strategy_execution_order_event`, and `laor_v4_strategy_execution` so start idempotency, order event audit records, and Laor V4 state survive restarts. They create `stock-purchase-service` `order_intent_submission`, `stock_order`, `order_id_mapping`, and `processed_event` so broker submission state, legacy scheduler sell state, broker order id mapping, and event idempotency survive restarts. They create `strategy-execution-service` `final_price_bating_v1_strategy_execution` and add its sell lifecycle columns so single-shot final-price strategy starts, buy fill completion, sell intent, and sell fill completion state can survive restarts. They also create `stock-purchase-service` `execution_fill`, `execution_reconciliation_cursor`, and `unmatched_execution` so broker fill deduplication, reconciliation cursor recovery, and unmatched execution operations state survive restarts. They also add nullable `traceId`, `spanId`, `traceParent`, `nextAttemptAt`, `claimOwner`, and `claimExpiresAt` columns to both outbox tables:
+These migrations create `strategy-execution-service` `order_intent_outbox_event` and `stock-purchase-service` `order_execution_outbox_event` so Kafka outbox rows survive restarts before publisher retry. They create `stock-search-service` `stock_volume_rank`, `stock_suggestion`, and `outbox_event` so discovery history and strategy start requests survive restarts. They create `strategy-execution-service` `strategy_execution_start_request`, `strategy_execution_order_event`, and `laor_v4_strategy_execution` so start idempotency, order event audit records, and Laor V4 state survive restarts. They create `stock-purchase-service` `order_intent_submission`, `stock_order`, `order_id_mapping`, and `processed_event` so broker submission state, legacy scheduler sell state, broker order id mapping, and event idempotency survive restarts. They create `strategy-execution-service` `final_price_bating_v1_strategy_execution` and add its sell lifecycle columns so single-shot final-price strategy starts, buy fill completion, sell intent, and sell fill completion state can survive restarts. They also create `stock-purchase-service` `execution_fill`, `execution_reconciliation_cursor`, and `unmatched_execution` so broker fill deduplication, reconciliation cursor recovery, and unmatched execution operations state survive restarts. They also add nullable `traceId`, `spanId`, `traceParent`, `nextAttemptAt`, `claimOwner`, and `claimExpiresAt` columns to both trading outbox tables:
 
 - `strategy-execution-service`: `order_intent_outbox_event`
 - `stock-purchase-service`: `order_execution_outbox_event`
@@ -543,8 +561,8 @@ Operational sequence:
 1. Stop outbox publishers or drain traffic so new outbox rows are not being written during the schema change.
 2. Run the preflight query in each SQL file and confirm the target tables or columns do not already exist.
 3. Apply the `CREATE TABLE` and `ALTER TABLE` statements in the migration files.
-4. Run the post-apply verification queries and confirm `order_intent_outbox_event` and `order_execution_outbox_event` have their primary keys, base Kafka payload columns, and status-created indexes; `strategy_execution_start_request`, `strategy_execution_order_event`, `laor_v4_strategy_execution`, `stock_order`, `order_id_mapping`, and `processed_event` have their primary keys and operations indexes; `order_intent_submission` has its primary key plus idempotency/external-order unique keys; `final_price_bating_v1_strategy_execution` has its primary key, buy lifecycle columns, and sell lifecycle columns; `execution_fill`/`execution_reconciliation_cursor`/`unmatched_execution` have their primary keys and operations indexes; six nullable `VARCHAR(255)` trace columns, two nullable `DATETIME(6)` retry-scheduling columns, two nullable `VARCHAR(255)` claim owner columns, two nullable `DATETIME(6)` claim expiry columns, one nullable `VARCHAR(255)` branch order number column, one nullable `VARCHAR(16)` exchange column, one nullable `VARCHAR(16)` trading environment column, and one nullable `VARCHAR(32)` market column.
-5. Start `strategy-execution-service` and `stock-purchase-service`.
+4. Run the post-apply verification queries and confirm `outbox_event`, `order_intent_outbox_event`, and `order_execution_outbox_event` have their primary keys, base Kafka payload columns, and status-created indexes; `stock_volume_rank` and `stock_suggestion` have auto-increment primary keys and discovery indexes; `strategy_execution_start_request`, `strategy_execution_order_event`, `laor_v4_strategy_execution`, `stock_order`, `order_id_mapping`, and `processed_event` have their primary keys and operations indexes; `order_intent_submission` has its primary key plus idempotency/external-order unique keys; `final_price_bating_v1_strategy_execution` has its primary key, buy lifecycle columns, and sell lifecycle columns; `execution_fill`/`execution_reconciliation_cursor`/`unmatched_execution` have their primary keys and operations indexes; six nullable `VARCHAR(255)` trace columns, two nullable `DATETIME(6)` retry-scheduling columns, two nullable `VARCHAR(255)` claim owner columns, two nullable `DATETIME(6)` claim expiry columns, one nullable `VARCHAR(255)` branch order number column, one nullable `VARCHAR(16)` exchange column, one nullable `VARCHAR(16)` trading environment column, and one nullable `VARCHAR(32)` market column.
+5. Start `stock-search-service`, `strategy-execution-service`, and `stock-purchase-service`.
 
 Outbox publishers use `akra.outbox.publish-retry-initial-delay-ms` and `akra.outbox.publish-retry-max-delay-ms` to calculate exponential backoff after Kafka publish failures. Failed rows are republished only after `nextAttemptAt`, so repeated Kafka outages should not produce tight retry loops. Before publishing, each instance claims rows with `PROCESSING`, `claimOwner`, and `claimExpiresAt`; expired claims are eligible for another instance to reclaim.
 
