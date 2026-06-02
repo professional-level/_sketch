@@ -347,7 +347,7 @@ The Laor V4 responses include current progress round/T, available cash, holding 
 
 ## DB Schema Migration
 
-Local sketch profiles currently use Hibernate `ddl-auto=update`, but production-like environments should not rely on automatic DDL. `stock-purchase-service` and `strategy-execution-service` now fail startup under production-like profiles unless `spring.jpa.hibernate.ddl-auto` is empty, `none`, or `validate`. Before deploying the Kafka outbox persistence, trace propagation, retry scheduling, KIS branch-order persistence, and final-price lifecycle persistence build, apply:
+Local sketch profiles currently use Hibernate `ddl-auto=update`, but production-like environments should not rely on automatic DDL. The root KIS wrapper, `stock-purchase-service`, and `strategy-execution-service` now fail startup under production-like profiles unless `spring.jpa.hibernate.ddl-auto` is empty, `none`, or `validate`. Use `docs/operations/sql/MIGRATION_MANIFEST.md` as the full ordered manifest, including KIS token persistence tables. Before deploying the Kafka outbox persistence, trace propagation, retry scheduling, KIS branch-order persistence, and final-price lifecycle persistence build, apply:
 
 ```text
 docs/operations/sql/20260602_create_strategy_execution_outbox_base.mysql.sql
