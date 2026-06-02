@@ -12,6 +12,7 @@ import com.example.stockpurchaseservice.application.port.out.ExecutionQuantityMo
 import com.example.stockpurchaseservice.application.port.out.ExecutionTypeDto
 import com.example.stockpurchaseservice.application.port.out.StockOrderMarket
 import com.example.stockpurchaseservice.application.port.out.StockOrderType
+import com.example.stockpurchaseservice.config.broker.KisBrokerGatewayProperties
 import org.springframework.core.io.buffer.DefaultDataBufferFactory
 import java.time.ZonedDateTime
 import java.util.UUID
@@ -662,10 +663,14 @@ class KisBrokerGatewayAdapterTest {
                 """.trimIndent(),
             ),
         )
+        val properties = KisBrokerGatewayProperties().apply {
+            queryMaxAttempts = 1
+        }
         val adapter = KisBrokerGatewayAdapter(
             WebClient.builder()
                 .exchangeFunction(exchangeFunction)
                 .build(),
+            properties = properties,
         )
 
         val exception = assertFailsWith<BrokerOrderTemporaryUnavailableException> {
@@ -686,6 +691,63 @@ class KisBrokerGatewayAdapterTest {
             "overseas balance lookup failed: EGW00201 per-second transaction limit exceeded",
             exception.message,
         )
+    }
+
+    @Test
+    fun `overseas account snapshot retries kis temporary business failure`() {
+        val exchangeFunction = StubExchangeFunction(
+            responses = listOf(
+                """
+                {
+                  "rt_cd": "1",
+                  "msg_cd": "EGW00201",
+                  "msg1": "per-second transaction limit exceeded"
+                }
+                """.trimIndent(),
+                """
+                {
+                  "rt_cd": "0",
+                  "ctx_area_fk200": "",
+                  "ctx_area_nk200": "",
+                  "output1": [
+                    {
+                      "ovrs_pdno": "TQQQ",
+                      "ovrs_item_name": "ProShares UltraPro QQQ",
+                      "ovrs_cblc_qty": "3"
+                    }
+                  ],
+                  "output2": {
+                    "ovrs_ord_psbl_amt": "1250.25"
+                  }
+                }
+                """.trimIndent(),
+            ),
+        )
+        val properties = KisBrokerGatewayProperties().apply {
+            queryMaxAttempts = 2
+            queryBackoff = java.time.Duration.ZERO
+            rateLimit.enabled = false
+            circuitBreaker.failureThreshold = 5
+        }
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+            properties = properties,
+        )
+
+        val snapshot = adapter.findAccountSnapshot(
+            BrokerAccountSnapshotQuery(
+                market = StockOrderMarket.OVERSEAS_US,
+                exchange = "NASD",
+                currency = "USD",
+                isMock = false,
+            ),
+        )
+
+        assertEquals("TQQQ", snapshot.positions.single().symbol)
+        assertEquals(1250.25, snapshot.availableCashAmount)
+        assertEquals(2, exchangeFunction.requests.size)
     }
 
     @Test

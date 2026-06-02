@@ -61,19 +61,21 @@ internal class KisBrokerGatewayAdapter(
     }
 
     override fun cancelOrder(command: BrokerOrderCancelCommand): BrokerOrderSubmissionDto {
-        return guard.execute("cancel-order:${command.market}") {
-            when (command.market) {
-                StockOrderMarket.DOMESTIC -> {
-                    ensureDomesticOrderCancelable(command)
+        return when (command.market) {
+            StockOrderMarket.DOMESTIC -> {
+                ensureDomesticOrderCancelable(command)
+                guard.execute("cancel-order:${command.market}") {
                     stockApiClient.submitStockOrder(
                         uri = OPEN_API_PREFIX + POST_STOCK_ORDER_CANCEL,
                         body = command.toKisDomesticCancelRequest(),
                         callOptions = properties.toSubmitCallOptions(),
                     )
                 }
+            }
 
-                StockOrderMarket.OVERSEAS_US -> {
-                    ensureOverseasOrderCancelable(command)
+            StockOrderMarket.OVERSEAS_US -> {
+                ensureOverseasOrderCancelable(command)
+                guard.execute("cancel-order:${command.market}") {
                     stockApiClient.submitStockOrder(
                         uri = OPEN_API_PREFIX + POST_OVERSEAS_STOCK_ORDER_CANCEL,
                         body = command.toKisUsOverseasCancelRequest(),
@@ -105,7 +107,9 @@ internal class KisBrokerGatewayAdapter(
         var pageCount = 0
         do {
             if (!seenCursors.add(cursor)) break
-            val page = stockApiClient.fetchDomesticCancelableOrderPage(command, cursor, properties.toQueryCallOptions())
+            val page = guard.executeQuery("domestic-cancelable-order") {
+                stockApiClient.fetchDomesticCancelableOrderPage(command, cursor, properties.toQueryCallOptions())
+            }
             items += page.items
             cursor = page.nextCursor
             pageCount += 1
@@ -208,7 +212,7 @@ internal class KisBrokerGatewayAdapter(
     }
 
     private fun fetchDomesticOrderHistoryPage(query: BrokerOrderHistoryQuery): BrokerOrderHistoryPage {
-        return guard.execute("domestic-order-history") {
+        return guard.executeQuery("domestic-order-history") {
             val response = stockApiClient.getExternalApi(
                 uri = OPEN_API_PREFIX + GET_EXECUTION_ORDERS,
                 queryParameters = query.toKisDomesticExecutionOrderQuery(),
@@ -235,7 +239,7 @@ internal class KisBrokerGatewayAdapter(
     }
 
     private fun fetchOverseasOrderHistoryPage(query: BrokerOrderHistoryQuery): BrokerOrderHistoryPage {
-        return guard.execute("overseas-order-history") {
+        return guard.executeQuery("overseas-order-history") {
             val response = stockApiClient.getExternalApi(
                 uri = OPEN_API_PREFIX + GET_OVERSEAS_EXECUTION_ORDERS,
                 queryParameters = query.toKisOverseasExecutionOrderQuery(),
@@ -262,7 +266,7 @@ internal class KisBrokerGatewayAdapter(
     }
 
     private fun fetchOverseasAccountSnapshotPage(query: BrokerAccountSnapshotQuery): BrokerAccountSnapshotPage {
-        return guard.execute("overseas-account-balance") {
+        return guard.executeQuery("overseas-account-balance") {
             val response = stockApiClient.getExternalApi(
                 uri = OPEN_API_PREFIX + GET_OVERSEAS_STOCK_BALANCE,
                 queryParameters = query.toKisOverseasBalanceQuery(),

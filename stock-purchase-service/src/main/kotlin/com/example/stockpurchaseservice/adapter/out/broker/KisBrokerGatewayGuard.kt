@@ -39,6 +39,30 @@ internal class KisBrokerGatewayGuard(
         }
     }
 
+    fun <T> executeQuery(operation: String, block: () -> T): T {
+        require(properties.queryMaxAttempts >= 1) { "queryMaxAttempts must be at least 1" }
+        require(!properties.queryBackoff.isNegative) { "queryBackoff must not be negative" }
+
+        var attempts = 0
+        var lastFailure: BrokerOrderTemporaryUnavailableException? = null
+        while (attempts < properties.queryMaxAttempts) {
+            attempts += 1
+            try {
+                return execute(operation, block)
+            } catch (exception: BrokerOrderTemporaryUnavailableException) {
+                if (!exception.isBrokerReportedTemporaryFailure() || attempts >= properties.queryMaxAttempts) {
+                    throw exception
+                }
+                lastFailure = exception
+                if (!properties.queryBackoff.isZero) {
+                    sleeper.sleep(properties.queryBackoff)
+                }
+            }
+        }
+
+        throw lastFailure ?: IllegalStateException("KIS broker gateway query failed without an exception")
+    }
+
     private fun assertCircuitClosed(operation: String) {
         val circuitBreaker = properties.circuitBreaker
         if (!circuitBreaker.enabled) return
@@ -111,6 +135,10 @@ internal class KisBrokerGatewayGuard(
             is BrokerOrderTemporaryUnavailableException -> true
             else -> isTransientExternalApiFailure(properties.transientHttpStatuses)
         }
+    }
+
+    private fun BrokerOrderTemporaryUnavailableException.isBrokerReportedTemporaryFailure(): Boolean {
+        return !brokerReturnCode.isNullOrBlank() || !brokerMessageCode.isNullOrBlank()
     }
 
     companion object {

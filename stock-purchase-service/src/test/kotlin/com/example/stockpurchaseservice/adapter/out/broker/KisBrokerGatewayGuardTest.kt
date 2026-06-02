@@ -59,6 +59,56 @@ class KisBrokerGatewayGuardTest {
     }
 
     @Test
+    fun `retries broker reported temporary query failure with backoff`() {
+        val clock = MutableClock(Instant.EPOCH)
+        val sleeps = mutableListOf<Duration>()
+        val properties = KisBrokerGatewayProperties().apply {
+            rateLimit.enabled = false
+            queryMaxAttempts = 2
+            queryBackoff = Duration.ofMillis(250)
+            circuitBreaker.failureThreshold = 5
+        }
+        val guard = KisBrokerGatewayGuard(properties, clock, BrokerGatewaySleeper { sleeps += it })
+        var attempts = 0
+
+        val result = guard.executeQuery("query") {
+            attempts += 1
+            if (attempts == 1) {
+                throw BrokerOrderTemporaryUnavailableException(
+                    message = "overseas balance lookup failed: EGW00201 per-second transaction limit exceeded",
+                    brokerReturnCode = "1",
+                    brokerMessageCode = "EGW00201",
+                    brokerMessage = "per-second transaction limit exceeded",
+                )
+            }
+            "ok"
+        }
+
+        assertEquals("ok", result)
+        assertEquals(2, attempts)
+        assertEquals(listOf(Duration.ofMillis(250)), sleeps)
+    }
+
+    @Test
+    fun `does not retry local temporary query failure`() {
+        val properties = KisBrokerGatewayProperties().apply {
+            rateLimit.enabled = false
+            queryMaxAttempts = 2
+        }
+        val guard = KisBrokerGatewayGuard(properties, Clock.systemUTC(), BrokerGatewaySleeper { })
+        var attempts = 0
+
+        assertFailsWith<BrokerOrderTemporaryUnavailableException> {
+            guard.executeQuery("query") {
+                attempts += 1
+                throw BrokerOrderTemporaryUnavailableException("KIS broker gateway circuit is open")
+            }
+        }
+
+        assertEquals(1, attempts)
+    }
+
+    @Test
     fun `allows trial call after circuit open duration and resets on success`() {
         val clock = MutableClock(Instant.EPOCH)
         val properties = KisBrokerGatewayProperties().apply {
