@@ -418,6 +418,12 @@ Daily order count and duplicate active-order checks are scoped by market. Legacy
 GET /actuator/health
 GET /actuator/metrics
 GET /actuator/metrics/stock.purchase.operational.alerts
+GET /actuator/metrics/stock.purchase.order.submissions
+GET /actuator/metrics/stock.purchase.order.problem.submissions
+GET /actuator/metrics/stock.purchase.order.execution.outbox.events
+GET /actuator/metrics/stock.purchase.reconciliation.unmatched.executions
+GET /actuator/metrics/stock.purchase.reconciliation.cursor.failures
+GET /actuator/metrics/stock.purchase.reconciliation.cursor.unmatched.executions
 GET /actuator/metrics/stock.purchase.outbox.publish
 GET /actuator/metrics/strategy.execution.outbox.publish
 GET /actuator/prometheus
@@ -443,6 +449,17 @@ Operational alert counters are emitted through Micrometer as `stock.purchase.ope
 - `severity`: `error` or `warning`
 
 `submission_unknown` alerts include `ageSeconds` and `persistent`. Recovery alerts become persistent when the order has stayed unknown longer than `akra.operations.trading.persistent-submission-unknown-threshold`; persistent unknown alerts are emitted with `severity=error`.
+
+`stock-purchase-service` also refreshes DB-backed operations gauges on `akra.operations.metrics.refresh-fixed-delay-ms`:
+
+- `stock.purchase.order.submissions{status}`: order-intent submissions by lifecycle status.
+- `stock.purchase.order.problem.submissions{status}`: recent problematic submissions by status, useful for `SUBMISSION_UNKNOWN` dashboards.
+- `stock.purchase.order.execution.outbox.events{status}`: order execution outbox rows by publish status.
+- `stock.purchase.reconciliation.unmatched.executions`: total unmatched broker executions.
+- `stock.purchase.reconciliation.cursor.failures{source}`: `1` when a reconciliation cursor source is currently failed, otherwise `0`.
+- `stock.purchase.reconciliation.cursor.unmatched.executions{source}`: unmatched execution count observed by each reconciliation cursor.
+
+If metric refresh cannot read the operations snapshot, `stock.purchase.operations.metrics.refresh.failures` increments and the service continues running. Operators can disable these scheduled gauges with `akra.operations.metrics.enabled=false` during controlled diagnostics.
 
 Optional outbound alert routes:
 
