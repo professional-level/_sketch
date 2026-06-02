@@ -129,9 +129,12 @@ class ReconcileExecutionsService(
                 }
 
                 is FillPublishPlan.Publish -> {
-                    if (executionFillPort.saveIfNew(ExecutionFillDto.from(ExecutionFill.from(execution)))) {
+                    val fill = ExecutionFillDto.from(ExecutionFill.from(execution))
+                    if (executionFillPort.exists(fill.externalExecutionId)) return@forEach
+
+                    publishOrderFillEvent(execution, publishPlan)
+                    if (executionFillPort.saveIfNew(fill)) {
                         refinedExecutedStockList += execution
-                        publishOrderFillEvent(execution, publishPlan)
                     }
                 }
             }
@@ -144,13 +147,17 @@ class ReconcileExecutionsService(
         if (refinedExecutedStockList.isEmpty()) return
 
         val (selled, purchased) = refinedExecutedStockList.partition { it.type == ExecutionType.Selling }
-        selled.forEach {
-            // Selling reconciliation is modeled here so the scheduler no longer owns the branch.
-            // A later order-state redesign can apply external execution ids to the aggregate.
-            // TODO: Mark selling completion from aggregated fill events instead of assuming one fill closes the order.
+        selled.forEach { item ->
+            stockOrderRepository.findByExternalOrderId(item.externalOrderId)?.let { sellingOrder ->
+                if (sellingOrder !is SellingOrder) return@let
+                if (!isFullyFilled(item.externalOrderId.value, sellingOrder.quantity.toLong())) return@let
+
+                sellingOrder.changeOrderState(OrderState.SELLING_COMPLETED)
+                stockOrderRepository.save(sellingOrder)
+            }
         }
         purchased.forEach { item ->
-            // TODO: Unmatched broker executions should emit an event/log; normal fills should map to a known order.
+            // Legacy order completion remains for sketch orders that still predate order intent submissions.
             stockOrderRepository.findByExternalOrderId(item.externalOrderId)?.let { purchasedOrder ->
                 if (!isFullyFilled(item.externalOrderId.value, purchasedOrder.quantity.toLong())) return@let
 
@@ -309,7 +316,13 @@ private suspend fun submitLegacySellOrder(
 
     when (result.status) {
         OrderIntentSubmissionStatus.SUBMITTED,
-        OrderIntentSubmissionStatus.SKIPPED_DUPLICATE -> order.changeOrderState(OrderState.SELLING_IN_PROCESS)
+        OrderIntentSubmissionStatus.SKIPPED_DUPLICATE -> {
+            order.changeOrderState(OrderState.SELLING_IN_PROCESS)
+            result.externalOrderId?.let { externalOrderId ->
+                stockOrderRepository.save(order, ExternalOrderId(externalOrderId))
+                return
+            }
+        }
         OrderIntentSubmissionStatus.SUBMISSION_UNKNOWN -> order.changeOrderState(OrderState.SUBMISSION_UNKNOWN)
         OrderIntentSubmissionStatus.REJECTED -> order.changeOrderState(OrderState.SUBMIT_FAILED)
     }

@@ -5,6 +5,7 @@ import com.example.stockpurchaseservice.domain.ExecutionType
 import java.time.ZonedDateTime
 
 interface ExecutionFillPort {
+    suspend fun exists(externalExecutionId: String): Boolean
     suspend fun saveIfNew(fill: ExecutionFillDto): Boolean
     suspend fun sumQuantityByExternalOrderId(externalOrderId: String): Long
 }

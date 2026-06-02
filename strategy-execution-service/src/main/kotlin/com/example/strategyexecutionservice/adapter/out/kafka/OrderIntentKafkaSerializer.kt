@@ -29,6 +29,7 @@ internal class OrderIntentKafkaSerializer {
             .setIdempotencyKey(idempotencyKey)
             .setCreatedAt(createdAt.toProtobufTimestamp())
             .setTradingEnvironment(tradingEnvironment.toProto())
+            .setExchange(exchange)
             .setMeta(
                 Event.EventMeta.newBuilder()
                     .setOccurredAt(createdAt.toProtobufTimestamp())

@@ -113,18 +113,24 @@ internal class OrderExecutionOutboxAdapter(
         eventType: String,
         payload: ByteArray,
     ) {
+        if (outboxEventRepository.exists(id)) return
+
         val traceContext = TraceContext.current()
-        outboxEventRepository.save(
-            OrderExecutionOutboxEventEntity.pending(
-                id = id,
-                topic = topic,
-                messageKey = messageKey,
-                eventType = eventType,
-                payload = payload,
-                traceId = traceContext.traceId,
-                spanId = traceContext.spanId,
-                traceParent = traceContext.traceParent,
-            ),
-        ).awaitSuspending()
+        runCatching {
+            outboxEventRepository.save(
+                OrderExecutionOutboxEventEntity.pending(
+                    id = id,
+                    topic = topic,
+                    messageKey = messageKey,
+                    eventType = eventType,
+                    payload = payload,
+                    traceId = traceContext.traceId,
+                    spanId = traceContext.spanId,
+                    traceParent = traceContext.traceParent,
+                ),
+            ).awaitSuspending()
+        }.onFailure { exception ->
+            if (!outboxEventRepository.exists(id)) throw exception
+        }
     }
 }

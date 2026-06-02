@@ -38,6 +38,7 @@ message OrderIntentCreatedEvent{
   google.protobuf.Timestamp created_at = 11;
   EventMeta meta = 12;
   OrderTradingEnvironment trading_environment = 13;
+  string exchange = 14;
 }
 
 message StrategyExecutionStartRequested {

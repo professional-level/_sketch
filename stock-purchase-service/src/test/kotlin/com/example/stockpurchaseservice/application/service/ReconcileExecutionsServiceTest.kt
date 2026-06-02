@@ -120,6 +120,62 @@ class ReconcileExecutionsServiceTest {
     }
 
     @Test
+    fun `does not save fill when outbox event publish fails`() = runBlocking {
+        val executionFillPort = FakeExecutionFillPort()
+        val eventPort = FakeOrderExecutionEventPort(failPublish = true)
+        val reconciliationStatePort = FakeExecutionReconciliationStatePort()
+        val service = service(
+            marketPort = FakeMarketServicePort(
+                executions = listOf(execution(externalExecutionId = "exec-1", quantity = 30)),
+            ),
+            executionFillPort = executionFillPort,
+            submissionPort = FakeOrderIntentSubmissionPort(
+                submissions = listOf(submission(quantity = 100)),
+            ),
+            eventPort = eventPort,
+            reconciliationStatePort = reconciliationStatePort,
+        )
+
+        runCatching { service.execute() }
+
+        assertEquals(emptyList<String>(), executionFillPort.savedExternalExecutionIds)
+        assertEquals(emptyList<ExecutionReconciliationResultDto>(), reconciliationStatePort.completed)
+        assertEquals(listOf<String?>("outbox unavailable"), reconciliationStatePort.failedReasons)
+    }
+
+    @Test
+    fun `retries fill save without duplicating deterministic outbox event`() = runBlocking {
+        val executionFillPort = FakeExecutionFillPort(failFirstSave = true)
+        val eventPort = FakeOrderExecutionEventPort(idempotent = true)
+        val firstService = service(
+            marketPort = FakeMarketServicePort(
+                executions = listOf(execution(externalExecutionId = "exec-1", quantity = 30)),
+            ),
+            executionFillPort = executionFillPort,
+            submissionPort = FakeOrderIntentSubmissionPort(
+                submissions = listOf(submission(quantity = 100)),
+            ),
+            eventPort = eventPort,
+        )
+        val secondService = service(
+            marketPort = FakeMarketServicePort(
+                executions = listOf(execution(externalExecutionId = "exec-1", quantity = 30)),
+            ),
+            executionFillPort = executionFillPort,
+            submissionPort = FakeOrderIntentSubmissionPort(
+                submissions = listOf(submission(quantity = 100)),
+            ),
+            eventPort = eventPort,
+        )
+
+        firstService.execute()
+        secondService.execute()
+
+        assertEquals(listOf("exec-1"), executionFillPort.savedExternalExecutionIds)
+        assertEquals(1, eventPort.partiallyFilled.size)
+    }
+
+    @Test
     fun `publishes only new delta when broker execution quantity is cumulative`() = runBlocking {
         val eventPort = FakeOrderExecutionEventPort()
         val service = service(
@@ -145,6 +201,36 @@ class ReconcileExecutionsServiceTest {
 
         assertEquals(40, eventPort.partiallyFilled.single().filledQuantity)
         assertEquals(emptyList(), eventPort.filled)
+    }
+
+    @Test
+    fun `publishes final delta as filled when cumulative broker quantity reaches submitted quantity`() = runBlocking {
+        val eventPort = FakeOrderExecutionEventPort()
+        val executionFillPort = FakeExecutionFillPort(
+            initialQuantitiesByExternalOrderId = mapOf("broker-1" to 30),
+        )
+        val service = service(
+            marketPort = FakeMarketServicePort(
+                executions = listOf(
+                    execution(
+                        externalExecutionId = "broker-1:100:PURCHASE",
+                        quantity = 100,
+                        quantityMode = ExecutionQuantityModeDto.CUMULATIVE,
+                    ),
+                ),
+            ),
+            executionFillPort = executionFillPort,
+            submissionPort = FakeOrderIntentSubmissionPort(
+                submissions = listOf(submission(quantity = 100)),
+            ),
+            eventPort = eventPort,
+        )
+
+        service.execute()
+
+        assertEquals(emptyList(), eventPort.partiallyFilled)
+        assertEquals(70, eventPort.filled.single().filledQuantity)
+        assertEquals(listOf("broker-1:100:PURCHASE"), executionFillPort.savedExternalExecutionIds)
     }
 
     @Test
@@ -318,6 +404,10 @@ class ReconcileExecutionsServiceTest {
             listOf(OrderState.SELLING_WAITING, OrderState.SELLING_IN_PROCESS),
             stockOrderRepository.savedStates,
         )
+        assertEquals(
+            listOf(OrderId(UUID.fromString("00000000-0000-0000-0000-000000000010")) to "broker-sell"),
+            stockOrderRepository.savedExternalOrderIds,
+        )
     }
 
     @Test
@@ -376,6 +466,47 @@ class ReconcileExecutionsServiceTest {
         )
     }
 
+    @Test
+    fun `selling reconciliation marks legacy sell order completed when fully filled`() = runBlocking {
+        val stockOrderRepository = FakeStockOrderRepository(
+            orderByExternalOrderId = mapOf(
+                "broker-sell" to sellingOrder(orderState = OrderState.SELLING_IN_PROCESS),
+            ),
+        )
+        val eventPort = FakeOrderExecutionEventPort()
+        val service = service(
+            stockOrderRepository = stockOrderRepository,
+            marketPort = FakeMarketServicePort(
+                executions = listOf(
+                    execution(
+                        externalExecutionId = "sell-exec-1",
+                        externalOrderId = "broker-sell",
+                        quantity = 10,
+                        type = ExecutionTypeDto.SELLING,
+                    ),
+                ),
+            ),
+            executionFillPort = FakeExecutionFillPort(),
+            submissionPort = FakeOrderIntentSubmissionPort(
+                submissions = listOf(
+                    submission(
+                        quantity = 10,
+                        externalOrderId = "broker-sell",
+                        side = OrderIntentSide.SELL,
+                        orderTag = "FINAL_PRICE_BATING_V1_SELL",
+                    ),
+                ),
+            ),
+            eventPort = eventPort,
+        )
+
+        service.execute()
+
+        assertEquals(OrderIntentSide.SELL, eventPort.filled.single().side)
+        assertEquals(10L, eventPort.filled.single().filledQuantity)
+        assertEquals(listOf(OrderState.SELLING_COMPLETED), stockOrderRepository.savedStates)
+    }
+
     private fun service(
         stockOrderRepository: StockOrderRepository = FakeStockOrderRepository(),
         submitOrderIntentUseCase: SubmitOrderIntentUseCase = FakeSubmitOrderIntentUseCase(),
@@ -403,13 +534,14 @@ class ReconcileExecutionsServiceTest {
         quantity: Int,
         externalOrderId: String = "broker-1",
         quantityMode: ExecutionQuantityModeDto = ExecutionQuantityModeDto.DELTA,
+        type: ExecutionTypeDto = ExecutionTypeDto.PURCHASE,
     ): ExecutedStockDto {
         return ExecutedStockDto(
             stockId = "TQQQ",
             stockName = "TQQQ",
             createdAt = ZonedDateTime.parse("2026-06-02T09:00:00+09:00"),
             quantity = quantity,
-            type = ExecutionTypeDto.PURCHASE,
+            type = type,
             externalOrderId = externalOrderId,
             externalExecutionId = externalExecutionId,
             quantityMode = quantityMode,
@@ -419,17 +551,19 @@ class ReconcileExecutionsServiceTest {
     private fun submission(
         quantity: Long,
         externalOrderId: String = "broker-1",
+        side: OrderIntentSide = OrderIntentSide.BUY,
+        orderTag: String = "ENTRY_BUY",
     ): OrderIntentSubmissionDto {
         return OrderIntentSubmissionDto(
             orderIntentId = UUID.fromString("00000000-0000-0000-0000-000000000001"),
             idempotencyKey = "idempotency-key",
             strategyExecutionId = "laor-v4:TQQQ",
             symbol = "TQQQ",
-            side = OrderIntentSide.BUY,
+            side = side,
             orderType = OrderIntentType.LOC,
             submittedPrice = 100.0,
             quantity = quantity,
-            orderTag = "ENTRY_BUY",
+            orderTag = orderTag,
             internalOrderId = UUID.fromString("00000000-0000-0000-0000-000000000002"),
             externalOrderId = externalOrderId,
             submittedAt = ZonedDateTime.parse("2026-06-02T09:00:00+09:00"),
@@ -473,12 +607,16 @@ class ReconcileExecutionsServiceTest {
 
     private class FakeSubmitOrderIntentUseCase(
         private val status: OrderIntentSubmissionStatus = OrderIntentSubmissionStatus.SUBMITTED,
+        private val externalOrderId: String? = "broker-sell",
     ) : SubmitOrderIntentUseCase {
         val commands: MutableList<SubmitOrderIntentCommand> = mutableListOf()
 
         override suspend fun execute(command: SubmitOrderIntentCommand): SubmitOrderIntentResult {
             commands += command
-            return SubmitOrderIntentResult(status)
+            return SubmitOrderIntentResult(
+                status = status,
+                externalOrderId = externalOrderId,
+            )
         }
     }
 
@@ -515,13 +653,21 @@ class ReconcileExecutionsServiceTest {
     private class FakeExecutionFillPort(
         private val duplicateExecutionIds: Set<String> = emptySet(),
         private val initialQuantitiesByExternalOrderId: Map<String, Long> = emptyMap(),
+        private val failFirstSave: Boolean = false,
     ) : ExecutionFillPort {
         private val saved: MutableList<ExecutionFillDto> = mutableListOf()
+        private var saveAttemptCount: Int = 0
         val savedExternalExecutionIds: List<String>
             get() = saved.map { it.externalExecutionId }
 
+        override suspend fun exists(externalExecutionId: String): Boolean {
+            return externalExecutionId in duplicateExecutionIds || saved.any { it.externalExecutionId == externalExecutionId }
+        }
+
         override suspend fun saveIfNew(fill: ExecutionFillDto): Boolean {
-            if (fill.externalExecutionId in duplicateExecutionIds) return false
+            if (exists(fill.externalExecutionId)) return false
+            saveAttemptCount += 1
+            if (failFirstSave && saveAttemptCount == 1) return false
 
             saved += fill
             return true
@@ -557,9 +703,13 @@ class ReconcileExecutionsServiceTest {
         override suspend fun findCancelPendingSubmissions(): List<OrderIntentSubmissionDto> = emptyList()
     }
 
-    private class FakeOrderExecutionEventPort : OrderExecutionEventPort {
+    private class FakeOrderExecutionEventPort(
+        private val failPublish: Boolean = false,
+        private val idempotent: Boolean = false,
+    ) : OrderExecutionEventPort {
         val partiallyFilled: MutableList<OrderPartiallyFilledMessage> = mutableListOf()
         val filled: MutableList<OrderFilledMessage> = mutableListOf()
+        private val seenEventIds: MutableSet<UUID> = mutableSetOf()
 
         override suspend fun publishSubmitted(event: OrderSubmittedMessage) = Unit
 
@@ -568,10 +718,14 @@ class ReconcileExecutionsServiceTest {
         override suspend fun publishCancelled(event: OrderCancelledMessage) = Unit
 
         override suspend fun publishFilled(event: OrderFilledMessage) {
+            if (failPublish) throw IllegalStateException("outbox unavailable")
+            if (idempotent && !seenEventIds.add(event.eventId)) return
             filled += event
         }
 
         override suspend fun publishPartiallyFilled(event: OrderPartiallyFilledMessage) {
+            if (failPublish) throw IllegalStateException("outbox unavailable")
+            if (idempotent && !seenEventIds.add(event.eventId)) return
             partiallyFilled += event
         }
     }
@@ -640,6 +794,7 @@ class ReconcileExecutionsServiceTest {
         private val orderByExternalOrderId: Map<String, Order> = emptyMap(),
     ) : StockOrderRepository {
         val savedStates: MutableList<OrderState> = mutableListOf()
+        val savedExternalOrderIds: MutableList<Pair<OrderId, String>> = mutableListOf()
 
         override suspend fun save(order: Order) {
             savedStates += order.orderState
@@ -647,6 +802,7 @@ class ReconcileExecutionsServiceTest {
 
         override suspend fun save(order: Order, externalOrderId: ExternalOrderId) {
             savedStates += order.orderState
+            savedExternalOrderIds += order.id to externalOrderId.value
         }
 
         override suspend fun existsByStrategyId(strategyId: String): Boolean = false

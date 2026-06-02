@@ -23,9 +23,12 @@ data class OrderIntentMessage(
     val idempotencyKey: String,
     val createdAt: ZonedDateTime,
     val tradingEnvironment: OrderTradingEnvironment = OrderTradingEnvironment.MOCK,
+    val exchange: String = DEFAULT_OVERSEAS_ORDER_EXCHANGE,
 )
 
 enum class OrderTradingEnvironment {
     MOCK,
     LIVE,
 }
+
+const val DEFAULT_OVERSEAS_ORDER_EXCHANGE = "NASD"

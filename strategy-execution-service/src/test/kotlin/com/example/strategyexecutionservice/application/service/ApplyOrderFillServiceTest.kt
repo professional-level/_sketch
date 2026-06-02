@@ -6,6 +6,8 @@ import com.example.strategyexecutionservice.application.port.`in`.OrderFillKind
 import com.example.strategyexecutionservice.application.port.out.FinalPriceBatingV1ExecutionState
 import com.example.strategyexecutionservice.application.port.out.LaorV4ExecutionState
 import com.example.strategyexecutionservice.application.port.out.MarketDataPort
+import com.example.strategyexecutionservice.application.port.out.OrderIntentMessage
+import com.example.strategyexecutionservice.application.port.out.OrderIntentPort
 import com.example.strategyexecutionservice.application.port.out.StrategyExecutionOrderEventPort
 import com.example.strategyexecutionservice.application.port.out.StrategyExecutionOrderEventRecord
 import com.example.strategyexecutionservice.application.port.out.StrategyExecutionOrderEventType
@@ -13,6 +15,7 @@ import com.example.strategyexecutionservice.application.port.out.StrategyExecuti
 import com.example.strategyexecutionservice.application.port.out.StrategyExecutionStatePort
 import com.example.strategyexecutionservice.application.port.out.StrategyMarketDataSnapshot
 import com.example.strategyexecutionservice.domain.strategy.execution.OrderSide
+import com.example.strategyexecutionservice.domain.strategy.execution.OrderType
 import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategyState
 import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategySymbol
 import java.time.ZonedDateTime
@@ -39,7 +42,12 @@ class ApplyOrderFillServiceTest {
             ),
         )
         val orderEventPort = FakeStrategyExecutionOrderEventPort()
-        val service = ApplyOrderFillService(statePort, FakeMarketDataPort(), orderEventPort)
+        val service = ApplyOrderFillService(
+            statePort,
+            FakeMarketDataPort(),
+            orderEventPort,
+            FakeOrderIntentPort(),
+        )
 
         val result = service.execute(
             ApplyOrderFillCommand(
@@ -82,7 +90,12 @@ class ApplyOrderFillServiceTest {
                 ),
             ),
         )
-        val service = ApplyOrderFillService(statePort, FakeMarketDataPort(), FakeStrategyExecutionOrderEventPort())
+        val service = ApplyOrderFillService(
+            statePort,
+            FakeMarketDataPort(),
+            FakeStrategyExecutionOrderEventPort(),
+            FakeOrderIntentPort(),
+        )
 
         service.execute(
             ApplyOrderFillCommand(
@@ -123,6 +136,7 @@ class ApplyOrderFillServiceTest {
             statePort,
             FakeMarketDataPort(),
             FakeStrategyExecutionOrderEventPort(duplicateEventIds = setOf("fill-1")),
+            FakeOrderIntentPort(),
         )
 
         val result = service.execute(
@@ -159,7 +173,12 @@ class ApplyOrderFillServiceTest {
             ),
         )
         val orderEventPort = FakeStrategyExecutionOrderEventPort()
-        val service = ApplyOrderFillService(statePort, FakeMarketDataPort(), orderEventPort)
+        val service = ApplyOrderFillService(
+            statePort,
+            FakeMarketDataPort(),
+            orderEventPort,
+            FakeOrderIntentPort(),
+        )
 
         val result = service.execute(
             ApplyOrderFillCommand(
@@ -191,7 +210,12 @@ class ApplyOrderFillServiceTest {
             finalPriceInitial = finalPriceState(quantity = 3),
         )
         val orderEventPort = FakeStrategyExecutionOrderEventPort()
-        val service = ApplyOrderFillService(statePort, FakeMarketDataPort(), orderEventPort)
+        val service = ApplyOrderFillService(
+            statePort,
+            FakeMarketDataPort(),
+            orderEventPort,
+            FakeOrderIntentPort(),
+        )
 
         val result = service.execute(
             ApplyOrderFillCommand(
@@ -212,19 +236,25 @@ class ApplyOrderFillServiceTest {
         assertEquals(StrategyExecutionOrderEventType.PARTIALLY_FILLED, orderEventPort.saved.single().type)
         with(statePort.finalPriceSaved.single()) {
             assertEquals(StrategyExecutionLifecycleStatus.ACTIVE, status)
-            assertEquals(1, filledQuantity)
+            assertEquals(1L, filledQuantity)
             assertEquals(70_000.0, averageFilledPrice)
             assertEquals(null, completedAt)
         }
     }
 
     @Test
-    fun `final price bating full fill completes single shot strategy`() = runBlocking {
+    fun `final price bating entry full fill creates sell intent`() = runBlocking {
         val statePort = FakeStrategyExecutionStatePort(
             finalPriceInitial = finalPriceState(quantity = 2, filledQuantity = 1, averageFilledPrice = 70_000.0),
         )
         val orderEventPort = FakeStrategyExecutionOrderEventPort()
-        val service = ApplyOrderFillService(statePort, FakeMarketDataPort(), orderEventPort)
+        val orderIntentPort = FakeOrderIntentPort()
+        val service = ApplyOrderFillService(
+            statePort,
+            FakeMarketDataPort(),
+            orderEventPort,
+            orderIntentPort,
+        )
 
         val result = service.execute(
             ApplyOrderFillCommand(
@@ -244,19 +274,36 @@ class ApplyOrderFillServiceTest {
         assertEquals(ApplyOrderFillStatus.APPLIED, result.status)
         assertEquals(StrategyExecutionOrderEventType.FILLED, orderEventPort.saved.single().type)
         with(statePort.finalPriceSaved.single()) {
-            assertEquals(StrategyExecutionLifecycleStatus.COMPLETED, status)
-            assertEquals(2, filledQuantity)
+            assertEquals(StrategyExecutionLifecycleStatus.ACTIVE, status)
+            assertEquals(2L, filledQuantity)
             assertEquals(71_000.0, averageFilledPrice)
-            assertEquals(ZonedDateTime.parse("2026-06-02T09:30:00+09:00"), completedAt)
+            assertEquals(73_130.0, sellTargetPrice)
+            assertEquals(2L, sellQuantity)
+            assertEquals(ZonedDateTime.parse("2026-06-02T09:30:00+09:00"), sellIntentCreatedAt)
+            assertEquals(null, completedAt)
+        }
+        with(orderIntentPort.published.single()) {
+            assertEquals("FinalPriceBatingV1:005930", strategyExecutionId)
+            assertEquals(OrderSide.SELL, side)
+            assertEquals(OrderType.LIMIT, orderType)
+            assertEquals(73_130.0, price)
+            assertEquals(2L, quantity)
+            assertEquals("FINAL_PRICE_BATING_V1_SELL", orderTag)
         }
     }
 
     @Test
-    fun `final price bating overflow fill caps quantity and average calculation`() = runBlocking {
+    fun `final price bating overflow entry fill caps quantity and creates one sell intent`() = runBlocking {
         val statePort = FakeStrategyExecutionStatePort(
             finalPriceInitial = finalPriceState(quantity = 2, filledQuantity = 1, averageFilledPrice = 70_000.0),
         )
-        val service = ApplyOrderFillService(statePort, FakeMarketDataPort(), FakeStrategyExecutionOrderEventPort())
+        val orderIntentPort = FakeOrderIntentPort()
+        val service = ApplyOrderFillService(
+            statePort,
+            FakeMarketDataPort(),
+            FakeStrategyExecutionOrderEventPort(),
+            orderIntentPort,
+        )
 
         val result = service.execute(
             ApplyOrderFillCommand(
@@ -275,11 +322,61 @@ class ApplyOrderFillServiceTest {
 
         assertEquals(ApplyOrderFillStatus.APPLIED, result.status)
         with(statePort.finalPriceSaved.single()) {
-            assertEquals(StrategyExecutionLifecycleStatus.COMPLETED, status)
-            assertEquals(2, filledQuantity)
+            assertEquals(StrategyExecutionLifecycleStatus.ACTIVE, status)
+            assertEquals(2L, filledQuantity)
             assertEquals(71_000.0, averageFilledPrice)
-            assertEquals(ZonedDateTime.parse("2026-06-02T09:35:00+09:00"), completedAt)
+            assertEquals(73_130.0, sellTargetPrice)
+            assertEquals(2L, sellQuantity)
+            assertEquals(ZonedDateTime.parse("2026-06-02T09:35:00+09:00"), sellIntentCreatedAt)
+            assertEquals(null, completedAt)
         }
+        assertEquals(1, orderIntentPort.published.size)
+        assertEquals(2L, orderIntentPort.published.single().quantity)
+    }
+
+    @Test
+    fun `final price bating exit sell fill completes strategy`() = runBlocking {
+        val statePort = FakeStrategyExecutionStatePort(
+            finalPriceInitial = finalPriceState(
+                quantity = 2,
+                filledQuantity = 2,
+                averageFilledPrice = 71_000.0,
+                sellTargetPrice = 73_130.0,
+                sellQuantity = 2,
+                sellIntentCreatedAt = ZonedDateTime.parse("2026-06-02T09:30:00+09:00"),
+            ),
+        )
+        val orderIntentPort = FakeOrderIntentPort()
+        val service = ApplyOrderFillService(
+            statePort,
+            FakeMarketDataPort(),
+            FakeStrategyExecutionOrderEventPort(),
+            orderIntentPort,
+        )
+
+        val result = service.execute(
+            ApplyOrderFillCommand(
+                eventId = "final-price-sell-filled-1",
+                strategyExecutionId = "FinalPriceBatingV1:005930",
+                orderIntentId = "intent-sell-1",
+                brokerOrderId = "broker-sell-1",
+                side = OrderSide.SELL,
+                fillKind = OrderFillKind.FILLED,
+                filledPrice = 73_500.0,
+                filledQuantity = 2,
+                orderTag = "FINAL_PRICE_BATING_V1_SELL",
+                filledAt = ZonedDateTime.parse("2026-06-02T10:30:00+09:00"),
+            ),
+        )
+
+        assertEquals(ApplyOrderFillStatus.APPLIED, result.status)
+        with(statePort.finalPriceSaved.single()) {
+            assertEquals(StrategyExecutionLifecycleStatus.COMPLETED, status)
+            assertEquals(2L, soldQuantity)
+            assertEquals(73_500.0, averageSoldPrice)
+            assertEquals(ZonedDateTime.parse("2026-06-02T10:30:00+09:00"), completedAt)
+        }
+        assertEquals(emptyList(), orderIntentPort.published)
     }
 
     private class FakeStrategyExecutionStatePort(
@@ -317,6 +414,11 @@ class ApplyOrderFillServiceTest {
         quantity: Long,
         filledQuantity: Long = 0,
         averageFilledPrice: Double? = null,
+        sellTargetPrice: Double? = null,
+        sellQuantity: Long = 0,
+        sellIntentCreatedAt: ZonedDateTime? = null,
+        soldQuantity: Long = 0,
+        averageSoldPrice: Double? = null,
     ): FinalPriceBatingV1ExecutionState {
         return FinalPriceBatingV1ExecutionState(
             executionId = "FinalPriceBatingV1:005930",
@@ -327,6 +429,11 @@ class ApplyOrderFillServiceTest {
             quantity = quantity,
             filledQuantity = filledQuantity,
             averageFilledPrice = averageFilledPrice,
+            sellTargetPrice = sellTargetPrice,
+            sellQuantity = sellQuantity,
+            sellIntentCreatedAt = sellIntentCreatedAt,
+            soldQuantity = soldQuantity,
+            averageSoldPrice = averageSoldPrice,
             startedAt = ZonedDateTime.parse("2026-06-02T09:00:00+09:00"),
         )
     }
@@ -353,6 +460,14 @@ class ApplyOrderFillServiceTest {
 
             saved += event
             return true
+        }
+    }
+
+    private class FakeOrderIntentPort : OrderIntentPort {
+        val published: MutableList<OrderIntentMessage> = mutableListOf()
+
+        override suspend fun publishAll(orderIntents: List<OrderIntentMessage>) {
+            published += orderIntents
         }
     }
 }

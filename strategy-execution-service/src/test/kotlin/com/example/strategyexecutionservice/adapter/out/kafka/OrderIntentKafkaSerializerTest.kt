@@ -20,6 +20,7 @@ class OrderIntentKafkaSerializerTest {
         val event = Event.OrderIntentCreatedEvent.parseFrom(serializer.serialize(message()))
 
         assertEquals(Event.OrderTradingEnvironment.ORDER_TRADING_ENVIRONMENT_LIVE, event.tradingEnvironment)
+        assertEquals("NYSE", event.exchange)
     }
 
     private fun message(): OrderIntentMessage {
@@ -36,6 +37,7 @@ class OrderIntentKafkaSerializerTest {
             idempotencyKey = "laor-v4-live:TQQQ:2026-06-02:FIRST_BUY:0",
             createdAt = ZonedDateTime.parse("2026-06-02T09:00:00+09:00"),
             tradingEnvironment = OrderTradingEnvironment.LIVE,
+            exchange = "NYSE",
         )
     }
 }

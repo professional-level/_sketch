@@ -12,6 +12,10 @@ internal class ExecutionFillAdapter(
     private val executionFillRepository: ExecutionFillRepository,
 ) : ExecutionFillPort {
 
+    override suspend fun exists(externalExecutionId: String): Boolean {
+        return executionFillRepository.exists(externalExecutionId)
+    }
+
     override suspend fun saveIfNew(fill: ExecutionFillDto): Boolean {
         if (executionFillRepository.exists(fill.externalExecutionId)) return false
 
