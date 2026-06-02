@@ -11,6 +11,7 @@ The root sketch app reads KIS credentials from runtime-injected Spring `Environm
 - Never commit `application-secret.properties`.
 - Use `src/main/resources/application-secret.properties.example` as the local template.
 - Keep real account numbers, app keys, app secrets, and tokens outside Git.
+- Gradle excludes `application-secret.properties` from processed resources for the root app and subprojects; keep this exclusion in place if build scripts are refactored.
 - For a real deployment, provide these values through environment variables, Kubernetes/Vault-injected properties, or another runtime secret source instead of packaging them in the application jar.
 
 Required keys:

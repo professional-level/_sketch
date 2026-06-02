@@ -1,3 +1,5 @@
+import org.gradle.language.jvm.tasks.ProcessResources
+
 plugins {
     id("org.springframework.boot") version "3.3.0"
     id("io.spring.dependency-management") version "1.0.13.RELEASE"
@@ -99,4 +101,12 @@ kotlin {
 }
 tasks.withType<Test> {
     useJUnitPlatform()
+}
+tasks.withType<ProcessResources>().configureEach {
+    exclude("application-secret.properties")
+}
+subprojects {
+    tasks.withType<ProcessResources>().configureEach {
+        exclude("application-secret.properties")
+    }
 }
