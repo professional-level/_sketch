@@ -100,6 +100,32 @@ class BrokerOrderHistoryItemTest {
     }
 
     @Test
+    fun `preserves original fill details when terminal cancel row has no fill quantity`() {
+        val status = listOf(
+            row(
+                externalOrderId = "broker-1",
+                externalExecutionId = "broker-fill-1",
+                cumulativeFilledQuantity = 1,
+                averageExecutionPrice = 112.5,
+                orderedPrice = 112.0,
+            ),
+            row(
+                externalOrderId = "cancel-broker-1",
+                originalOrderId = "broker-1",
+                cancelledQuantity = 2,
+                cancelled = true,
+            ),
+        ).findStatusFor(query(externalOrderId = "broker-1"))
+
+        assertEquals(BrokerOrderStatus.CANCELLED, status.status)
+        assertEquals("broker-1", status.externalOrderId)
+        assertEquals("broker-fill-1", status.externalExecutionId)
+        assertEquals(1L, status.cumulativeFilledQuantity)
+        assertEquals(112.5, status.averageExecutionPrice)
+        assertEquals(112.0, status.orderedPrice)
+    }
+
+    @Test
     fun `returns unknown when order lookup is ambiguous without broker order id`() {
         val status = listOf(
             row(externalOrderId = "broker-1"),

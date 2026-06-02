@@ -250,7 +250,10 @@ internal fun List<BrokerOrderHistoryItem>.findStatusFor(query: BrokerOrderStatus
             reason = "broker order not found",
         )
 
-        selectedCandidate != null -> selectedCandidate.toStatus().normalizeExternalOrderId(query.externalOrderId)
+        selectedCandidate != null -> selectedCandidate
+            .toStatus()
+            .withBestFillFrom(candidates, selectedCandidate)
+            .normalizeExternalOrderId(query.externalOrderId)
         else -> BrokerOrderStatusDto(
             status = BrokerOrderStatus.UNKNOWN,
             externalOrderId = query.externalOrderId,
@@ -297,6 +300,29 @@ private fun BrokerOrderStatusDto.normalizeExternalOrderId(queriedExternalOrderId
         externalOrderId == queriedExternalOrderId -> this
         else -> copy(externalOrderId = queriedExternalOrderId)
     }
+}
+
+private fun BrokerOrderStatusDto.withBestFillFrom(
+    candidates: List<BrokerOrderHistoryItem>,
+    selectedCandidate: BrokerOrderHistoryItem,
+): BrokerOrderStatusDto {
+    val currentFilledQuantity = cumulativeFilledQuantity ?: 0
+    val filledCandidate = candidates
+        .filter { it.cumulativeFilledQuantity > currentFilledQuantity }
+        .maxWithOrNull(compareBy<BrokerOrderHistoryItem> { it.cumulativeFilledQuantity }.thenBy { it.orderedAt })
+        ?: return this
+    val filledStatus = filledCandidate.toStatus()
+    return copy(
+        externalExecutionId = externalExecutionId ?: filledStatus.externalExecutionId,
+        orderedQuantity = orderedQuantity ?: filledStatus.orderedQuantity,
+        orderedPrice = orderedPrice ?: filledStatus.orderedPrice,
+        cumulativeFilledQuantity = filledStatus.cumulativeFilledQuantity,
+        averageExecutionPrice = averageExecutionPrice ?: filledStatus.averageExecutionPrice,
+        brokerReportedAt = maxOf(
+            brokerReportedAt ?: selectedCandidate.orderedAt,
+            filledStatus.brokerReportedAt ?: filledCandidate.orderedAt,
+        ),
+    )
 }
 
 private fun String?.containsStatusToken(token: String): Boolean {
