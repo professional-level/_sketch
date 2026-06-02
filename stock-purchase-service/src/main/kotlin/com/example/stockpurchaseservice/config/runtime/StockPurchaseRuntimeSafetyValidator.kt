@@ -42,6 +42,15 @@ class StockPurchaseRuntimeSafetyValidator(
                 enabledStrategyPrefixes = orderRiskProperties.enabledStrategyPrefixes,
                 symbolMaxOrderNotional = orderRiskProperties.symbolMaxOrderNotional,
                 strategyTradingEnvironmentPrefixes = orderRiskProperties.strategyTradingEnvironments.keys,
+                currencyConversionProvider = orderRiskProperties.currencyConversion.provider,
+                riskBaseCurrency = orderRiskProperties.currencyConversion.baseCurrency,
+                domesticCurrency = orderRiskProperties.currencyConversion.domesticCurrency,
+                overseasUsCurrency = orderRiskProperties.currencyConversion.overseasUsCurrency,
+                staticRatesToBase = orderRiskProperties.currencyConversion.ratesToBase,
+                httpFxRateBaseUrl = orderRiskProperties.currencyConversion.http.baseUrl,
+                kisWrapperFxPairKeysWithSymbol = orderRiskProperties.currencyConversion.kisWrapper.pairs
+                    .filterValues { it.symbol.isNotBlank() }
+                    .keys,
                 allowLocalBrokerEndpointInProduction = properties.allowLocalBrokerEndpointInProduction,
                 allowMockTradingInProduction = properties.allowMockTradingInProduction,
                 allowDisabledRiskControlsInProduction = properties.allowDisabledRiskControlsInProduction,
@@ -81,6 +90,13 @@ object StockPurchaseRuntimeSafetyRules {
         val enabledStrategyPrefixes: Collection<String>,
         val symbolMaxOrderNotional: Map<String, Double>,
         val strategyTradingEnvironmentPrefixes: Collection<String>,
+        val currencyConversionProvider: String,
+        val riskBaseCurrency: String,
+        val domesticCurrency: String,
+        val overseasUsCurrency: String,
+        val staticRatesToBase: Map<String, Double>,
+        val httpFxRateBaseUrl: String,
+        val kisWrapperFxPairKeysWithSymbol: Collection<String>,
         val allowLocalBrokerEndpointInProduction: Boolean,
         val allowMockTradingInProduction: Boolean,
         val allowDisabledRiskControlsInProduction: Boolean,
@@ -160,6 +176,64 @@ object StockPurchaseRuntimeSafetyRules {
                     violations += "prod/live profile must configure strategy trading environment policies " +
                         "(akra.order.risk.strategy-trading-environments)"
                 }
+                violations += validateCurrencyConversion(input)
+            }
+        }
+
+        return violations
+    }
+
+    private fun validateCurrencyConversion(input: Input): List<String> {
+        val violations = mutableListOf<String>()
+        val baseCurrency = input.riskBaseCurrency.normalizedCurrency()
+        val domesticCurrency = input.domesticCurrency.normalizedCurrency()
+        val overseasUsCurrency = input.overseasUsCurrency.normalizedCurrency()
+
+        val hasBlankCurrency = baseCurrency.isBlank() || domesticCurrency.isBlank() || overseasUsCurrency.isBlank()
+        if (baseCurrency.isBlank()) {
+            violations += "prod/live profile must configure a risk base currency " +
+                "(akra.order.risk.currency-conversion.base-currency)"
+        }
+        if (domesticCurrency.isBlank()) {
+            violations += "prod/live profile must configure a domestic risk currency " +
+                "(akra.order.risk.currency-conversion.domestic-currency)"
+        }
+        if (overseasUsCurrency.isBlank()) {
+            violations += "prod/live profile must configure an overseas US risk currency " +
+                "(akra.order.risk.currency-conversion.overseas-us-currency)"
+        }
+
+        val provider = input.currencyConversionProvider.trim().lowercase()
+        val unsupportedProvider = provider !in FX_PROVIDERS
+        if (unsupportedProvider) {
+            violations += "prod/live profile must configure a supported FX provider " +
+                "(akra.order.risk.currency-conversion.provider=static|http|kis-wrapper)"
+        }
+        if (hasBlankCurrency || unsupportedProvider) {
+            return violations
+        }
+
+        val marketCurrencies = listOf(domesticCurrency, overseasUsCurrency)
+            .filter { it.isNotBlank() && it != baseCurrency }
+            .distinct()
+        when (provider) {
+            "static" -> marketCurrencies.forEach { currency ->
+                if (!input.staticRatesToBase.hasPositiveRateFor(currency)) {
+                    violations += "prod/live profile must configure a positive static FX rate " +
+                        "for $currency to $baseCurrency " +
+                        "(akra.order.risk.currency-conversion.rates-to-base.$currency)"
+                }
+            }
+            "http" -> if (input.httpFxRateBaseUrl.isBlank()) {
+                violations += "prod/live profile must configure an HTTP FX base URL " +
+                    "(akra.order.risk.currency-conversion.http.base-url)"
+            }
+            "kis-wrapper" -> marketCurrencies.forEach { currency ->
+                if (!input.kisWrapperFxPairKeysWithSymbol.hasFxPair(currency, baseCurrency)) {
+                    violations += "prod/live profile must configure a KIS wrapper FX pair " +
+                        "for $currency to $baseCurrency " +
+                        "(akra.order.risk.currency-conversion.kis-wrapper.pairs.$currency-$baseCurrency.symbol)"
+                }
             }
         }
 
@@ -180,6 +254,30 @@ object StockPurchaseRuntimeSafetyRules {
 
     private fun Map<String, Double>.hasPositiveSymbolLimit(): Boolean {
         return entries.any { (symbol, limit) -> symbol.trim().isNotBlank() && limit.isFinite() && limit > 0.0 }
+    }
+
+    private fun Map<String, Double>.hasPositiveRateFor(currency: String): Boolean {
+        return entries.any { (configuredCurrency, rate) ->
+            configuredCurrency.normalizedCurrency() == currency && rate.isFinite() && rate > 0.0
+        }
+    }
+
+    private fun Collection<String>.hasFxPair(sourceCurrency: String, baseCurrency: String): Boolean {
+        val expectedKeys = setOf(
+            "$sourceCurrency-$baseCurrency",
+            "$sourceCurrency:$baseCurrency",
+            "$sourceCurrency/$baseCurrency",
+            "$sourceCurrency$baseCurrency",
+        )
+        return any { it.normalizedFxPairKey() in expectedKeys }
+    }
+
+    private fun String.normalizedCurrency(): String {
+        return trim().uppercase()
+    }
+
+    private fun String.normalizedFxPairKey(): String {
+        return trim().uppercase()
     }
 
     private fun isSafeHibernateDdlAuto(value: String?): Boolean {
@@ -204,4 +302,6 @@ object StockPurchaseRuntimeSafetyRules {
             normalized == "::1" ||
             normalized.startsWith("::1:")
     }
+
+    private val FX_PROVIDERS = setOf("static", "http", "kis-wrapper")
 }

@@ -276,6 +276,11 @@ Blocked by default:
 - `akra.order.risk.account-cash.enabled=false`.
 - Missing or non-positive `akra.order.risk.max-order-notional`, `max-account-pending-buy-notional`, `max-account-exposure-notional`, or `max-daily-order-count`.
 - Empty `akra.order.risk.enabled-strategy-prefixes`, `symbol-max-order-notional.*`, or `strategy-trading-environments`.
+- Blank or unsupported `akra.order.risk.currency-conversion.provider`.
+- Blank `akra.order.risk.currency-conversion.base-currency`, `domestic-currency`, or `overseas-us-currency`.
+- `provider=static` with a missing or non-positive `rates-to-base.<currency>` entry for any configured market currency that differs from the risk base currency.
+- `provider=http` with blank `akra.order.risk.currency-conversion.http.base-url`.
+- `provider=kis-wrapper` with no configured pair symbol such as `akra.order.risk.currency-conversion.kis-wrapper.pairs.KRW-USD.symbol` for a required market-currency-to-base-currency pair.
 
 Temporary waiver properties exist for controlled tests only:
 
@@ -325,7 +330,7 @@ Before enabling real orders:
 - Use JDBC or managed external storage for shared KIS tokens; do not use local-file token persistence for multi-instance production deployments.
 - Set real-vs-mock trading flags intentionally for the account being operated.
 - Confirm `strategy-execution-service` order-intent trading environment settings and `stock-purchase-service` broker mock/live flags agree for each strategy prefix.
-- Confirm risk guard limits are set for order notional, account pending buy notional, broker account exposure/cash, symbol notional, daily order count, strategy allow-list, and strategy trading environments. `stock-purchase-service` startup now enforces these settings under production-like profiles unless the disabled-risk-control waiver is explicitly set.
+- Confirm risk guard limits are set for order notional, account pending buy notional, broker account exposure/cash, symbol notional, daily order count, strategy allow-list, strategy trading environments, and FX conversion provider/rates/pairs. `stock-purchase-service` startup now enforces these settings under production-like profiles unless the disabled-risk-control waiver is explicitly set.
 - Confirm broker order status lookup windows are wide enough for `SUBMISSION_UNKNOWN` and `CANCEL_PENDING` recovery without creating excessive KIS query load.
 - Configure domestic and US order windows, holidays, early-close dates, and LOC/MOC cutoffs until an exchange calendar sync is available.
 - Configure `akra.trading-calendar.us.*` in `strategy-execution-service` separately from purchase-service risk windows. The daily active-strategy run resolves the order session date from the requested timestamp and market close, then skips strategy execution when that target US session is closed. If the Temporal trigger lands before the resolved session open or after the prior session close, generated order intents use the resolved session open timestamp for `createdAt` so `stock-purchase-service` evaluates trading-hours risk against the intended order session.
@@ -547,7 +552,7 @@ GET /operations/trading/account-snapshot?market=DOMESTIC&exchange=KRX&currency=K
 ```
 
 This calls the broker wrapper's domestic or overseas balance lookup and returns current positions with quantity, average purchase price, current price, purchase amount, evaluation amount, profit/loss, and legacy `availableCashAmount` when KIS provides those fields.
-The response also includes `cashCurrency`, `orderableCashAmount`, `settledCashAmount`, and `withdrawableCashAmount` when those KIS summary aliases are present. `availableCashAmount` remains as a legacy compatibility field and is derived from the first available broker cash bucket. Risk checks can normalize configured domestic and overseas currencies through the configured FX provider. The default provider uses static `rates-to-base` settings, the optional HTTP provider can call an operator-managed FX endpoint, and `provider=kis-wrapper` can use the root wrapper's KIS overseas daily chart price endpoint for configured currency pairs. KIS symbol mapping, mock/real execution evidence, and broader account cash/exposure modeling still require additional hardening.
+The response also includes `cashCurrency`, `orderableCashAmount`, `settledCashAmount`, and `withdrawableCashAmount` when those KIS summary aliases are present. `availableCashAmount` remains as a legacy compatibility field and is derived from the first available broker cash bucket. Risk checks can normalize configured domestic and overseas currencies through the configured FX provider. The default provider uses static `rates-to-base` settings, the optional HTTP provider can call an operator-managed FX endpoint, and `provider=kis-wrapper` can use the root wrapper's KIS overseas daily chart price endpoint for configured currency pairs. KIS symbol mapping and mock/real execution evidence still require target-environment smoke; broader account cash/exposure modeling remains bounded by the broker snapshot fields KIS returns.
 
 When `akra.order.risk.max-account-exposure-notional` is set, buy order risk checks use the configured account exposure markets to reject orders whose projected whole-account exposure would exceed the configured limit. By default the guard includes both `DOMESTIC` and `OVERSEAS_US`:
 

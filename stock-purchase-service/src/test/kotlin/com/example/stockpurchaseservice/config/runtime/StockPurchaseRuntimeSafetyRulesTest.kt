@@ -178,6 +178,124 @@ class StockPurchaseRuntimeSafetyRulesTest {
     }
 
     @Test
+    fun `blocks missing static fx rate in production profile`() {
+        val violations = StockPurchaseRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                brokerBaseUrl = "https://broker-wrapper.example.com",
+                domesticMockOrder = false,
+                overseasMockOrder = false,
+                staticRatesToBase = emptyMap(),
+            ),
+        )
+
+        assertEquals(1, violations.size)
+        assertTrue(violations.single().contains("positive static FX rate for KRW to USD"))
+    }
+
+    @Test
+    fun `blocks unsupported fx provider in production profile`() {
+        val violations = StockPurchaseRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                brokerBaseUrl = "https://broker-wrapper.example.com",
+                domesticMockOrder = false,
+                overseasMockOrder = false,
+                currencyConversionProvider = "manual",
+            ),
+        )
+
+        assertEquals(1, violations.size)
+        assertTrue(violations.single().contains("supported FX provider"))
+    }
+
+    @Test
+    fun `blocks incomplete fx currency names in production profile`() {
+        val violations = StockPurchaseRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                brokerBaseUrl = "https://broker-wrapper.example.com",
+                domesticMockOrder = false,
+                overseasMockOrder = false,
+                riskBaseCurrency = "",
+                domesticCurrency = " ",
+                overseasUsCurrency = "",
+            ),
+        )
+
+        assertEquals(3, violations.size)
+        assertTrue(violations.any { it.contains("risk base currency") })
+        assertTrue(violations.any { it.contains("domestic risk currency") })
+        assertTrue(violations.any { it.contains("overseas US risk currency") })
+    }
+
+    @Test
+    fun `blocks http fx provider without base url in production profile`() {
+        val violations = StockPurchaseRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                brokerBaseUrl = "https://broker-wrapper.example.com",
+                domesticMockOrder = false,
+                overseasMockOrder = false,
+                currencyConversionProvider = "http",
+                httpFxRateBaseUrl = "",
+            ),
+        )
+
+        assertEquals(1, violations.size)
+        assertTrue(violations.single().contains("HTTP FX base URL"))
+    }
+
+    @Test
+    fun `allows configured http fx provider in production profile`() {
+        val violations = StockPurchaseRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                brokerBaseUrl = "https://broker-wrapper.example.com",
+                domesticMockOrder = false,
+                overseasMockOrder = false,
+                currencyConversionProvider = "http",
+                httpFxRateBaseUrl = "https://fx.example.com",
+            ),
+        )
+
+        assertTrue(violations.isEmpty())
+    }
+
+    @Test
+    fun `blocks kis wrapper fx provider without required pair in production profile`() {
+        val violations = StockPurchaseRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                brokerBaseUrl = "https://broker-wrapper.example.com",
+                domesticMockOrder = false,
+                overseasMockOrder = false,
+                currencyConversionProvider = "kis-wrapper",
+                kisWrapperFxPairKeysWithSymbol = emptyList(),
+            ),
+        )
+
+        assertEquals(1, violations.size)
+        assertTrue(violations.single().contains("KIS wrapper FX pair for KRW to USD"))
+    }
+
+    @Test
+    fun `allows configured kis wrapper fx provider in production profile`() {
+        val violations = StockPurchaseRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                brokerBaseUrl = "https://broker-wrapper.example.com",
+                domesticMockOrder = false,
+                overseasMockOrder = false,
+                currencyConversionProvider = "kis-wrapper",
+                kisWrapperFxPairKeysWithSymbol = listOf("KRW-USD"),
+            ),
+        )
+
+        assertTrue(violations.isEmpty())
+    }
+
+    @Test
     fun `allows explicitly waived production checks`() {
         val violations = StockPurchaseRuntimeSafetyRules.validate(
             input(
@@ -214,6 +332,13 @@ class StockPurchaseRuntimeSafetyRulesTest {
         enabledStrategyPrefixes: Collection<String> = listOf("laor-v4-live"),
         symbolMaxOrderNotional: Map<String, Double> = mapOf("TQQQ" to 1_000.0),
         strategyTradingEnvironmentPrefixes: Collection<String> = listOf("laor-v4-live"),
+        currencyConversionProvider: String = "static",
+        riskBaseCurrency: String = "USD",
+        domesticCurrency: String = "KRW",
+        overseasUsCurrency: String = "USD",
+        staticRatesToBase: Map<String, Double> = mapOf("KRW" to 0.001),
+        httpFxRateBaseUrl: String = "https://fx.example.com",
+        kisWrapperFxPairKeysWithSymbol: Collection<String> = listOf("KRW-USD"),
         allowLocalBrokerEndpointInProduction: Boolean = false,
         allowMockTradingInProduction: Boolean = false,
         allowDisabledRiskControlsInProduction: Boolean = false,
@@ -237,6 +362,13 @@ class StockPurchaseRuntimeSafetyRulesTest {
         enabledStrategyPrefixes = enabledStrategyPrefixes,
         symbolMaxOrderNotional = symbolMaxOrderNotional,
         strategyTradingEnvironmentPrefixes = strategyTradingEnvironmentPrefixes,
+        currencyConversionProvider = currencyConversionProvider,
+        riskBaseCurrency = riskBaseCurrency,
+        domesticCurrency = domesticCurrency,
+        overseasUsCurrency = overseasUsCurrency,
+        staticRatesToBase = staticRatesToBase,
+        httpFxRateBaseUrl = httpFxRateBaseUrl,
+        kisWrapperFxPairKeysWithSymbol = kisWrapperFxPairKeysWithSymbol,
         allowLocalBrokerEndpointInProduction = allowLocalBrokerEndpointInProduction,
         allowMockTradingInProduction = allowMockTradingInProduction,
         allowDisabledRiskControlsInProduction = allowDisabledRiskControlsInProduction,
