@@ -32,7 +32,6 @@ import java.util.UUID
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 
 class CancelOrderSubmissionServiceTest {
 
@@ -208,30 +207,36 @@ class CancelOrderSubmissionServiceTest {
     }
 
     @Test
-    fun `fails domestic cancel request without branch order number`() = runBlocking {
+    fun `passes domestic cancel request without branch order number to broker gateway`() = runBlocking {
+        val marketPort = FakeMarketServicePort()
         val processedEventPort = FakeProcessedEventPort()
         val alertPort = FakeOperationalAlertPort()
         val service = CancelOrderSubmissionService(
-            FakeMarketServicePort(),
+            marketPort,
             processedEventPort,
             alertPort,
             FakeOrderIntentSubmissionPort(),
         )
         val eventId = UUID.randomUUID()
 
-        assertFailsWith<IllegalArgumentException> {
-            service.execute(
-                cancelCommand(
-                    eventId = eventId,
-                    symbol = "005930",
-                    originalBrokerOrderId = "domestic-order-1",
-                    branchOrderNumber = null,
-                ),
-            )
-        }
+        val result = service.execute(
+            cancelCommand(
+                eventId = eventId,
+                symbol = "005930",
+                originalBrokerOrderId = "domestic-order-1",
+                branchOrderNumber = null,
+            ),
+        )
 
-        assertEquals(eventId, processedEventPort.failed.single())
-        assertEquals(eventId, alertPort.failedCancellations.single().cancellationRequestId)
+        assertEquals(CancelOrderSubmissionStatus.ACCEPTED, result.status)
+        assertEquals(eventId, processedEventPort.succeeded.single())
+        with(marketPort.cancelOrders) {
+            assertEquals(1, size)
+            assertEquals(StockOrderMarket.DOMESTIC, single().market)
+            assertEquals(null, single().branchOrderNumber)
+        }
+        assertEquals(emptyList(), processedEventPort.failed)
+        assertEquals(emptyList(), alertPort.failedCancellations)
     }
 
     private fun cancelCommand(

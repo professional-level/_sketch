@@ -64,11 +64,11 @@ internal class KisBrokerGatewayAdapter(
     override fun cancelOrder(command: BrokerOrderCancelCommand): BrokerOrderSubmissionDto {
         return when (command.market) {
             StockOrderMarket.DOMESTIC -> {
-                ensureDomesticOrderCancelable(command)
+                val resolvedCommand = prepareDomesticCancelCommand(command)
                 guard.execute("cancel-order:${command.market}") {
                     stockApiClient.submitStockOrder(
                         uri = OPEN_API_PREFIX + POST_STOCK_ORDER_CANCEL,
-                        body = command.toKisDomesticCancelRequest(),
+                        body = resolvedCommand.toKisDomesticCancelRequest(),
                         callOptions = properties.toSubmitCallOptions(),
                     )
                 }
@@ -87,7 +87,7 @@ internal class KisBrokerGatewayAdapter(
         }
     }
 
-    private fun ensureDomesticOrderCancelable(command: BrokerOrderCancelCommand) {
+    private fun prepareDomesticCancelCommand(command: BrokerOrderCancelCommand): BrokerOrderCancelCommand {
         val cancelableOrder = findCancelableOrders(command.toCancelableQuery())
             .bestCancelableOrder()
             ?: throw BrokerOrderRejectedException(
@@ -99,6 +99,13 @@ internal class KisBrokerGatewayAdapter(
                     "requested=${command.quantity} possible=${cancelableOrder.possibleQuantity}",
             )
         }
+        val branchOrderNumber = command.branchOrderNumber
+            ?.takeIf { it.isNotBlank() }
+            ?: cancelableOrder.branchOrderNumber?.takeIf { it.isNotBlank() }
+            ?: throw BrokerOrderRejectedException(
+                message = "domestic cancelable order has no branch order number: ${command.originalOrderId}",
+            )
+        return command.copy(branchOrderNumber = branchOrderNumber)
     }
 
     override fun findCancelableOrders(query: BrokerOrderCancelableQuery): List<BrokerCancelableOrderItem> {

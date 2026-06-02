@@ -2953,6 +2953,111 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `domestic cancel uses cancelable lookup branch when command branch is missing`() {
+        val exchangeFunction = ResponseExchangeFunction(
+            responses = listOf(
+                jsonResponse(
+                    """
+                    {
+                      "rt_cd": "0",
+                      "ctx_area_fk100": "",
+                      "ctx_area_nk100": "",
+                      "output": [
+                        {
+                          "ord_gno_brno": "00001",
+                          "odno": "domestic-order-1",
+                          "pdno": "005930",
+                          "psbl_qty": "2"
+                        }
+                      ]
+                    }
+                    """.trimIndent(),
+                ),
+                protobufResponse(
+                    ApiResponse.StockOrder.newBuilder()
+                        .setRtCd("0")
+                        .setOutput(
+                            ApiResponse.Output.newBuilder()
+                                .setODNO("cancel-order-1")
+                                .build(),
+                        )
+                        .build(),
+                ),
+            ),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        val submission = adapter.cancelOrder(
+            brokerCancelCommand(
+                market = StockOrderMarket.DOMESTIC,
+                symbol = "005930",
+                originalOrderId = "domestic-order-1",
+                branchOrderNumber = null,
+                price = 0.0,
+                quantity = 2,
+                orderType = StockOrderType.LIMIT,
+                isMock = false,
+            ),
+        )
+
+        assertEquals("cancel-order-1", submission.externalOrderId)
+        assertEquals(2, exchangeFunction.requests.size)
+        assertEquals("/open-api/trading/order-rvsecncl", exchangeFunction.requests[1].url().path)
+    }
+
+    @Test
+    fun `domestic cancel rejects when cancelable lookup cannot provide branch`() {
+        val exchangeFunction = ResponseExchangeFunction(
+            responses = listOf(
+                jsonResponse(
+                    """
+                    {
+                      "rt_cd": "0",
+                      "ctx_area_fk100": "",
+                      "ctx_area_nk100": "",
+                      "output": [
+                        {
+                          "ord_gno_brno": "0000000000",
+                          "odno": "domestic-order-1",
+                          "pdno": "005930",
+                          "psbl_qty": "2"
+                        }
+                      ]
+                    }
+                    """.trimIndent(),
+                ),
+            ),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        val exception = assertFailsWith<BrokerOrderRejectedException> {
+            adapter.cancelOrder(
+                brokerCancelCommand(
+                    market = StockOrderMarket.DOMESTIC,
+                    symbol = "005930",
+                    originalOrderId = "domestic-order-1",
+                    branchOrderNumber = null,
+                    price = 0.0,
+                    quantity = 2,
+                    orderType = StockOrderType.LIMIT,
+                    isMock = false,
+                ),
+            )
+        }
+
+        assertEquals("domestic cancelable order has no branch order number: domestic-order-1", exception.message)
+        assertEquals(1, exchangeFunction.requests.size)
+    }
+
+    @Test
     fun `finds domestic cancelable orders without submitting cancel`() {
         val exchangeFunction = ResponseExchangeFunction(
             responses = listOf(
