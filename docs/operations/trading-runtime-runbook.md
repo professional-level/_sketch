@@ -116,6 +116,8 @@ Run the submit/cancel smoke only during a KIS mock overseas order window. Use a 
 
 The root KIS wrapper must preserve KIS order and cancel business responses as a successful HTTP response body, even when `rt_cd != 0`. `stock-purchase-service` classifies that body as `BrokerOrderRejectedException`. A wrapper HTTP 5xx during submit remains a submission-unknown candidate because the broker order id may not be known.
 
+For KIS query endpoints, the wrapper also preserves non-2xx JSON business responses when the body contains `rt_cd`. Non-KIS transport failures still remain HTTP failures. This distinction is important during smoke tests because it lets the downstream adapter report a broker return code instead of losing the diagnostic body behind a generic wrapper 500.
+
 Use `--no-daemon` so the test JVM sees the current smoke-test environment variables, and use `--rerun-tasks` so Gradle does not report a stale up-to-date result.
 
 ## Startup Safety Checks

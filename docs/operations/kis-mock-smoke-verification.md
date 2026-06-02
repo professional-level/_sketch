@@ -60,4 +60,4 @@ Coverage:
 Next action:
 
 - Retry submit/query/cancel with a KIS mock account that is enabled for overseas mock orders.
-- If KIS mock balance continues returning HTTP 500, capture a redacted wrapper-side response sample and decide whether the wrapper should preserve non-2xx KIS error bodies for query diagnostics.
+- If KIS mock balance continues returning HTTP 500, capture a redacted wrapper-side response sample. The wrapper now preserves non-2xx KIS JSON business responses when the body contains `rt_cd`, so the downstream adapter can classify the broker error instead of receiving only a transport 500.

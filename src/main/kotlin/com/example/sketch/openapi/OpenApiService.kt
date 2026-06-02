@@ -619,13 +619,16 @@ class OpenApiService(
             true -> (requestSpec as RequestBodySpec).bodyValue(body)
             false -> requestSpec
         }
-            .retrieve()
-            .toEntity<JsonNode>()
-            .awaitSingleOrNull() ?: ResponseEntity.notFound().build<String>()
+            .exchangeToMono { response ->
+                response.toEntity(JsonNode::class.java)
+            }
+            .awaitSingleOrNull() ?: ResponseEntity.notFound().build<JsonNode>()
 
         val status = responseEntity.statusCode
+        val bodyNode = responseEntity.body
         val response = when {
-            status.is2xxSuccessful -> (responseEntity.body as OpenApiResponse)
+            status.is2xxSuccessful && bodyNode != null -> bodyNode
+            bodyNode.isKisBusinessResponse() -> bodyNode
             status.is4xxClientError -> throw RuntimeException("$status") // TODO: exception 처리 필요
             status.is5xxServerError -> throw RuntimeException("$status") // TODO: token expire에 대한 분기 처리 필요
             else -> throw RuntimeException("$status")
@@ -690,3 +693,9 @@ object BodyParameter {
 }
 
 internal class UnexpectApiResponseException : RuntimeException()
+
+private fun JsonNode?.isKisBusinessResponse(): Boolean {
+    return this != null &&
+        isObject &&
+        listOf("rt_cd", "rtCd", "RT_CD").any { path(it).asText("").isNotBlank() }
+}
