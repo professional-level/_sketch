@@ -109,6 +109,57 @@ class RecoverUnknownOrderSubmissionsServiceTest {
     }
 
     @Test
+    fun `recovers filled legacy sell unknown submission to completed stock order`() = runBlocking {
+        val submissionPort = FakeOrderIntentSubmissionPort(
+            listOf(
+                submission(
+                    idempotencyKey = "legacy-sell:legacy-final-price:TQQQ:$LEGACY_ORDER_ID:3:112.0",
+                    side = OrderIntentSide.SELL,
+                    orderTag = "FINAL_PRICE_BATING_V1_SELL",
+                ),
+            ),
+        )
+        val stockOrderPort = FakeStockOrderPort(
+            order = orderDto(orderState = OrderStateDto.SUBMISSION_UNKNOWN),
+        )
+        val eventPort = FakeOrderExecutionEventPort()
+        val executionFillPort = FakeExecutionFillPort()
+        val service = RecoverUnknownOrderSubmissionsService(
+            marketService = FakeMarketServicePort(
+                status = BrokerOrderStatusDto(
+                    status = BrokerOrderStatus.FILLED,
+                    externalOrderId = "broker-sell",
+                    externalExecutionId = "sell-exec-1",
+                    checkedAt = CHECKED_AT,
+                    orderedQuantity = 3,
+                    cumulativeFilledQuantity = 3,
+                    remainingQuantity = 0,
+                    averageExecutionPrice = 113.0,
+                    brokerReportedAt = BROKER_REPORTED_AT,
+                ),
+            ),
+            orderIntentSubmissionPort = submissionPort,
+            orderExecutionEventPort = eventPort,
+            operationalAlertPort = FakeOperationalAlertPort(),
+            stockOrderPort = stockOrderPort,
+            executionFillPort = executionFillPort,
+        )
+
+        service.execute()
+
+        assertEquals("broker-sell", submissionPort.submitted.single().externalOrderId)
+        assertEquals(
+            listOf(OrderStateDto.SELLING_IN_PROCESS, OrderStateDto.SELLING_COMPLETED),
+            stockOrderPort.saved.map { it.orderState },
+        )
+        assertEquals(LEGACY_ORDER_ID to "broker-sell", stockOrderPort.savedExternalOrderIds.single())
+        assertEquals("broker-sell", eventPort.submitted.single().brokerOrderId)
+        assertEquals("broker-sell", eventPort.filled.single().brokerOrderId)
+        assertEquals(OrderIntentSide.SELL, eventPort.filled.single().side)
+        assertEquals("sell-exec-1", executionFillPort.saved.single().externalExecutionId)
+    }
+
+    @Test
     fun `recovers unknown partially filled submission to submitted and partial fill event`() = runBlocking {
         val submissionPort = FakeOrderIntentSubmissionPort(listOf(submission()))
         val eventPort = FakeOrderExecutionEventPort()

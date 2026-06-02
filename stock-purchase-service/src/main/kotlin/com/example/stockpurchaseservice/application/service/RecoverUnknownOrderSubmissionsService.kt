@@ -199,7 +199,12 @@ class RecoverUnknownOrderSubmissionsService(
         val executionType = submission.side.toExecutionType()
         val externalExecutionId = status.externalExecutionId
             ?: "$externalOrderId:$cumulativeFilledQuantity:$executionType"
-        if (fillPort.exists(externalExecutionId)) return
+        val fullyFilled = status.status == BrokerOrderStatus.FILLED ||
+            cumulativeFilledQuantity >= submission.quantity
+        if (fillPort.exists(externalExecutionId)) {
+            syncRecoveredLegacyFillCompletion(submission, externalOrderId, fullyFilled)
+            return
+        }
 
         val filledPrice = status.averageExecutionPrice ?: submission.submittedPrice ?: return
         val filledAt = status.brokerReportedAt ?: status.checkedAt
@@ -220,10 +225,19 @@ class RecoverUnknownOrderSubmissionsService(
             filledPrice = filledPrice,
             filledQuantity = deltaFilledQuantity,
             filledAt = filledAt,
-            fullyFilled = status.status == BrokerOrderStatus.FILLED ||
-                cumulativeFilledQuantity >= submission.quantity,
+            fullyFilled = fullyFilled,
         )
         fillPort.saveIfNew(fill)
+        syncRecoveredLegacyFillCompletion(submission, externalOrderId, fullyFilled)
+    }
+
+    private suspend fun syncRecoveredLegacyFillCompletion(
+        submission: OrderIntentSubmissionDto,
+        externalOrderId: String,
+        fullyFilled: Boolean,
+    ) {
+        if (!fullyFilled || submission.side != OrderIntentSide.SELL) return
+        syncRecoveredLegacySellOrder(submission, externalOrderId, OrderStateDto.SELLING_COMPLETED)
     }
 
     private suspend fun publishRecoveredFillEvent(
@@ -417,6 +431,13 @@ class RecoverUnknownOrderSubmissionsService(
                 OrderStateDto.SELLING_IN_PROCESS,
                 OrderStateDto.SUBMISSION_UNKNOWN -> OrderStateDto.SUBMIT_FAILED
                 OrderStateDto.SUBMIT_FAILED,
+                OrderStateDto.SELLING_COMPLETED -> this
+                else -> null
+            }
+            OrderStateDto.SELLING_COMPLETED -> when (this) {
+                OrderStateDto.SELLING_WAITING,
+                OrderStateDto.SELLING_IN_PROCESS,
+                OrderStateDto.SUBMISSION_UNKNOWN -> OrderStateDto.SELLING_COMPLETED
                 OrderStateDto.SELLING_COMPLETED -> this
                 else -> null
             }
