@@ -369,6 +369,7 @@ GET /operations/trading/status
 The response includes:
 
 - order submission counts by `SUBMITTED`, `SUBMISSION_UNKNOWN`, `CANCEL_PENDING`, `REJECTED`, and `CANCELLED`
+- persistent `SUBMISSION_UNKNOWN` threshold seconds, recent persistent unknown count, and per-problem age/persistent flags
 - order execution outbox counts by publisher status
 - reconciliation cursor status, attempt counts, last observed execution id/time, saved fill count, unmatched execution count, and failure reason
 - total unmatched broker execution count
@@ -376,8 +377,8 @@ The response includes:
 
 Use this endpoint with the alert counters when checking whether broker submission recovery, cancel request confirmation, reconciliation, and unmatched execution handling are advancing after a restart.
 `CANCEL_PENDING` means the broker accepted the cancel request, or the cancel response was unclear, but the original order has not yet been confirmed as cancelled by broker status lookup. `OrderCancelled` should only be treated as final after that status becomes `CANCELLED`.
-Recovery lookup failures are isolated per pending order. If counts stay flat, check `SUBMISSION_UNKNOWN` alerts and the row's last status check reason before assuming the broker order was rejected or cancelled.
-If broker status recovery reports `PARTIALLY_FILLED` or `FILLED`, `stock-purchase-service` also subtracts already saved `execution_fill` quantity from the broker cumulative fill quantity and writes only the missing delta as a deterministic `OrderPartiallyFilled` or `OrderFilled` outbox event. `SUBMISSION_UNKNOWN` recovery republishes `OrderSubmitted` before the recovered fill event; `CANCEL_PENDING` recovery keeps the row cancel-pending for partial fills and does not republish `OrderSubmitted`.
+Recovery lookup failures are isolated per pending order. If counts stay flat, check `SUBMISSION_UNKNOWN` alerts, the response's `persistentSubmissionUnknown` flags, and the row's last status check reason before assuming the broker order was rejected or cancelled.
+If broker status recovery reports cumulative fill quantity for `PARTIALLY_FILLED`, `FILLED`, or a partially filled `CANCELLED` order, `stock-purchase-service` subtracts already saved `execution_fill` quantity from the broker cumulative fill quantity and writes only the missing delta as a deterministic `OrderPartiallyFilled` or `OrderFilled` outbox event. `SUBMISSION_UNKNOWN` recovery republishes `OrderSubmitted` before recovered partial/full fill events, except when the broker has already confirmed cancellation; `CANCEL_PENDING` recovery keeps the row cancel-pending for partial fills and does not republish `OrderSubmitted`.
 
 For live broker position checks, `stock-purchase-service` exposes:
 
@@ -455,7 +456,7 @@ SELECT COUNT(*) FROM unmatched_execution;
 Manual recovery checks:
 
 - Re-run reconciliation from the durable cursor if broker executions may have been missed.
-- When `SUBMISSION_UNKNOWN` or `CANCEL_PENDING` rows recover to broker fill statuses, verify both `order_execution_outbox_event` and `execution_fill` before manually adjusting strategy state.
+- When `SUBMISSION_UNKNOWN` or `CANCEL_PENDING` rows recover to broker fill statuses, or to `CANCELLED` with cumulative fill quantity, verify both `order_execution_outbox_event` and `execution_fill` before manually adjusting strategy state.
 - Keep `akra.order.status-lookup.backfill-days`, `akra.order.status-lookup.forward-days`, and `akra.order.execution-reconciliation.backfill-days` aligned with KIS order-history retention and the operational delay expected before unknown/cancel-pending recovery or broker execution reconciliation runs.
 - Inspect unmatched executions before manually adjusting strategy state.
 - Do not clear outbox, processed-event, order submission, reconciliation cursor, fill, or unmatched-execution records unless the replay and duplicate impact is understood.
