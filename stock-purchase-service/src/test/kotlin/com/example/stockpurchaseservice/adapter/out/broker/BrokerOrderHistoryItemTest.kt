@@ -211,6 +211,56 @@ class BrokerOrderHistoryItemTest {
     }
 
     @Test
+    fun `recovers unknown submission from multiple rows for same broker order id`() {
+        val status = listOf(
+            row(
+                externalOrderId = "broker-1",
+                externalExecutionId = "fill-1",
+                cumulativeFilledQuantity = 1,
+                orderedQuantity = 3,
+                orderedPrice = 112.5,
+            ),
+            row(
+                externalOrderId = "broker-1",
+                externalExecutionId = "fill-2",
+                cumulativeFilledQuantity = 2,
+                orderedQuantity = 3,
+                orderedPrice = 112.5,
+            ),
+        ).findStatusFor(query(externalOrderId = null, orderedQuantity = 3, submittedPrice = 112.5))
+
+        assertEquals(BrokerOrderStatus.PARTIALLY_FILLED, status.status)
+        assertEquals("broker-1", status.externalOrderId)
+        assertEquals("fill-2", status.externalExecutionId)
+        assertEquals(2L, status.cumulativeFilledQuantity)
+        assertEquals(1L, status.remainingQuantity)
+    }
+
+    @Test
+    fun `recovers unknown submission from linked original and cancel rows`() {
+        val status = listOf(
+            row(
+                externalOrderId = "broker-1",
+                cumulativeFilledQuantity = 1,
+                orderedQuantity = 3,
+                orderedPrice = 112.5,
+            ),
+            row(
+                externalOrderId = "cancel-broker-1",
+                originalOrderId = "broker-1",
+                cancelledQuantity = 2,
+                cancelled = true,
+                orderedQuantity = 3,
+                orderedPrice = 112.5,
+            ),
+        ).findStatusFor(query(externalOrderId = null, orderedQuantity = 3, submittedPrice = 112.5))
+
+        assertEquals(BrokerOrderStatus.CANCELLED, status.status)
+        assertEquals("cancel-broker-1", status.externalOrderId)
+        assertEquals(1L, status.cumulativeFilledQuantity)
+    }
+
+    @Test
     fun `uses ordered quantity to disambiguate lookup without broker order id`() {
         val status = listOf(
             row(externalOrderId = "broker-1", orderedQuantity = 1, cumulativeFilledQuantity = 1),

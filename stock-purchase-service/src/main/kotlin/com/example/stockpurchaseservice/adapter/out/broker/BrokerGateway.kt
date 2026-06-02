@@ -290,7 +290,8 @@ internal fun List<BrokerOrderHistoryItem>.findStatusFor(query: BrokerOrderStatus
 private fun List<BrokerOrderHistoryItem>.selectStatusCandidate(
     query: BrokerOrderStatusQuery,
 ): BrokerOrderHistoryItem? {
-    val externalOrderId = query.externalOrderId ?: return singleOrNull()
+    val externalOrderId = query.externalOrderId ?: return singleBrokerOrderGroupOrNull()
+        ?.selectBestLinkedOrderGroupCandidate()
     return selectCandidateForExternalOrderId(externalOrderId)
 }
 
@@ -308,11 +309,15 @@ private fun List<BrokerOrderHistoryItem>.selectCandidateForExternalOrderId(
     val exactSelected = filter { it.externalOrderId == externalOrderId }.selectSingleTerminalOrSingle()
     if (exactSelected != null) return exactSelected
 
+    val exactPartialCandidate = filter { it.externalOrderId == externalOrderId }
+        .selectBestPartialFillCandidate()
+    if (exactPartialCandidate != null) return exactPartialCandidate
+
     return filter { row ->
         row.externalOrderId != externalOrderId &&
             row.originalOrderId == externalOrderId &&
             row.toStatus().status != BrokerOrderStatus.REJECTED
-    }.selectSingleTerminalOrSingle()
+    }.selectBestLinkedOrderGroupCandidate()
 }
 
 private fun List<BrokerOrderHistoryItem>.selectSingleTerminalOrSingle(): BrokerOrderHistoryItem? {
@@ -322,6 +327,66 @@ private fun List<BrokerOrderHistoryItem>.selectSingleTerminalOrSingle(): BrokerO
         terminalCandidates.size > 1 -> null
         else -> singleOrNull()
     }
+}
+
+private fun List<BrokerOrderHistoryItem>.selectBestLinkedOrderGroupCandidate(): BrokerOrderHistoryItem? {
+    val filledCandidate = filter { it.toStatus().status == BrokerOrderStatus.FILLED }
+        .maxWithOrNull(compareBy<BrokerOrderHistoryItem> { it.cumulativeFilledQuantity }.thenBy { it.orderedAt })
+    if (filledCandidate != null) return filledCandidate
+
+    val cancelledCandidate = filter { it.toStatus().status == BrokerOrderStatus.CANCELLED }
+        .maxWithOrNull(compareBy<BrokerOrderHistoryItem> { it.cancelledQuantity }.thenBy { it.orderedAt })
+    if (cancelledCandidate != null) return cancelledCandidate
+
+    val partialCandidate = selectBestPartialFillCandidate()
+    if (partialCandidate != null) return partialCandidate
+
+    val submittedCandidate = filter { it.toStatus().status == BrokerOrderStatus.SUBMITTED }
+        .maxByOrNull { it.orderedAt }
+    if (submittedCandidate != null) return submittedCandidate
+
+    return selectSingleTerminalOrSingle()
+}
+
+private fun List<BrokerOrderHistoryItem>.selectBestPartialFillCandidate(): BrokerOrderHistoryItem? {
+    return filter { it.toStatus().status == BrokerOrderStatus.PARTIALLY_FILLED }
+        .maxWithOrNull(compareBy<BrokerOrderHistoryItem> { it.cumulativeFilledQuantity }.thenBy { it.orderedAt })
+}
+
+private fun List<BrokerOrderHistoryItem>.singleBrokerOrderGroupOrNull(): List<BrokerOrderHistoryItem>? {
+    return brokerOrderGroups().singleOrNull()
+}
+
+private fun List<BrokerOrderHistoryItem>.brokerOrderGroups(): List<List<BrokerOrderHistoryItem>> {
+    val remaining = toMutableList()
+    val groups = mutableListOf<List<BrokerOrderHistoryItem>>()
+    while (remaining.isNotEmpty()) {
+        val group = mutableListOf(remaining.removeAt(0))
+        val groupIds = group.flatMapTo(mutableSetOf()) { it.brokerOrderGroupIds() }
+        var expanded: Boolean
+        do {
+            expanded = false
+            val iterator = remaining.iterator()
+            while (iterator.hasNext()) {
+                val row = iterator.next()
+                if (row.brokerOrderGroupIds().any(groupIds::contains)) {
+                    group += row
+                    groupIds += row.brokerOrderGroupIds()
+                    iterator.remove()
+                    expanded = true
+                }
+            }
+        } while (expanded)
+        groups += group
+    }
+    return groups
+}
+
+private fun BrokerOrderHistoryItem.brokerOrderGroupIds(): List<String> {
+    return listOfNotNull(
+        externalOrderId.trim().takeIf { it.isNotBlank() },
+        originalOrderId?.trim()?.takeIf { it.isNotBlank() },
+    )
 }
 
 private fun BrokerOrderStatus.isTerminalStatus(): Boolean {
