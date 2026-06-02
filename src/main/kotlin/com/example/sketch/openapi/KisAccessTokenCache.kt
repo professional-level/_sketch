@@ -15,7 +15,7 @@ enum class KisTokenScope {
     MOCK,
 }
 
-internal data class CachedKisAccessToken(
+data class CachedKisAccessToken(
     val token: String,
     val expiresAt: Instant,
 ) {
@@ -27,6 +27,7 @@ internal data class CachedKisAccessToken(
 class KisAccessTokenCache(
     private val properties: KisTokenProperties,
     private val clock: Clock = Clock.systemUTC(),
+    private val tokenStore: KisAccessTokenStore = NoopKisAccessTokenStore,
 ) {
     private val tokens = ConcurrentHashMap<KisTokenScope, CachedKisAccessToken>()
     private val locks = ConcurrentHashMap<KisTokenScope, Mutex>()
@@ -45,15 +46,21 @@ class KisAccessTokenCache(
             tokens[scope]?.takeIf { it.isUsable(lockedNow, properties) }?.let {
                 return@withLock TokenResponse(token = it.token)
             }
+            tokenStore.load(scope)?.takeIf { it.isUsable(lockedNow, properties) }?.let {
+                tokens[scope] = it
+                return@withLock TokenResponse(token = it.token)
+            }
 
             val cached = fetch().toCachedToken(clock, properties)
             tokens[scope] = cached
+            tokenStore.save(scope, cached)
             TokenResponse(token = cached.token)
         }
     }
 
     fun invalidate(scope: KisTokenScope) {
         tokens.remove(scope)
+        tokenStore.delete(scope)
     }
 
     private fun lockFor(scope: KisTokenScope): Mutex {

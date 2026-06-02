@@ -2,7 +2,7 @@
 
 ## Scope
 
-This runbook covers the minimum runtime configuration and restart checks needed before running the trading sketch against real broker infrastructure. It does not make the system production complete. KIS token persistence, broker-wrapper deployment, and a managed secret store are still separate hardening work.
+This runbook covers the minimum runtime configuration and restart checks needed before running the trading sketch against real broker infrastructure. It does not make the system production complete. The KIS wrapper has optional local-file token persistence, but broker-wrapper deployment, shared token storage, and a managed secret store are still separate hardening work.
 
 ## Secret Handling
 
@@ -50,9 +50,11 @@ Token cache knobs:
 ```properties
 akra.kis.token.refresh-before-expiry=10m
 akra.kis.token.fallback-ttl=23h
+akra.kis.token.persistence.enabled=true
+akra.kis.token.persistence.file=/var/lib/akra/kis-token-cache.json
 ```
 
-The cache is process-local. Restarting the wrapper fetches a new token, and a multi-instance deployment still needs shared token storage or single-writer token issuance policy.
+When token persistence is enabled, the wrapper stores real and mock token scopes in the configured local JSON file and reloads still-usable tokens after restart. Keep this file outside Git, restrict it to the application user, and place it on an encrypted or otherwise protected volume. A multi-instance deployment still needs a shared token store or single-writer token issuance policy; the local file adapter is not a distributed lock.
 
 ## Startup Safety Checks
 

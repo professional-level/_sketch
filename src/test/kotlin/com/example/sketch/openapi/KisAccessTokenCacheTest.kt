@@ -5,9 +5,11 @@ import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
+import java.nio.file.Path
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.io.TempDir
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -15,6 +17,9 @@ import kotlin.test.assertFailsWith
 class KisAccessTokenCacheTest {
 
     private val objectMapper = ObjectMapper()
+
+    @TempDir
+    lateinit var tempDir: Path
 
     @Test
     fun `reuses cached token before refresh window`() = runTest {
@@ -81,6 +86,51 @@ class KisAccessTokenCacheTest {
 
         assertEquals("real-token", real.token)
         assertEquals("mock-token", mock.token)
+    }
+
+    @Test
+    fun `loads usable token from persistent store before fetching`() = runTest {
+        val clock = MutableClock(Instant.parse("2026-06-02T00:00:00Z"))
+        val store = FileKisAccessTokenStore(tempDir.resolve("kis-tokens.json"), objectMapper)
+        store.save(
+            KisTokenScope.REAL,
+            CachedKisAccessToken(
+                token = "persisted-token",
+                expiresAt = Instant.parse("2026-06-02T01:00:00Z"),
+            ),
+        )
+        val cache = KisAccessTokenCache(KisTokenProperties(), clock, store)
+        var fetchCount = 0
+
+        val token = cache.getOrRefresh(KisTokenScope.REAL) {
+            fetchCount += 1
+            tokenResponse("fresh-token", expiresIn = 3600)
+        }
+
+        assertEquals("persisted-token", token.token)
+        assertEquals(0, fetchCount)
+    }
+
+    @Test
+    fun `persists refreshed token for a new cache instance`() = runTest {
+        val clock = MutableClock(Instant.parse("2026-06-02T00:00:00Z"))
+        val store = FileKisAccessTokenStore(tempDir.resolve("kis-tokens.json"), objectMapper)
+        val firstCache = KisAccessTokenCache(KisTokenProperties(), clock, store)
+        val secondCache = KisAccessTokenCache(KisTokenProperties(), clock, store)
+        var fetchCount = 0
+
+        val first = firstCache.getOrRefresh(KisTokenScope.MOCK) {
+            fetchCount += 1
+            tokenResponse("persisted-mock-token", expiresIn = 3600)
+        }
+        val second = secondCache.getOrRefresh(KisTokenScope.MOCK) {
+            fetchCount += 1
+            tokenResponse("unexpected-token", expiresIn = 3600)
+        }
+
+        assertEquals("persisted-mock-token", first.token)
+        assertEquals("persisted-mock-token", second.token)
+        assertEquals(1, fetchCount)
     }
 
     @Test
