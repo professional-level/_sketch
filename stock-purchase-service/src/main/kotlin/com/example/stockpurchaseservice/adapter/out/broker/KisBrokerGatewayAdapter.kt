@@ -89,7 +89,7 @@ internal class KisBrokerGatewayAdapter(
 
     private fun ensureDomesticOrderCancelable(command: BrokerOrderCancelCommand) {
         val cancelableOrder = findCancelableOrders(command.toCancelableQuery())
-            .firstOrNull()
+            .bestCancelableOrder()
             ?: throw BrokerOrderRejectedException(
                 message = "domestic order is not cancelable: ${command.originalOrderId}",
             )
@@ -145,7 +145,7 @@ internal class KisBrokerGatewayAdapter(
 
     private fun ensureOverseasOrderCancelable(command: BrokerOrderCancelCommand) {
         val cancelableOrder = findCancelableOrders(command.toCancelableQuery())
-            .firstOrNull()
+            .bestCancelableOrder()
             ?: throw BrokerOrderRejectedException(
                 message = "overseas order is not cancelable: ${command.originalOrderId}",
             )
@@ -438,6 +438,10 @@ private fun BrokerOrderCancelableQuery.toKisDomesticCancelableOrderQuery(): Map<
         "ctxAreaFk100" to pageCursor.foreignKeyContext,
         "ctxAreaNk100" to pageCursor.nextKeyContext,
     )
+}
+
+private fun List<BrokerCancelableOrderItem>.bestCancelableOrder(): BrokerCancelableOrderItem? {
+    return maxByOrNull { it.possibleQuantity }
 }
 
 private fun WebClient.fetchDomesticCancelableOrderPage(

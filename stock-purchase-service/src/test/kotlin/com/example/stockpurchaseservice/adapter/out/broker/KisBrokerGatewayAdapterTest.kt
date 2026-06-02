@@ -322,6 +322,68 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `overseas cancel selects highest possible quantity from matching unfilled rows`() {
+        val exchangeFunction = ResponseExchangeFunction(
+            responses = listOf(
+                jsonResponse(
+                    """
+                    {
+                      "rt_cd": "0",
+                      "ctx_area_fk200": "",
+                      "ctx_area_nk200": "",
+                      "output": [
+                        {
+                          "odno": "overseas-order-1",
+                          "pdno": "TQQQ",
+                          "nccs_qty": "0"
+                        },
+                        {
+                          "odno": "overseas-revised-order-1",
+                          "orgn_odno": "overseas-order-1",
+                          "pdno": "TQQQ",
+                          "nccs_qty": "2"
+                        }
+                      ]
+                    }
+                    """.trimIndent(),
+                ),
+                protobufResponse(
+                    ApiResponse.StockOrder.newBuilder()
+                        .setRtCd("0")
+                        .setOutput(
+                            ApiResponse.Output.newBuilder()
+                                .setODNO("overseas-cancel-1")
+                                .build(),
+                        )
+                        .build(),
+                ),
+            ),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        val submission = adapter.cancelOrder(
+            brokerCancelCommand(
+                market = StockOrderMarket.OVERSEAS_US,
+                symbol = "TQQQ",
+                originalOrderId = "overseas-order-1",
+                branchOrderNumber = null,
+                price = 112.5,
+                quantity = 2,
+                orderType = StockOrderType.LOC,
+                isMock = false,
+            ),
+        )
+
+        assertEquals("overseas-cancel-1", submission.externalOrderId)
+        assertEquals(2, exchangeFunction.requests.size)
+        assertEquals("/open-api/overseas/trading/order-rvsecncl", exchangeFunction.requests[1].url().path)
+    }
+
+    @Test
     fun `overseas cancel uses branch order number to disambiguate duplicate broker order ids`() {
         val exchangeFunction = ResponseExchangeFunction(
             responses = listOf(
@@ -2319,6 +2381,70 @@ class KisBrokerGatewayAdapterTest {
         assertEquals("false", exchangeFunction.requests[0].queryValue("isMock"))
         assertEquals("1", exchangeFunction.requests[0].queryValue("inqrDvsn1"))
         assertEquals("0", exchangeFunction.requests[0].queryValue("inqrDvsn2"))
+        assertEquals("/open-api/trading/order-rvsecncl", exchangeFunction.requests[1].url().path)
+    }
+
+    @Test
+    fun `domestic cancel selects highest possible quantity from matching cancelable rows`() {
+        val exchangeFunction = ResponseExchangeFunction(
+            responses = listOf(
+                jsonResponse(
+                    """
+                    {
+                      "rt_cd": "0",
+                      "ctx_area_fk100": "",
+                      "ctx_area_nk100": "",
+                      "output": [
+                        {
+                          "ord_gno_brno": "00001",
+                          "odno": "domestic-order-1",
+                          "pdno": "005930",
+                          "psbl_qty": "0"
+                        },
+                        {
+                          "ord_gno_brno": "00001",
+                          "odno": "domestic-revised-order-1",
+                          "orgn_odno": "domestic-order-1",
+                          "pdno": "005930",
+                          "psbl_qty": "2"
+                        }
+                      ]
+                    }
+                    """.trimIndent(),
+                ),
+                protobufResponse(
+                    ApiResponse.StockOrder.newBuilder()
+                        .setRtCd("0")
+                        .setOutput(
+                            ApiResponse.Output.newBuilder()
+                                .setODNO("cancel-order-1")
+                                .build(),
+                        )
+                        .build(),
+                ),
+            ),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        val submission = adapter.cancelOrder(
+            brokerCancelCommand(
+                market = StockOrderMarket.DOMESTIC,
+                symbol = "005930",
+                originalOrderId = "domestic-order-1",
+                branchOrderNumber = "00001",
+                price = 0.0,
+                quantity = 2,
+                orderType = StockOrderType.LIMIT,
+                isMock = false,
+            ),
+        )
+
+        assertEquals("cancel-order-1", submission.externalOrderId)
+        assertEquals(2, exchangeFunction.requests.size)
         assertEquals("/open-api/trading/order-rvsecncl", exchangeFunction.requests[1].url().path)
     }
 
