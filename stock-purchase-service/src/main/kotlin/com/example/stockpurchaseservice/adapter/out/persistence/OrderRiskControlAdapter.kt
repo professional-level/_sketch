@@ -4,6 +4,7 @@ import com.example.common.PersistenceAdapter
 import com.example.stockpurchaseservice.adapter.out.persistence.entity.OrderIntentSubmissionMarket
 import com.example.stockpurchaseservice.adapter.out.persistence.entity.OrderIntentSubmissionSide
 import com.example.stockpurchaseservice.adapter.out.persistence.repository.OrderRiskSubmissionReader
+import com.example.stockpurchaseservice.adapter.out.persistence.repository.OrderRiskSubmissionMarketDayWindow
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
 import com.example.stockpurchaseservice.application.port.out.OrderRiskAssessmentCommand
 import com.example.stockpurchaseservice.application.port.out.OrderRiskAssessmentResult
@@ -126,11 +127,25 @@ internal class OrderRiskControlAdapter(
         val limit = properties.maxDailyOrderCount ?: return null
         if (limit <= 0) return null
 
-        val window = command.marketDayWindow()
-        val currentCount = orderRiskSubmissionReader.countBrokerSubmittedBetween(
-            market = command.market.toEntity(),
-            from = window.first,
-            to = window.second,
+        val windows = properties.dailyOrderCount.marketsForAssessment(command.market)
+            .map { market ->
+                val window = command.marketDayWindow(market)
+                OrderRiskSubmissionMarketDayWindow(
+                    market = market.toEntity(),
+                    from = window.first,
+                    to = window.second,
+                )
+            }
+        val unknownMarketWindow = command.marketDayWindow(command.market).let { window ->
+            OrderRiskSubmissionMarketDayWindow(
+                market = command.market.toEntity(),
+                from = window.first,
+                to = window.second,
+            )
+        }
+        val currentCount = orderRiskSubmissionReader.countBrokerSubmittedAcrossMarkets(
+            windows = windows,
+            unknownMarketWindow = unknownMarketWindow,
         )
         return if (currentCount >= limit) {
             "daily broker order count $currentCount reached limit $limit"
@@ -379,6 +394,14 @@ internal class OrderRiskControlAdapter(
             .ifEmpty { listOf(currentMarket) }
     }
 
+    private fun OrderRiskProperties.DailyOrderCountProperties.marketsForAssessment(
+        currentMarket: StockOrderMarket,
+    ): List<StockOrderMarket> {
+        return markets
+            .distinct()
+            .ifEmpty { listOf(currentMarket) }
+    }
+
     private fun String.normalizedCurrency(): String {
         return trim().uppercase()
     }
@@ -439,7 +462,9 @@ internal class OrderRiskControlAdapter(
         return if (isMock) OrderTradingEnvironment.MOCK else OrderTradingEnvironment.LIVE
     }
 
-    private fun OrderRiskAssessmentCommand.marketDayWindow(): Pair<ZonedDateTime, ZonedDateTime> {
+    private fun OrderRiskAssessmentCommand.marketDayWindow(
+        market: StockOrderMarket = this.market,
+    ): Pair<ZonedDateTime, ZonedDateTime> {
         val zone = market.tradingWindow().zoneId.toZoneIdOrNull() ?: createdAt.zone
         val start = createdAt.withZoneSameInstant(zone).toLocalDate().atStartOfDay(zone)
         return start to start.plusDays(1)

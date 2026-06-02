@@ -103,6 +103,46 @@ internal class OrderIntentSubmissionRepository :
         }.awaitSuspending().toLong()
     }
 
+    override suspend fun countBrokerSubmittedAcrossMarkets(
+        windows: List<OrderRiskSubmissionMarketDayWindow>,
+        unknownMarketWindow: OrderRiskSubmissionMarketDayWindow,
+    ): Long {
+        val marketClauses = windows.mapIndexed { index, _ ->
+            "(o.market = :market$index AND o.submittedAt >= :from$index AND o.submittedAt < :to$index)"
+        }
+        val unknownMarketClause =
+            "(o.market IS NULL AND o.submittedAt >= :unknownFrom AND o.submittedAt < :unknownTo)"
+        val submittedAtClauses = (marketClauses + unknownMarketClause).joinToString(
+            separator = System.lineSeparator() + "                  OR ",
+        )
+
+        return sessionFactory.withSession { session ->
+            val query = session.createQuery(
+                """
+                SELECT COUNT(o)
+                FROM OrderIntentSubmissionEntity o
+                WHERE o.status IN (:statuses)
+                  AND (
+                    $submittedAtClauses
+                  )
+                """.trimIndent(),
+                java.lang.Long::class.java,
+            )
+                .setParameter("statuses", BROKER_SUBMITTED_STATUSES)
+                .setParameter("unknownFrom", unknownMarketWindow.from)
+                .setParameter("unknownTo", unknownMarketWindow.to)
+
+            windows.forEachIndexed { index, window ->
+                query
+                    .setParameter("market$index", window.market)
+                    .setParameter("from$index", window.from)
+                    .setParameter("to$index", window.to)
+            }
+
+            query.singleResult
+        }.awaitSuspending().toLong()
+    }
+
     override suspend fun existsActiveDuplicate(
         market: OrderIntentSubmissionMarket,
         strategyExecutionId: String,

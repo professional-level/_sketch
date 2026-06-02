@@ -5,6 +5,11 @@ import com.example.stockpurchaseservice.adapter.out.persistence.entity.OrderInte
 import java.time.ZonedDateTime
 
 internal interface OrderRiskSubmissionReader {
+    suspend fun countBrokerSubmittedAcrossMarkets(
+        windows: List<OrderRiskSubmissionMarketDayWindow>,
+        unknownMarketWindow: OrderRiskSubmissionMarketDayWindow,
+    ): Long
+
     suspend fun countBrokerSubmittedBetween(
         market: OrderIntentSubmissionMarket,
         from: ZonedDateTime,
@@ -28,3 +33,9 @@ internal interface OrderRiskSubmissionReader {
         market: OrderIntentSubmissionMarket,
     ): Long
 }
+
+internal data class OrderRiskSubmissionMarketDayWindow(
+    val market: OrderIntentSubmissionMarket,
+    val from: ZonedDateTime,
+    val to: ZonedDateTime,
+)

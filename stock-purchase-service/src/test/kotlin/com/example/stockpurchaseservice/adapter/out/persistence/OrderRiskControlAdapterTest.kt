@@ -3,6 +3,7 @@ package com.example.stockpurchaseservice.adapter.out.persistence
 import com.example.stockpurchaseservice.adapter.out.persistence.entity.OrderIntentSubmissionSide
 import com.example.stockpurchaseservice.adapter.out.persistence.entity.OrderIntentSubmissionMarket
 import com.example.stockpurchaseservice.adapter.out.persistence.repository.OrderRiskSubmissionReader
+import com.example.stockpurchaseservice.adapter.out.persistence.repository.OrderRiskSubmissionMarketDayWindow
 import com.example.stockpurchaseservice.adapter.out.risk.ConfiguredFxRateAdapter
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentType
@@ -262,7 +263,7 @@ class OrderRiskControlAdapterTest {
     }
 
     @Test
-    fun `counts daily orders using market trading day window`() = runBlocking {
+    fun `counts daily orders across configured market trading day windows`() = runBlocking {
         val properties = OrderRiskProperties().apply {
             tradingHours.enabled = false
             maxDailyOrderCount = 10
@@ -274,10 +275,35 @@ class OrderRiskControlAdapterTest {
         )
 
         assertTrue(result.accepted)
-        val (from, to) = reader.countBrokerSubmittedWindows.single()
-        assertEquals(ZonedDateTime.parse("2026-06-01T00:00:00-04:00[America/New_York]"), from)
-        assertEquals(ZonedDateTime.parse("2026-06-02T00:00:00-04:00[America/New_York]"), to)
-        assertEquals(listOf(OrderIntentSubmissionMarket.OVERSEAS_US), reader.countBrokerSubmittedMarkets)
+        val windowsByMarket = reader.countBrokerSubmittedAcrossMarketWindows.associateBy { it.market }
+        assertEquals(ZonedDateTime.parse("2026-06-02T00:00:00+09:00[Asia/Seoul]"), windowsByMarket[OrderIntentSubmissionMarket.DOMESTIC]?.from)
+        assertEquals(ZonedDateTime.parse("2026-06-03T00:00:00+09:00[Asia/Seoul]"), windowsByMarket[OrderIntentSubmissionMarket.DOMESTIC]?.to)
+        assertEquals(ZonedDateTime.parse("2026-06-01T00:00:00-04:00[America/New_York]"), windowsByMarket[OrderIntentSubmissionMarket.OVERSEAS_US]?.from)
+        assertEquals(ZonedDateTime.parse("2026-06-02T00:00:00-04:00[America/New_York]"), windowsByMarket[OrderIntentSubmissionMarket.OVERSEAS_US]?.to)
+        assertEquals(OrderIntentSubmissionMarket.OVERSEAS_US, reader.countBrokerSubmittedUnknownMarketWindows.single().market)
+    }
+
+    @Test
+    fun `rejects order when combined daily broker order count reaches configured limit`() = runBlocking {
+        val properties = OrderRiskProperties().apply {
+            tradingHours.enabled = false
+            maxDailyOrderCount = 3
+        }
+        val reader = FakeOrderRiskSubmissionReader(
+            brokerSubmittedCountByMarket = mapOf(
+                OrderIntentSubmissionMarket.DOMESTIC to 1,
+                OrderIntentSubmissionMarket.OVERSEAS_US to 2,
+            ),
+        )
+
+        val result = adapter(properties, reader).assess(command())
+
+        assertFalse(result.accepted)
+        assertContains(result.reason ?: "", "daily broker order count 3 reached limit 3")
+        assertEquals(
+            listOf(OrderIntentSubmissionMarket.DOMESTIC, OrderIntentSubmissionMarket.OVERSEAS_US),
+            reader.countBrokerSubmittedAcrossMarketWindows.map { it.market },
+        )
     }
 
     @Test
@@ -868,14 +894,31 @@ class OrderRiskControlAdapterTest {
         private val activeBuyNotionalByMarket: Map<OrderIntentSubmissionMarket, Double> = emptyMap(),
         private val activeSellQuantity: Long = 0,
         private val brokerSubmittedCount: Long = 0,
+        private val brokerSubmittedCountByMarket: Map<OrderIntentSubmissionMarket, Long> = emptyMap(),
+        private val unknownMarketBrokerSubmittedCount: Long = 0,
         private val duplicateExists: Boolean = false,
     ) : OrderRiskSubmissionReader {
         val activeBuyNotionalMarkets: MutableList<OrderIntentSubmissionMarket> = mutableListOf()
         val activeSellQuantityRequests: MutableList<Pair<String, OrderIntentSubmissionMarket>> = mutableListOf()
         val countBrokerSubmittedMarkets: MutableList<OrderIntentSubmissionMarket> = mutableListOf()
         val countBrokerSubmittedWindows: MutableList<Pair<ZonedDateTime, ZonedDateTime>> = mutableListOf()
+        val countBrokerSubmittedAcrossMarketWindows: MutableList<OrderRiskSubmissionMarketDayWindow> = mutableListOf()
+        val countBrokerSubmittedUnknownMarketWindows: MutableList<OrderRiskSubmissionMarketDayWindow> = mutableListOf()
         val activeDuplicateMarkets: MutableList<OrderIntentSubmissionMarket> = mutableListOf()
         val activeDuplicateWindows: MutableList<Pair<ZonedDateTime, ZonedDateTime>> = mutableListOf()
+
+        override suspend fun countBrokerSubmittedAcrossMarkets(
+            windows: List<OrderRiskSubmissionMarketDayWindow>,
+            unknownMarketWindow: OrderRiskSubmissionMarketDayWindow,
+        ): Long {
+            countBrokerSubmittedAcrossMarketWindows += windows
+            countBrokerSubmittedUnknownMarketWindows += unknownMarketWindow
+            if (brokerSubmittedCountByMarket.isEmpty()) {
+                return brokerSubmittedCount + unknownMarketBrokerSubmittedCount
+            }
+            return windows.sumOf { window -> brokerSubmittedCountByMarket[window.market] ?: 0 } +
+                unknownMarketBrokerSubmittedCount
+        }
 
         override suspend fun countBrokerSubmittedBetween(
             market: OrderIntentSubmissionMarket,

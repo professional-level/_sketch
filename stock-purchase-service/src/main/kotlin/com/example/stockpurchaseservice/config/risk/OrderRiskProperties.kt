@@ -19,6 +19,7 @@ class OrderRiskProperties {
     var strategyTradingEnvironments: MutableMap<String, OrderTradingEnvironment> = mutableMapOf()
     var accountExposure: AccountExposureProperties = AccountExposureProperties()
     var accountCash: AccountCashProperties = AccountCashProperties()
+    var dailyOrderCount: DailyOrderCountProperties = DailyOrderCountProperties()
     var sellPosition: SellPositionProperties = SellPositionProperties()
     var currencyConversion: CurrencyConversionProperties = CurrencyConversionProperties()
     var tradingHours: TradingHoursProperties = TradingHoursProperties()
@@ -35,6 +36,13 @@ class OrderRiskProperties {
     class AccountCashProperties {
         var enabled: Boolean = false
         var reserveNotional: Double = 0.0
+    }
+
+    class DailyOrderCountProperties {
+        var markets: List<StockOrderMarket> = listOf(
+            StockOrderMarket.DOMESTIC,
+            StockOrderMarket.OVERSEAS_US,
+        )
     }
 
     class SellPositionProperties {
