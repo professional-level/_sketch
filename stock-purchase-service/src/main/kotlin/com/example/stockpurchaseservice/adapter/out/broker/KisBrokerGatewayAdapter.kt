@@ -705,7 +705,7 @@ private fun KisBrokerGatewayProperties.toSubmitCallOptions(): ExternalApiCallOpt
 }
 
 private fun ZonedDateTime.toKisDate(): String {
-    return toLocalDate().format(DateTimeFormatter.BASIC_ISO_DATE)
+    return withZoneSameInstant(BROKER_ORDER_ZONE).toLocalDate().format(DateTimeFormatter.BASIC_ISO_DATE)
 }
 
 private fun JsonNode.toBrokerAccountSnapshot(query: BrokerAccountSnapshotQuery): BrokerAccountSnapshot {

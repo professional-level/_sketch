@@ -905,6 +905,40 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `overseas order history formats query dates in broker timezone`() {
+        val exchangeFunction = StubExchangeFunction(
+            responses = listOf(
+                """
+                {
+                  "rt_cd": "0",
+                  "ctx_area_fk200": "",
+                  "ctx_area_nk200": "",
+                  "output": []
+                }
+                """.trimIndent(),
+            ),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        adapter.findOrderHistory(
+            BrokerOrderHistoryQuery(
+                market = StockOrderMarket.OVERSEAS_US,
+                symbol = "TQQQ",
+                from = ZonedDateTime.parse("2026-06-01T15:30:00Z"),
+                to = ZonedDateTime.parse("2026-06-02T15:30:00Z"),
+                isMock = false,
+            ),
+        )
+
+        assertEquals("20260602", exchangeFunction.requests.single().queryValue("ordStrtDt"))
+        assertEquals("20260603", exchangeFunction.requests.single().queryValue("ordEndDt"))
+    }
+
+    @Test
     fun `overseas order history maps uppercase top level aliases and cursor`() {
         val exchangeFunction = StubExchangeFunction(
             responses = listOf(
@@ -1576,6 +1610,32 @@ class KisBrokerGatewayAdapterTest {
         assertEquals("", exchangeFunction.requests.single().queryValue("pdno"))
         assertEquals("20260602", exchangeFunction.requests.single().queryValue("inqrStrtDt"))
         assertEquals("20260602", exchangeFunction.requests.single().queryValue("inqrEndDt"))
+    }
+
+    @Test
+    fun `domestic order history formats query dates in broker timezone`() {
+        val exchangeFunction = ResponseExchangeFunction(
+            responses = listOf(protobufResponse(domesticHistoryResponse())),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        adapter.findOrderHistory(
+            BrokerOrderHistoryQuery(
+                market = StockOrderMarket.DOMESTIC,
+                symbol = "",
+                externalOrderId = "domestic-order-1",
+                from = ZonedDateTime.parse("2026-06-01T15:30:00Z"),
+                to = ZonedDateTime.parse("2026-06-02T15:30:00Z"),
+                isMock = false,
+            ),
+        )
+
+        assertEquals("20260602", exchangeFunction.requests.single().queryValue("inqrStrtDt"))
+        assertEquals("20260603", exchangeFunction.requests.single().queryValue("inqrEndDt"))
     }
 
     @Test
