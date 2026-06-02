@@ -416,6 +416,7 @@ class SubmitOrderIntentServiceTest {
         val saved: MutableList<OrderIntentSubmissionDto> = mutableListOf()
         val unknown: MutableList<OrderIntentSubmissionDto> = mutableListOf()
         val rejected: MutableList<OrderIntentSubmissionDto> = mutableListOf()
+        val cancelPending: MutableList<OrderIntentSubmissionDto> = mutableListOf()
 
         override suspend fun saveSubmitted(submission: OrderIntentSubmissionDto) {
             saved += submission
@@ -431,11 +432,17 @@ class SubmitOrderIntentServiceTest {
 
         override suspend fun saveCancelled(submission: OrderIntentSubmissionDto) = Unit
 
+        override suspend fun saveCancelPending(submission: OrderIntentSubmissionDto) {
+            cancelPending += submission
+        }
+
         override suspend fun findByExternalOrderId(externalOrderId: String): OrderIntentSubmissionDto? {
             return saved.firstOrNull { it.externalOrderId == externalOrderId }
         }
 
         override suspend fun findUnknownSubmissions(): List<OrderIntentSubmissionDto> = unknown
+
+        override suspend fun findCancelPendingSubmissions(): List<OrderIntentSubmissionDto> = cancelPending
     }
 
     private class FakeOrderRiskControlPort(

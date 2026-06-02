@@ -140,15 +140,18 @@ internal class OrderIntentSubmissionRepository :
         private val BROKER_SUBMITTED_STATUSES = listOf(
             OrderIntentSubmissionStatus.SUBMITTED,
             OrderIntentSubmissionStatus.SUBMISSION_UNKNOWN,
+            OrderIntentSubmissionStatus.CANCEL_PENDING,
             OrderIntentSubmissionStatus.CANCELLED,
         )
         private val ACTIVE_DUPLICATE_STATUSES = listOf(
             OrderIntentSubmissionStatus.SUBMITTED,
             OrderIntentSubmissionStatus.SUBMISSION_UNKNOWN,
+            OrderIntentSubmissionStatus.CANCEL_PENDING,
         )
         private val ACTIVE_EXPOSURE_STATUSES = listOf(
             OrderIntentSubmissionStatus.SUBMITTED,
             OrderIntentSubmissionStatus.SUBMISSION_UNKNOWN,
+            OrderIntentSubmissionStatus.CANCEL_PENDING,
         )
     }
 }

@@ -106,6 +106,7 @@ internal enum class OrderIntentSubmissionStatus {
     SUBMISSION_UNKNOWN,
     REJECTED,
     CANCELLED,
+    CANCEL_PENDING,
     ;
 
     fun toDto(): OrderIntentSubmissionStatusDto {
@@ -114,6 +115,7 @@ internal enum class OrderIntentSubmissionStatus {
             SUBMISSION_UNKNOWN -> OrderIntentSubmissionStatusDto.SUBMISSION_UNKNOWN
             REJECTED -> OrderIntentSubmissionStatusDto.REJECTED
             CANCELLED -> OrderIntentSubmissionStatusDto.CANCELLED
+            CANCEL_PENDING -> OrderIntentSubmissionStatusDto.CANCEL_PENDING
         }
     }
 
@@ -124,6 +126,7 @@ internal enum class OrderIntentSubmissionStatus {
                 OrderIntentSubmissionStatusDto.SUBMISSION_UNKNOWN -> SUBMISSION_UNKNOWN
                 OrderIntentSubmissionStatusDto.REJECTED -> REJECTED
                 OrderIntentSubmissionStatusDto.CANCELLED -> CANCELLED
+                OrderIntentSubmissionStatusDto.CANCEL_PENDING -> CANCEL_PENDING
             }
         }
     }

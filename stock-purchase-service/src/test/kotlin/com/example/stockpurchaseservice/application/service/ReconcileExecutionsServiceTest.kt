@@ -512,11 +512,15 @@ class ReconcileExecutionsServiceTest {
 
         override suspend fun saveCancelled(submission: OrderIntentSubmissionDto) = Unit
 
+        override suspend fun saveCancelPending(submission: OrderIntentSubmissionDto) = Unit
+
         override suspend fun findByExternalOrderId(externalOrderId: String): OrderIntentSubmissionDto? {
             return submissionsByExternalOrderId[externalOrderId]
         }
 
         override suspend fun findUnknownSubmissions(): List<OrderIntentSubmissionDto> = emptyList()
+
+        override suspend fun findCancelPendingSubmissions(): List<OrderIntentSubmissionDto> = emptyList()
     }
 
     private class FakeOrderExecutionEventPort : OrderExecutionEventPort {

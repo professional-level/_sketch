@@ -256,12 +256,13 @@ GET /operations/trading/status
 
 The response includes:
 
-- order submission counts by `SUBMITTED`, `SUBMISSION_UNKNOWN`, `REJECTED`, and `CANCELLED`
+- order submission counts by `SUBMITTED`, `SUBMISSION_UNKNOWN`, `CANCEL_PENDING`, `REJECTED`, and `CANCELLED`
 - reconciliation cursor status, attempt counts, last observed execution id/time, saved fill count, unmatched execution count, and failure reason
 - total unmatched broker execution count
 - the 20 most recent unmatched broker executions
 
-Use this endpoint with the alert counters when checking whether broker submission recovery, reconciliation, and unmatched execution handling are advancing after a restart.
+Use this endpoint with the alert counters when checking whether broker submission recovery, cancel request confirmation, reconciliation, and unmatched execution handling are advancing after a restart.
+`CANCEL_PENDING` means the broker accepted the cancel request, or the cancel response was unclear, but the original order has not yet been confirmed as cancelled by broker status lookup. `OrderCancelled` should only be treated as final after that status becomes `CANCELLED`.
 
 For live broker position checks, `stock-purchase-service` exposes:
 

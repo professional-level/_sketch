@@ -518,7 +518,7 @@ broker API 자체가 idempotency key를 지원하지 않는다면, purchase-serv
 - `stock-purchase-service`는 주문 제출 성공/실패를 `OrderSubmitted`, `OrderRejected`로 발행한다.
 - `stock-purchase-service`는 체결 reconciliation 결과를 `OrderPartiallyFilled` 또는 `OrderFilled`로 구분해 발행한다.
 - `stock-purchase-service`는 broker 주문 취소 확인 시 `OrderCancelled`를 발행한다.
-- `stock-purchase-service`는 broker 제출 결과가 불명확한 order intent를 `SUBMISSION_UNKNOWN`으로 저장하고, recovery use case에서 broker 상태를 다시 조회해 submitted/rejected/cancelled로 확정한다.
+- `stock-purchase-service`는 broker 제출 결과가 불명확한 order intent를 `SUBMISSION_UNKNOWN`으로 저장하고, recovery use case에서 broker 상태를 다시 조회해 submitted/rejected/cancelled로 확정한다. 취소 요청은 accepted/unknown 시 원 주문 제출 row를 `CANCEL_PENDING`으로 보존하고, broker 조회가 실제 cancelled를 확인한 뒤에만 `OrderCancelled`를 발행한다.
 - `stock-purchase-service`의 broker gateway anti-corruption layer는 KIS wrapper의 주문 제출, 1일 주문/체결 조회 응답을 내부 broker status와 execution DTO로 정규화한다.
 - KIS 누적 체결 수량(`tot_ccld_qty`, `ft_ccld_qty`)은 reconciliation 단계에서 이미 저장된 수량을 빼고 신규 delta만 `OrderPartiallyFilled` 또는 `OrderFilled`로 발행한다.
 - full fill 판단은 같은 broker order id의 누적 체결 수량이 원 주문 수량 이상인지로 한다.
@@ -594,7 +594,7 @@ stock-search-service
 10. 완료: active strategy state를 persistence adapter로 옮긴다.
 11. 완료: Temporal schedule로 daily execution trigger를 붙인다.
 12. 완료: stock-purchase reconciliation에 durable cursor, unmatched execution 저장, KIS wrapper 기반 주문/체결 조회 매핑, cursor 기준 날짜 범위 backfill, KIS 조회 cursor pagination, 조회성 호출 retry/backoff, wrapper 호출 rate-limit/circuit breaker를 추가한다.
-13. 완료: 주문 lifecycle을 `SUBMISSION_UNKNOWN` 복구와 `OrderCancelled`까지 확장하고, direct sell event 경로를 order intent lifecycle로 통일한다.
+13. 완료: 주문 lifecycle을 `SUBMISSION_UNKNOWN` 복구, `CANCEL_PENDING` 취소 요청 확정 대기, `OrderCancelled` 발행까지 확장하고, direct sell event 경로를 order intent lifecycle로 통일한다.
 14. 완료: 발행 측 outbox 적용 범위를 strategy-execution과 stock-purchase의 publisher까지 확장한다.
 15. 부분 완료: stock-purchase-service 내부 주문/조회 KIS 계약을 broker gateway anti-corruption layer로 분리한다. 주문 제출 transient 실패와 broker order id 누락은 `SUBMISSION_UNKNOWN` 복구 흐름으로 보내고, wrapper 호출 rate-limit/circuit breaker를 둔다. root wrapper의 국내 주문체결조회 응답 정규화, stock-purchase의 해외 주문체결/잔고 top-level alias 매핑, token은 fixture test, real/mock scope별 만료 기반 cache, optional local-file persistence, optional JDBC shared token store, JDBC refresh TTL lock으로 보강했다. 모의투자 query/submit/query/cancel smoke test 경계와 runbook은 추가했지만, 별도 broker wrapper service 배포, secret manager 연동, 실제 KIS 모의/실계좌 실행 증적은 남아 있다.
 16. 부분 완료: stock-purchase-service의 broker 제출 전 risk guard를 추가한다. 주문 단위/종목별 금액 한도, 활성 매수 주문 기준 계좌 pending exposure 한도, KIS 해외 계좌 스냅샷 기반 계좌 exposure 한도, KIS 해외 available cash 기반 현금 사용 한도, 하루 broker 제출 건수 한도, 중복 주문 kill switch, 전략 prefix disable, 전략 prefix별 mock/live broker route 검증은 적용됐다. 국내 잔고, 엄밀한 settled cash 구분, 다통화/환율 반영, order intent 계약 수준의 trading environment 명시는 남아 있다.
@@ -608,7 +608,8 @@ stock-search-service
 - Operators can submit explicit cancel requests through `POST /orders/cancellations` in `stock-purchase-service`; this endpoint calls the cancel-submission use case and returns the broker cancel-request submission status.
 - Domestic cancel submissions now call KIS `inquire-psbl-rvsecncl` first and reject the cancel request when the original order is missing from the cancelable list or the requested quantity exceeds `psbl_qty`.
 - Overseas cancel submissions now query KIS `inquire-ccnl` first and reject the cancel request when the original order is missing, already rejected/cancelled, has no remaining quantity, or the requested cancel quantity exceeds the remaining quantity.
-- Cancel submission success is treated as broker acceptance of the cancel request, not as final cancellation. `OrderCancelled` remains emitted only after broker status lookup/recovery confirms the original order is cancelled.
+- Cancel submission success is treated as broker acceptance of the cancel request, not as final cancellation. Accepted or unclear cancel submissions mark the original order intent submission as `CANCEL_PENDING`, and recovery keeps polling broker status from that durable state.
+- `OrderCancelled` remains emitted only after broker status lookup/recovery confirms the original order is cancelled. A still-submitted broker status keeps the row in `CANCEL_PENDING` without republishing `OrderSubmitted`.
 - Domestic KIS cancel requests require `KRX_FWDG_ORD_ORGNO` and `ORGN_ODNO`; overseas cancel requests use `OVRS_EXCG_CD`, `PDNO`, and `ORGN_ODNO`. Modify/revise orders and production credential/live-market verification are still production-hardening gaps.
 
 ### Order Trading Hours Guard

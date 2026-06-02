@@ -31,6 +31,9 @@ class RecoverUnknownOrderSubmissionsService(
         orderIntentSubmissionPort.findUnknownSubmissions().forEach { submission ->
             recover(submission)
         }
+        orderIntentSubmissionPort.findCancelPendingSubmissions().forEach { submission ->
+            recoverCancelPending(submission)
+        }
     }
 
     private suspend fun recover(submission: OrderIntentSubmissionDto) {
@@ -47,6 +50,27 @@ class RecoverUnknownOrderSubmissionsService(
                 orderIntentSubmissionPort.saveUnknown(unresolved)
                 runCatching {
                     operationalAlertPort.alertSubmissionUnknown(unresolved.toSubmissionUnknownAlert(status))
+                }
+            }
+        }
+    }
+
+    private suspend fun recoverCancelPending(submission: OrderIntentSubmissionDto) {
+        val status = marketService.findOrderSubmissionStatus(submission.toQuery())
+        when (status.status) {
+            BrokerOrderStatus.CANCELLED -> markCancelled(submission, status)
+            BrokerOrderStatus.REJECTED -> markRejected(submission, status)
+            BrokerOrderStatus.SUBMITTED,
+            BrokerOrderStatus.UNKNOWN -> {
+                val pending = submission.copy(
+                    statusReason = status.reason ?: submission.statusReason,
+                    lastStatusCheckedAt = status.checkedAt,
+                )
+                orderIntentSubmissionPort.saveCancelPending(pending)
+                if (status.status == BrokerOrderStatus.UNKNOWN) {
+                    runCatching {
+                        operationalAlertPort.alertSubmissionUnknown(pending.toSubmissionUnknownAlert(status))
+                    }
                 }
             }
         }

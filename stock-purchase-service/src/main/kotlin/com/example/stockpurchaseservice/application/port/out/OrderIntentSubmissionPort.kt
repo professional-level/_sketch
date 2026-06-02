@@ -10,8 +10,10 @@ interface OrderIntentSubmissionPort {
     suspend fun saveUnknown(submission: OrderIntentSubmissionDto)
     suspend fun saveRejected(submission: OrderIntentSubmissionDto)
     suspend fun saveCancelled(submission: OrderIntentSubmissionDto)
+    suspend fun saveCancelPending(submission: OrderIntentSubmissionDto)
     suspend fun findByExternalOrderId(externalOrderId: String): OrderIntentSubmissionDto?
     suspend fun findUnknownSubmissions(): List<OrderIntentSubmissionDto>
+    suspend fun findCancelPendingSubmissions(): List<OrderIntentSubmissionDto>
 }
 
 data class OrderIntentSubmissionDto(
@@ -37,4 +39,5 @@ enum class OrderIntentSubmissionStatusDto {
     SUBMISSION_UNKNOWN,
     REJECTED,
     CANCELLED,
+    CANCEL_PENDING,
 }

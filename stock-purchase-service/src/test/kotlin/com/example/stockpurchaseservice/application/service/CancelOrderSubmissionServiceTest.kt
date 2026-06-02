@@ -2,6 +2,7 @@ package com.example.stockpurchaseservice.application.service
 
 import com.example.stockpurchaseservice.application.port.`in`.CancelOrderSubmissionCommand
 import com.example.stockpurchaseservice.application.port.`in`.CancelOrderSubmissionStatus
+import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentType
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderRejectedException
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatus
@@ -15,6 +16,9 @@ import com.example.stockpurchaseservice.application.port.out.ExecutedStockDto
 import com.example.stockpurchaseservice.application.port.out.MarketServicePort
 import com.example.stockpurchaseservice.application.port.out.OperationalAlertPort
 import com.example.stockpurchaseservice.application.port.out.OrderCancellationSubmissionAlert
+import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionDto
+import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionPort
+import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionStatusDto
 import com.example.stockpurchaseservice.application.port.out.OrderSubmissionFailureAlert
 import com.example.stockpurchaseservice.application.port.out.ProcessedEventPort
 import com.example.stockpurchaseservice.application.port.out.PurchaseOrderDto
@@ -36,10 +40,14 @@ class CancelOrderSubmissionServiceTest {
     fun `submits cancel request to market port`() = runBlocking {
         val marketPort = FakeMarketServicePort()
         val processedEventPort = FakeProcessedEventPort()
+        val submissionPort = FakeOrderIntentSubmissionPort(
+            originalSubmission(externalOrderId = "broker-order-1"),
+        )
         val service = CancelOrderSubmissionService(
             marketPort,
             processedEventPort,
             FakeOperationalAlertPort(),
+            submissionPort,
         )
         val eventId = UUID.randomUUID()
 
@@ -58,6 +66,9 @@ class CancelOrderSubmissionServiceTest {
         assertEquals(CancelOrderSubmissionStatus.ACCEPTED, result.status)
         assertEquals("cancel-broker-1", result.brokerOrderId)
         assertEquals(eventId, processedEventPort.succeeded.single())
+        assertEquals(OrderIntentSubmissionStatusDto.CANCEL_PENDING, submissionPort.cancelPending.single().status)
+        assertEquals("cancel request accepted by broker", submissionPort.cancelPending.single().statusReason)
+        assertEquals(ZonedDateTime.parse("2026-06-02T09:00:00+09:00"), submissionPort.cancelPending.single().lastStatusCheckedAt)
         with(marketPort.cancelOrders.single()) {
             assertEquals("TQQQ", stockId)
             assertEquals("broker-order-1", originalOrderId)
@@ -76,6 +87,7 @@ class CancelOrderSubmissionServiceTest {
             marketPort,
             FakeProcessedEventPort(),
             FakeOperationalAlertPort(),
+            FakeOrderIntentSubmissionPort(),
         )
 
         service.execute(
@@ -101,6 +113,7 @@ class CancelOrderSubmissionServiceTest {
             marketPort,
             processedEventPort,
             FakeOperationalAlertPort(),
+            FakeOrderIntentSubmissionPort(),
         )
 
         val result = service.execute(cancelCommand())
@@ -120,7 +133,10 @@ class CancelOrderSubmissionServiceTest {
         )
         val processedEventPort = FakeProcessedEventPort()
         val alertPort = FakeOperationalAlertPort()
-        val service = CancelOrderSubmissionService(marketPort, processedEventPort, alertPort)
+        val submissionPort = FakeOrderIntentSubmissionPort(
+            originalSubmission(externalOrderId = "broker-order-1"),
+        )
+        val service = CancelOrderSubmissionService(marketPort, processedEventPort, alertPort, submissionPort)
         val eventId = UUID.randomUUID()
 
         val result = service.execute(cancelCommand(eventId = eventId))
@@ -128,6 +144,8 @@ class CancelOrderSubmissionServiceTest {
         assertEquals(CancelOrderSubmissionStatus.SUBMISSION_UNKNOWN, result.status)
         assertEquals("maybe-cancel-order", result.brokerOrderId)
         assertEquals(eventId, processedEventPort.succeeded.single())
+        assertEquals(OrderIntentSubmissionStatusDto.CANCEL_PENDING, submissionPort.cancelPending.single().status)
+        assertEquals("cancel response timed out", submissionPort.cancelPending.single().statusReason)
         assertEquals(eventId, alertPort.unknownCancellations.single().cancellationRequestId)
         assertEquals(emptyList(), processedEventPort.failed)
     }
@@ -139,7 +157,12 @@ class CancelOrderSubmissionServiceTest {
         )
         val processedEventPort = FakeProcessedEventPort()
         val alertPort = FakeOperationalAlertPort()
-        val service = CancelOrderSubmissionService(marketPort, processedEventPort, alertPort)
+        val service = CancelOrderSubmissionService(
+            marketPort,
+            processedEventPort,
+            alertPort,
+            FakeOrderIntentSubmissionPort(),
+        )
         val eventId = UUID.randomUUID()
 
         val result = service.execute(cancelCommand(eventId = eventId))
@@ -158,6 +181,7 @@ class CancelOrderSubmissionServiceTest {
             FakeMarketServicePort(),
             processedEventPort,
             alertPort,
+            FakeOrderIntentSubmissionPort(),
         )
         val eventId = UUID.randomUUID()
 
@@ -198,6 +222,25 @@ class CancelOrderSubmissionServiceTest {
             price = price,
             cancelAll = cancelAll,
             requestedAt = ZonedDateTime.parse("2026-06-02T09:00:00+09:00"),
+        )
+    }
+
+    private fun originalSubmission(
+        externalOrderId: String,
+    ): OrderIntentSubmissionDto {
+        return OrderIntentSubmissionDto(
+            orderIntentId = UUID.fromString("00000000-0000-0000-0000-000000000111"),
+            idempotencyKey = "order:TQQQ:broker-order-1",
+            strategyExecutionId = "strategy:TQQQ",
+            symbol = "TQQQ",
+            side = OrderIntentSide.BUY,
+            orderType = OrderIntentType.LIMIT,
+            submittedPrice = 100.0,
+            quantity = 1,
+            orderTag = "FIRST_BUY",
+            internalOrderId = UUID.fromString("00000000-0000-0000-0000-000000000222"),
+            externalOrderId = externalOrderId,
+            submittedAt = ZonedDateTime.parse("2026-06-02T08:50:00+09:00"),
         )
     }
 
@@ -250,6 +293,28 @@ class CancelOrderSubmissionServiceTest {
         override suspend fun markFailed(eventId: UUID, reason: String?) {
             failed += eventId
         }
+    }
+
+    private class FakeOrderIntentSubmissionPort(
+        private var originalSubmission: OrderIntentSubmissionDto? = null,
+    ) : OrderIntentSubmissionPort {
+        val cancelPending: MutableList<OrderIntentSubmissionDto> = mutableListOf()
+
+        override suspend fun saveSubmitted(submission: OrderIntentSubmissionDto) = Unit
+        override suspend fun saveUnknown(submission: OrderIntentSubmissionDto) = Unit
+        override suspend fun saveRejected(submission: OrderIntentSubmissionDto) = Unit
+        override suspend fun saveCancelled(submission: OrderIntentSubmissionDto) = Unit
+
+        override suspend fun saveCancelPending(submission: OrderIntentSubmissionDto) {
+            cancelPending += submission.copy(status = OrderIntentSubmissionStatusDto.CANCEL_PENDING)
+        }
+
+        override suspend fun findByExternalOrderId(externalOrderId: String): OrderIntentSubmissionDto? {
+            return originalSubmission?.takeIf { it.externalOrderId == externalOrderId }
+        }
+
+        override suspend fun findUnknownSubmissions(): List<OrderIntentSubmissionDto> = emptyList()
+        override suspend fun findCancelPendingSubmissions(): List<OrderIntentSubmissionDto> = emptyList()
     }
 
     private class FakeOperationalAlertPort : OperationalAlertPort {

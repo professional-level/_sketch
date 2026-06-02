@@ -38,6 +38,12 @@ internal class OrderIntentSubmissionAdapter(
         )
     }
 
+    override suspend fun saveCancelPending(submission: OrderIntentSubmissionDto) {
+        orderIntentSubmissionRepository.upsert(
+            submission.copy(status = OrderIntentSubmissionStatusDto.CANCEL_PENDING),
+        )
+    }
+
     override suspend fun findByExternalOrderId(externalOrderId: String): OrderIntentSubmissionDto? {
         return orderIntentSubmissionRepository.findByExternalOrderId(externalOrderId)?.toDto()
     }
@@ -45,6 +51,12 @@ internal class OrderIntentSubmissionAdapter(
     override suspend fun findUnknownSubmissions(): List<OrderIntentSubmissionDto> {
         return orderIntentSubmissionRepository
             .findByStatus(OrderIntentSubmissionStatus.SUBMISSION_UNKNOWN)
+            .map { it.toDto() }
+    }
+
+    override suspend fun findCancelPendingSubmissions(): List<OrderIntentSubmissionDto> {
+        return orderIntentSubmissionRepository
+            .findByStatus(OrderIntentSubmissionStatus.CANCEL_PENDING)
             .map { it.toDto() }
     }
 

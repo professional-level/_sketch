@@ -13,6 +13,7 @@ import com.example.stockpurchaseservice.application.port.out.CancelOrderDto
 import com.example.stockpurchaseservice.application.port.out.MarketServicePort
 import com.example.stockpurchaseservice.application.port.out.OperationalAlertPort
 import com.example.stockpurchaseservice.application.port.out.OrderCancellationSubmissionAlert
+import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionPort
 import com.example.stockpurchaseservice.application.port.out.ProcessedEventPort
 import com.example.stockpurchaseservice.application.port.out.StockOrderMarket
 import com.example.stockpurchaseservice.application.port.out.StockOrderType
@@ -25,6 +26,7 @@ class CancelOrderSubmissionService(
     private val marketService: MarketServicePort,
     private val processedEventPort: ProcessedEventPort,
     private val operationalAlertPort: OperationalAlertPort,
+    private val orderIntentSubmissionPort: OrderIntentSubmissionPort,
 ) : CancelOrderSubmissionUseCase {
 
     override suspend fun execute(command: CancelOrderSubmissionCommand): CancelOrderSubmissionResult {
@@ -35,12 +37,14 @@ class CancelOrderSubmissionService(
 
         return try {
             val submission = marketService.cancelOrder(command.toCancelOrderDto())
+            markOriginalOrderCancelPending(command, "cancel request accepted by broker")
             processedEventPort.markSuccess(command.eventId)
             CancelOrderSubmissionResult(
                 status = CancelOrderSubmissionStatus.ACCEPTED,
                 brokerOrderId = submission.externalOrderId,
             )
         } catch (exception: BrokerOrderSubmissionUnknownException) {
+            markOriginalOrderCancelPending(command, exception.message)
             runCatching {
                 operationalAlertPort.alertOrderCancellationSubmissionUnknown(command.toAlert(exception.message))
             }
@@ -100,6 +104,19 @@ class CancelOrderSubmissionService(
             branchOrderNumber = branchOrderNumber,
             reason = reason,
             occurredAt = ZonedDateTime.now(),
+        )
+    }
+
+    private suspend fun markOriginalOrderCancelPending(
+        command: CancelOrderSubmissionCommand,
+        reason: String?,
+    ) {
+        val original = orderIntentSubmissionPort.findByExternalOrderId(command.originalBrokerOrderId) ?: return
+        orderIntentSubmissionPort.saveCancelPending(
+            original.copy(
+                statusReason = reason,
+                lastStatusCheckedAt = command.requestedAt,
+            ),
         )
     }
 

@@ -13,6 +13,7 @@ import com.example.stockpurchaseservice.application.port.out.OrderExecutionEvent
 import com.example.stockpurchaseservice.application.port.out.OrderFilledMessage
 import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionDto
 import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionPort
+import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionStatusDto
 import com.example.stockpurchaseservice.application.port.out.OrderPartiallyFilledMessage
 import com.example.stockpurchaseservice.application.port.out.OrderRejectedMessage
 import com.example.stockpurchaseservice.application.port.out.OrderSubmittedMessage
@@ -111,6 +112,71 @@ class RecoverUnknownOrderSubmissionsServiceTest {
         assertEquals("not found yet", alertPort.submissionUnknown.single().reason)
     }
 
+    @Test
+    fun `keeps cancel pending submission without republishing submitted event`() = runBlocking {
+        val pending = submission(externalOrderId = "broker-1").copy(
+            status = OrderIntentSubmissionStatusDto.CANCEL_PENDING,
+            statusReason = "cancel request accepted by broker",
+        )
+        val submissionPort = FakeOrderIntentSubmissionPort(
+            unknownSubmissions = emptyList(),
+            cancelPendingSubmissions = listOf(pending),
+        )
+        val eventPort = FakeOrderExecutionEventPort()
+        val service = RecoverUnknownOrderSubmissionsService(
+            marketService = FakeMarketServicePort(
+                status = BrokerOrderStatusDto(
+                    status = BrokerOrderStatus.SUBMITTED,
+                    externalOrderId = "broker-1",
+                    checkedAt = CHECKED_AT,
+                ),
+            ),
+            orderIntentSubmissionPort = submissionPort,
+            orderExecutionEventPort = eventPort,
+            operationalAlertPort = FakeOperationalAlertPort(),
+        )
+
+        service.execute()
+
+        assertEquals(OrderIntentSubmissionStatusDto.CANCEL_PENDING, submissionPort.cancelPending.single().status)
+        assertEquals(CHECKED_AT, submissionPort.cancelPending.single().lastStatusCheckedAt)
+        assertEquals(emptyList(), eventPort.submitted)
+        assertEquals(emptyList(), eventPort.cancelled)
+    }
+
+    @Test
+    fun `recovers cancel pending submission to cancelled event`() = runBlocking {
+        val pending = submission(externalOrderId = "broker-1").copy(
+            status = OrderIntentSubmissionStatusDto.CANCEL_PENDING,
+            statusReason = "cancel request accepted by broker",
+        )
+        val submissionPort = FakeOrderIntentSubmissionPort(
+            unknownSubmissions = emptyList(),
+            cancelPendingSubmissions = listOf(pending),
+        )
+        val eventPort = FakeOrderExecutionEventPort()
+        val service = RecoverUnknownOrderSubmissionsService(
+            marketService = FakeMarketServicePort(
+                status = BrokerOrderStatusDto(
+                    status = BrokerOrderStatus.CANCELLED,
+                    externalOrderId = "broker-1",
+                    reason = "cancel confirmed",
+                    checkedAt = CHECKED_AT,
+                ),
+            ),
+            orderIntentSubmissionPort = submissionPort,
+            orderExecutionEventPort = eventPort,
+            operationalAlertPort = FakeOperationalAlertPort(),
+        )
+
+        service.execute()
+
+        assertEquals("broker-1", submissionPort.cancelled.single().externalOrderId)
+        assertEquals("broker-1", eventPort.cancelled.single().brokerOrderId)
+        assertEquals("cancel confirmed", eventPort.cancelled.single().reason)
+        assertEquals(emptyList(), eventPort.submitted)
+    }
+
     private fun submission(externalOrderId: String? = null): OrderIntentSubmissionDto {
         return OrderIntentSubmissionDto(
             orderIntentId = ORDER_INTENT_ID,
@@ -150,11 +216,13 @@ class RecoverUnknownOrderSubmissionsServiceTest {
 
     private class FakeOrderIntentSubmissionPort(
         private val unknownSubmissions: List<OrderIntentSubmissionDto>,
+        private val cancelPendingSubmissions: List<OrderIntentSubmissionDto> = emptyList(),
     ) : OrderIntentSubmissionPort {
         val submitted: MutableList<OrderIntentSubmissionDto> = mutableListOf()
         val unknown: MutableList<OrderIntentSubmissionDto> = mutableListOf()
         val rejected: MutableList<OrderIntentSubmissionDto> = mutableListOf()
         val cancelled: MutableList<OrderIntentSubmissionDto> = mutableListOf()
+        val cancelPending: MutableList<OrderIntentSubmissionDto> = mutableListOf()
 
         override suspend fun saveSubmitted(submission: OrderIntentSubmissionDto) {
             submitted += submission
@@ -172,10 +240,18 @@ class RecoverUnknownOrderSubmissionsServiceTest {
             cancelled += submission
         }
 
+        override suspend fun saveCancelPending(submission: OrderIntentSubmissionDto) {
+            cancelPending += submission.copy(status = OrderIntentSubmissionStatusDto.CANCEL_PENDING)
+        }
+
         override suspend fun findByExternalOrderId(externalOrderId: String): OrderIntentSubmissionDto? = null
 
         override suspend fun findUnknownSubmissions(): List<OrderIntentSubmissionDto> {
             return unknownSubmissions
+        }
+
+        override suspend fun findCancelPendingSubmissions(): List<OrderIntentSubmissionDto> {
+            return cancelPendingSubmissions
         }
     }
 
