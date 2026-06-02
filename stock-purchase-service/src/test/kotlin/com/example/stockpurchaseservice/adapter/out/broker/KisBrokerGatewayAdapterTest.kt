@@ -1444,6 +1444,124 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `domestic cancelable lookup maps uppercase aliases and cursor pagination`() {
+        val exchangeFunction = ResponseExchangeFunction(
+            responses = listOf(
+                jsonResponse(
+                    """
+                    {
+                      "RT_CD": "0",
+                      "CTX_AREA_FK100": "FK1",
+                      "CTX_AREA_NK100": "NK1",
+                      "OUTPUT": [
+                        {
+                          "ORD_GNO_BRNO": "99999",
+                          "ODNO": "other-order",
+                          "PDNO": "005930",
+                          "PSBL_QTY": "1"
+                        }
+                      ]
+                    }
+                    """.trimIndent(),
+                ),
+                jsonResponse(
+                    """
+                    {
+                      "RT_CD": "0",
+                      "CTX_AREA_FK100": "",
+                      "CTX_AREA_NK100": "",
+                      "OUTPUT1": {
+                        "ORD_GNO_BRNO": "00001",
+                        "ODNO": "domestic-order-1",
+                        "ORGN_ODNO": "",
+                        "PDNO": "005930",
+                        "PSBL_QTY": "3"
+                      }
+                    }
+                    """.trimIndent(),
+                ),
+                protobufResponse(
+                    ApiResponse.StockOrder.newBuilder()
+                        .setRtCd("0")
+                        .setOutput(
+                            ApiResponse.Output.newBuilder()
+                                .setODNO("cancel-order-1")
+                                .build(),
+                        )
+                        .build(),
+                ),
+            ),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        val submission = adapter.cancelOrder(
+            brokerCancelCommand(
+                market = StockOrderMarket.DOMESTIC,
+                symbol = "005930",
+                originalOrderId = "domestic-order-1",
+                branchOrderNumber = "00001",
+                price = 0.0,
+                quantity = 2,
+                orderType = StockOrderType.LIMIT,
+                isMock = false,
+            ),
+        )
+
+        assertEquals("cancel-order-1", submission.externalOrderId)
+        assertEquals(3, exchangeFunction.requests.size)
+        assertEquals("FK1", exchangeFunction.requests[1].queryValue("ctxAreaFk100"))
+        assertEquals("NK1", exchangeFunction.requests[1].queryValue("ctxAreaNk100"))
+        assertEquals("/open-api/trading/order-rvsecncl", exchangeFunction.requests[2].url().path)
+    }
+
+    @Test
+    fun `domestic cancelable lookup preserves uppercase kis business failure`() {
+        val exchangeFunction = ResponseExchangeFunction(
+            responses = listOf(
+                jsonResponse(
+                    """
+                    {
+                      "RT_CD": "1",
+                      "MSG_CD": "APBK0001",
+                      "MSG1": "cancelable lookup rejected"
+                    }
+                    """.trimIndent(),
+                ),
+            ),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        val exception = assertFailsWith<BrokerOrderQueryFailedException> {
+            adapter.cancelOrder(
+                brokerCancelCommand(
+                    market = StockOrderMarket.DOMESTIC,
+                    symbol = "005930",
+                    originalOrderId = "domestic-order-1",
+                    branchOrderNumber = "00001",
+                    price = 0.0,
+                    quantity = 2,
+                    orderType = StockOrderType.LIMIT,
+                    isMock = false,
+                ),
+            )
+        }
+
+        assertEquals("1", exception.brokerReturnCode)
+        assertEquals("APBK0001", exception.brokerMessageCode)
+        assertEquals("cancelable lookup rejected", exception.brokerMessage)
+        assertEquals("domestic cancelable order lookup failed: APBK0001 cancelable lookup rejected", exception.message)
+        assertEquals(1, exchangeFunction.requests.size)
+    }
+
+    @Test
     fun `domestic cancel rejects when possible quantity is lower than requested quantity`() {
         val exchangeFunction = ResponseExchangeFunction(
             responses = listOf(

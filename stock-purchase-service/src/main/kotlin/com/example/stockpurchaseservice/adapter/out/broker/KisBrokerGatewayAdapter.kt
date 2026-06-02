@@ -441,7 +441,7 @@ private fun WebClient.fetchDomesticCancelableOrderPage(
         responseType = JsonNode::class.java,
         callOptions = callOptions,
     )
-    val returnCode = response.path("rt_cd").asText("")
+    val returnCode = response.textOrNull("rt_cd", "rtCd", "RT_CD").orEmpty()
     if (returnCode.isNotBlank() && returnCode != "0") {
         throwKisBrokerBusinessFailure(
             operation = "domestic cancelable order lookup",
@@ -450,17 +450,12 @@ private fun WebClient.fetchDomesticCancelableOrderPage(
             brokerMessage = response.textOrNull("msg1", "msg_1", "MSG1"),
         )
     }
-    val output = response.path("output")
-    val rows = when {
-        output.isArray -> output.toList()
-        output.isObject -> listOf(output)
-        else -> emptyList()
-    }
+    val rows = response.rows("output", "OUTPUT", "output1", "OUTPUT1")
     return KisCancelableOrderPage(
         items = rows.mapNotNull { it.toKisCancelableOrderItem() },
         nextCursor = BrokerOrderHistoryPageCursor(
-            foreignKeyContext = response.path("ctx_area_fk100").asText(""),
-            nextKeyContext = response.path("ctx_area_nk100").asText(""),
+            foreignKeyContext = response.textOrNull("ctx_area_fk100", "ctxAreaFk100", "CTX_AREA_FK100").orEmpty(),
+            nextKeyContext = response.textOrNull("ctx_area_nk100", "ctxAreaNk100", "CTX_AREA_NK100").orEmpty(),
         ),
     )
 }
@@ -533,16 +528,16 @@ private data class KisCancelableOrderItem(
 }
 
 private fun JsonNode.toKisCancelableOrderItem(): KisCancelableOrderItem? {
-    val orderId = path("odno").asText("").trim()
-    val originalOrderId = path("orgn_odno").textOrNull()
+    val orderId = textOrNull("odno", "ODNO", "ord_no", "ORD_NO", "order_no").orEmpty()
+    val originalOrderId = textOrNull("orgn_odno", "ORGN_ODNO")
     val matchableOrderId = orderId.ifBlank { originalOrderId.orEmpty() }
     if (matchableOrderId.isBlank()) return null
     return KisCancelableOrderItem(
-        branchOrderNumber = path("ord_gno_brno").textOrNull(),
+        branchOrderNumber = textOrNull("ord_gno_brno", "ORD_GNO_BRNO", "krx_fwdg_ord_orgno", "KRX_FWDG_ORD_ORGNO"),
         orderId = orderId,
         originalOrderId = originalOrderId,
-        symbol = path("pdno").asText("").trim(),
-        possibleQuantity = path("psbl_qty").asText("").toLongValue(),
+        symbol = textOrNull("pdno", "PDNO").orEmpty(),
+        possibleQuantity = longValue("psbl_qty", "PSBL_QTY", "ord_psbl_qty", "ORD_PSBL_QTY"),
     )
 }
 
