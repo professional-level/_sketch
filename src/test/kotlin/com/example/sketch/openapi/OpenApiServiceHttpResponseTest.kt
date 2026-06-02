@@ -119,6 +119,37 @@ class OpenApiServiceHttpResponseTest {
     }
 
     @Test
+    fun `sends official tr id for real overseas us moc buy order`() = runTest {
+        val exchangeFunction = SingleResponseExchangeFunction.success()
+        val service = openApiService(exchangeFunction)
+
+        service.postOverseasStockOrder(
+            OverseasStockOrderRequest(
+                PDNO = "tqqq",
+                OVRS_EXCG_CD = "nasd",
+                ORD_QTY = 1,
+                OVRS_ORD_UNPR = "0",
+                ORD_DVSN = "32",
+                isMock = false,
+            ),
+        )
+
+        with(exchangeFunction.requests.single()) {
+            assertEquals("/uapi/overseas-stock/v1/trading/order", url().path)
+            assertEquals("TTTT1002U", headers().getFirst("tr_id"))
+            with(bodyAsJson()) {
+                assertEquals("NASD", text("OVRS_EXCG_CD"))
+                assertEquals("TQQQ", text("PDNO"))
+                assertEquals("1", text("ORD_QTY"))
+                assertEquals("0", text("OVRS_ORD_UNPR"))
+                assertEquals("32", text("ORD_DVSN"))
+                assertEquals("", text("SLL_TYPE"))
+                assertEquals("0", text("ORD_SVR_DVSN_CD"))
+            }
+        }
+    }
+
+    @Test
     fun `sends official tr id for mock overseas us sell order`() = runTest {
         val exchangeFunction = SingleResponseExchangeFunction.success()
         val service = openApiService(exchangeFunction)

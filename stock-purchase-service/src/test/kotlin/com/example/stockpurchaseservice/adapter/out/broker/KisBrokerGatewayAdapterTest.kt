@@ -57,6 +57,29 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `builds real us overseas buy request using moc order division`() {
+        val command = brokerCommand(
+            side = OrderIntentSide.BUY,
+            symbol = "TQQQ",
+            price = 0.0,
+            quantity = 2,
+            orderType = StockOrderType.MOC,
+            isMock = false,
+        )
+
+        val body = command.toKisUsOverseasOrderRequest()
+
+        assertEquals("TQQQ", body["PDNO"])
+        assertEquals("NASD", body["OVRS_EXCG_CD"])
+        assertEquals(2, body["ORD_QTY"])
+        assertEquals("0", body["OVRS_ORD_UNPR"])
+        assertEquals("32", body["ORD_DVSN"])
+        assertEquals(null, body["SLL_TYPE"])
+        assertEquals("0", body["ORD_SVR_DVSN_CD"])
+        assertEquals(false, body["isMock"])
+    }
+
+    @Test
     fun `builds us overseas cancel request using configured exchange code`() {
         val command = brokerCancelCommand(
             market = StockOrderMarket.OVERSEAS_US,

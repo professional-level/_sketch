@@ -1320,7 +1320,7 @@ private fun StockOrderType.toKisUsOrderDivision(side: OrderIntentSide, isMock: B
         OrderIntentSide.BUY -> when (this) {
             StockOrderType.LIMIT -> "00"
             StockOrderType.LOC -> "34"
-            StockOrderType.MOC -> throw UnsupportedOperationException("US overseas buy does not support MOC")
+            StockOrderType.MOC -> "32"
         }
 
         OrderIntentSide.SELL -> when (this) {
