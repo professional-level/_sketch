@@ -16,6 +16,7 @@ import com.example.stockpurchaseservice.application.port.out.OperationalAlertPor
 import com.example.stockpurchaseservice.application.port.out.SubmissionUnknownAlert
 import com.example.stockpurchaseservice.application.port.out.StockOrderMarket
 import java.nio.charset.StandardCharsets
+import java.time.Clock
 import java.time.ZonedDateTime
 import java.util.UUID
 
@@ -26,6 +27,7 @@ class RecoverUnknownOrderSubmissionsService(
     private val orderExecutionEventPort: OrderExecutionEventPort,
     private val operationalAlertPort: OperationalAlertPort,
 ) : RecoverUnknownOrderSubmissionsUseCase {
+    internal var clock: Clock = Clock.systemDefaultZone()
 
     override suspend fun execute() {
         orderIntentSubmissionPort.findUnknownSubmissions().forEach { submission ->
@@ -37,7 +39,7 @@ class RecoverUnknownOrderSubmissionsService(
     }
 
     private suspend fun recover(submission: OrderIntentSubmissionDto) {
-        val status = marketService.findOrderSubmissionStatus(submission.toQuery())
+        val status = lookupStatus(submission, RecoveryMode.UNKNOWN_SUBMISSION) ?: return
         when (status.status) {
             BrokerOrderStatus.SUBMITTED -> markSubmitted(submission, status)
             BrokerOrderStatus.REJECTED -> markRejected(submission, status)
@@ -56,7 +58,7 @@ class RecoverUnknownOrderSubmissionsService(
     }
 
     private suspend fun recoverCancelPending(submission: OrderIntentSubmissionDto) {
-        val status = marketService.findOrderSubmissionStatus(submission.toQuery())
+        val status = lookupStatus(submission, RecoveryMode.CANCEL_PENDING) ?: return
         when (status.status) {
             BrokerOrderStatus.CANCELLED -> markCancelled(submission, status)
             BrokerOrderStatus.REJECTED -> markRejected(submission, status)
@@ -73,6 +75,46 @@ class RecoverUnknownOrderSubmissionsService(
                     }
                 }
             }
+        }
+    }
+
+    private suspend fun lookupStatus(
+        submission: OrderIntentSubmissionDto,
+        mode: RecoveryMode,
+    ): BrokerOrderStatusDto? {
+        return try {
+            marketService.findOrderSubmissionStatus(submission.toQuery())
+        } catch (exception: RuntimeException) {
+            markRecoveryLookupFailed(submission, mode, exception)
+            null
+        }
+    }
+
+    private suspend fun markRecoveryLookupFailed(
+        submission: OrderIntentSubmissionDto,
+        mode: RecoveryMode,
+        exception: RuntimeException,
+    ) {
+        val checkedAt = ZonedDateTime.now(clock)
+        val unresolved = submission.copy(
+            statusReason = "broker status lookup failed: ${exception.message ?: exception::class.java.simpleName}",
+            lastStatusCheckedAt = checkedAt,
+        )
+        when (mode) {
+            RecoveryMode.UNKNOWN_SUBMISSION -> orderIntentSubmissionPort.saveUnknown(unresolved)
+            RecoveryMode.CANCEL_PENDING -> orderIntentSubmissionPort.saveCancelPending(unresolved)
+        }
+        runCatching {
+            operationalAlertPort.alertSubmissionUnknown(
+                unresolved.toSubmissionUnknownAlert(
+                    BrokerOrderStatusDto(
+                        status = BrokerOrderStatus.UNKNOWN,
+                        externalOrderId = unresolved.externalOrderId,
+                        reason = unresolved.statusReason,
+                        checkedAt = checkedAt,
+                    ),
+                ),
+            )
         }
     }
 
@@ -192,5 +234,10 @@ class RecoverUnknownOrderSubmissionsService(
             length == 6 && all(Char::isDigit) -> StockOrderMarket.DOMESTIC
             else -> StockOrderMarket.OVERSEAS_US
         }
+    }
+
+    private enum class RecoveryMode {
+        UNKNOWN_SUBMISSION,
+        CANCEL_PENDING,
     }
 }

@@ -263,6 +263,7 @@ The response includes:
 
 Use this endpoint with the alert counters when checking whether broker submission recovery, cancel request confirmation, reconciliation, and unmatched execution handling are advancing after a restart.
 `CANCEL_PENDING` means the broker accepted the cancel request, or the cancel response was unclear, but the original order has not yet been confirmed as cancelled by broker status lookup. `OrderCancelled` should only be treated as final after that status becomes `CANCELLED`.
+Recovery lookup failures are isolated per pending order. If counts stay flat, check `SUBMISSION_UNKNOWN` alerts and the row's last status check reason before assuming the broker order was rejected or cancelled.
 
 For live broker position checks, `stock-purchase-service` exposes:
 

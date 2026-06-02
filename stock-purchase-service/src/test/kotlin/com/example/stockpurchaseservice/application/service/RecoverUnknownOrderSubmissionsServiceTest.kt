@@ -23,6 +23,9 @@ import com.example.stockpurchaseservice.application.port.out.PurchaseOrderDto
 import com.example.stockpurchaseservice.application.port.out.ReconciliationFailureAlert
 import com.example.stockpurchaseservice.application.port.out.SellingOrderDto
 import com.example.stockpurchaseservice.application.port.out.SubmissionUnknownAlert
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.util.UUID
 import kotlinx.coroutines.runBlocking
@@ -113,6 +116,43 @@ class RecoverUnknownOrderSubmissionsServiceTest {
     }
 
     @Test
+    fun `keeps recovering other unknown submissions when one broker lookup fails`() = runBlocking {
+        var callCount = 0
+        val first = submission(externalOrderId = "broker-fail")
+        val second = submission(externalOrderId = "broker-ok")
+        val submissionPort = FakeOrderIntentSubmissionPort(listOf(first, second))
+        val eventPort = FakeOrderExecutionEventPort()
+        val alertPort = FakeOperationalAlertPort()
+        val service = RecoverUnknownOrderSubmissionsService(
+            marketService = FakeMarketServicePort { query ->
+                callCount += 1
+                if (query.externalOrderId == "broker-fail") {
+                    throw RuntimeException("KIS lookup timeout")
+                }
+                BrokerOrderStatusDto(
+                    status = BrokerOrderStatus.SUBMITTED,
+                    externalOrderId = "broker-ok",
+                    checkedAt = CHECKED_AT,
+                )
+            },
+            orderIntentSubmissionPort = submissionPort,
+            orderExecutionEventPort = eventPort,
+            operationalAlertPort = alertPort,
+        ).apply {
+            clock = Clock.fixed(Instant.parse("2026-06-02T00:00:00Z"), ZoneId.of("Asia/Seoul"))
+        }
+
+        service.execute()
+
+        assertEquals(2, callCount)
+        assertEquals("broker status lookup failed: KIS lookup timeout", submissionPort.unknown.single().statusReason)
+        assertEquals(ZonedDateTime.parse("2026-06-02T09:00:00+09:00[Asia/Seoul]"), submissionPort.unknown.single().lastStatusCheckedAt)
+        assertEquals("broker-ok", submissionPort.submitted.single().externalOrderId)
+        assertEquals("broker-ok", eventPort.submitted.single().brokerOrderId)
+        assertEquals("broker status lookup failed: KIS lookup timeout", alertPort.submissionUnknown.single().reason)
+    }
+
+    @Test
     fun `keeps cancel pending submission without republishing submitted event`() = runBlocking {
         val pending = submission(externalOrderId = "broker-1").copy(
             status = OrderIntentSubmissionStatusDto.CANCEL_PENDING,
@@ -177,6 +217,38 @@ class RecoverUnknownOrderSubmissionsServiceTest {
         assertEquals(emptyList(), eventPort.submitted)
     }
 
+    @Test
+    fun `keeps cancel pending when broker lookup fails`() = runBlocking {
+        val pending = submission(externalOrderId = "broker-1").copy(
+            status = OrderIntentSubmissionStatusDto.CANCEL_PENDING,
+            statusReason = "cancel request accepted by broker",
+        )
+        val submissionPort = FakeOrderIntentSubmissionPort(
+            unknownSubmissions = emptyList(),
+            cancelPendingSubmissions = listOf(pending),
+        )
+        val eventPort = FakeOrderExecutionEventPort()
+        val alertPort = FakeOperationalAlertPort()
+        val service = RecoverUnknownOrderSubmissionsService(
+            marketService = FakeMarketServicePort {
+                throw RuntimeException("KIS lookup timeout")
+            },
+            orderIntentSubmissionPort = submissionPort,
+            orderExecutionEventPort = eventPort,
+            operationalAlertPort = alertPort,
+        ).apply {
+            clock = Clock.fixed(Instant.parse("2026-06-02T00:00:00Z"), ZoneId.of("Asia/Seoul"))
+        }
+
+        service.execute()
+
+        assertEquals(OrderIntentSubmissionStatusDto.CANCEL_PENDING, submissionPort.cancelPending.single().status)
+        assertEquals("broker status lookup failed: KIS lookup timeout", submissionPort.cancelPending.single().statusReason)
+        assertEquals(ZonedDateTime.parse("2026-06-02T09:00:00+09:00[Asia/Seoul]"), submissionPort.cancelPending.single().lastStatusCheckedAt)
+        assertEquals(emptyList(), eventPort.cancelled)
+        assertEquals("broker status lookup failed: KIS lookup timeout", alertPort.submissionUnknown.single().reason)
+    }
+
     private fun submission(externalOrderId: String? = null): OrderIntentSubmissionDto {
         return OrderIntentSubmissionDto(
             orderIntentId = ORDER_INTENT_ID,
@@ -195,8 +267,10 @@ class RecoverUnknownOrderSubmissionsServiceTest {
     }
 
     private class FakeMarketServicePort(
-        private val status: BrokerOrderStatusDto,
+        private val statusProvider: (BrokerOrderStatusQuery) -> BrokerOrderStatusDto,
     ) : MarketServicePort {
+        constructor(status: BrokerOrderStatusDto) : this({ status })
+
         override fun buyStock(order: PurchaseOrderDto): BrokerOrderSubmissionDto {
             return BrokerOrderSubmissionDto(externalOrderId = "broker-buy")
         }
@@ -210,7 +284,7 @@ class RecoverUnknownOrderSubmissionsServiceTest {
         override fun findOrderSubmissionStatus(query: BrokerOrderStatusQuery): BrokerOrderStatusDto {
             assertEquals(ORDER_INTENT_ID, query.orderIntentId)
             assertEquals(INTERNAL_ORDER_ID, query.internalOrderId)
-            return status
+            return statusProvider(query)
         }
     }
 

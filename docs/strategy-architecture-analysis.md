@@ -518,7 +518,7 @@ broker API 자체가 idempotency key를 지원하지 않는다면, purchase-serv
 - `stock-purchase-service`는 주문 제출 성공/실패를 `OrderSubmitted`, `OrderRejected`로 발행한다.
 - `stock-purchase-service`는 체결 reconciliation 결과를 `OrderPartiallyFilled` 또는 `OrderFilled`로 구분해 발행한다.
 - `stock-purchase-service`는 broker 주문 취소 확인 시 `OrderCancelled`를 발행한다.
-- `stock-purchase-service`는 broker 제출 결과가 불명확한 order intent를 `SUBMISSION_UNKNOWN`으로 저장하고, recovery use case에서 broker 상태를 다시 조회해 submitted/rejected/cancelled로 확정한다. 취소 요청은 accepted/unknown 시 원 주문 제출 row를 `CANCEL_PENDING`으로 보존하고, broker 조회가 실제 cancelled를 확인한 뒤에만 `OrderCancelled`를 발행한다.
+- `stock-purchase-service`는 broker 제출 결과가 불명확한 order intent를 `SUBMISSION_UNKNOWN`으로 저장하고, recovery use case에서 broker 상태를 다시 조회해 submitted/rejected/cancelled로 확정한다. 취소 요청은 accepted/unknown 시 원 주문 제출 row를 `CANCEL_PENDING`으로 보존하고, broker 조회가 실제 cancelled를 확인한 뒤에만 `OrderCancelled`를 발행한다. 복구 조회 실패는 주문별로 격리해 해당 row를 pending 상태로 유지하고 알림을 남기며, 다른 pending 주문 복구를 계속 진행한다.
 - `stock-purchase-service`의 broker gateway anti-corruption layer는 KIS wrapper의 주문 제출, 1일 주문/체결 조회 응답을 내부 broker status와 execution DTO로 정규화한다.
 - KIS 누적 체결 수량(`tot_ccld_qty`, `ft_ccld_qty`)은 reconciliation 단계에서 이미 저장된 수량을 빼고 신규 delta만 `OrderPartiallyFilled` 또는 `OrderFilled`로 발행한다.
 - full fill 판단은 같은 broker order id의 누적 체결 수량이 원 주문 수량 이상인지로 한다.
