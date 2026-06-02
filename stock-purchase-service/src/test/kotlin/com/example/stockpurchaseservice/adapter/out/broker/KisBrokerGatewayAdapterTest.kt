@@ -1508,6 +1508,31 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `maps domestic order org number as branch order number fallback`() {
+        val adapter = domesticHistoryAdapter(
+            domesticHistoryResponse(
+                DailyExecutionOrdersResponseOuterClass.DailyExecutionOrdersOutput1.newBuilder()
+                    .setOrdDt("20260602")
+                    .setOrdOrgno("00007")
+                    .setOdno("domestic-order-orgno")
+                    .setSllBuyDvsnCd("02")
+                    .setPdno("005930")
+                    .setPrdtName("Samsung Electronics")
+                    .setOrdQty("3")
+                    .setOrdTmd("093000")
+                    .setTotCcldQty("0")
+                    .setRmnQty("3")
+                    .build(),
+            ),
+        )
+
+        val item = adapter.findOrderHistory(domesticHistoryQuery()).single()
+
+        assertEquals("00007", item.branchOrderNumber)
+        assertEquals(BrokerOrderStatus.SUBMITTED, item.toStatus().status)
+    }
+
+    @Test
     fun `maps domestic rejected quantity to rejected status`() {
         val adapter = domesticHistoryAdapter(
             domesticHistoryResponse(
@@ -1920,7 +1945,7 @@ class KisBrokerGatewayAdapterTest {
               "output": [
                 {
                   "ODNO": "alias-order",
-                  "ORD_GNO_BRNO": "00002",
+                  "ORD_ORGNO": "00002",
                   "PDNO": "TQQQ",
                   "PRDT_ENG_NAME": "ProShares UltraPro QQQ",
                   "ORD_DT": "20260602",
@@ -2767,7 +2792,7 @@ class KisBrokerGatewayAdapterTest {
                       "ctxAreaNk100": "",
                       "output1": [
                         {
-                          "ordGnoBrno": "00001",
+                          "ordOrgno": "00001",
                           "ordNo": "revised-domestic-order-1",
                           "orgnOdno": "domestic-order-1",
                           "prdtCode": "005930",
