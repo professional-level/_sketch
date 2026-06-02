@@ -1321,6 +1321,7 @@ class KisBrokerGatewayAdapterTest {
                   "ord_tmd": "093000",
                   "ft_ord_qty": "3",
                   "ft_ord_unpr": "112.5",
+                  "ccld_no": "overseas-fill-1",
                   "ft_ccld_qty": "1",
                   "nccs_qty": "2",
                   "sll_buy_dvsn_cd": "02",
@@ -1343,6 +1344,7 @@ class KisBrokerGatewayAdapterTest {
         assertEquals(2L, status.remainingQuantity)
         checkNotNull(execution)
         assertEquals("partial-order", execution.externalOrderId)
+        assertEquals("overseas-fill-1", execution.externalExecutionId)
         assertEquals(1, execution.quantity)
         assertEquals(112.5, execution.averageExecutionPrice)
         assertEquals(ExecutionQuantityModeDto.CUMULATIVE, execution.quantityMode)

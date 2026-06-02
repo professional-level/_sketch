@@ -124,6 +124,7 @@ internal data class BrokerOrderHistoryPageCursor(
 
 internal data class BrokerOrderHistoryItem(
     val externalOrderId: String,
+    val externalExecutionId: String? = null,
     val originalOrderId: String? = null,
     val branchOrderNumber: String?,
     val symbol: String,
@@ -155,7 +156,7 @@ internal data class BrokerOrderHistoryItem(
             quantity = cumulativeFilledQuantity.toInt(),
             type = executionType,
             externalOrderId = externalOrderId,
-            externalExecutionId = "$externalOrderId:${cumulativeFilledQuantity}:$executionType",
+            externalExecutionId = externalExecutionId ?: "$externalOrderId:${cumulativeFilledQuantity}:$executionType",
             averageExecutionPrice = averageExecutionPrice,
             quantityMode = ExecutionQuantityModeDto.CUMULATIVE,
         )

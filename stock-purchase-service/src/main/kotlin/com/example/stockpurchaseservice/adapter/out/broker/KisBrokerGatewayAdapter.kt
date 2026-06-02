@@ -899,6 +899,20 @@ private fun JsonNode.toBrokerHistoryItem(): BrokerOrderHistoryItem? {
     val explicitCancelledQuantity = longValue("cncl_cfrm_qty", "CNCL_CFRM_QTY", "cncl_qty", "CNCL_QTY")
     return BrokerOrderHistoryItem(
         externalOrderId = orderId,
+        externalExecutionId = textOrNull(
+            "ccld_no",
+            "CCLD_NO",
+            "ft_ccld_no",
+            "FT_CCLD_NO",
+            "ovrs_ccld_no",
+            "OVRS_CCLD_NO",
+            "exec_no",
+            "EXEC_NO",
+            "execution_no",
+            "EXECUTION_NO",
+            "cntr_no",
+            "CNTR_NO",
+        ),
         originalOrderId = textOrNull("orgn_odno", "ORGN_ODNO"),
         branchOrderNumber = textOrNull(
             "ord_gno_brno",

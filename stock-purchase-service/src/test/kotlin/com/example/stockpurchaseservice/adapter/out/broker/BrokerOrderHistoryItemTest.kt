@@ -25,8 +25,21 @@ class BrokerOrderHistoryItemTest {
         assertEquals("TQQQ", dto.stockId)
         assertEquals(3, dto.quantity)
         assertEquals(ExecutionTypeDto.PURCHASE, dto.type)
+        assertEquals("broker-1:3:PURCHASE", dto.externalExecutionId)
         assertEquals(ExecutionQuantityModeDto.CUMULATIVE, dto.quantityMode)
         assertEquals(112.5, dto.averageExecutionPrice)
+    }
+
+    @Test
+    fun `uses broker execution id when present`() {
+        val dto = row(
+            cumulativeFilledQuantity = 3,
+            externalExecutionId = "broker-fill-1",
+        ).toExecutionDto()
+
+        checkNotNull(dto)
+        assertEquals("broker-fill-1", dto.externalExecutionId)
+        assertEquals(ExecutionQuantityModeDto.CUMULATIVE, dto.quantityMode)
     }
 
     @Test
@@ -156,6 +169,7 @@ class BrokerOrderHistoryItemTest {
 
     private fun row(
         externalOrderId: String = "broker-1",
+        externalExecutionId: String? = null,
         originalOrderId: String? = null,
         cumulativeFilledQuantity: Long = 0,
         cancelledQuantity: Long = 0,
@@ -167,6 +181,7 @@ class BrokerOrderHistoryItemTest {
     ): BrokerOrderHistoryItem {
         return BrokerOrderHistoryItem(
             externalOrderId = externalOrderId,
+            externalExecutionId = externalExecutionId,
             originalOrderId = originalOrderId,
             branchOrderNumber = "00001",
             symbol = "TQQQ",
