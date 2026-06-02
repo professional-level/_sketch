@@ -609,6 +609,54 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `finds overseas cancelable order by original order number alias`() {
+        val exchangeFunction = ResponseExchangeFunction(
+            responses = listOf(
+                jsonResponse(
+                    """
+                    {
+                      "rt_cd": "0",
+                      "ctx_area_fk200": "",
+                      "ctx_area_nk200": "",
+                      "output": [
+                        {
+                          "ordNo": "overseas-revised-order-1",
+                          "orgnOrdNo": "overseas-order-1",
+                          "ordGnoBrno": "00001",
+                          "ovrsPdno": "TQQQ",
+                          "nccsQty": "2"
+                        }
+                      ]
+                    }
+                    """.trimIndent(),
+                ),
+            ),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        val items = adapter.findCancelableOrders(
+            BrokerOrderCancelableQuery(
+                market = StockOrderMarket.OVERSEAS_US,
+                symbol = "TQQQ",
+                exchange = "NASD",
+                originalOrderId = "overseas-order-1",
+                branchOrderNumber = "00001",
+                isMock = false,
+            ),
+        )
+
+        val item = items.single()
+        assertEquals("overseas-revised-order-1", item.orderId)
+        assertEquals("overseas-order-1", item.originalOrderId)
+        assertEquals("00001", item.branchOrderNumber)
+        assertEquals(2L, item.possibleQuantity)
+    }
+
+    @Test
     fun `overseas cancel rejects when explicit branch order number does not match unfilled order`() {
         val exchangeFunction = ResponseExchangeFunction(
             responses = listOf(
@@ -2548,6 +2596,55 @@ class KisBrokerGatewayAdapterTest {
         assertEquals(BrokerOrderStatus.CANCELLED, item.toStatus().status)
         assertEquals(BrokerOrderStatus.CANCELLED, status.status)
         assertEquals("original-order-1", status.externalOrderId)
+    }
+
+    @Test
+    fun `maps overseas original order number aliases for cancel status recovery`() {
+        val adapter = overseasHistoryAdapter(
+            """
+            {
+              "rt_cd": "0",
+              "ctx_area_fk200": "",
+              "ctx_area_nk200": "",
+              "output": [
+                {
+                  "ORD_NO": "cancel-order-2",
+                  "ORGN_ORD_NO": "original-order-2",
+                  "KRX_FWDG_ORD_ORGNO": "00009",
+                  "PDNO": "TQQQ",
+                  "ORD_DT": "20260602",
+                  "ORD_TMD": "093000",
+                  "ORD_QTY": "3",
+                  "TOT_CCLD_QTY": "0",
+                  "RMN_QTY": "3",
+                  "RVSE_CNCL_DVSN_CD": "02",
+                  "SLL_BUY_DVSN_NAME": "BUY",
+                  "PRCS_STAT_NAME": "Processed"
+                }
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        val items = adapter.findOrderHistory(historyQuery())
+        val item = items.single()
+        val status = items.findStatusFor(
+            BrokerOrderStatusQuery(
+                orderIntentId = UUID.randomUUID(),
+                internalOrderId = UUID.randomUUID(),
+                externalOrderId = "original-order-2",
+                symbol = "TQQQ",
+                side = OrderIntentSide.BUY,
+                market = StockOrderMarket.OVERSEAS_US,
+                submittedAt = ZonedDateTime.parse("2026-06-02T09:00:00+09:00"),
+            ),
+        )
+
+        assertEquals("cancel-order-2", item.externalOrderId)
+        assertEquals("original-order-2", item.originalOrderId)
+        assertEquals(BrokerOrderStatus.CANCELLED, item.toStatus().status)
+        assertEquals(BrokerOrderStatus.CANCELLED, status.status)
+        assertEquals("original-order-2", status.externalOrderId)
     }
 
     @Test

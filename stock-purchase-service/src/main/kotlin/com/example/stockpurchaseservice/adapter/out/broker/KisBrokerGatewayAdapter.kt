@@ -575,7 +575,7 @@ private fun JsonNode.toKisCancelableOrderItem(): BrokerCancelableOrderItem? {
     val orderId = textOrNull("odno", "ODNO", "ordNo", "ord_no", "ORD_NO", "orderNo", "order_no", "ORDER_NO")
         .toBrokerOrderIdOrNull()
         .orEmpty()
-    val originalOrderId = textOrNull("orgn_odno", "ORGN_ODNO", "orgnOdno").toBrokerOrderIdOrNull()
+    val originalOrderId = originalOrderIdOrNull()
     val matchableOrderId = orderId.ifBlank { originalOrderId.orEmpty() }
     if (matchableOrderId.isBlank()) return null
     return BrokerCancelableOrderItem(
@@ -1078,7 +1078,7 @@ private fun JsonNode.toBrokerHistoryItem(): BrokerOrderHistoryItem? {
             "cntrNo",
             "CNTR_NO",
         ).toBrokerExecutionIdOrNull(),
-        originalOrderId = textOrNull("orgn_odno", "orgnOdno", "ORGN_ODNO").toBrokerOrderIdOrNull(),
+        originalOrderId = originalOrderIdOrNull(),
         branchOrderNumber = textOrNull(
             "ord_gno_brno",
             "ordGnoBrno",
@@ -1172,6 +1172,23 @@ private fun JsonNode.longValue(vararg fieldNames: String): Long {
 
 private fun JsonNode.textOrNull(): String? {
     return asText("").trim().takeIf { it.isNotBlank() }
+}
+
+private fun JsonNode.originalOrderIdOrNull(): String? {
+    return textOrNull(
+        "orgn_odno",
+        "orgnOdno",
+        "ORGN_ODNO",
+        "orgn_ord_no",
+        "orgnOrdNo",
+        "ORGN_ORD_NO",
+        "orig_odno",
+        "origOdno",
+        "ORIG_ODNO",
+        "orig_ord_no",
+        "origOrdNo",
+        "ORIG_ORD_NO",
+    ).toBrokerOrderIdOrNull()
 }
 
 private fun String?.toBrokerOrderIdOrNull(): String? {
