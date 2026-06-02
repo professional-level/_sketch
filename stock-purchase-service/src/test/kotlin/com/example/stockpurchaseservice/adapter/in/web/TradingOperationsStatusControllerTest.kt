@@ -3,6 +3,8 @@ package com.example.stockpurchaseservice.adapter.`in`.web
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentType
 import com.example.stockpurchaseservice.application.port.`in`.GetTradingOperationsStatusUseCase
+import com.example.stockpurchaseservice.application.port.`in`.TradingAccountPositionStatus
+import com.example.stockpurchaseservice.application.port.`in`.TradingAccountSnapshotStatus
 import com.example.stockpurchaseservice.application.port.`in`.TradingOperationsStatusResult
 import com.example.stockpurchaseservice.application.port.out.ExecutionReconciliationCursorStatus
 import com.example.stockpurchaseservice.application.port.out.ExecutionTypeDto
@@ -27,6 +29,7 @@ class TradingOperationsStatusControllerTest {
         val result = TradingOperationsStatusResult(
             generatedAt = ZonedDateTime.parse("2026-06-02T10:00:00+09:00[Asia/Seoul]"),
             snapshot = snapshot(),
+            accountSnapshots = accountSnapshots(),
         )
         val useCase = FakeGetTradingOperationsStatusUseCase(result)
         val controller = TradingOperationsStatusController(
@@ -62,6 +65,7 @@ class TradingOperationsStatusControllerTest {
         assertEquals(result.snapshot.reconciliationCursors, response.reconciliationCursors)
         assertEquals(result.snapshot.unmatchedExecutionCount, response.unmatchedExecutionCount)
         assertEquals(result.snapshot.recentUnmatchedExecutions, response.recentUnmatchedExecutions)
+        assertEquals(result.accountSnapshots, response.accountSnapshots)
     }
 
     private fun snapshot(): TradingOperationsStatusSnapshot {
@@ -130,5 +134,25 @@ class TradingOperationsStatusControllerTest {
             callCount += 1
             return result
         }
+    }
+
+    private fun accountSnapshots(): List<TradingAccountSnapshotStatus> {
+        return listOf(
+            TradingAccountSnapshotStatus(
+                market = StockOrderMarket.OVERSEAS_US,
+                exchange = "NASD",
+                currency = "USD",
+                available = true,
+                orderableCashAmount = 500.0,
+                positions = listOf(
+                    TradingAccountPositionStatus(
+                        symbol = "TQQQ",
+                        stockName = "ProShares UltraPro QQQ",
+                        quantity = 2,
+                        averagePurchasePrice = 50.0,
+                    ),
+                ),
+            ),
+        )
     }
 }
