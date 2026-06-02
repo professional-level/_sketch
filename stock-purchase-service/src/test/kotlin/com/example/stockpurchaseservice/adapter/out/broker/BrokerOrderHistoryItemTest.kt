@@ -114,11 +114,22 @@ class BrokerOrderHistoryItemTest {
     @Test
     fun `keeps broader candidates when broker rows do not expose matching branch order number`() {
         val status = listOf(
-            row(externalOrderId = "broker-1", branchOrderNumber = "00001"),
+            row(externalOrderId = "broker-1", branchOrderNumber = null),
         ).findStatusFor(query(externalOrderId = "broker-1", branchOrderNumber = "00002"))
 
         assertEquals(BrokerOrderStatus.SUBMITTED, status.status)
         assertEquals("broker-1", status.externalOrderId)
+    }
+
+    @Test
+    fun `returns unknown when explicit branch order number does not match broker rows`() {
+        val status = listOf(
+            row(externalOrderId = "broker-1", branchOrderNumber = "00001"),
+        ).findStatusFor(query(externalOrderId = "broker-1", branchOrderNumber = "00002"))
+
+        assertEquals(BrokerOrderStatus.UNKNOWN, status.status)
+        assertEquals("broker-1", status.externalOrderId)
+        assertEquals("broker order not found", status.reason)
     }
 
     @Test

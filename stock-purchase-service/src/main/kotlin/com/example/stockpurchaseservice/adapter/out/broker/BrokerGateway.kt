@@ -267,9 +267,10 @@ private fun List<BrokerOrderHistoryItem>.narrowByBranchOrderNumber(
     query: BrokerOrderStatusQuery,
 ): List<BrokerOrderHistoryItem> {
     val branchOrderNumber = query.branchOrderNumber?.trim()?.takeIf { it.isNotBlank() } ?: return this
-    return filter { it.branchOrderNumber?.trim() == branchOrderNumber }
-        .takeIf { it.isNotEmpty() }
-        ?: this
+    return filter { row ->
+        val rowBranchOrderNumber = row.branchOrderNumber?.trim()?.takeIf { it.isNotBlank() }
+        rowBranchOrderNumber == null || rowBranchOrderNumber == branchOrderNumber
+    }
 }
 
 private fun List<BrokerOrderHistoryItem>.narrowByOrderedQuantity(
