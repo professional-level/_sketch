@@ -4,6 +4,7 @@ import com.example.stockpurchaseservice.application.port.out.OrderExecutionOutbo
 import com.example.stockpurchaseservice.application.port.out.OrderExecutionOutboxPort
 import common.MessageTopic
 import common.observability.TraceContext
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import kotlinx.coroutines.runBlocking
 import java.nio.charset.StandardCharsets
 import java.time.Clock
@@ -22,7 +23,8 @@ class OrderExecutionOutboxPublisherTest {
         val event = outboxMessage()
         val outboxPort = FakeOrderExecutionOutboxPort(events = listOf(event))
         val sender = FakeOrderExecutionOutboxMessageSender()
-        val publisher = OrderExecutionOutboxPublisher(outboxPort, sender)
+        val meterRegistry = SimpleMeterRegistry()
+        val publisher = OrderExecutionOutboxPublisher(outboxPort, sender, meterRegistry)
 
         publisher.publishPendingEvents()
 
@@ -31,6 +33,8 @@ class OrderExecutionOutboxPublisherTest {
         assertEquals(listOf(PublishedOutboxEvent(event.id, claimRequest.claimOwner)), outboxPort.published)
         assertEquals(emptyList(), outboxPort.failed)
         assertEquals(ClaimRequest(limit = 50, claimExpiresAt = null), claimRequest.withoutOwner())
+        assertEquals(1.0, meterRegistry.counter(OUTBOX_PUBLISH_METRIC, "result", "published").count())
+        assertEquals(0.0, meterRegistry.counter(OUTBOX_PUBLISH_METRIC, "result", "failed").count())
     }
 
     @Test
@@ -38,7 +42,8 @@ class OrderExecutionOutboxPublisherTest {
         val event = outboxMessage()
         val outboxPort = FakeOrderExecutionOutboxPort(events = listOf(event))
         val sender = FakeOrderExecutionOutboxMessageSender(failure = IllegalStateException("kafka down"))
-        val publisher = OrderExecutionOutboxPublisher(outboxPort, sender)
+        val meterRegistry = SimpleMeterRegistry()
+        val publisher = OrderExecutionOutboxPublisher(outboxPort, sender, meterRegistry)
         publisher.clock = FIXED_CLOCK
 
         publisher.publishPendingEvents()
@@ -50,6 +55,8 @@ class OrderExecutionOutboxPublisherTest {
             outboxPort.failed,
         )
         assertEquals(FIXED_NOW.plusSeconds(60), claimRequest.claimExpiresAt)
+        assertEquals(0.0, meterRegistry.counter(OUTBOX_PUBLISH_METRIC, "result", "published").count())
+        assertEquals(1.0, meterRegistry.counter(OUTBOX_PUBLISH_METRIC, "result", "failed").count())
     }
 
     @Test
@@ -60,6 +67,7 @@ class OrderExecutionOutboxPublisherTest {
         val publisher = OrderExecutionOutboxPublisher(
             outboxPort,
             sender,
+            SimpleMeterRegistry(),
             retryInitialDelayMs = 1_000,
             retryMaxDelayMs = 60_000,
         )
@@ -171,6 +179,7 @@ class OrderExecutionOutboxPublisherTest {
     }
 
     private companion object {
+        const val OUTBOX_PUBLISH_METRIC = "stock.purchase.outbox.publish"
         const val TRACE_ID = "4bf92f3577b34da6a3ce929d0e0e4736"
         const val SPAN_ID = "00f067aa0ba902b7"
         const val TRACE_PARENT = "00-$TRACE_ID-$SPAN_ID-01"

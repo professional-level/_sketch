@@ -316,10 +316,17 @@ Daily order count and duplicate active-order checks are scoped by market. Legacy
 GET /actuator/health
 GET /actuator/metrics
 GET /actuator/metrics/stock.purchase.operational.alerts
+GET /actuator/metrics/stock.purchase.outbox.publish
+GET /actuator/metrics/strategy.execution.outbox.publish
 GET /actuator/prometheus
 ```
 
 `strategy-execution-service` uses the same health, metrics, and Prometheus endpoints with `management.metrics.tags.application=strategy-execution-service`, so Temporal scheduling, Kafka outbox publisher, and HTTP client metrics can be scraped under a stable service tag.
+
+Outbox publisher result counters use a low-cardinality `result` tag with `published` or `failed`:
+
+- `stock.purchase.outbox.publish`
+- `strategy.execution.outbox.publish`
 
 Operational alert counters are emitted through Micrometer as `stock.purchase.operational.alerts` with low-cardinality tags:
 

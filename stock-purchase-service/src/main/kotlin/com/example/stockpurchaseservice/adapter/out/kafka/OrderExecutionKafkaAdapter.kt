@@ -4,6 +4,8 @@ import com.example.common.ExternalApiAdapter
 import com.example.stockpurchaseservice.application.port.out.OrderExecutionOutboxMessage
 import com.example.stockpurchaseservice.application.port.out.OrderExecutionOutboxPort
 import common.observability.TraceContext
+import io.micrometer.core.instrument.Counter
+import io.micrometer.core.instrument.MeterRegistry
 import kotlinx.coroutines.future.await
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.springframework.scheduling.annotation.Scheduled
@@ -57,6 +59,7 @@ internal interface OrderExecutionOutboxMessageSender {
 internal class OrderExecutionOutboxPublisher(
     private val outboxEventPort: OrderExecutionOutboxPort,
     private val messageSender: OrderExecutionOutboxMessageSender,
+    private val meterRegistry: MeterRegistry,
     @Value("\${akra.outbox.publish-retry-initial-delay-ms:5000}")
     private val retryInitialDelayMs: Long = DEFAULT_RETRY_INITIAL_DELAY_MS,
     @Value("\${akra.outbox.publish-retry-max-delay-ms:300000}")
@@ -78,8 +81,10 @@ internal class OrderExecutionOutboxPublisher(
                 messageSender.publish(event)
             }.onSuccess {
                 outboxEventPort.markPublished(event.id, claimOwner)
+                recordPublishResult(PUBLISH_RESULT_PUBLISHED)
             }.onFailure { exception ->
                 outboxEventPort.markFailed(event.id, claimOwner, exception.message, nextAttemptAt(event))
+                recordPublishResult(PUBLISH_RESULT_FAILED)
             }
         }
     }
@@ -99,7 +104,17 @@ internal class OrderExecutionOutboxPublisher(
         return ZonedDateTime.now(clock).plus(Duration.ofMillis(claimLeaseMs.coerceAtLeast(1)))
     }
 
+    private fun recordPublishResult(result: String) {
+        Counter.builder(OUTBOX_PUBLISH_METRIC)
+            .tag("result", result)
+            .register(meterRegistry)
+            .increment()
+    }
+
     companion object {
+        private const val OUTBOX_PUBLISH_METRIC = "stock.purchase.outbox.publish"
+        private const val PUBLISH_RESULT_PUBLISHED = "published"
+        private const val PUBLISH_RESULT_FAILED = "failed"
         private const val DEFAULT_RETRY_INITIAL_DELAY_MS = 5_000L
         private const val DEFAULT_RETRY_MAX_DELAY_MS = 300_000L
         private const val DEFAULT_CLAIM_LEASE_MS = 60_000L
