@@ -415,10 +415,17 @@ GET /actuator/prometheus
 
 `strategy-execution-service` uses the same health, metrics, and Prometheus endpoints with `management.metrics.tags.application=strategy-execution-service`, so Temporal scheduling, Kafka outbox publisher, and HTTP client metrics can be scraped under a stable service tag.
 
-Outbox publisher result counters use a low-cardinality `result` tag with `published` or `failed`:
+Outbox publisher result counters use a low-cardinality `result` tag:
 
 - `stock.purchase.outbox.publish`
 - `strategy.execution.outbox.publish`
+
+Expected `result` values:
+
+- `published`: Kafka send succeeded and the claimed outbox row was marked `PUBLISHED`.
+- `failed`: Kafka send failed and the claimed outbox row was marked `FAILED` with a retry time.
+- `claim_lost`: Kafka send or failure handling completed, but the row was no longer claimed by this publisher instance.
+- `state_update_failed`: Kafka send or failure handling completed, but the outbox status update itself failed. The row should become retryable again after its claim lease expires.
 
 Operational alert counters are emitted through Micrometer as `stock.purchase.operational.alerts` with low-cardinality tags:
 
