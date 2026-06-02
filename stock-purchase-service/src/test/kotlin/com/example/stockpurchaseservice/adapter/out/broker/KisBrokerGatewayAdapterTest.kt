@@ -1559,6 +1559,28 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `ignores domestic all zero order id placeholder`() {
+        val adapter = domesticHistoryAdapter(
+            domesticHistoryResponse(
+                DailyExecutionOrdersResponseOuterClass.DailyExecutionOrdersOutput1.newBuilder()
+                    .setOrdDt("20260602")
+                    .setOrdGnoBrno("00001")
+                    .setOdno("0000000000")
+                    .setSllBuyDvsnCd("02")
+                    .setPdno("005930")
+                    .setPrdtName("Samsung Electronics")
+                    .setOrdQty("3")
+                    .setOrdTmd("093000")
+                    .setTotCcldQty("0")
+                    .setRmnQty("3")
+                    .build(),
+            ),
+        )
+
+        assertEquals(emptyList(), adapter.findOrderHistory(domesticHistoryQuery()))
+    }
+
+    @Test
     fun `maps domestic rejected quantity to rejected status`() {
         val adapter = domesticHistoryAdapter(
             domesticHistoryResponse(
@@ -2035,6 +2057,33 @@ class KisBrokerGatewayAdapterTest {
 
         assertEquals(null, item.originalOrderId)
         assertEquals(BrokerOrderStatus.SUBMITTED, item.toStatus().status)
+    }
+
+    @Test
+    fun `ignores overseas all zero order id placeholder`() {
+        val adapter = overseasHistoryAdapter(
+            """
+            {
+              "rt_cd": "0",
+              "ctx_area_fk200": "",
+              "ctx_area_nk200": "",
+              "output": [
+                {
+                  "ODNO": "0000000000",
+                  "PDNO": "TQQQ",
+                  "ORD_DT": "20260602",
+                  "ORD_TMD": "093000",
+                  "ORD_QTY": "3",
+                  "TOT_CCLD_QTY": "0",
+                  "RMN_QTY": "3",
+                  "SLL_BUY_DVSN_NAME": "BUY"
+                }
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(emptyList(), adapter.findOrderHistory(historyQuery()))
     }
 
     @Test

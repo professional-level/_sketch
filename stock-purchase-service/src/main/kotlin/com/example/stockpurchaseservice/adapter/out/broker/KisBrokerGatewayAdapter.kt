@@ -566,6 +566,7 @@ private data class BrokerAccountSnapshotPage(
 
 private fun JsonNode.toKisCancelableOrderItem(): BrokerCancelableOrderItem? {
     val orderId = textOrNull("odno", "ODNO", "ordNo", "ord_no", "ORD_NO", "orderNo", "order_no", "ORDER_NO")
+        .toBrokerOrderIdOrNull()
         .orEmpty()
     val originalOrderId = textOrNull("orgn_odno", "ORGN_ODNO", "orgnOdno").toBrokerOrderIdOrNull()
     val matchableOrderId = orderId.ifBlank { originalOrderId.orEmpty() }
@@ -895,8 +896,7 @@ private fun JsonNode.toBrokerPositionSnapshot(): BrokerPositionSnapshot? {
 }
 
 private fun DailyExecutionOrdersResponseOuterClass.DailyExecutionOrdersOutput1.toBrokerHistoryItem(): BrokerOrderHistoryItem? {
-    val orderId = odno.trim()
-    if (orderId.isBlank()) return null
+    val orderId = odno.toBrokerOrderIdOrNull() ?: return null
     return BrokerOrderHistoryItem(
         externalOrderId = orderId,
         externalExecutionId = ccldNo.takeIf { it.isNotBlank() },
@@ -941,8 +941,7 @@ private fun JsonNode.toBrokerHistoryItem(): BrokerOrderHistoryItem? {
         "orderNo",
         "order_no",
         "ORDER_NO",
-    ) ?: ""
-    if (orderId.isBlank()) return null
+    ).toBrokerOrderIdOrNull() ?: return null
     val orderedQuantity = longValue(
         "ft_ord_qty",
         "ftOrdQty",
