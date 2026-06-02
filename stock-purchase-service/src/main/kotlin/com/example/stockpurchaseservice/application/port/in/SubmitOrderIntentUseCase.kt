@@ -1,6 +1,7 @@
 package com.example.stockpurchaseservice.application.port.`in`
 
 import com.example.common.UseCase
+import com.example.stockpurchaseservice.application.port.out.OrderTradingEnvironment
 import java.time.ZonedDateTime
 import java.util.UUID
 
@@ -20,6 +21,7 @@ data class SubmitOrderIntentCommand(
     val quantity: Long,
     val orderTag: String,
     val createdAt: ZonedDateTime,
+    val tradingEnvironment: OrderTradingEnvironment? = null,
 ) {
     init {
         require(idempotencyKey.isNotBlank()) { "idempotencyKey must not be blank" }

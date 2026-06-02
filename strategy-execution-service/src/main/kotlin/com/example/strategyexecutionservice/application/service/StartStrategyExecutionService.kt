@@ -30,6 +30,7 @@ class StartStrategyExecutionService(
     private val runStrategyExecutionUseCase: RunStrategyExecutionUseCase,
     private val marketDataPort: MarketDataPort,
     private val orderIntentPort: OrderIntentPort,
+    private val tradingEnvironmentResolver: OrderIntentTradingEnvironmentResolver = OrderIntentTradingEnvironmentResolver(),
 ) : StartStrategyExecutionUseCase {
 
     override suspend fun execute(command: StartStrategyExecutionCommand): StartStrategyExecutionResult {
@@ -118,6 +119,7 @@ class StartStrategyExecutionService(
                     orderTag = "ENTRY_BUY",
                     idempotencyKey = idempotencyKey,
                     createdAt = command.requestedAt,
+                    tradingEnvironment = tradingEnvironmentResolver.resolve(command.executionId),
                 ),
             ),
         )

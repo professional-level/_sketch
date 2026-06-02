@@ -30,6 +30,7 @@ data class OrderIntentSubmissionDto(
     val externalOrderId: String?,
     val branchOrderNumber: String? = null,
     val submittedAt: ZonedDateTime,
+    val tradingEnvironment: OrderTradingEnvironment? = null,
     val status: OrderIntentSubmissionStatusDto = OrderIntentSubmissionStatusDto.SUBMITTED,
     val statusReason: String? = null,
     val lastStatusCheckedAt: ZonedDateTime? = null,

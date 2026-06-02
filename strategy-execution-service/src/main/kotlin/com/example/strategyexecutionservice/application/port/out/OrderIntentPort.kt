@@ -22,4 +22,10 @@ data class OrderIntentMessage(
     val orderTag: String,
     val idempotencyKey: String,
     val createdAt: ZonedDateTime,
+    val tradingEnvironment: OrderTradingEnvironment = OrderTradingEnvironment.MOCK,
 )
+
+enum class OrderTradingEnvironment {
+    MOCK,
+    LIVE,
+}

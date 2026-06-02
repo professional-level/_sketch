@@ -164,6 +164,7 @@ Before enabling real orders:
 - Point `akra.order.kis-open-api.base-url` and `akra.market-data.kis-open-api.base-url` to the deployed broker wrapper.
 - Point `akra.temporal.target` to the managed Temporal frontend.
 - Set real-vs-mock trading flags intentionally for the account being operated.
+- Confirm `strategy-execution-service` order-intent trading environment settings and `stock-purchase-service` broker mock/live flags agree for each strategy prefix.
 - Confirm risk guard limits are set for order notional, account pending buy notional, broker account exposure/cash, symbol notional, daily order count, disabled strategies, and strategy trading environments.
 - Confirm broker order status lookup windows are wide enough for `SUBMISSION_UNKNOWN` and `CANCEL_PENDING` recovery without creating excessive KIS query load.
 - Configure domestic and US order windows, holidays, early-close dates, and LOC/MOC cutoffs until an exchange calendar sync is available.
@@ -172,6 +173,9 @@ Before enabling real orders:
 Broker recovery, risk, and trading-hours guard keys:
 
 ```properties
+akra.order-intent.default-trading-environment=MOCK
+akra.order-intent.strategy-trading-environments[laor-v4-live]=LIVE
+akra.order-intent.strategy-trading-environments[laor-v4-paper]=MOCK
 akra.order.status-lookup.backfill-days=1
 akra.order.status-lookup.forward-days=1
 akra.order.risk.max-order-notional=1000
@@ -242,6 +246,7 @@ docs/operations/sql/20260602_add_outbox_trace_columns.mysql.sql
 docs/operations/sql/20260602_add_outbox_next_attempt_at.mysql.sql
 docs/operations/sql/20260602_add_outbox_claim_lease.mysql.sql
 docs/operations/sql/20260602_add_order_intent_submission_branch_order_number.mysql.sql
+docs/operations/sql/20260602_add_order_intent_submission_trading_environment.mysql.sql
 ```
 
 These migrations add nullable `traceId`, `spanId`, `traceParent`, `nextAttemptAt`, `claimOwner`, and `claimExpiresAt` columns to both outbox tables:
@@ -249,14 +254,14 @@ These migrations add nullable `traceId`, `spanId`, `traceParent`, `nextAttemptAt
 - `strategy-execution-service`: `order_intent_outbox_event`
 - `stock-purchase-service`: `order_execution_outbox_event`
 
-They also add nullable `branchOrderNumber` to `stock-purchase-service` `order_intent_submission`, so KIS domestic `KRX_FWDG_ORD_ORGNO` values returned during order submission can be reused for later cancel/recovery requests.
+They also add nullable `branchOrderNumber` and `tradingEnvironment` to `stock-purchase-service` `order_intent_submission`, so KIS domestic `KRX_FWDG_ORD_ORGNO` values can be reused for later cancel/recovery requests and the expected mock/live route remains auditable from stored order intent submissions.
 
 Operational sequence:
 
 1. Stop outbox publishers or drain traffic so new outbox rows are not being written during the schema change.
 2. Run the preflight query in the SQL file and confirm the target columns do not already exist.
 3. Apply the `ALTER TABLE` statements in the migration files.
-4. Run the post-apply verification queries and confirm six nullable `VARCHAR(255)` trace columns, two nullable `DATETIME(6)` retry-scheduling columns, two nullable `VARCHAR(255)` claim owner columns, two nullable `DATETIME(6)` claim expiry columns, and one nullable `VARCHAR(255)` branch order number column.
+4. Run the post-apply verification queries and confirm six nullable `VARCHAR(255)` trace columns, two nullable `DATETIME(6)` retry-scheduling columns, two nullable `VARCHAR(255)` claim owner columns, two nullable `DATETIME(6)` claim expiry columns, one nullable `VARCHAR(255)` branch order number column, and one nullable `VARCHAR(16)` trading environment column.
 5. Start `strategy-execution-service` and `stock-purchase-service`.
 
 Outbox publishers use `akra.outbox.publish-retry-initial-delay-ms` and `akra.outbox.publish-retry-max-delay-ms` to calculate exponential backoff after Kafka publish failures. Failed rows are republished only after `nextAttemptAt`, so repeated Kafka outages should not produce tight retry loops. Before publishing, each instance claims rows with `PROCESSING`, `claimOwner`, and `claimExpiresAt`; expired claims are eligible for another instance to reclaim.

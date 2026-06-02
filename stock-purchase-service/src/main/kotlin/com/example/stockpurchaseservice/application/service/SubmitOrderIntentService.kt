@@ -142,6 +142,7 @@ class SubmitOrderIntentService(
             externalOrderId = submission.externalOrderId,
             branchOrderNumber = submission.branchOrderNumber,
             submittedAt = ZonedDateTime.now(),
+            tradingEnvironment = command.tradingEnvironment,
             status = OrderIntentSubmissionStatusDto.SUBMITTED,
         )
     }
@@ -174,6 +175,7 @@ class SubmitOrderIntentService(
             internalOrderId = orderId,
             externalOrderId = exception.externalOrderId,
             submittedAt = ZonedDateTime.now(),
+            tradingEnvironment = tradingEnvironment,
             status = OrderIntentSubmissionStatusDto.SUBMISSION_UNKNOWN,
             statusReason = exception.message,
             lastStatusCheckedAt = null,
@@ -197,6 +199,7 @@ class SubmitOrderIntentService(
             internalOrderId = orderId,
             externalOrderId = null,
             submittedAt = ZonedDateTime.now(),
+            tradingEnvironment = tradingEnvironment,
             status = OrderIntentSubmissionStatusDto.REJECTED,
             statusReason = reason,
             lastStatusCheckedAt = null,
@@ -283,6 +286,7 @@ class SubmitOrderIntentService(
             market = market,
             orderTag = orderTag,
             createdAt = createdAt,
+            expectedTradingEnvironment = tradingEnvironment,
         )
     }
 

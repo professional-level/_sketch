@@ -51,7 +51,9 @@ internal class OrderRiskControlAdapter(
     }
 
     private fun tradingEnvironmentReason(command: OrderRiskAssessmentCommand): String? {
-        val matchedPolicy = command.expectedTradingEnvironment() ?: return null
+        val matchedPolicy = command.orderIntentTradingEnvironmentPolicy()
+            ?: command.configuredTradingEnvironmentPolicy()
+            ?: return null
         val actualEnvironment = command.market.actualTradingEnvironment()
         return if (actualEnvironment != matchedPolicy.environment) {
             "strategy trading environment mismatch: prefix=${matchedPolicy.prefix} " +
@@ -192,7 +194,11 @@ internal class OrderRiskControlAdapter(
         }
     }
 
-    private fun OrderRiskAssessmentCommand.expectedTradingEnvironment(): StrategyTradingEnvironmentPolicy? {
+    private fun OrderRiskAssessmentCommand.orderIntentTradingEnvironmentPolicy(): StrategyTradingEnvironmentPolicy? {
+        return expectedTradingEnvironment?.let { StrategyTradingEnvironmentPolicy("order-intent", it) }
+    }
+
+    private fun OrderRiskAssessmentCommand.configuredTradingEnvironmentPolicy(): StrategyTradingEnvironmentPolicy? {
         return properties.strategyTradingEnvironments
             .mapNotNull { (prefix, environment) ->
                 val normalizedPrefix = prefix.trim()

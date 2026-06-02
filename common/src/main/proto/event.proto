@@ -37,6 +37,7 @@ message OrderIntentCreatedEvent{
   string idempotency_key = 10;
   google.protobuf.Timestamp created_at = 11;
   EventMeta meta = 12;
+  OrderTradingEnvironment trading_environment = 13;
 }
 
 message StrategyExecutionStartRequested {
@@ -150,4 +151,10 @@ enum OrderIntentOrderType{
   ORDER_INTENT_LOC = 1;
   ORDER_INTENT_MOC = 2;
   ORDER_INTENT_LIMIT = 3;
+}
+
+enum OrderTradingEnvironment{
+  ORDER_TRADING_ENVIRONMENT_UNDEFINED = 0;
+  ORDER_TRADING_ENVIRONMENT_MOCK = 1;
+  ORDER_TRADING_ENVIRONMENT_LIVE = 2;
 }

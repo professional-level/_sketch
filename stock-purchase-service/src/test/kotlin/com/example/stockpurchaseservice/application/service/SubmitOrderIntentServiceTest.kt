@@ -24,6 +24,7 @@ import com.example.stockpurchaseservice.application.port.out.OrderRiskAssessment
 import com.example.stockpurchaseservice.application.port.out.OrderRiskAssessmentResult
 import com.example.stockpurchaseservice.application.port.out.OrderRiskControlPort
 import com.example.stockpurchaseservice.application.port.out.OrderSubmittedMessage
+import com.example.stockpurchaseservice.application.port.out.OrderTradingEnvironment
 import com.example.stockpurchaseservice.application.port.out.OperationalAlertPort
 import com.example.stockpurchaseservice.application.port.out.OrderSubmissionFailureAlert
 import com.example.stockpurchaseservice.application.port.out.ProcessedEventPort
@@ -356,11 +357,14 @@ class SubmitOrderIntentServiceTest {
                 quantity = 3,
                 orderTag = "FIRST_BUY",
                 createdAt = ZonedDateTime.parse("2026-05-30T09:00:00+09:00"),
+                tradingEnvironment = OrderTradingEnvironment.LIVE,
             ),
         )
 
         assertEquals(OrderIntentSubmissionStatus.REJECTED, result.status)
         assertEquals(336.0, riskPort.assessed.single().estimatedNotional)
+        assertEquals(OrderTradingEnvironment.LIVE, riskPort.assessed.single().expectedTradingEnvironment)
+        assertEquals(OrderTradingEnvironment.LIVE, submissionPort.rejected.single().tradingEnvironment)
         assertEquals(emptyList(), marketPort.buyOrders)
         assertEquals(eventId, processedEventPort.succeeded.single())
         assertEquals("order notional exceeds limit", submissionPort.rejected.single().statusReason)

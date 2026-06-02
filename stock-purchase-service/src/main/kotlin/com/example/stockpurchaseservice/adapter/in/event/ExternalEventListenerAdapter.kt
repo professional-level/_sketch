@@ -6,6 +6,7 @@ import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentType
 import com.example.stockpurchaseservice.application.port.`in`.SubmitOrderIntentCommand
 import com.example.stockpurchaseservice.application.port.`in`.SubmitOrderIntentUseCase
+import com.example.stockpurchaseservice.application.port.out.OrderTradingEnvironment
 import common.ConsumerGroupId.PURCHASE_SERVICE
 import common.Topic.ORDER_INTENT_CREATED
 import common.observability.TraceContext
@@ -65,6 +66,7 @@ fun Event.OrderIntentCreatedEvent.toCommand(): SubmitOrderIntentCommand {
         quantity = event.quantity,
         orderTag = event.orderTag,
         createdAt = event.createdAt.toZonedDateTime(),
+        tradingEnvironment = event.tradingEnvironment.convert(),
     )
 }
 
@@ -84,6 +86,15 @@ private fun Event.OrderIntentOrderType.convert(): OrderIntentType {
         Event.OrderIntentOrderType.ORDER_INTENT_LIMIT -> OrderIntentType.LIMIT
         Event.OrderIntentOrderType.ORDER_INTENT_ORDER_TYPE_UNDEFINED,
         Event.OrderIntentOrderType.UNRECOGNIZED -> throw IllegalArgumentException("unsupported order intent type: $this")
+    }
+}
+
+private fun Event.OrderTradingEnvironment.convert(): OrderTradingEnvironment? {
+    return when (this) {
+        Event.OrderTradingEnvironment.ORDER_TRADING_ENVIRONMENT_MOCK -> OrderTradingEnvironment.MOCK
+        Event.OrderTradingEnvironment.ORDER_TRADING_ENVIRONMENT_LIVE -> OrderTradingEnvironment.LIVE
+        Event.OrderTradingEnvironment.ORDER_TRADING_ENVIRONMENT_UNDEFINED,
+        Event.OrderTradingEnvironment.UNRECOGNIZED -> null
     }
 }
 

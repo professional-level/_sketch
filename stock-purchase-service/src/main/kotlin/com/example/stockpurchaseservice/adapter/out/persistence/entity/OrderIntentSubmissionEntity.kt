@@ -4,6 +4,7 @@ import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentType
 import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionDto
 import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionStatusDto
+import com.example.stockpurchaseservice.application.port.out.OrderTradingEnvironment
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
@@ -53,6 +54,9 @@ internal class OrderIntentSubmissionEntity private constructor(
     @Column(nullable = false)
     val submittedAt: ZonedDateTime,
     @Enumerated(EnumType.STRING)
+    @Column
+    val tradingEnvironment: OrderIntentTradingEnvironment?,
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     val status: OrderIntentSubmissionStatus,
     @Column(length = 1000)
@@ -75,6 +79,7 @@ internal class OrderIntentSubmissionEntity private constructor(
             externalOrderId = externalOrderId,
             branchOrderNumber = branchOrderNumber,
             submittedAt = submittedAt,
+            tradingEnvironment = tradingEnvironment?.toDto(),
             status = status.toDto(),
             statusReason = statusReason,
             lastStatusCheckedAt = lastStatusCheckedAt,
@@ -97,10 +102,33 @@ internal class OrderIntentSubmissionEntity private constructor(
                 externalOrderId = dto.externalOrderId,
                 branchOrderNumber = dto.branchOrderNumber,
                 submittedAt = dto.submittedAt,
+                tradingEnvironment = dto.tradingEnvironment?.let(OrderIntentTradingEnvironment::from),
                 status = OrderIntentSubmissionStatus.from(dto.status),
                 statusReason = dto.statusReason?.take(1000),
                 lastStatusCheckedAt = dto.lastStatusCheckedAt,
             )
+        }
+    }
+}
+
+internal enum class OrderIntentTradingEnvironment {
+    MOCK,
+    LIVE,
+    ;
+
+    fun toDto(): OrderTradingEnvironment {
+        return when (this) {
+            MOCK -> OrderTradingEnvironment.MOCK
+            LIVE -> OrderTradingEnvironment.LIVE
+        }
+    }
+
+    companion object {
+        fun from(environment: OrderTradingEnvironment): OrderIntentTradingEnvironment {
+            return when (environment) {
+                OrderTradingEnvironment.MOCK -> MOCK
+                OrderTradingEnvironment.LIVE -> LIVE
+            }
         }
     }
 }

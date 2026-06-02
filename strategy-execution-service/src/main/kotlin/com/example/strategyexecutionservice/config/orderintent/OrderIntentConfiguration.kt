@@ -1,0 +1,8 @@
+package com.example.strategyexecutionservice.config.orderintent
+
+import org.springframework.boot.context.properties.EnableConfigurationProperties
+import org.springframework.context.annotation.Configuration
+
+@Configuration
+@EnableConfigurationProperties(OrderIntentProperties::class)
+class OrderIntentConfiguration

@@ -23,6 +23,7 @@ data class OrderRiskAssessmentCommand(
     val market: StockOrderMarket,
     val orderTag: String,
     val createdAt: ZonedDateTime,
+    val expectedTradingEnvironment: OrderTradingEnvironment? = null,
 )
 
 data class OrderRiskAssessmentResult(

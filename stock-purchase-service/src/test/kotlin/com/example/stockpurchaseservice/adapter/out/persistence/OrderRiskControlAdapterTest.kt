@@ -308,6 +308,21 @@ class OrderRiskControlAdapterTest {
     }
 
     @Test
+    fun `order intent trading environment overrides configured prefix policy`() = runBlocking {
+        val properties = OrderRiskProperties().apply {
+            strategyTradingEnvironments["laor-v4"] = OrderTradingEnvironment.MOCK
+        }
+
+        val result = adapter(properties, overseasMockOrder = true).assess(
+            command(expectedTradingEnvironment = OrderTradingEnvironment.LIVE),
+        )
+
+        assertFalse(result.accepted)
+        assertContains(result.reason ?: "", "prefix=order-intent")
+        assertContains(result.reason ?: "", "expected=LIVE actual=MOCK")
+    }
+
+    @Test
     fun `accepts strategy when expected live environment routes to live broker`() = runBlocking {
         val properties = OrderRiskProperties().apply {
             strategyTradingEnvironments["laor-v4-live"] = OrderTradingEnvironment.LIVE
@@ -372,6 +387,7 @@ class OrderRiskControlAdapterTest {
         quantity: Long = 1,
         limitPrice: Double? = 100.0,
         createdAt: ZonedDateTime = ZonedDateTime.parse("2026-06-01T10:00:00-04:00[America/New_York]"),
+        expectedTradingEnvironment: OrderTradingEnvironment? = null,
     ): OrderRiskAssessmentCommand {
         return OrderRiskAssessmentCommand(
             orderIntentId = UUID.randomUUID(),
@@ -387,6 +403,7 @@ class OrderRiskControlAdapterTest {
             market = market,
             orderTag = "FIRST_BUY",
             createdAt = createdAt,
+            expectedTradingEnvironment = expectedTradingEnvironment,
         )
     }
 

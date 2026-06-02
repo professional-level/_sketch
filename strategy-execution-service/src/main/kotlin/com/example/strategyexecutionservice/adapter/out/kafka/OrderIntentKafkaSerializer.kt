@@ -2,6 +2,7 @@ package com.example.strategyexecutionservice.adapter.out.kafka
 
 import Event
 import com.example.strategyexecutionservice.application.port.out.OrderIntentMessage
+import com.example.strategyexecutionservice.application.port.out.OrderTradingEnvironment
 import com.example.strategyexecutionservice.domain.strategy.execution.OrderSide
 import com.example.strategyexecutionservice.domain.strategy.execution.OrderType
 import com.example.strategyexecutionservice.domain.strategy.execution.StrategyExecutionType
@@ -27,6 +28,7 @@ internal class OrderIntentKafkaSerializer {
             .setOrderTag(orderTag)
             .setIdempotencyKey(idempotencyKey)
             .setCreatedAt(createdAt.toProtobufTimestamp())
+            .setTradingEnvironment(tradingEnvironment.toProto())
             .setMeta(
                 Event.EventMeta.newBuilder()
                     .setOccurredAt(createdAt.toProtobufTimestamp())
@@ -55,6 +57,13 @@ internal class OrderIntentKafkaSerializer {
             OrderType.LOC -> Event.OrderIntentOrderType.ORDER_INTENT_LOC
             OrderType.MOC -> Event.OrderIntentOrderType.ORDER_INTENT_MOC
             OrderType.LIMIT -> Event.OrderIntentOrderType.ORDER_INTENT_LIMIT
+        }
+    }
+
+    private fun OrderTradingEnvironment.toProto(): Event.OrderTradingEnvironment {
+        return when (this) {
+            OrderTradingEnvironment.MOCK -> Event.OrderTradingEnvironment.ORDER_TRADING_ENVIRONMENT_MOCK
+            OrderTradingEnvironment.LIVE -> Event.OrderTradingEnvironment.ORDER_TRADING_ENVIRONMENT_LIVE
         }
     }
 }

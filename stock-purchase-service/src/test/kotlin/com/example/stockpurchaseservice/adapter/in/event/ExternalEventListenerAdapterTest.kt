@@ -7,6 +7,7 @@ import com.example.stockpurchaseservice.application.port.`in`.OrderIntentType
 import com.example.stockpurchaseservice.application.port.`in`.SubmitOrderIntentCommand
 import com.example.stockpurchaseservice.application.port.`in`.SubmitOrderIntentResult
 import com.example.stockpurchaseservice.application.port.`in`.SubmitOrderIntentUseCase
+import com.example.stockpurchaseservice.application.port.out.OrderTradingEnvironment
 import com.google.protobuf.Timestamp
 import common.Topic.ORDER_INTENT_CREATED
 import common.observability.TraceContext
@@ -52,6 +53,7 @@ class ExternalEventListenerAdapterTest {
         assertEquals(1L, useCase.commands.single().quantity)
         assertEquals("FIRST_BUY", useCase.commands.single().orderTag)
         assertEquals(Instant.ofEpochSecond(CREATED_AT_EPOCH_SECONDS), useCase.commands.single().createdAt.toInstant())
+        assertEquals(OrderTradingEnvironment.MOCK, useCase.commands.single().tradingEnvironment)
     }
 
     private fun orderIntentRecord(): ConsumerRecord<String, ByteArray> {
@@ -67,6 +69,7 @@ class ExternalEventListenerAdapterTest {
             .setQuantity(1L)
             .setOrderTag("FIRST_BUY")
             .setCreatedAt(Timestamp.newBuilder().setSeconds(CREATED_AT_EPOCH_SECONDS).build())
+            .setTradingEnvironment(Event.OrderTradingEnvironment.ORDER_TRADING_ENVIRONMENT_MOCK)
             .build()
         return ConsumerRecord(ORDER_INTENT_CREATED, 0, 0L, "laor-v4:TQQQ", event.toByteArray())
     }

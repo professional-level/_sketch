@@ -5,6 +5,7 @@ import com.example.strategyexecutionservice.application.port.`in`.MarketSnapshot
 import com.example.strategyexecutionservice.application.port.`in`.RunStrategyExecutionCommand
 import com.example.strategyexecutionservice.application.port.out.OrderIntentMessage
 import com.example.strategyexecutionservice.application.port.out.OrderIntentPort
+import com.example.strategyexecutionservice.application.port.out.OrderTradingEnvironment
 import com.example.strategyexecutionservice.domain.strategy.execution.OrderSide
 import com.example.strategyexecutionservice.domain.strategy.execution.OrderType
 import com.example.strategyexecutionservice.domain.strategy.execution.StrategyExecutionType
@@ -47,6 +48,7 @@ class RunStrategyExecutionServiceTest {
             assertEquals(1, quantity)
             assertEquals("FIRST_BUY", orderTag)
             assertEquals("laor-v4-strategy:TQQQ:2026-05-30:FIRST_BUY:0", idempotencyKey)
+            assertEquals(OrderTradingEnvironment.MOCK, tradingEnvironment)
         }
     }
 

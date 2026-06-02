@@ -8,7 +8,9 @@ import com.example.strategyexecutionservice.application.port.`in`.RunStrategyExe
 import com.example.strategyexecutionservice.application.port.`in`.RunStrategyExecutionUseCase
 import com.example.strategyexecutionservice.application.port.out.OrderIntentMessage
 import com.example.strategyexecutionservice.application.port.out.OrderIntentPort
+import com.example.strategyexecutionservice.application.port.out.OrderTradingEnvironment
 import com.example.strategyexecutionservice.domain.strategy.execution.OrderIntent
+import com.example.strategyexecutionservice.domain.strategy.execution.StrategyExecutionType
 import com.example.strategyexecutionservice.domain.strategy.execution.StrategyExecutionId
 import com.example.strategyexecutionservice.domain.strategy.execution.StrategyMarketSnapshot
 import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4Strategy
@@ -21,6 +23,7 @@ import java.util.UUID
 @UseCaseImpl
 class RunStrategyExecutionService(
     private val orderIntentPort: OrderIntentPort,
+    private val tradingEnvironmentResolver: OrderIntentTradingEnvironmentResolver = OrderIntentTradingEnvironmentResolver(),
 ) : RunStrategyExecutionUseCase {
 
     override suspend fun execute(command: RunStrategyExecutionCommand): RunStrategyExecutionResult {
@@ -35,6 +38,7 @@ class RunStrategyExecutionService(
                     executionRunId = command.executionRunId,
                     orderIndex = index,
                     createdAt = createdAt,
+                    tradingEnvironment = tradingEnvironmentResolver.resolve(command.executionId),
                 )
             },
         )
@@ -98,10 +102,11 @@ class RunStrategyExecutionService(
     }
 
     private fun OrderIntent.toMessage(
-        strategyType: com.example.strategyexecutionservice.domain.strategy.execution.StrategyExecutionType,
+        strategyType: StrategyExecutionType,
         executionRunId: String,
         orderIndex: Int,
         createdAt: ZonedDateTime,
+        tradingEnvironment: OrderTradingEnvironment,
     ): OrderIntentMessage {
         val idempotencyKey = "${executionId.value}:$executionRunId:$tag:$orderIndex"
         return OrderIntentMessage(
@@ -116,6 +121,7 @@ class RunStrategyExecutionService(
             orderTag = tag,
             idempotencyKey = idempotencyKey,
             createdAt = createdAt,
+            tradingEnvironment = tradingEnvironment,
         )
     }
 }

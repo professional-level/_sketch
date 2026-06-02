@@ -14,6 +14,7 @@ import com.example.strategyexecutionservice.application.port.out.LaorV4Execution
 import com.example.strategyexecutionservice.application.port.out.MarketDataPort
 import com.example.strategyexecutionservice.application.port.out.OrderIntentMessage
 import com.example.strategyexecutionservice.application.port.out.OrderIntentPort
+import com.example.strategyexecutionservice.application.port.out.OrderTradingEnvironment
 import com.example.strategyexecutionservice.application.port.out.StrategyExecutionStatePort
 import com.example.strategyexecutionservice.application.port.out.StrategyMarketDataSnapshot
 import com.example.strategyexecutionservice.domain.strategy.execution.OrderSide
@@ -62,6 +63,7 @@ class StartStrategyExecutionServiceTest {
             assertEquals(70_000.0, price)
             assertEquals(2, quantity)
             assertEquals("ENTRY_BUY", orderTag)
+            assertEquals(OrderTradingEnvironment.MOCK, tradingEnvironment)
         }
     }
 
