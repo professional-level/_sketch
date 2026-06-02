@@ -102,6 +102,25 @@ class KisSecretPropertyResolverTest {
     }
 
     @Test
+    fun `fails with file key when secret file source cannot be read`() {
+        val properties = mapOf(
+            "KIS_BASE_URL" to "https://openapi.koreainvestment.com:9443",
+            "KIS_APP_KEY_FILE" to "/vault/kis/missing-app-key",
+        )
+
+        val exception = assertFailsWith<IllegalArgumentException> {
+            KisSecretPropertyResolver.resolve(properties::get) {
+                throw IllegalStateException("file not found")
+            }
+        }
+
+        assertEquals(
+            "KIS secret file could not be read for KIS_APP_KEY_FILE: /vault/kis/missing-app-key",
+            exception.message,
+        )
+    }
+
+    @Test
     fun `allows real account properties to be omitted`() {
         val properties = mapOf(
             "base_url" to "https://openapi.koreainvestment.com:9443",

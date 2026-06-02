@@ -137,7 +137,19 @@ object KisSecretPropertyResolver {
             return keys.firstNotNullOfOrNull { key ->
                 fileAliases(key).firstNotNullOfOrNull { fileKey ->
                     getProperty(fileKey).configuredOrNull()
-                }?.let { filePath -> readSecretFile(filePath).configuredOrNull() }
+                        ?.let { filePath -> readConfiguredFile(fileKey = fileKey, filePath = filePath) }
+                }
+            }
+        }
+
+        private fun readConfiguredFile(fileKey: String, filePath: String): String? {
+            return runCatching {
+                readSecretFile(filePath).configuredOrNull()
+            }.getOrElse { exception ->
+                throw IllegalArgumentException(
+                    "KIS secret file could not be read for $fileKey: $filePath",
+                    exception,
+                )
             }
         }
 
