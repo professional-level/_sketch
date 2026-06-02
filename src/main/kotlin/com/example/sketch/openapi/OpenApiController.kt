@@ -352,9 +352,9 @@ internal fun OpenApiResponse.toDailyExecutionOrdersResponse(): DailyExecutionOrd
     return dailyExecutionOrdersResponse {
         ctxAreaFk100 = this@toDailyExecutionOrdersResponse.text("ctx_area_fk100", "CTX_AREA_FK100")
         ctxAreaNk100 = this@toDailyExecutionOrdersResponse.text("ctx_area_nk100", "CTX_AREA_NK100")
-        rtCd = this@toDailyExecutionOrdersResponse.text("rt_cd", "rtCd")
-        msgCd = this@toDailyExecutionOrdersResponse.text("msg_cd", "msgCd")
-        msg1 = this@toDailyExecutionOrdersResponse.text("msg1", "msg_1")
+        rtCd = this@toDailyExecutionOrdersResponse.text("rt_cd", "rtCd", "RT_CD")
+        msgCd = this@toDailyExecutionOrdersResponse.text("msg_cd", "msgCd", "MSG_CD")
+        msg1 = this@toDailyExecutionOrdersResponse.text("msg1", "msg_1", "MSG1")
 
         this@toDailyExecutionOrdersResponse.elements("output1", "OUTPUT1").forEach { item ->
             output1 += dailyExecutionOrdersOutput1 {

@@ -249,6 +249,24 @@ class OpenApiControllerMappingTest {
     }
 
     @Test
+    fun `maps uppercase daily execution business failure fields`() {
+        val response = ParseJsonResponse.parseJsonString(
+            """
+            {
+              "RT_CD": "1",
+              "MSG_CD": "APBK0001",
+              "MSG1": "domestic query rejected"
+            }
+            """.trimIndent(),
+        ).toDailyExecutionOrdersResponse()
+
+        assertEquals("1", response.rtCd)
+        assertEquals("APBK0001", response.msgCd)
+        assertEquals("domestic query rejected", response.msg1)
+        assertEquals(0, response.output1List.size)
+    }
+
+    @Test
     fun `maps empty daily execution response without output nodes`() {
         val response = ParseJsonResponse.parseJsonString(
             """
