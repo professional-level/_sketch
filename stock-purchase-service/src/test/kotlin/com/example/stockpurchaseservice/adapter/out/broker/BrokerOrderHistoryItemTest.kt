@@ -224,6 +224,28 @@ class BrokerOrderHistoryItemTest {
     }
 
     @Test
+    fun `uses unknown side row when broker id is absent and identity is unambiguous`() {
+        val status = listOf(
+            row(externalOrderId = "broker-1", side = null, orderedQuantity = 3, orderedPrice = 112.5),
+        ).findStatusFor(query(externalOrderId = null, orderedQuantity = 3, submittedPrice = 112.5))
+
+        assertEquals(BrokerOrderStatus.SUBMITTED, status.status)
+        assertEquals("broker-1", status.externalOrderId)
+        assertEquals(3L, status.orderedQuantity)
+        assertEquals(112.5, status.orderedPrice)
+    }
+
+    @Test
+    fun `does not use opposite side row when broker id is absent`() {
+        val status = listOf(
+            row(externalOrderId = "broker-1", side = OrderIntentSide.SELL, orderedQuantity = 3, orderedPrice = 112.5),
+        ).findStatusFor(query(externalOrderId = null, orderedQuantity = 3, submittedPrice = 112.5))
+
+        assertEquals(BrokerOrderStatus.UNKNOWN, status.status)
+        assertEquals("broker order not found", status.reason)
+    }
+
+    @Test
     fun `keeps broader candidates when broker rows do not expose matching ordered quantity`() {
         val status = listOf(
             row(externalOrderId = "broker-1", orderedQuantity = 0),

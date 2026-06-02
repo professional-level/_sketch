@@ -256,7 +256,7 @@ internal fun List<BrokerOrderHistoryItem>.findStatusFor(query: BrokerOrderStatus
         when {
             query.externalOrderId != null -> row.matchesExternalOrderId(query.externalOrderId)
             else -> row.symbol.equals(query.symbol, ignoreCase = true) &&
-                row.side == query.side &&
+                (row.side == null || row.side == query.side) &&
                 (query.submittedAt?.toLocalDate()?.let { row.orderedAt.toLocalDate() == it } ?: true)
         }
     }
