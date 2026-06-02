@@ -13,5 +13,8 @@ class KisTokenProperties {
         var enabled: Boolean = false
         var type: String = "file"
         var file: String = ""
+        var lockTtl: Duration = Duration.ofSeconds(30)
+        var lockWaitTimeout: Duration = Duration.ofSeconds(10)
+        var lockRetryDelay: Duration = Duration.ofMillis(100)
     }
 }

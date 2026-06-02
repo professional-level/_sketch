@@ -35,11 +35,27 @@ class KisTokenConfiguration {
     }
 
     @Bean
+    fun kisTokenRefreshLock(
+        properties: KisTokenProperties,
+        jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
+    ): KisTokenRefreshLock {
+        if (!properties.persistence.enabled || properties.persistence.type.trim().lowercase() != "jdbc") {
+            return NoopKisTokenRefreshLock
+        }
+        return JdbcKisTokenRefreshLock(
+            jdbcTemplateProvider.getIfAvailable()
+                ?: error("akra.kis.token.persistence.type=jdbc requires a JdbcTemplate bean"),
+            properties,
+        )
+    }
+
+    @Bean
     fun kisAccessTokenCache(
         properties: KisTokenProperties,
         tokenStore: KisAccessTokenStore,
+        refreshLock: KisTokenRefreshLock,
     ): KisAccessTokenCache {
-        return KisAccessTokenCache(properties, tokenStore = tokenStore)
+        return KisAccessTokenCache(properties, tokenStore = tokenStore, refreshLock = refreshLock)
     }
 
     private fun defaultKisAccessTokenStorePath(): Path {

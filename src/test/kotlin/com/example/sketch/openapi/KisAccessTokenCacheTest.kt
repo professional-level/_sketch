@@ -8,6 +8,7 @@ import java.time.ZoneId
 import java.nio.file.Path
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.io.TempDir
 import org.springframework.jdbc.core.JdbcTemplate
@@ -15,7 +16,9 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class KisAccessTokenCacheTest {
 
@@ -137,6 +140,32 @@ class KisAccessTokenCacheTest {
     }
 
     @Test
+    fun `reloads persistent store after acquiring refresh lock`() = runTest {
+        val clock = MutableClock(Instant.parse("2026-06-02T00:00:00Z"))
+        val store = FileKisAccessTokenStore(tempDir.resolve("kis-tokens.json"), objectMapper)
+        val refreshLock = BeforeBlockRefreshLock {
+            store.save(
+                KisTokenScope.REAL,
+                CachedKisAccessToken(
+                    token = "refreshed-by-peer",
+                    expiresAt = Instant.parse("2026-06-02T01:00:00Z"),
+                ),
+            )
+        }
+        val cache = KisAccessTokenCache(KisTokenProperties(), clock, store, refreshLock)
+        var fetchCount = 0
+
+        val token = cache.getOrRefresh(KisTokenScope.REAL) {
+            fetchCount += 1
+            tokenResponse("duplicate-refresh", expiresIn = 3600)
+        }
+
+        assertEquals("refreshed-by-peer", token.token)
+        assertEquals(0, fetchCount)
+        assertEquals(1, refreshLock.calls)
+    }
+
+    @Test
     fun `jdbc store saves loads and deletes scoped tokens`() {
         val store = JdbcKisAccessTokenStore(jdbcTemplate())
         val token = CachedKisAccessToken(
@@ -152,6 +181,50 @@ class KisAccessTokenCacheTest {
         store.delete(KisTokenScope.REAL)
 
         assertNull(store.load(KisTokenScope.REAL))
+    }
+
+    @Test
+    fun `jdbc refresh lock releases scope after block`() = runBlocking {
+        val jdbcTemplate = jdbcTemplate()
+        val first = JdbcKisTokenRefreshLock(jdbcTemplate, lockProperties(), ownerId = "owner-1")
+        val second = JdbcKisTokenRefreshLock(jdbcTemplate, lockProperties(), ownerId = "owner-2")
+        var firstAcquired = false
+        var secondAcquired = false
+
+        first.withLock(KisTokenScope.REAL) {
+            firstAcquired = true
+        }
+        second.withLock(KisTokenScope.REAL) {
+            secondAcquired = true
+        }
+
+        assertTrue(firstAcquired)
+        assertTrue(secondAcquired)
+    }
+
+    @Test
+    fun `jdbc refresh lock times out while another owner holds scope`() = runBlocking {
+        val jdbcTemplate = jdbcTemplate()
+        val first = JdbcKisTokenRefreshLock(jdbcTemplate, lockProperties(), ownerId = "owner-1")
+        val second = JdbcKisTokenRefreshLock(
+            jdbcTemplate,
+            lockProperties(waitTimeout = Duration.ofMillis(20), retryDelay = Duration.ofMillis(1)),
+            ownerId = "owner-2",
+        )
+        var failure: IllegalStateException? = null
+
+        first.withLock(KisTokenScope.REAL) {
+            try {
+                second.withLock(KisTokenScope.REAL) {
+                    error("second owner must not acquire an active refresh lock")
+                }
+            } catch (ex: IllegalStateException) {
+                failure = ex
+            }
+        }
+
+        assertNotNull(failure)
+        assertTrue(failure?.message?.contains("Timed out") == true)
     }
 
     @Test
@@ -223,6 +296,41 @@ class KisAccessTokenCacheTest {
                 )
                 """.trimIndent(),
             )
+            execute(
+                """
+                CREATE TABLE kis_token_refresh_lock (
+                    token_scope VARCHAR(16) NOT NULL,
+                    owner_id VARCHAR(128) NOT NULL,
+                    locked_until TIMESTAMP NOT NULL,
+                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (token_scope)
+                )
+                """.trimIndent(),
+            )
+        }
+    }
+
+    private fun lockProperties(
+        waitTimeout: Duration = Duration.ofMillis(100),
+        retryDelay: Duration = Duration.ofMillis(5),
+    ): KisTokenProperties {
+        return KisTokenProperties().apply {
+            persistence.lockTtl = Duration.ofSeconds(30)
+            persistence.lockWaitTimeout = waitTimeout
+            persistence.lockRetryDelay = retryDelay
+        }
+    }
+
+    private class BeforeBlockRefreshLock(
+        private val beforeBlock: () -> Unit,
+    ) : KisTokenRefreshLock {
+        var calls: Int = 0
+            private set
+
+        override suspend fun <T> withLock(scope: KisTokenScope, block: suspend () -> T): T {
+            calls += 1
+            beforeBlock()
+            return block()
         }
     }
 

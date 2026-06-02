@@ -2,7 +2,7 @@
 
 ## Scope
 
-This runbook covers the minimum runtime configuration and restart checks needed before running the trading sketch against real broker infrastructure. It does not make the system production complete. The KIS wrapper has optional local-file and JDBC token persistence, but broker-wrapper deployment, managed secret storage, and a stronger distributed refresh lock are still separate hardening work.
+This runbook covers the minimum runtime configuration and restart checks needed before running the trading sketch against real broker infrastructure. It does not make the system production complete. The KIS wrapper has optional local-file and JDBC token persistence. When JDBC persistence is enabled, token refresh is serialized with a database-backed TTL lock. Broker-wrapper deployment and managed secret storage are still separate hardening work.
 
 ## Secret Handling
 
@@ -53,6 +53,10 @@ akra.kis.token.fallback-ttl=23h
 akra.kis.token.persistence.enabled=true
 akra.kis.token.persistence.type=file
 akra.kis.token.persistence.file=/var/lib/akra/kis-token-cache.json
+# JDBC persistence only:
+akra.kis.token.persistence.lock-ttl=30s
+akra.kis.token.persistence.lock-wait-timeout=10s
+akra.kis.token.persistence.lock-retry-delay=100ms
 ```
 
 When file persistence is enabled, the wrapper stores real and mock token scopes in the configured local JSON file and reloads still-usable tokens after restart. Keep this file outside Git, restrict it to the application user, and place it on an encrypted or otherwise protected volume.
@@ -68,9 +72,10 @@ Before enabling JDBC token persistence, apply:
 
 ```text
 docs/operations/sql/20260602_create_kis_access_token.mysql.sql
+docs/operations/sql/20260602_create_kis_token_refresh_lock.mysql.sql
 ```
 
-The JDBC adapter shares issued tokens through the configured application database, but it is still not a full distributed token-issuance lock. If KIS enforces strict token issuance limits, use a single writer or a stronger shared lock around token refresh.
+The JDBC adapter shares issued tokens through the configured application database and uses `kis_token_refresh_lock` to prevent multiple wrapper instances from refreshing the same real/mock token scope at the same time. The lock is a short TTL row lock, so keep application clocks sane, monitor refresh timeout failures, and size `lock-ttl` above the expected KIS token issuance latency.
 
 ## Startup Safety Checks
 

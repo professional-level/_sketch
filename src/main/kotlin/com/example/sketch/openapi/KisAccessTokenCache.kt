@@ -28,6 +28,7 @@ class KisAccessTokenCache(
     private val properties: KisTokenProperties,
     private val clock: Clock = Clock.systemUTC(),
     private val tokenStore: KisAccessTokenStore = NoopKisAccessTokenStore,
+    private val refreshLock: KisTokenRefreshLock = NoopKisTokenRefreshLock,
 ) {
     private val tokens = ConcurrentHashMap<KisTokenScope, CachedKisAccessToken>()
     private val locks = ConcurrentHashMap<KisTokenScope, Mutex>()
@@ -51,10 +52,21 @@ class KisAccessTokenCache(
                 return@withLock TokenResponse(token = it.token)
             }
 
-            val cached = fetch().toCachedToken(clock, properties)
-            tokens[scope] = cached
-            tokenStore.save(scope, cached)
-            TokenResponse(token = cached.token)
+            refreshLock.withLock(scope) refresh@{
+                val refreshLockedNow = clock.instant()
+                tokens[scope]?.takeIf { it.isUsable(refreshLockedNow, properties) }?.let {
+                    return@refresh TokenResponse(token = it.token)
+                }
+                tokenStore.load(scope)?.takeIf { it.isUsable(refreshLockedNow, properties) }?.let {
+                    tokens[scope] = it
+                    return@refresh TokenResponse(token = it.token)
+                }
+
+                val cached = fetch().toCachedToken(clock, properties)
+                tokens[scope] = cached
+                tokenStore.save(scope, cached)
+                TokenResponse(token = cached.token)
+            }
         }
     }
 
