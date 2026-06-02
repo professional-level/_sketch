@@ -2,7 +2,7 @@
 
 ## Scope
 
-This runbook covers the minimum runtime configuration and restart checks needed before running the trading sketch against real broker infrastructure. It does not make the system production complete. The KIS wrapper has optional local-file token persistence, but broker-wrapper deployment, shared token storage, and a managed secret store are still separate hardening work.
+This runbook covers the minimum runtime configuration and restart checks needed before running the trading sketch against real broker infrastructure. It does not make the system production complete. The KIS wrapper has optional local-file and JDBC token persistence, but broker-wrapper deployment, managed secret storage, and a stronger distributed refresh lock are still separate hardening work.
 
 ## Secret Handling
 
@@ -51,10 +51,26 @@ Token cache knobs:
 akra.kis.token.refresh-before-expiry=10m
 akra.kis.token.fallback-ttl=23h
 akra.kis.token.persistence.enabled=true
+akra.kis.token.persistence.type=file
 akra.kis.token.persistence.file=/var/lib/akra/kis-token-cache.json
 ```
 
-When token persistence is enabled, the wrapper stores real and mock token scopes in the configured local JSON file and reloads still-usable tokens after restart. Keep this file outside Git, restrict it to the application user, and place it on an encrypted or otherwise protected volume. A multi-instance deployment still needs a shared token store or single-writer token issuance policy; the local file adapter is not a distributed lock.
+When file persistence is enabled, the wrapper stores real and mock token scopes in the configured local JSON file and reloads still-usable tokens after restart. Keep this file outside Git, restrict it to the application user, and place it on an encrypted or otherwise protected volume.
+
+For multi-instance deployments, prefer the shared JDBC token store:
+
+```properties
+akra.kis.token.persistence.enabled=true
+akra.kis.token.persistence.type=jdbc
+```
+
+Before enabling JDBC token persistence, apply:
+
+```text
+docs/operations/sql/20260602_create_kis_access_token.mysql.sql
+```
+
+The JDBC adapter shares issued tokens through the configured application database, but it is still not a full distributed token-issuance lock. If KIS enforces strict token issuance limits, use a single writer or a stronger shared lock around token refresh.
 
 ## Startup Safety Checks
 

@@ -7,6 +7,8 @@ import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.nio.file.attribute.PosixFilePermission
 import java.time.Instant
+import java.sql.Timestamp
+import org.springframework.jdbc.core.JdbcTemplate
 
 interface KisAccessTokenStore {
     fun load(scope: KisTokenScope): CachedKisAccessToken?
@@ -93,6 +95,53 @@ class FileKisAccessTokenStore(
 
     private companion object {
         const val MIN_TEMP_FILE_PREFIX_LENGTH = 3
+    }
+}
+
+class JdbcKisAccessTokenStore(
+    private val jdbcTemplate: JdbcTemplate,
+) : KisAccessTokenStore {
+    override fun load(scope: KisTokenScope): CachedKisAccessToken? {
+        return jdbcTemplate.query(
+            """
+            SELECT access_token, expires_at
+            FROM kis_access_token
+            WHERE token_scope = ?
+            """.trimIndent(),
+            { rs, _ ->
+                CachedKisAccessToken(
+                    token = rs.getString("access_token"),
+                    expiresAt = rs.getTimestamp("expires_at").toInstant(),
+                )
+            },
+            scope.name,
+        ).firstOrNull()
+    }
+
+    override fun save(scope: KisTokenScope, token: CachedKisAccessToken) {
+        jdbcTemplate.update(
+            """
+            INSERT INTO kis_access_token (token_scope, access_token, expires_at, updated_at)
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            ON DUPLICATE KEY UPDATE
+                access_token = VALUES(access_token),
+                expires_at = VALUES(expires_at),
+                updated_at = CURRENT_TIMESTAMP
+            """.trimIndent(),
+            scope.name,
+            token.token,
+            Timestamp.from(token.expiresAt),
+        )
+    }
+
+    override fun delete(scope: KisTokenScope) {
+        jdbcTemplate.update(
+            """
+            DELETE FROM kis_access_token
+            WHERE token_scope = ?
+            """.trimIndent(),
+            scope.name,
+        )
     }
 }
 

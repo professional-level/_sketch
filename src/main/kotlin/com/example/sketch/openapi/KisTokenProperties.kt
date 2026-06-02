@@ -11,6 +11,7 @@ class KisTokenProperties {
 
     class Persistence {
         var enabled: Boolean = false
+        var type: String = "file"
         var file: String = ""
     }
 }

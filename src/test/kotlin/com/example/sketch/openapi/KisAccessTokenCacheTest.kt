@@ -10,9 +10,12 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.io.TempDir
+import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.jdbc.datasource.DriverManagerDataSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 
 class KisAccessTokenCacheTest {
 
@@ -134,6 +137,24 @@ class KisAccessTokenCacheTest {
     }
 
     @Test
+    fun `jdbc store saves loads and deletes scoped tokens`() {
+        val store = JdbcKisAccessTokenStore(jdbcTemplate())
+        val token = CachedKisAccessToken(
+            token = "shared-token",
+            expiresAt = Instant.parse("2026-06-02T01:00:00Z"),
+        )
+
+        store.save(KisTokenScope.REAL, token)
+
+        assertEquals(token, store.load(KisTokenScope.REAL))
+        assertNull(store.load(KisTokenScope.MOCK))
+
+        store.delete(KisTokenScope.REAL)
+
+        assertNull(store.load(KisTokenScope.REAL))
+    }
+
+    @Test
     fun `coalesces concurrent refreshes per token scope`() = runTest {
         val clock = MutableClock(Instant.parse("2026-06-02T00:00:00Z"))
         val cache = KisAccessTokenCache(KisTokenProperties(), clock)
@@ -182,6 +203,27 @@ class KisAccessTokenCacheTest {
         put("access_token", token)
         expiresIn?.let { put("expires_in", it) }
         expiresAt?.let { put("access_token_token_expired", it) }
+    }
+
+    private fun jdbcTemplate(): JdbcTemplate {
+        val dataSource = DriverManagerDataSource(
+            "jdbc:h2:mem:kis_token_${System.nanoTime()};MODE=MySQL;DATABASE_TO_UPPER=false;DB_CLOSE_DELAY=-1",
+            "sa",
+            "",
+        )
+        return JdbcTemplate(dataSource).apply {
+            execute(
+                """
+                CREATE TABLE kis_access_token (
+                    token_scope VARCHAR(16) NOT NULL,
+                    access_token TEXT NOT NULL,
+                    expires_at TIMESTAMP NOT NULL,
+                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (token_scope)
+                )
+                """.trimIndent(),
+            )
+        }
     }
 
     private class MutableClock(
