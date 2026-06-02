@@ -358,6 +358,7 @@ internal class KisBrokerGatewayAdapter(
 internal const val OPEN_API_PREFIX = "/open-api"
 private const val DOMESTIC_EXCHANGE = "KRX"
 private const val DOMESTIC_CURRENCY = "KRW"
+private const val KIS_CANCEL_REVISION_CODE = "02"
 
 private val TEMPORARY_KIS_MESSAGE_CODES = setOf(
     "EGW00201",
@@ -828,6 +829,7 @@ private fun DailyExecutionOrdersResponseOuterClass.DailyExecutionOrdersOutput1.t
     if (orderId.isBlank()) return null
     return BrokerOrderHistoryItem(
         externalOrderId = orderId,
+        originalOrderId = orgnOdno.takeIf { it.isNotBlank() },
         branchOrderNumber = ordGnoBrno.takeIf { it.isNotBlank() },
         symbol = pdno.trim(),
         stockName = prdtName.trim(),
@@ -844,12 +846,18 @@ private fun DailyExecutionOrdersResponseOuterClass.DailyExecutionOrdersOutput1.t
 }
 
 private fun JsonNode.toBrokerHistoryItem(): BrokerOrderHistoryItem? {
-    val orderId = textOrNull("odno", "ODNO", "ord_no", "order_no") ?: ""
+    val orderId = textOrNull("odno", "ODNO", "ord_no", "ORD_NO", "order_no", "ORDER_NO") ?: ""
     if (orderId.isBlank()) return null
     val orderedQuantity = longValue("ft_ord_qty", "FT_ORD_QTY", "ord_qty", "ORD_QTY")
     val filledQuantity = longValue("ft_ccld_qty", "FT_CCLD_QTY", "tot_ccld_qty", "TOT_CCLD_QTY", "ccld_qty")
     val remainingQuantity = longValue("nccs_qty", "NCCS_QTY", "rmn_qty", "RMN_QTY")
     val statusName = textOrNull("prcs_stat_name", "PRCS_STAT_NAME", "ord_stat_name", "ORD_STAT_NAME")
+    val revisionCancelCode = textOrNull(
+        "rvse_cncl_dvsn",
+        "RVSE_CNCL_DVSN",
+        "rvse_cncl_dvsn_cd",
+        "RVSE_CNCL_DVSN_CD",
+    )
     val revisionCancelName = textOrNull(
         "rvse_cncl_dvsn_name",
         "RVSE_CNCL_DVSN_NAME",
@@ -863,11 +871,18 @@ private fun JsonNode.toBrokerHistoryItem(): BrokerOrderHistoryItem? {
         textOrNull("rjct_rson_cn", "RJCT_RSON_CN"),
         textOrNull("rjct_rson_cd_name", "RJCT_RSON_CD_NAME"),
     )
-    val cancelled = statusMessage?.contains(CANCELLED_KOREAN) == true
+    val cancelled = statusMessage?.contains(CANCELLED_KOREAN) == true || revisionCancelCode == KIS_CANCEL_REVISION_CODE
     val explicitCancelledQuantity = longValue("cncl_cfrm_qty", "CNCL_CFRM_QTY", "cncl_qty", "CNCL_QTY")
     return BrokerOrderHistoryItem(
         externalOrderId = orderId,
-        branchOrderNumber = textOrNull("ord_gno_brno", "ORD_GNO_BRNO"),
+        originalOrderId = textOrNull("orgn_odno", "ORGN_ODNO"),
+        branchOrderNumber = textOrNull(
+            "ord_gno_brno",
+            "ORD_GNO_BRNO",
+            "krx_fwdg_ord_orgno",
+            "KRX_FWDG_ORD_ORGNO",
+            "krxFwdgOrdOrgno",
+        ),
         symbol = textOrNull("pdno", "PDNO", "ovrs_pdno", "OVRS_PDNO").orEmpty(),
         stockName = textOrNull("prdt_name", "PRDT_NAME", "prdt_eng_name", "PRDT_ENG_NAME").orEmpty(),
         orderedAt = parseKisOrderDateTime(

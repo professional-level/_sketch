@@ -6,6 +6,7 @@ import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatus
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderQueryFailedException
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderRejectedException
+import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatusQuery
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderSubmissionUnknownException
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderTemporaryUnavailableException
 import com.example.stockpurchaseservice.application.port.out.ExecutionQuantityModeDto
@@ -1302,6 +1303,56 @@ class KisBrokerGatewayAdapterTest {
         assertEquals(3, item.cancelledQuantity)
         assertEquals(BrokerOrderStatus.CANCELLED, status.status)
         assertEquals("Cancelled", status.reason)
+    }
+
+    @Test
+    fun `maps overseas cancel revision code and original broker order id`() {
+        val adapter = overseasHistoryAdapter(
+            """
+            {
+              "rt_cd": "0",
+              "ctx_area_fk200": "",
+              "ctx_area_nk200": "",
+              "output": [
+                {
+                  "ORD_NO": "cancel-order-1",
+                  "ORGN_ODNO": "original-order-1",
+                  "KRX_FWDG_ORD_ORGNO": "00009",
+                  "PDNO": "TQQQ",
+                  "ORD_DT": "20260602",
+                  "ORD_TMD": "093000",
+                  "ORD_QTY": "3",
+                  "TOT_CCLD_QTY": "0",
+                  "RMN_QTY": "3",
+                  "RVSE_CNCL_DVSN": "02",
+                  "SLL_BUY_DVSN_NAME": "BUY",
+                  "PRCS_STAT_NAME": "Processed"
+                }
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        val items = adapter.findOrderHistory(historyQuery())
+        val item = items.single()
+        val status = items.findStatusFor(
+            BrokerOrderStatusQuery(
+                orderIntentId = UUID.randomUUID(),
+                internalOrderId = UUID.randomUUID(),
+                externalOrderId = "original-order-1",
+                symbol = "TQQQ",
+                side = OrderIntentSide.BUY,
+                market = StockOrderMarket.OVERSEAS_US,
+                submittedAt = ZonedDateTime.parse("2026-06-02T09:00:00+09:00"),
+            ),
+        )
+
+        assertEquals("cancel-order-1", item.externalOrderId)
+        assertEquals("original-order-1", item.originalOrderId)
+        assertEquals("00009", item.branchOrderNumber)
+        assertEquals(BrokerOrderStatus.CANCELLED, item.toStatus().status)
+        assertEquals(BrokerOrderStatus.CANCELLED, status.status)
+        assertEquals("original-order-1", status.externalOrderId)
     }
 
     @Test

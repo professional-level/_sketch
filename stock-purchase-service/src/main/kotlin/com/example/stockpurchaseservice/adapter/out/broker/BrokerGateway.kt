@@ -119,6 +119,7 @@ internal data class BrokerOrderHistoryPageCursor(
 
 internal data class BrokerOrderHistoryItem(
     val externalOrderId: String,
+    val originalOrderId: String? = null,
     val branchOrderNumber: String?,
     val symbol: String,
     val stockName: String,
@@ -188,26 +189,55 @@ internal data class BrokerOrderHistoryItem(
 internal fun List<BrokerOrderHistoryItem>.findStatusFor(query: BrokerOrderStatusQuery): BrokerOrderStatusDto {
     val candidates = filter { row ->
         when {
-            query.externalOrderId != null -> row.externalOrderId == query.externalOrderId
+            query.externalOrderId != null -> row.matchesExternalOrderId(query.externalOrderId)
             else -> row.symbol.equals(query.symbol, ignoreCase = true) &&
                 row.side == query.side &&
                 (query.submittedAt?.toLocalDate()?.let { row.orderedAt.toLocalDate() == it } ?: true)
         }
     }
+    val terminalCandidates = candidates.filter { row ->
+        when (row.toStatus().status) {
+            BrokerOrderStatus.REJECTED,
+            BrokerOrderStatus.CANCELLED -> true
+            BrokerOrderStatus.SUBMITTED,
+            BrokerOrderStatus.UNKNOWN -> false
+        }
+    }
+    val selectedCandidate = when {
+        terminalCandidates.size == 1 -> terminalCandidates.single()
+        terminalCandidates.size > 1 -> null
+        query.externalOrderId != null -> {
+            candidates.filter { it.externalOrderId == query.externalOrderId }.singleOrNull()
+                ?: candidates.singleOrNull()
+        }
+        else -> candidates.singleOrNull()
+    }
 
-    return when (candidates.size) {
-        0 -> BrokerOrderStatusDto(
+    return when {
+        candidates.isEmpty() -> BrokerOrderStatusDto(
             status = BrokerOrderStatus.UNKNOWN,
             externalOrderId = query.externalOrderId,
             reason = "broker order not found",
         )
 
-        1 -> candidates.single().toStatus()
+        selectedCandidate != null -> selectedCandidate.toStatus().normalizeExternalOrderId(query.externalOrderId)
         else -> BrokerOrderStatusDto(
             status = BrokerOrderStatus.UNKNOWN,
             externalOrderId = query.externalOrderId,
             reason = "ambiguous broker orders: ${candidates.joinToString { it.externalOrderId }}",
         )
+    }
+}
+
+private fun BrokerOrderHistoryItem.matchesExternalOrderId(externalOrderId: String): Boolean {
+    return this.externalOrderId == externalOrderId || originalOrderId == externalOrderId
+}
+
+private fun BrokerOrderStatusDto.normalizeExternalOrderId(queriedExternalOrderId: String?): BrokerOrderStatusDto {
+    return when {
+        queriedExternalOrderId.isNullOrBlank() -> this
+        externalOrderId == queriedExternalOrderId -> this
+        else -> copy(externalOrderId = queriedExternalOrderId)
     }
 }
 

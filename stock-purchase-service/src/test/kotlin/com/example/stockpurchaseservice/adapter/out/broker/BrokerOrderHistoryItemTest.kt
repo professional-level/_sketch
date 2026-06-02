@@ -40,6 +40,22 @@ class BrokerOrderHistoryItemTest {
     }
 
     @Test
+    fun `prefers terminal cancel row matched by original broker order id`() {
+        val status = listOf(
+            row(externalOrderId = "broker-1"),
+            row(
+                externalOrderId = "cancel-broker-1",
+                originalOrderId = "broker-1",
+                cancelledQuantity = 3,
+                cancelled = true,
+            ),
+        ).findStatusFor(query(externalOrderId = "broker-1"))
+
+        assertEquals(BrokerOrderStatus.CANCELLED, status.status)
+        assertEquals("broker-1", status.externalOrderId)
+    }
+
+    @Test
     fun `returns unknown when order lookup is ambiguous without broker order id`() {
         val status = listOf(
             row(externalOrderId = "broker-1"),
@@ -63,6 +79,7 @@ class BrokerOrderHistoryItemTest {
 
     private fun row(
         externalOrderId: String = "broker-1",
+        originalOrderId: String? = null,
         cumulativeFilledQuantity: Long = 0,
         cancelledQuantity: Long = 0,
         cancelled: Boolean = false,
@@ -71,6 +88,7 @@ class BrokerOrderHistoryItemTest {
     ): BrokerOrderHistoryItem {
         return BrokerOrderHistoryItem(
             externalOrderId = externalOrderId,
+            originalOrderId = originalOrderId,
             branchOrderNumber = "00001",
             symbol = "TQQQ",
             stockName = "TQQQ",
