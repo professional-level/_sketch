@@ -351,65 +351,80 @@ private fun OpenApiResponse.toGetProgramTradeInfoPerIndividual(): ProgramTradeVo
         items.addAll(stocks)
     }
 }
-private fun OpenApiResponse.toDailyExecutionOrdersResponse(): DailyExecutionOrdersResponse {
+internal fun OpenApiResponse.toDailyExecutionOrdersResponse(): DailyExecutionOrdersResponse {
     return dailyExecutionOrdersResponse {
-        // top-level 필드들 가져오기
-        ctxAreaFk100 = this@toDailyExecutionOrdersResponse.get("ctx_area_fk100").asText()
-        ctxAreaNk100 = this@toDailyExecutionOrdersResponse.get("ctx_area_nk100").asText()
-        rtCd = this@toDailyExecutionOrdersResponse.get("rt_cd").asText()
-        msgCd = this@toDailyExecutionOrdersResponse.get("msg_cd").asText()
-        msg1 = this@toDailyExecutionOrdersResponse.get("msg1").asText()
+        ctxAreaFk100 = this@toDailyExecutionOrdersResponse.text("ctx_area_fk100", "CTX_AREA_FK100")
+        ctxAreaNk100 = this@toDailyExecutionOrdersResponse.text("ctx_area_nk100", "CTX_AREA_NK100")
+        rtCd = this@toDailyExecutionOrdersResponse.text("rt_cd", "rtCd")
+        msgCd = this@toDailyExecutionOrdersResponse.text("msg_cd", "msgCd")
+        msg1 = this@toDailyExecutionOrdersResponse.text("msg1", "msg_1")
 
-        // output1 배열 처리
-        val output1Array = this@toDailyExecutionOrdersResponse.get("output1")
-        output1Array.forEach { item ->
-                output1 += dailyExecutionOrdersOutput1 {
-                    ordDt = item.get("ord_dt").asText()
-                    ordGnoBrno = item.get("ord_gno_brno").asText()
-                    odno = item.get("odno").asText()
-                    orgnOdno = item.get("orgn_odno").asText()
-                    ordDvsnName = item.get("ord_dvsn_name").asText()
-                    sllBuyDvsnCd = item.get("sll_buy_dvsn_cd").asText()
-                    sllBuyDvsnCdName = item.get("sll_buy_dvsn_cd_name").asText()
-                    pdno = item.get("pdno").asText()
-                    prdtName = item.get("prdt_name").asText()
-                    ordQty = item.get("ord_qty").asText()
-                    ordUnpr = item.get("ord_unpr").asText()
-                    ordTmd = item.get("ord_tmd").asText()
-                    totCcldQty = item.get("tot_ccld_qty").asText()
-                    avgPrvs = item.get("avg_prvs").asText()
-                    cnclYn = item.get("cncl_yn").asText()
-                    totCcldAmt = item.get("tot_ccld_amt").asText()
-                    loanDt = item.get("loan_dt").asText()
-                    ordrEmpno = item.get("ordr_empno").asText()
-                    ordDvsnCd = item.get("ord_dvsn_cd").asText()
-                    cnclCfrmQty = item.get("cncl_cfrm_qty").asText()
-                    rmnQty = item.get("rmn_qty").asText()
-                    rjctQty = item.get("rjct_qty").asText()
-                    ccldCndtName = item.get("ccld_cndt_name").asText()
-                    inqrIpAddr = item.get("inqr_ip_addr").asText()
-                    cpbcOrdpOrdRcitDvsnCd = item.get("cpbc_ordp_ord_rcit_dvsn_cd").asText()
-                    cpbcOrdpInfmMthdDvsnCd = item.get("cpbc_ordp_infm_mthd_dvsn_cd").asText()
-                    infmTmd = item.get("infm_tmd").asText()
-                    ctacTlno = item.get("ctac_tlno").asText()
-                    prdtTypeCd = item.get("prdt_type_cd").asText()
-                    excgDvsnCd = item.get("excg_dvsn_cd").asText()
-                    cpbcOrdpMtrlDvsnCd = item.get("cpbc_ordp_mtrl_dvsn_cd").asText()
-                    ordOrgno = item.get("ord_orgno").asText()
-                    rsvnOrdEndDt = item.get("rsvn_ord_end_dt").asText()
-                }
+        this@toDailyExecutionOrdersResponse.elements("output1", "OUTPUT1").forEach { item ->
+            output1 += dailyExecutionOrdersOutput1 {
+                ordDt = item.text("ord_dt", "ORD_DT")
+                ordGnoBrno = item.text("ord_gno_brno", "ORD_GNO_BRNO")
+                odno = item.text("odno", "ODNO")
+                orgnOdno = item.text("orgn_odno", "ORGN_ODNO")
+                ordDvsnName = item.text("ord_dvsn_name", "ORD_DVSN_NAME")
+                sllBuyDvsnCd = item.text("sll_buy_dvsn_cd", "SLL_BUY_DVSN_CD")
+                sllBuyDvsnCdName = item.text("sll_buy_dvsn_cd_name", "SLL_BUY_DVSN_CD_NAME")
+                pdno = item.text("pdno", "PDNO")
+                prdtName = item.text("prdt_name", "PRDT_NAME")
+                ordQty = item.text("ord_qty", "ORD_QTY")
+                ordUnpr = item.text("ord_unpr", "ORD_UNPR")
+                ordTmd = item.text("ord_tmd", "ORD_TMD")
+                totCcldQty = item.text("tot_ccld_qty", "TOT_CCLD_QTY")
+                avgPrvs = item.text("avg_prvs", "AVG_PRVS")
+                cnclYn = item.text("cncl_yn", "CNCL_YN")
+                totCcldAmt = item.text("tot_ccld_amt", "TOT_CCLD_AMT")
+                loanDt = item.text("loan_dt", "LOAN_DT")
+                ordrEmpno = item.text("ordr_empno", "ORDR_EMPNO")
+                ordDvsnCd = item.text("ord_dvsn_cd", "ORD_DVSN_CD")
+                cnclCfrmQty = item.text("cncl_cfrm_qty", "CNCL_CFRM_QTY")
+                rmnQty = item.text("rmn_qty", "RMN_QTY")
+                rjctQty = item.text("rjct_qty", "RJCT_QTY")
+                ccldCndtName = item.text("ccld_cndt_name", "CCLD_CNDT_NAME")
+                inqrIpAddr = item.text("inqr_ip_addr", "INQR_IP_ADDR")
+                cpbcOrdpOrdRcitDvsnCd = item.text("cpbc_ordp_ord_rcit_dvsn_cd", "CPBC_ORDP_ORD_RCIT_DVSN_CD")
+                cpbcOrdpInfmMthdDvsnCd = item.text(
+                    "cpbc_ordp_infm_mthd_dvsn_cd",
+                    "CPBC_ORDP_INFM_MTHD_DVSN_CD",
+                )
+                infmTmd = item.text("infm_tmd", "INFM_TMD")
+                ctacTlno = item.text("ctac_tlno", "CTAC_TLNO")
+                prdtTypeCd = item.text("prdt_type_cd", "PRDT_TYPE_CD")
+                excgDvsnCd = item.text("excg_dvsn_cd", "EXCG_DVSN_CD")
+                cpbcOrdpMtrlDvsnCd = item.text("cpbc_ordp_mtrl_dvsn_cd", "CPBC_ORDP_MTRL_DVSN_CD")
+                ordOrgno = item.text("ord_orgno", "ORD_ORGNO")
+                rsvnOrdEndDt = item.text("rsvn_ord_end_dt", "RSVN_ORD_END_DT")
+            }
         }
 
-        // output2 객체 처리
-        val output2Object = this@toDailyExecutionOrdersResponse.get("output2")
+        val output2Object = this@toDailyExecutionOrdersResponse.objectNode("output2", "OUTPUT2")
         output2 = dailyExecutionOrdersOutput2 {
-            totOrdQty = output2Object.get("tot_ord_qty").asText()
-            totCcldQty = output2Object.get("tot_ccld_qty").asText()
-            totCcldAmt = output2Object.get("tot_ccld_amt").asText()
-            prsmTlexSmtl = output2Object.get("prsm_tlex_smtl").asText()
-            pchsAvgPric = output2Object.get("pchs_avg_pric").asText()
+            totOrdQty = output2Object?.text("tot_ord_qty", "TOT_ORD_QTY").orEmpty()
+            totCcldQty = output2Object?.text("tot_ccld_qty", "TOT_CCLD_QTY").orEmpty()
+            totCcldAmt = output2Object?.text("tot_ccld_amt", "TOT_CCLD_AMT").orEmpty()
+            prsmTlexSmtl = output2Object?.text("prsm_tlex_smtl", "PRSM_TLEX_SMTL").orEmpty()
+            pchsAvgPric = output2Object?.text("pchs_avg_pric", "PCHS_AVG_PRIC").orEmpty()
         }
     }
+}
+
+private fun JsonNode.elements(vararg fieldNames: String): List<JsonNode> {
+    val node = objectNode(*fieldNames) ?: return emptyList()
+    return when {
+        node.isArray -> node.toList()
+        node.isObject -> listOf(node)
+        else -> emptyList()
+    }
+}
+
+private fun JsonNode.objectNode(vararg fieldNames: String): JsonNode? {
+    return fieldNames
+        .asSequence()
+        .map { path(it) }
+        .firstOrNull { !it.isMissingNode && !it.isNull }
 }
 
 data class GetProgramTradeInfoPerIndividualRequest(
