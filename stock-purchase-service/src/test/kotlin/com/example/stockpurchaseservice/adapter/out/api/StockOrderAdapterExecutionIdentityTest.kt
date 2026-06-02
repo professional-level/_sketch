@@ -51,6 +51,7 @@ class StockOrderAdapterExecutionIdentityTest {
 
         assertEquals("OVERSEAS_US:fill-1", executions.single().externalExecutionId)
         assertEquals(StockOrderMarket.OVERSEAS_US, gateway.historyQueries.single().market)
+        assertEquals("", gateway.historyQueries.single().symbol)
     }
 
     @Test

@@ -55,7 +55,7 @@ internal class OverseasStockOrderAdapter(
         return brokerGateway.findOrderHistory(
             BrokerOrderHistoryQuery(
                 market = StockOrderMarket.OVERSEAS_US,
-                symbol = "%",
+                symbol = "",
                 exchange = defaultExchange,
                 from = query.from,
                 to = query.to,
