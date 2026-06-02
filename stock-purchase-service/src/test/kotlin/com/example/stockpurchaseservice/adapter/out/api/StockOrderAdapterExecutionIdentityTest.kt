@@ -96,7 +96,50 @@ class StockOrderAdapterExecutionIdentityTest {
         assertEquals("DOMESTIC:broker-1:1:PURCHASE", status.externalExecutionId)
     }
 
-    private fun historyItem(externalExecutionId: String?): BrokerOrderHistoryItem {
+    @Test
+    fun `status lookup recovers unknown submission from unambiguous row without side`() {
+        val gateway = FakeBrokerGateway(
+            listOf(
+                historyItem(
+                    externalExecutionId = null,
+                    side = null,
+                    orderedQuantity = 3,
+                    orderedPrice = 112.0,
+                    cumulativeFilledQuantity = 0,
+                    remainingQuantity = 3,
+                ),
+            ),
+        )
+        val adapter = OverseasStockOrderAdapter(gateway, isMockOrder = true)
+
+        val status = adapter.findOrderSubmissionStatus(
+            BrokerOrderStatusQuery(
+                orderIntentId = UUID.randomUUID(),
+                internalOrderId = UUID.randomUUID(),
+                externalOrderId = null,
+                symbol = "TQQQ",
+                side = OrderIntentSide.BUY,
+                orderedQuantity = 3,
+                submittedPrice = 112.0,
+                market = StockOrderMarket.OVERSEAS_US,
+                submittedAt = ZonedDateTime.parse("2026-06-02T09:00:00+09:00"),
+            ),
+        )
+
+        assertEquals(BrokerOrderStatus.SUBMITTED, status.status)
+        assertEquals("broker-1", status.externalOrderId)
+        assertEquals(3L, status.orderedQuantity)
+        assertEquals(112.0, status.orderedPrice)
+    }
+
+    private fun historyItem(
+        externalExecutionId: String?,
+        side: OrderIntentSide? = OrderIntentSide.BUY,
+        orderedQuantity: Long = 1,
+        orderedPrice: Double? = 100.0,
+        cumulativeFilledQuantity: Long = 1,
+        remainingQuantity: Long = 0,
+    ): BrokerOrderHistoryItem {
         return BrokerOrderHistoryItem(
             externalOrderId = "broker-1",
             externalExecutionId = externalExecutionId,
@@ -104,14 +147,14 @@ class StockOrderAdapterExecutionIdentityTest {
             symbol = "TQQQ",
             stockName = "TQQQ",
             orderedAt = ZonedDateTime.parse("2026-06-02T09:00:00+09:00"),
-            orderedQuantity = 1,
-            orderedPrice = 100.0,
-            cumulativeFilledQuantity = 1,
-            remainingQuantity = 0,
+            orderedQuantity = orderedQuantity,
+            orderedPrice = orderedPrice,
+            cumulativeFilledQuantity = cumulativeFilledQuantity,
+            remainingQuantity = remainingQuantity,
             rejectedQuantity = 0,
             cancelledQuantity = 0,
             cancelled = false,
-            side = OrderIntentSide.BUY,
+            side = side,
             averageExecutionPrice = 100.0,
         )
     }
