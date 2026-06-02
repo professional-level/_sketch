@@ -177,24 +177,25 @@ class OpenApiControllerMappingTest {
     }
 
     @Test
-    fun `maps single object daily execution response with uppercase aliases and missing summary`() {
+    fun `maps single object daily execution response with row identity aliases and missing summary`() {
         val response = ParseJsonResponse.parseJsonString(
             """
             {
               "rt_cd": "0",
               "msg_cd": "MCA00000",
               "msg_1": "ok",
-              "CTX_AREA_FK100": "",
-              "CTX_AREA_NK100": "",
+              "ctxAreaFk100": "FK_CAMEL",
+              "ctxAreaNk100": "NK_CAMEL",
               "OUTPUT1": {
                 "ORD_DT": "20260602",
-                "ORD_GNO_BRNO": "00002",
-                "ODNO": "upper-order",
+                "KRX_FWDG_ORD_ORGNO": "00002",
+                "ORDER_NO": "upper-order",
+                "ORGN_ODNO": "original-order",
                 "SLL_BUY_DVSN_CD": "01",
                 "PDNO": "005930",
                 "PRDT_NAME": "Samsung Electronics",
                 "ORD_QTY": "3",
-                "ORD_TMD": "100000",
+                "THCO_ORD_TMD": "100000",
                 "TOT_CCLD_QTY": "0",
                 "CNCL_YN": "Y",
                 "CNCL_CFRM_QTY": "3",
@@ -206,11 +207,15 @@ class OpenApiControllerMappingTest {
         ).toDailyExecutionOrdersResponse()
 
         assertEquals("ok", response.msg1)
+        assertEquals("FK_CAMEL", response.ctxAreaFk100)
+        assertEquals("NK_CAMEL", response.ctxAreaNk100)
         with(response.output1List.single()) {
             assertEquals("upper-order", odno)
+            assertEquals("original-order", orgnOdno)
             assertEquals("00002", ordGnoBrno)
             assertEquals("01", sllBuyDvsnCd)
             assertEquals("3", ordQty)
+            assertEquals("100000", ordTmd)
             assertEquals("Y", cnclYn)
             assertEquals("3", cnclCfrmQty)
             assertEquals("0", rmnQty)

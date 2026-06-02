@@ -350,8 +350,8 @@ private fun OpenApiResponse.toGetProgramTradeInfoPerIndividual(): ProgramTradeVo
 }
 internal fun OpenApiResponse.toDailyExecutionOrdersResponse(): DailyExecutionOrdersResponse {
     return dailyExecutionOrdersResponse {
-        ctxAreaFk100 = this@toDailyExecutionOrdersResponse.text("ctx_area_fk100", "CTX_AREA_FK100")
-        ctxAreaNk100 = this@toDailyExecutionOrdersResponse.text("ctx_area_nk100", "CTX_AREA_NK100")
+        ctxAreaFk100 = this@toDailyExecutionOrdersResponse.text("ctx_area_fk100", "ctxAreaFk100", "CTX_AREA_FK100")
+        ctxAreaNk100 = this@toDailyExecutionOrdersResponse.text("ctx_area_nk100", "ctxAreaNk100", "CTX_AREA_NK100")
         rtCd = this@toDailyExecutionOrdersResponse.text("rt_cd", "rtCd", "RT_CD")
         msgCd = this@toDailyExecutionOrdersResponse.text("msg_cd", "msgCd", "MSG_CD")
         msg1 = this@toDailyExecutionOrdersResponse.text("msg1", "msg_1", "MSG1")
@@ -359,9 +359,15 @@ internal fun OpenApiResponse.toDailyExecutionOrdersResponse(): DailyExecutionOrd
         this@toDailyExecutionOrdersResponse.elements("output1", "OUTPUT1").forEach { item ->
             output1 += dailyExecutionOrdersOutput1 {
                 ordDt = item.text("ord_dt", "ORD_DT")
-                ordGnoBrno = item.text("ord_gno_brno", "ORD_GNO_BRNO")
-                odno = item.text("odno", "ODNO")
-                orgnOdno = item.text("orgn_odno", "ORGN_ODNO")
+                ordGnoBrno = item.text(
+                    "ord_gno_brno",
+                    "ORD_GNO_BRNO",
+                    "krx_fwdg_ord_orgno",
+                    "KRX_FWDG_ORD_ORGNO",
+                    "krxFwdgOrdOrgno",
+                )
+                odno = item.text("odno", "ODNO", "ord_no", "ORD_NO", "order_no", "ORDER_NO")
+                orgnOdno = item.text("orgn_odno", "ORGN_ODNO", "orgnOdno")
                 ordDvsnName = item.text("ord_dvsn_name", "ORD_DVSN_NAME")
                 sllBuyDvsnCd = item.text("sll_buy_dvsn_cd", "SLL_BUY_DVSN_CD")
                 sllBuyDvsnCdName = item.text("sll_buy_dvsn_cd_name", "SLL_BUY_DVSN_CD_NAME")
@@ -369,7 +375,7 @@ internal fun OpenApiResponse.toDailyExecutionOrdersResponse(): DailyExecutionOrd
                 prdtName = item.text("prdt_name", "PRDT_NAME")
                 ordQty = item.text("ord_qty", "ORD_QTY")
                 ordUnpr = item.text("ord_unpr", "ORD_UNPR")
-                ordTmd = item.text("ord_tmd", "ORD_TMD")
+                ordTmd = item.text("ord_tmd", "ORD_TMD", "thco_ord_tmd", "THCO_ORD_TMD", "ordTmd")
                 totCcldQty = item.text("tot_ccld_qty", "TOT_CCLD_QTY")
                 avgPrvs = item.text("avg_prvs", "AVG_PRVS")
                 cnclYn = item.text("cncl_yn", "CNCL_YN")
