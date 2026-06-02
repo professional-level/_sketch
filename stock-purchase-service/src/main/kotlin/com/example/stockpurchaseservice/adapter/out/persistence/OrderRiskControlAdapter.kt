@@ -16,6 +16,7 @@ import com.example.stockpurchaseservice.application.port.out.MarketServicePort
 import com.example.stockpurchaseservice.application.port.out.StockOrderMarket
 import com.example.stockpurchaseservice.config.risk.OrderRiskProperties
 import org.springframework.beans.factory.annotation.Value
+import java.time.ZoneId
 import java.time.ZonedDateTime
 
 @PersistenceAdapter
@@ -111,7 +112,7 @@ internal class OrderRiskControlAdapter(
         val limit = properties.maxDailyOrderCount ?: return null
         if (limit <= 0) return null
 
-        val window = command.createdAt.dayWindow()
+        val window = command.marketDayWindow()
         val currentCount = orderRiskSubmissionReader.countBrokerSubmittedBetween(window.first, window.second)
         return if (currentCount >= limit) {
             "daily broker order count $currentCount reached limit $limit"
@@ -212,7 +213,7 @@ internal class OrderRiskControlAdapter(
     private suspend fun duplicateOrderReason(command: OrderRiskAssessmentCommand): String? {
         if (!properties.duplicateOrderKillSwitchEnabled) return null
 
-        val window = command.createdAt.dayWindow()
+        val window = command.marketDayWindow()
         val exists = orderRiskSubmissionReader.existsActiveDuplicate(
             strategyExecutionId = command.strategyExecutionId,
             symbol = command.symbol,
@@ -380,9 +381,21 @@ internal class OrderRiskControlAdapter(
         return if (isMock) OrderTradingEnvironment.MOCK else OrderTradingEnvironment.LIVE
     }
 
-    private fun ZonedDateTime.dayWindow(): Pair<ZonedDateTime, ZonedDateTime> {
-        val start = toLocalDate().atStartOfDay(zone)
+    private fun OrderRiskAssessmentCommand.marketDayWindow(): Pair<ZonedDateTime, ZonedDateTime> {
+        val zone = market.tradingWindow().zoneId.toZoneIdOrNull() ?: createdAt.zone
+        val start = createdAt.withZoneSameInstant(zone).toLocalDate().atStartOfDay(zone)
         return start to start.plusDays(1)
+    }
+
+    private fun StockOrderMarket.tradingWindow(): OrderRiskProperties.MarketTradingHours {
+        return when (this) {
+            StockOrderMarket.DOMESTIC -> properties.tradingHours.domestic
+            StockOrderMarket.OVERSEAS_US -> properties.tradingHours.overseasUs
+        }
+    }
+
+    private fun String.toZoneIdOrNull(): ZoneId? {
+        return runCatching { ZoneId.of(trim()) }.getOrNull()
     }
 
     private fun OrderIntentSide.toEntity(): OrderIntentSubmissionSide {

@@ -247,6 +247,47 @@ class OrderRiskControlAdapterTest {
     }
 
     @Test
+    fun `counts daily orders using market trading day window`() = runBlocking {
+        val properties = OrderRiskProperties().apply {
+            tradingHours.enabled = false
+            maxDailyOrderCount = 10
+        }
+        val reader = FakeOrderRiskSubmissionReader()
+
+        val result = adapter(properties, reader).assess(
+            command(createdAt = ZonedDateTime.parse("2026-06-02T08:00:00+09:00[Asia/Seoul]")),
+        )
+
+        assertTrue(result.accepted)
+        val (from, to) = reader.countBrokerSubmittedWindows.single()
+        assertEquals(ZonedDateTime.parse("2026-06-01T00:00:00-04:00[America/New_York]"), from)
+        assertEquals(ZonedDateTime.parse("2026-06-02T00:00:00-04:00[America/New_York]"), to)
+    }
+
+    @Test
+    fun `checks duplicate orders using market trading day window`() = runBlocking {
+        val properties = OrderRiskProperties().apply {
+            tradingHours.enabled = false
+            duplicateOrderKillSwitchEnabled = true
+        }
+        val reader = FakeOrderRiskSubmissionReader(duplicateExists = true)
+
+        val result = adapter(
+            properties = properties,
+            reader = reader,
+            disableDuplicateOrderKillSwitch = false,
+        ).assess(
+            command(createdAt = ZonedDateTime.parse("2026-06-02T08:00:00+09:00[Asia/Seoul]")),
+        )
+
+        assertFalse(result.accepted)
+        assertContains(result.reason ?: "", "duplicate active order blocked")
+        val (from, to) = reader.activeDuplicateWindows.single()
+        assertEquals(ZonedDateTime.parse("2026-06-01T00:00:00-04:00[America/New_York]"), from)
+        assertEquals(ZonedDateTime.parse("2026-06-02T00:00:00-04:00[America/New_York]"), to)
+    }
+
+    @Test
     fun `converts domestic pending buy notional to risk base currency`() = runBlocking {
         val properties = OrderRiskProperties().apply {
             tradingHours.enabled = false
@@ -686,8 +727,11 @@ class OrderRiskControlAdapterTest {
         marketService: MarketServicePort = FakeMarketServicePort(),
         domesticMockOrder: Boolean = true,
         overseasMockOrder: Boolean = true,
+        disableDuplicateOrderKillSwitch: Boolean = true,
     ): OrderRiskControlAdapter {
-        properties.duplicateOrderKillSwitchEnabled = false
+        if (disableDuplicateOrderKillSwitch) {
+            properties.duplicateOrderKillSwitchEnabled = false
+        }
         return OrderRiskControlAdapter(
             orderRiskSubmissionReader = reader,
             marketServicePort = marketService,
@@ -730,14 +774,21 @@ class OrderRiskControlAdapterTest {
     private class FakeOrderRiskSubmissionReader(
         private val activeBuyNotional: Double = 0.0,
         private val activeSellQuantity: Long = 0,
+        private val brokerSubmittedCount: Long = 0,
+        private val duplicateExists: Boolean = false,
     ) : OrderRiskSubmissionReader {
         val activeBuyNotionalMarkets: MutableList<OrderIntentSubmissionMarket> = mutableListOf()
         val activeSellQuantityRequests: MutableList<Pair<String, OrderIntentSubmissionMarket>> = mutableListOf()
+        val countBrokerSubmittedWindows: MutableList<Pair<ZonedDateTime, ZonedDateTime>> = mutableListOf()
+        val activeDuplicateWindows: MutableList<Pair<ZonedDateTime, ZonedDateTime>> = mutableListOf()
 
         override suspend fun countBrokerSubmittedBetween(
             from: ZonedDateTime,
             to: ZonedDateTime,
-        ): Long = 0
+        ): Long {
+            countBrokerSubmittedWindows += Pair(from, to)
+            return brokerSubmittedCount
+        }
 
         override suspend fun existsActiveDuplicate(
             strategyExecutionId: String,
@@ -746,7 +797,10 @@ class OrderRiskControlAdapterTest {
             orderTag: String,
             from: ZonedDateTime,
             to: ZonedDateTime,
-        ): Boolean = false
+        ): Boolean {
+            activeDuplicateWindows += Pair(from, to)
+            return duplicateExists
+        }
 
         override suspend fun sumActiveBuyNotional(market: OrderIntentSubmissionMarket): Double {
             activeBuyNotionalMarkets += market
