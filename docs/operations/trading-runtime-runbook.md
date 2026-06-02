@@ -442,6 +442,18 @@ Restart order:
 7. Start `stock-search-service` last so new discovery events do not arrive before execution/order services are ready.
 8. Check logs for startup safety violations, outbox publish failures, `SUBMISSION_UNKNOWN` alerts, cancellation recovery alerts, and reconciliation failures.
 
+API checks after restart:
+
+```text
+GET /actuator/health
+GET /operations/trading/status
+GET /operations/trading/account-snapshot?market=OVERSEAS_US&exchange=NASD&currency=USD
+GET /strategy-executions/laor-v4
+GET /strategy-executions/final-price-bating-v1
+```
+
+Confirm `recentPersistentSubmissionUnknownCount`, failed outbox counts, reconciliation cursor `status`/`failureReason`, and unmatched execution counts are stable or decreasing before re-enabling new strategy starts.
+
 Kafka outage recovery:
 
 - Keep outbox rows intact. `PENDING` and retry-eligible `FAILED` rows are republished after Kafka returns.
@@ -458,6 +470,7 @@ Temporal outage recovery:
 - Confirm the Temporal namespace, task queue, and active-execution schedule are reachable before manually triggering missed work.
 - Check the strategy state APIs for the intended execution id before starting a replacement run. Deterministic idempotency keys protect known paths, but manual duplicate starts can still confuse operator analysis.
 - If a daily schedule was missed, run one controlled catch-up and then verify resulting order-intent outbox counts before re-enabling discovery.
+- Do not run multiple catch-ups for the same trading date without checking the strategy execution id and order intent idempotency keys already present in the strategy state API and outbox table.
 
 Broker wrapper or KIS outage recovery:
 
@@ -474,6 +487,7 @@ SELECT COUNT(*) FROM unmatched_execution;
 Manual recovery checks:
 
 - Re-run reconciliation from the durable cursor if broker executions may have been missed.
+- Compare broker account snapshots with strategy state APIs before manually creating replacement orders; cash, holding quantity, and average price must agree with the broker-backed account view or have an explicit operator note.
 - When `SUBMISSION_UNKNOWN` or `CANCEL_PENDING` rows recover to broker fill statuses, or to `CANCELLED` with cumulative fill quantity, verify both `order_execution_outbox_event` and `execution_fill` before manually adjusting strategy state.
 - Keep `akra.order.status-lookup.backfill-days`, `akra.order.status-lookup.forward-days`, and `akra.order.execution-reconciliation.backfill-days` aligned with KIS order-history retention and the operational delay expected before unknown/cancel-pending recovery or broker execution reconciliation runs.
 - Inspect unmatched executions before manually adjusting strategy state.
