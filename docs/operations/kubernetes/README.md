@@ -17,6 +17,17 @@ Before applying `trading-runtime.yaml`:
    ConfigMaps. KIS credentials should be mounted through the `kis-broker-secrets`
    Secret and read by the wrapper through `*_FILE` environment variables.
 
+`external-secrets.yaml` is an optional External Secrets Operator template for a
+Vault-backed deployment. It syncs the checked-in Secret names expected by
+`trading-runtime.yaml`:
+
+- `kis-broker-secrets`
+- `trading-database-secrets`
+
+The template uses `external-secrets.io/v1` `SecretStore` and `ExternalSecret`
+resources. Confirm the installed External Secrets Operator CRD version in the
+target cluster before applying it.
+
 Images are built by `.github/workflows/container-images.yml` for:
 
 - `ghcr.io/professional-level/sketch-kis-wrapper`
@@ -33,24 +44,28 @@ To validate the checked-in template without applying it:
 ```powershell
 .\deploy-trading-runtime.ps1 `
   -ImageTag 0123456789abcdef `
+  -SecretManifestPath .\external-secrets.yaml `
   -DryRun `
   -AllowTemplatePlaceholders
 ```
 
 For an actual rollout, first create a prepared manifest copy where every
 `REPLACE_...` value has been replaced by the deployment secret manager or
-cluster-specific values. Then run:
+cluster-specific values. If using External Secrets Operator, prepare a matching
+`external-secrets.prepared.yaml` and run:
 
 ```powershell
 .\deploy-trading-runtime.ps1 `
   -ImageTag <git-sha> `
+  -SecretManifestPath .\external-secrets.prepared.yaml `
   -ManifestPath .\trading-runtime.prepared.yaml
 ```
 
 The helper refuses unresolved placeholders during real rollout. It renders the
-image tag, applies the manifest, updates the SQL migration ConfigMap, recreates
-and unsuspends the migration Job, waits for it to complete, then restarts and
-waits for the service Deployments.
+image tag, applies the optional secret manifest first, applies the runtime
+manifest, updates the SQL migration ConfigMap, recreates and unsuspends the
+migration Job, waits for it to complete, then restarts and waits for the service
+Deployments.
 
 For a local dry build, stage the boot jar and build with the matching
 Dockerfile:

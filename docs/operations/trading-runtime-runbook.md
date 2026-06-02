@@ -14,6 +14,7 @@ The root sketch app reads KIS credentials from runtime-injected Spring `Environm
 - Gradle excludes `application-secret.properties` from processed resources for the root app and subprojects; keep this exclusion in place if build scripts are refactored.
 - For a real deployment, provide these values through environment variables, Kubernetes/Vault-injected properties, or another runtime secret source instead of packaging them in the application jar.
 - `docs/operations/kubernetes/trading-runtime.yaml` provides a Kubernetes-style template that mounts KIS credentials as Secret files and injects production profile configuration through mounted ConfigMaps.
+- `docs/operations/kubernetes/external-secrets.yaml` provides an External Secrets Operator template that can sync the expected Kubernetes Secret names from Vault without committing secret values.
 
 Required keys:
 
@@ -347,6 +348,7 @@ These waivers should not be enabled for real capital.
 Before enabling real orders:
 
 - Replace placeholder values in `docs/operations/kubernetes/trading-runtime.yaml` or the equivalent deployment manifest; do not apply the checked-in placeholders to a real cluster.
+- When using Vault, replace placeholder values in `docs/operations/kubernetes/external-secrets.yaml`, confirm the External Secrets Operator CRDs are installed, and wait for `kis-broker-secrets` plus `trading-database-secrets` to become Ready before starting application pods.
 - Build immutable service images with `.github/workflows/container-images.yml` or an equivalent pipeline, then replace `REPLACE_IMAGE_TAG` with the Git SHA tag.
 - Use `docs/operations/kubernetes/deploy-trading-runtime.ps1` or an equivalent rollout pipeline so image tag rendering, SQL migration ConfigMap refresh, migration Job execution, and Deployment rollout checks happen in a fixed order.
 - Set `spring.profiles.active=prod` or another configured production profile.
@@ -649,6 +651,19 @@ GET /strategy-executions/final-price-bating-v1
 ```
 
 Confirm `recentPersistentSubmissionUnknownCount`, failed outbox counts, reconciliation cursor `status`/`failureReason`, unmatched execution counts, broker account snapshots, and active strategy state summaries are stable or improving before re-enabling new strategy starts.
+
+Secret sync checks after restart:
+
+```powershell
+kubectl -n akra-trading get secretstore akra-vault-secret-store
+kubectl -n akra-trading get externalsecret kis-broker-secrets trading-database-secrets
+kubectl -n akra-trading get secret kis-broker-secrets trading-database-secrets
+```
+
+Do not start or restart application Deployments until the target Kubernetes
+Secrets exist. If Vault is unavailable during a restart, keep existing Secrets
+in place, avoid rotating KIS or database values, and resume rollout only after
+the ExternalSecret Ready condition returns.
 
 Kafka outage recovery:
 

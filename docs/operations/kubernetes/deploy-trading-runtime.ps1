@@ -8,6 +8,8 @@ param(
 
     [string] $ManifestPath = (Join-Path $PSScriptRoot "trading-runtime.yaml"),
 
+    [string] $SecretManifestPath,
+
     [string] $SqlDirectory = (Join-Path (Split-Path $PSScriptRoot -Parent) "sql"),
 
     [int] $MigrationTimeoutSeconds = 300,
@@ -62,31 +64,53 @@ function Invoke-KubectlPipe {
     }
 }
 
-Require-Command "kubectl"
+function New-RenderedManifest {
+    param(
+        [string] $Path,
+        [string] $RenderedImageTag
+    )
 
-if (-not (Test-Path -LiteralPath $ManifestPath)) {
-    throw "Manifest was not found: $ManifestPath"
+    if (-not (Test-Path -LiteralPath $Path)) {
+        throw "Manifest was not found: $Path"
+    }
+
+    $content = Get-Content -LiteralPath $Path -Raw
+    $rendered = $content.Replace("REPLACE_IMAGE_TAG", $RenderedImageTag)
+    $remainingPlaceholders = [regex]::Matches($rendered, "REPLACE_[A-Z0-9_]+") |
+        ForEach-Object { $_.Value } |
+        Sort-Object -Unique
+
+    if ($remainingPlaceholders.Count -gt 0 -and -not ($DryRun -and $AllowTemplatePlaceholders)) {
+        $joined = $remainingPlaceholders -join ", "
+        throw "Manifest still contains deployment placeholders: $joined. Use a prepared manifest with real values, or use -DryRun -AllowTemplatePlaceholders for template validation only."
+    }
+
+    $tempPath = Join-Path ([System.IO.Path]::GetTempPath()) ("akra-trading-runtime-{0}.yaml" -f [Guid]::NewGuid())
+    Set-Content -LiteralPath $tempPath -Value $rendered -Encoding UTF8
+    return $tempPath
 }
+
+Require-Command "kubectl"
 
 if (-not $SkipMigrations -and -not (Test-Path -LiteralPath $SqlDirectory)) {
     throw "SQL migration directory was not found: $SqlDirectory"
 }
 
-$template = Get-Content -LiteralPath $ManifestPath -Raw
-$rendered = $template.Replace("REPLACE_IMAGE_TAG", $ImageTag)
-$remainingPlaceholders = [regex]::Matches($rendered, "REPLACE_[A-Z0-9_]+") |
-    ForEach-Object { $_.Value } |
-    Sort-Object -Unique
-
-if ($remainingPlaceholders.Count -gt 0 -and -not ($DryRun -and $AllowTemplatePlaceholders)) {
-    $joined = $remainingPlaceholders -join ", "
-    throw "Manifest still contains deployment placeholders: $joined. Use a prepared manifest with real values, or use -DryRun -AllowTemplatePlaceholders for template validation only."
-}
-
-$tempManifest = Join-Path ([System.IO.Path]::GetTempPath()) ("akra-trading-runtime-{0}.yaml" -f [Guid]::NewGuid())
+$tempManifests = @()
 
 try {
-    Set-Content -LiteralPath $tempManifest -Value $rendered -Encoding UTF8
+    if (-not [string]::IsNullOrWhiteSpace($SecretManifestPath)) {
+        $tempSecretManifest = New-RenderedManifest $SecretManifestPath $ImageTag
+        $tempManifests += $tempSecretManifest
+        $secretApplyArgs = @("apply", "-f", $tempSecretManifest)
+        if ($DryRun) {
+            $secretApplyArgs += "--dry-run=client"
+        }
+        Invoke-Kubectl @secretApplyArgs
+    }
+
+    $tempManifest = New-RenderedManifest $ManifestPath $ImageTag
+    $tempManifests += $tempManifest
 
     $applyArgs = @("apply", "-f", $tempManifest)
     if ($DryRun) {
@@ -143,5 +167,7 @@ try {
     }
 }
 finally {
-    Remove-Item -LiteralPath $tempManifest -Force -ErrorAction SilentlyContinue
+    foreach ($manifest in $tempManifests) {
+        Remove-Item -LiteralPath $manifest -Force -ErrorAction SilentlyContinue
+    }
 }
