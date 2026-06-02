@@ -310,7 +310,7 @@ Daily order count and duplicate active-order checks are scoped by market. Legacy
 
 ## Observability Checks
 
-`stock-purchase-service` exposes Spring Boot Actuator endpoints for health and metrics:
+`stock-purchase-service` and `strategy-execution-service` expose Spring Boot Actuator endpoints for health and metrics:
 
 ```text
 GET /actuator/health
@@ -318,6 +318,8 @@ GET /actuator/metrics
 GET /actuator/metrics/stock.purchase.operational.alerts
 GET /actuator/prometheus
 ```
+
+`strategy-execution-service` uses the same health, metrics, and Prometheus endpoints with `management.metrics.tags.application=strategy-execution-service`, so Temporal scheduling, Kafka outbox publisher, and HTTP client metrics can be scraped under a stable service tag.
 
 Operational alert counters are emitted through Micrometer as `stock.purchase.operational.alerts` with low-cardinality tags:
 
