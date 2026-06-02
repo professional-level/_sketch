@@ -3,6 +3,7 @@ package com.example.sketch.openapi
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.ApplicationArguments
 import org.springframework.boot.ApplicationRunner
+import org.springframework.core.env.ConfigurableEnvironment
 import org.springframework.core.env.Environment
 import org.springframework.stereotype.Component
 
@@ -16,6 +17,8 @@ class KisTokenRuntimeSafetyValidator(
     private val productionProfiles: String,
     @Value("\${akra.runtime.safety.allow-file-token-persistence-in-production:false}")
     private val allowFileTokenPersistenceInProduction: Boolean,
+    @Value("\${akra.runtime.safety.allow-application-secret-property-source-in-production:false}")
+    private val allowApplicationSecretPropertySourceInProduction: Boolean,
 ) : ApplicationRunner {
 
     override fun run(args: ApplicationArguments) {
@@ -28,6 +31,8 @@ class KisTokenRuntimeSafetyValidator(
                 tokenPersistenceType = properties.persistence.type,
                 hibernateDdlAuto = environment.getProperty("spring.jpa.hibernate.ddl-auto"),
                 allowFileTokenPersistenceInProduction = allowFileTokenPersistenceInProduction,
+                applicationSecretPropertySources = environment.applicationSecretPropertySourceNames(),
+                allowApplicationSecretPropertySourceInProduction = allowApplicationSecretPropertySourceInProduction,
             ),
         )
 
@@ -41,6 +46,16 @@ class KisTokenRuntimeSafetyValidator(
             )
         }
     }
+
+    private fun Environment.applicationSecretPropertySourceNames(): List<String> {
+        return (this as? ConfigurableEnvironment)
+            ?.propertySources
+            ?.asSequence()
+            ?.map { it.name }
+            ?.filter { it.contains("application-secret.properties", ignoreCase = true) }
+            ?.toList()
+            ?: emptyList()
+    }
 }
 
 object KisTokenRuntimeSafetyRules {
@@ -52,6 +67,8 @@ object KisTokenRuntimeSafetyRules {
         val tokenPersistenceType: String,
         val hibernateDdlAuto: String?,
         val allowFileTokenPersistenceInProduction: Boolean,
+        val applicationSecretPropertySources: List<String>,
+        val allowApplicationSecretPropertySourceInProduction: Boolean,
     )
 
     fun validate(input: Input): List<String> {
@@ -75,6 +92,16 @@ object KisTokenRuntimeSafetyRules {
         if (!isSafeHibernateDdlAuto(input.hibernateDdlAuto)) {
             violations += "prod/live profile cannot use Hibernate automatic DDL " +
                 "(spring.jpa.hibernate.ddl-auto=${input.hibernateDdlAuto}); apply migrations explicitly and use none or validate"
+        }
+
+        if (
+            input.applicationSecretPropertySources.isNotEmpty() &&
+            !input.allowApplicationSecretPropertySourceInProduction
+        ) {
+            violations +=
+                "prod/live profile cannot load local application-secret.properties property sources " +
+                    "(${input.applicationSecretPropertySources.joinToString()}); provide KIS secrets through " +
+                    "environment variables, *_FILE secret mounts, or a managed secret source"
         }
 
         return violations
