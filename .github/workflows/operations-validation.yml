@@ -1,0 +1,33 @@
+name: Operations Validation
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - codex/trading-service-boundaries
+    paths:
+      - ".github/workflows/operations-validation.yml"
+      - "docs/operations/**"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/operations-validation.yml"
+      - "docs/operations/**"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate operations artifacts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate manifests, scripts, and placeholders
+        shell: pwsh
+        run: ./docs/operations/validate-operations-artifacts.ps1

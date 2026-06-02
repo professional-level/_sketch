@@ -58,6 +58,13 @@ The workflow tags each image with the Git SHA and `latest` on push or manual
 dispatch. Prefer the immutable Git SHA tag when replacing `REPLACE_IMAGE_TAG` in
 the template.
 
+`.github/workflows/operations-validation.yml` runs
+`docs/operations/validate-operations-artifacts.ps1` when operations manifests or
+scripts change. It checks PowerShell syntax, Vault dry-run rendering, required
+placeholder replacement coverage, Kafka topic bootstrap coverage, and the
+expected runtime Secret/image references before the branch can rely on the
+checked-in templates.
+
 To validate the checked-in template without applying it:
 
 ```powershell

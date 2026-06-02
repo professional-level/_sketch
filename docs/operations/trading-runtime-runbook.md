@@ -351,6 +351,7 @@ Before enabling real orders:
 - Replace placeholder values in `docs/operations/kubernetes/trading-runtime.yaml` or the equivalent deployment manifest; do not apply the checked-in placeholders to a real cluster.
 - When using Vault, prepare the read-only policy and Kubernetes auth role with `docs/operations/vault/bootstrap-akra-vault.ps1`, replace placeholder values in `docs/operations/kubernetes/external-secrets.yaml`, confirm the External Secrets Operator CRDs are installed, and wait for `kis-broker-secrets` plus `trading-database-secrets` to become Ready before starting application pods.
 - Build immutable service images with `.github/workflows/container-images.yml` or an equivalent pipeline, then replace `REPLACE_IMAGE_TAG` with the Git SHA tag.
+- Confirm `.github/workflows/operations-validation.yml` passed for the exact commit being deployed; it validates operations manifest placeholder rendering, script syntax, Vault dry-run rendering, Kafka topic bootstrap coverage, and runtime Secret/image references.
 - Use `docs/operations/kubernetes/deploy-trading-runtime.ps1` or an equivalent rollout pipeline so image tag rendering, SQL migration ConfigMap refresh, migration Job execution, and Deployment rollout checks happen in a fixed order.
 - Set `spring.profiles.active=prod` or another configured production profile.
 - Apply required DB migrations explicitly and set `spring.jpa.hibernate.ddl-auto=validate` or `none`; do not use `update` in production.
