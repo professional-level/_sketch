@@ -21,6 +21,7 @@ import com.example.stockpurchaseservice.application.port.out.ExecutionTypeDto
 import com.example.stockpurchaseservice.application.port.out.MarketServicePort
 import com.example.stockpurchaseservice.application.port.out.OrderExecutionEventPort
 import com.example.stockpurchaseservice.application.port.out.OrderFilledMessage
+import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionDto
 import com.example.stockpurchaseservice.application.port.out.OrderPartiallyFilledMessage
 import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionPort
 import com.example.stockpurchaseservice.application.port.out.OperationalAlertPort
@@ -117,16 +118,21 @@ class ReconcileExecutionsService(
         brokerExecutionList.forEach { brokerExecution ->
             val execution = brokerExecution.toDomainForReconciliation() ?: return@forEach
             executedStockList += execution
-            if (executionFillPort.saveIfNew(ExecutionFillDto.from(ExecutionFill.from(execution)))) {
-                refinedExecutedStockList += execution
-                val publishOutcome = publishOrderFillEventIfIntentSubmissionExists(execution)
-                if (publishOutcome.unmatchedReason != null) {
+            when (val publishPlan = resolveFillPublishPlan(execution)) {
+                is FillPublishPlan.Unmatched -> {
                     unmatchedExecutionCount += 1
                     recordUnmatchedExecution(
                         execution = execution,
-                        reason = publishOutcome.unmatchedReason,
+                        reason = publishPlan.reason,
                         observedAt = startedAt,
                     )
+                }
+
+                is FillPublishPlan.Publish -> {
+                    if (executionFillPort.saveIfNew(ExecutionFillDto.from(ExecutionFill.from(execution)))) {
+                        refinedExecutedStockList += execution
+                        publishOrderFillEvent(execution, publishPlan)
+                    }
                 }
             }
         }
@@ -162,22 +168,35 @@ class ReconcileExecutionsService(
         }
     }
 
-    private suspend fun publishOrderFillEventIfIntentSubmissionExists(execution: ExecutedStock): FillPublishOutcome {
+    private suspend fun resolveFillPublishPlan(execution: ExecutedStock): FillPublishPlan {
         val submission = orderIntentSubmissionPort.findByExternalOrderId(execution.externalOrderId.value)
-            ?: return FillPublishOutcome.MISSING_SUBMISSION
+            ?: return FillPublishPlan.Unmatched("NO_ORDER_INTENT_SUBMISSION")
         val filledPrice = execution.averageExecutionPrice ?: submission.submittedPrice
-            ?: return FillPublishOutcome.MISSING_SUBMITTED_PRICE
-        if (isFullyFilled(execution.externalOrderId.value, submission.quantity)) {
+            ?: return FillPublishPlan.Unmatched("MISSING_SUBMITTED_PRICE")
+        val filledQuantityAfterThisExecution =
+            executionFillPort.sumQuantityByExternalOrderId(execution.externalOrderId.value) + execution.quantity
+        return FillPublishPlan.Publish(
+            submission = submission,
+            filledPrice = filledPrice,
+            fullyFilled = filledQuantityAfterThisExecution >= submission.quantity,
+        )
+    }
+
+    private suspend fun publishOrderFillEvent(
+        execution: ExecutedStock,
+        plan: FillPublishPlan.Publish,
+    ) {
+        if (plan.fullyFilled) {
             orderExecutionEventPort.publishFilled(
                 OrderFilledMessage(
                     eventId = execution.toEventId("ORDER_FILLED"),
-                    strategyExecutionId = submission.strategyExecutionId,
-                    orderIntentId = submission.orderIntentId.toString(),
+                    strategyExecutionId = plan.submission.strategyExecutionId,
+                    orderIntentId = plan.submission.orderIntentId.toString(),
                     brokerOrderId = execution.externalOrderId.value,
                     side = execution.type.toOrderIntentSide(),
-                    filledPrice = filledPrice,
+                    filledPrice = plan.filledPrice,
                     filledQuantity = execution.quantity.toLong(),
-                    orderTag = submission.orderTag,
+                    orderTag = plan.submission.orderTag,
                     filledAt = execution.createdAt,
                 ),
             )
@@ -185,18 +204,17 @@ class ReconcileExecutionsService(
             orderExecutionEventPort.publishPartiallyFilled(
                 OrderPartiallyFilledMessage(
                     eventId = execution.toEventId("ORDER_PARTIALLY_FILLED"),
-                    strategyExecutionId = submission.strategyExecutionId,
-                    orderIntentId = submission.orderIntentId.toString(),
+                    strategyExecutionId = plan.submission.strategyExecutionId,
+                    orderIntentId = plan.submission.orderIntentId.toString(),
                     brokerOrderId = execution.externalOrderId.value,
                     side = execution.type.toOrderIntentSide(),
-                    filledPrice = filledPrice,
+                    filledPrice = plan.filledPrice,
                     filledQuantity = execution.quantity.toLong(),
-                    orderTag = submission.orderTag,
+                    orderTag = plan.submission.orderTag,
                     filledAt = execution.createdAt,
                 ),
             )
         }
-        return FillPublishOutcome.PUBLISHED
     }
 
     private suspend fun isFullyFilled(externalOrderId: String, orderQuantity: Long): Boolean {
@@ -251,10 +269,14 @@ class ReconcileExecutionsService(
         )
     }
 
-    private enum class FillPublishOutcome(val unmatchedReason: String?) {
-        PUBLISHED(null),
-        MISSING_SUBMISSION("NO_ORDER_INTENT_SUBMISSION"),
-        MISSING_SUBMITTED_PRICE("MISSING_SUBMITTED_PRICE"),
+    private sealed class FillPublishPlan {
+        data class Publish(
+            val submission: OrderIntentSubmissionDto,
+            val filledPrice: Double,
+            val fullyFilled: Boolean,
+        ) : FillPublishPlan()
+
+        data class Unmatched(val reason: String) : FillPublishPlan()
     }
 
     companion object {
@@ -265,7 +287,9 @@ class ReconcileExecutionsService(
 private const val DEFAULT_RECONCILIATION_BACKFILL_DAYS = 7L
 
 private fun ExecutionReconciliationCursorDto?.toLookupQuery(startedAt: ZonedDateTime): ExecutionLookupQuery {
-    val from = this?.lastObservedExecutionAt ?: startedAt.minusDays(DEFAULT_RECONCILIATION_BACKFILL_DAYS)
+    val from = this?.lastObservedExecutionAt
+        ?.minusDays(DEFAULT_RECONCILIATION_BACKFILL_DAYS)
+        ?: startedAt.minusDays(DEFAULT_RECONCILIATION_BACKFILL_DAYS)
     return ExecutionLookupQuery(from = from, to = startedAt)
 }
 

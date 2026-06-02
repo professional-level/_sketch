@@ -151,11 +151,12 @@ class ReconcileExecutionsServiceTest {
     fun `records reconciliation cursor and unmatched executions`() = runBlocking {
         val reconciliationStatePort = FakeExecutionReconciliationStatePort()
         val alertPort = FakeOperationalAlertPort()
+        val executionFillPort = FakeExecutionFillPort()
         val service = service(
             marketPort = FakeMarketServicePort(
                 executions = listOf(execution(externalExecutionId = "exec-1", quantity = 30)),
             ),
-            executionFillPort = FakeExecutionFillPort(),
+            executionFillPort = executionFillPort,
             submissionPort = FakeOrderIntentSubmissionPort(submissions = emptyList()),
             eventPort = FakeOrderExecutionEventPort(),
             reconciliationStatePort = reconciliationStatePort,
@@ -167,13 +168,44 @@ class ReconcileExecutionsServiceTest {
         assertEquals(listOf("BROKER_EXECUTION_DAILY"), reconciliationStatePort.startedSources)
         assertEquals("exec-1", reconciliationStatePort.completed.single().lastObservedExecutionId)
         assertEquals(1, reconciliationStatePort.completed.single().observedExecutionCount)
-        assertEquals(1, reconciliationStatePort.completed.single().savedFillCount)
+        assertEquals(0, reconciliationStatePort.completed.single().savedFillCount)
         assertEquals(1, reconciliationStatePort.completed.single().unmatchedExecutionCount)
         assertEquals("exec-1", reconciliationStatePort.unmatched.single().externalExecutionId)
         assertEquals("NO_ORDER_INTENT_SUBMISSION", reconciliationStatePort.unmatched.single().reason)
         assertEquals("exec-1", alertPort.unmatchedExecution.single().externalExecutionId)
         assertEquals("NO_ORDER_INTENT_SUBMISSION", alertPort.unmatchedExecution.single().reason)
         assertEquals("BROKER_EXECUTION_DAILY", alertPort.unmatchedExecution.single().source)
+        assertEquals(emptyList(), executionFillPort.savedExternalExecutionIds)
+    }
+
+    @Test
+    fun `unmatched execution can be published after order submission appears`() = runBlocking {
+        val executionFillPort = FakeExecutionFillPort()
+        val execution = execution(externalExecutionId = "exec-1", quantity = 30)
+        val firstStatePort = FakeExecutionReconciliationStatePort()
+        val firstEventPort = FakeOrderExecutionEventPort()
+        service(
+            marketPort = FakeMarketServicePort(executions = listOf(execution)),
+            executionFillPort = executionFillPort,
+            submissionPort = FakeOrderIntentSubmissionPort(submissions = emptyList()),
+            eventPort = firstEventPort,
+            reconciliationStatePort = firstStatePort,
+        ).execute()
+
+        val secondEventPort = FakeOrderExecutionEventPort()
+        service(
+            marketPort = FakeMarketServicePort(executions = listOf(execution)),
+            executionFillPort = executionFillPort,
+            submissionPort = FakeOrderIntentSubmissionPort(
+                submissions = listOf(submission(quantity = 100)),
+            ),
+            eventPort = secondEventPort,
+        ).execute()
+
+        assertEquals(emptyList(), firstEventPort.partiallyFilled)
+        assertEquals("NO_ORDER_INTENT_SUBMISSION", firstStatePort.unmatched.single().reason)
+        assertEquals(30, secondEventPort.partiallyFilled.single().filledQuantity)
+        assertEquals(listOf("exec-1"), executionFillPort.savedExternalExecutionIds)
     }
 
     @Test
@@ -221,7 +253,7 @@ class ReconcileExecutionsServiceTest {
     }
 
     @Test
-    fun `broker execution lookup starts from previous reconciliation cursor`() = runBlocking {
+    fun `broker execution lookup starts with rolling backfill from previous reconciliation cursor`() = runBlocking {
         val previousExecutionAt = ZonedDateTime.parse("2026-06-01T09:00:00+09:00")
         val marketPort = FakeMarketServicePort()
         val service = service(
@@ -241,7 +273,7 @@ class ReconcileExecutionsServiceTest {
         service.execute()
 
         with(marketPort.lookupQueries.single()) {
-            assertEquals(previousExecutionAt, from)
+            assertEquals(previousExecutionAt.minusDays(7), from)
             assertTrue(to >= previousExecutionAt)
         }
     }
@@ -485,6 +517,8 @@ class ReconcileExecutionsServiceTest {
         private val initialQuantitiesByExternalOrderId: Map<String, Long> = emptyMap(),
     ) : ExecutionFillPort {
         private val saved: MutableList<ExecutionFillDto> = mutableListOf()
+        val savedExternalExecutionIds: List<String>
+            get() = saved.map { it.externalExecutionId }
 
         override suspend fun saveIfNew(fill: ExecutionFillDto): Boolean {
             if (fill.externalExecutionId in duplicateExecutionIds) return false

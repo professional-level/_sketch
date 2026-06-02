@@ -531,12 +531,12 @@ broker API 자체가 idempotency key를 지원하지 않는다면, purchase-serv
 - `strategy-execution-service`는 Temporal Schedule로 active strategy daily execution workflow를 등록한다.
 - scheduled workflow는 실행일 기준 `ACTIVE_STRATEGIES_DAILY:yyyy-MM-dd` execution run id를 만들고, 같은 run id를 이미 처리한 active strategy는 다시 실행하지 않는다.
 - `stock-purchase-service`는 체결 reconciliation 시작/성공/실패 상태를 durable cursor로 저장한다.
-- 내부 주문과 매칭되지 않는 broker execution은 `unmatched_execution` 저장소에 보존하고 운영 알림으로 노출한다.
+- 내부 주문과 매칭되지 않는 broker execution은 `unmatched_execution` 저장소에 보존하고 운영 알림으로 노출한다. 이 경우 체결을 `execution_fill`에 확정 저장하지 않으므로, order intent submission이 늦게 복구되면 다음 rolling backfill reconciliation에서 다시 매칭해 fill event를 발행할 수 있다.
 - reconciliation 실패 시 cursor를 completed로 전진시키지 않고 failed 상태와 실패 사유를 기록한다.
 
 현재 남은 것:
 
-- `stock-purchase-service`의 체결 reconciliation은 cursor와 unmatched 저장, KIS wrapper 기반 주문/체결 조회 매핑, cursor 기준 날짜 범위 backfill, KIS 조회 cursor pagination을 갖췄다. KIS wrapper 조회성 호출에는 설정 기반 retry/backoff를 적용했고, wrapper 호출 전 rate-limit와 circuit breaker도 적용한다.
+- `stock-purchase-service`의 체결 reconciliation은 cursor와 unmatched 저장, KIS wrapper 기반 주문/체결 조회 매핑, cursor 기준 rolling 날짜 범위 backfill, KIS 조회 cursor pagination을 갖췄다. 미매칭 체결은 fill로 확정 저장하지 않아 늦게 복구된 order intent submission과 재매칭될 수 있다. KIS wrapper 조회성 호출에는 설정 기반 retry/backoff를 적용했고, wrapper 호출 전 rate-limit와 circuit breaker도 적용한다.
 - legacy direct sell submission은 order intent lifecycle 경로로 통일되었다.
 - `strategy-execution-service`의 `OrderIntentCreated` 발행과 `stock-purchase-service`의 주문/체결 이벤트 발행은 outbox 저장 후 scheduled publisher가 Kafka로 발행한다.
 - stock-purchase-service의 주문/조회 KIS 원문 계약은 `adapter/out/broker`의 broker gateway anti-corruption layer로 격리되었다. 주문 제출 POST는 중복 주문을 피하기 위해 retry하지 않고 transient 실패나 broker order id 누락을 `SUBMISSION_UNKNOWN`으로 보낸다. KIS 주문 응답의 `rt_cd != 0`은 `msg_cd/msg1`을 보존한 broker rejection으로 분리해 `OrderRejected`와 rejected submission으로 확정한다. root wrapper는 KIS 표준 주문 응답 객체의 top-level `rt_cd`, `msg_cd`, `msg1`과 nested `output.ODNO`를 stock-purchase-service용 protobuf로 정규화한다. root wrapper의 국내 주문체결조회 protobuf 변환은 `output1` 배열/단일 객체/누락, `output2` 누락, 대문자 field alias를 허용하고 `ODNO`, `rjct_qty`, `cncl_yn`, `cncl_cfrm_qty`, `tot_ccld_qty`, `rmn_qty` 같은 reconciliation 핵심 필드를 fixture test로 고정한다. 해외 주문체결조회는 KIS `ODNO` 검색 불가 제약 때문에 일자/종목 범위로 조회한 뒤 응답 row의 broker order id를 client-side에서 매칭한다. 해외 주문체결조회와 잔고조회는 top-level `output`/`output1`/`output2`/cursor의 대소문자 alias를 허용한다. 해외 row 매핑은 `ODNO/odno`, `ORD_QTY/ft_ord_qty`, `TOT_CCLD_QTY/ft_ccld_qty`, `RMN_QTY/nccs_qty`, `AVG_PRVS/ft_ccld_unpr3` 같은 wrapper alias를 허용하고, 한글/영문 rejected/cancelled 상태명을 내부 주문 상태로 정규화한다. KIS wrapper 호출에는 local rate-limit와 circuit breaker가 있고, circuit open/rate-limit 초과처럼 broker에 닿지 않은 실패는 broker rejection 이벤트로 발행하지 않는다. KIS 조회 응답의 non-zero business failure는 broker return/message code를 보존하며, `EGW00201` 초당 거래건수 초과는 query retry/backoff 대상으로 분류한다. root wrapper의 KIS token은 real/mock scope별 만료 기반 cache, optional local-file persistence, optional JDBC shared token store, JDBC refresh TTL lock으로 관리한다. 별도 broker wrapper service 배포와 secret manager 연동은 아직 남아 있다.
@@ -593,7 +593,7 @@ stock-search-service
 9. 완료: 라오어 cycle close와 auto restart 정책을 명시적으로 저장한다.
 10. 완료: active strategy state를 persistence adapter로 옮긴다.
 11. 완료: Temporal schedule로 daily execution trigger를 붙인다.
-12. 완료: stock-purchase reconciliation에 durable cursor, unmatched execution 저장, KIS wrapper 기반 주문/체결 조회 매핑, cursor 기준 날짜 범위 backfill, KIS 조회 cursor pagination, 조회성 호출 retry/backoff, wrapper 호출 rate-limit/circuit breaker를 추가한다.
+12. 완료: stock-purchase reconciliation에 durable cursor, unmatched execution 저장, KIS wrapper 기반 주문/체결 조회 매핑, cursor 기준 rolling 날짜 범위 backfill, KIS 조회 cursor pagination, 조회성 호출 retry/backoff, wrapper 호출 rate-limit/circuit breaker를 추가한다. 미매칭 체결은 확정 fill로 저장하지 않아 늦게 생성/복구된 order intent submission과 재매칭될 수 있다.
 13. 완료: 주문 lifecycle을 `SUBMISSION_UNKNOWN` 복구, `CANCEL_PENDING` 취소 요청 확정 대기, `OrderCancelled` 발행까지 확장하고, direct sell event 경로를 order intent lifecycle로 통일한다.
 14. 완료: 발행 측 outbox 적용 범위를 strategy-execution과 stock-purchase의 publisher까지 확장하고, publisher 실패 재시도에 `nextAttemptAt` 기반 exponential backoff와 `PROCESSING` claim lease를 적용한다.
 15. 부분 완료: stock-purchase-service 내부 주문/조회 KIS 계약을 broker gateway anti-corruption layer로 분리한다. 주문 제출 transient 실패와 broker order id 누락은 `SUBMISSION_UNKNOWN` 복구 흐름으로 보내고, wrapper 호출 rate-limit/circuit breaker를 둔다. root wrapper의 국내 주문체결조회 응답 정규화, stock-purchase의 해외 주문체결/잔고 top-level alias 매핑, token은 fixture test, real/mock scope별 만료 기반 cache, optional local-file persistence, optional JDBC shared token store, JDBC refresh TTL lock으로 보강했다. 모의투자 query/submit/query/cancel smoke test 경계와 runbook은 추가했지만, 별도 broker wrapper service 배포, secret manager 연동, 실제 KIS 모의/실계좌 실행 증적은 남아 있다.
