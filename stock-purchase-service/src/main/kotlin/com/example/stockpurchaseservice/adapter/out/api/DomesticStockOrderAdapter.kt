@@ -59,6 +59,7 @@ internal class DomesticStockOrderAdapter(
                 isMock = isMockOrder,
             ),
         ).mapNotNull { it.toExecutionDto() }
+            .map { it.withMarketQualifiedExecutionId(StockOrderMarket.DOMESTIC) }
     }
 
     override fun findOrderSubmissionStatus(query: BrokerOrderStatusQuery): BrokerOrderStatusDto {
@@ -75,7 +76,7 @@ internal class DomesticStockOrderAdapter(
                 to = lookupWindow.to,
                 isMock = isMockOrder,
             ),
-        ).findStatusFor(query)
+        ).findStatusFor(query).withMarketQualifiedExecutionId(StockOrderMarket.DOMESTIC)
     }
 
     override fun findAccountSnapshot(query: AccountSnapshotQuery): AccountSnapshotDto {
