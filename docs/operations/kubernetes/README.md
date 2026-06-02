@@ -26,7 +26,8 @@ Vault-backed deployment. It syncs the checked-in Secret names expected by
 
 The template uses `external-secrets.io/v1` `SecretStore` and `ExternalSecret`
 resources. Confirm the installed External Secrets Operator CRD version in the
-target cluster before applying it.
+target cluster before applying it. Prepare the matching Vault policy and
+Kubernetes auth role with `docs/operations/vault/bootstrap-akra-vault.ps1`.
 
 `trading-infra.yaml` is an optional bootstrap template for the runtime
 dependencies expected by `trading-runtime.yaml`:
