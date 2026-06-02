@@ -1,6 +1,7 @@
 package com.example.stockpurchaseservice.config.risk
 
 import com.example.stockpurchaseservice.application.port.out.OrderTradingEnvironment
+import com.example.stockpurchaseservice.application.port.out.StockOrderMarket
 import org.springframework.boot.context.properties.ConfigurationProperties
 import java.time.Duration
 
@@ -23,6 +24,10 @@ class OrderRiskProperties {
     var tradingHours: TradingHoursProperties = TradingHoursProperties()
 
     class AccountExposureProperties {
+        var markets: List<StockOrderMarket> = listOf(
+            StockOrderMarket.DOMESTIC,
+            StockOrderMarket.OVERSEAS_US,
+        )
         var overseasExchange: String = "NASD"
         var overseasCurrency: String = "USD"
     }

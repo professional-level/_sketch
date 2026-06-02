@@ -347,15 +347,30 @@ class OrderRiskControlAdapterTest {
     fun `rejects buy when broker account exposure plus pending and new order exceeds limit`() = runBlocking {
         val properties = OrderRiskProperties().apply {
             maxAccountExposureNotional = 1_000.0
+            currencyConversion.ratesToBase["KRW"] = 0.001
         }
-        val reader = FakeOrderRiskSubmissionReader(activeBuyNotional = 150.0)
+        val reader = FakeOrderRiskSubmissionReader(
+            activeBuyNotionalByMarket = mapOf(
+                OrderIntentSubmissionMarket.DOMESTIC to 50_000.0,
+                OrderIntentSubmissionMarket.OVERSEAS_US to 100.0,
+            ),
+        )
         val marketService = FakeMarketServicePort(
-            snapshot = AccountSnapshotDto(
-                market = StockOrderMarket.OVERSEAS_US,
-                exchange = "NASD",
-                currency = "USD",
-                positions = emptyList(),
-                totalEvaluationAmount = 800.0,
+            snapshotsByMarket = mapOf(
+                StockOrderMarket.DOMESTIC to AccountSnapshotDto(
+                    market = StockOrderMarket.DOMESTIC,
+                    exchange = "KRX",
+                    currency = "KRW",
+                    positions = emptyList(),
+                    totalEvaluationAmount = 300_000.0,
+                ),
+                StockOrderMarket.OVERSEAS_US to AccountSnapshotDto(
+                    market = StockOrderMarket.OVERSEAS_US,
+                    exchange = "NASD",
+                    currency = "USD",
+                    positions = emptyList(),
+                    totalEvaluationAmount = 500.0,
+                ),
             ),
         )
 
@@ -364,13 +379,10 @@ class OrderRiskControlAdapterTest {
         )
 
         assertFalse(result.accepted)
-        assertContains(result.reason ?: "", "account exposure notional 1050.0 exceeds limit 1000.0")
-        assertContains(result.reason ?: "", "(current=800.0 active=150.0 order=100.0)")
-        with(marketService.queries.single()) {
-            assertEquals(StockOrderMarket.OVERSEAS_US, market)
-            assertEquals("NASD", exchange)
-            assertEquals("USD", currency)
-        }
+        assertContains(result.reason ?: "", "account exposure notional 1050.0 USD exceeds limit 1000.0 USD")
+        assertContains(result.reason ?: "", "(current=800.0 USD active=150.0 USD order=100.0)")
+        assertEquals(listOf(OrderIntentSubmissionMarket.DOMESTIC, OrderIntentSubmissionMarket.OVERSEAS_US), reader.activeBuyNotionalMarkets)
+        assertEquals(listOf(StockOrderMarket.DOMESTIC, StockOrderMarket.OVERSEAS_US), marketService.queries.map { it.market })
     }
 
     @Test
@@ -378,9 +390,12 @@ class OrderRiskControlAdapterTest {
         val properties = OrderRiskProperties().apply {
             tradingHours.enabled = false
             maxAccountExposureNotional = 1_000.0
+            accountExposure.markets = listOf(StockOrderMarket.DOMESTIC)
             currencyConversion.ratesToBase["KRW"] = 0.001
         }
-        val reader = FakeOrderRiskSubmissionReader(activeBuyNotional = 150_000.0)
+        val reader = FakeOrderRiskSubmissionReader(
+            activeBuyNotionalByMarket = mapOf(OrderIntentSubmissionMarket.DOMESTIC to 150_000.0),
+        )
         val marketService = FakeMarketServicePort(
             snapshot = AccountSnapshotDto(
                 market = StockOrderMarket.DOMESTIC,
@@ -401,7 +416,7 @@ class OrderRiskControlAdapterTest {
         )
 
         assertFalse(result.accepted)
-        assertContains(result.reason ?: "", "account exposure notional 1050.0 exceeds limit 1000.0 USD")
+        assertContains(result.reason ?: "", "account exposure notional 1050.0 USD exceeds limit 1000.0 USD")
         assertContains(result.reason ?: "", "(current=800.0 USD active=150.0 USD order=100.0 USD)")
     }
 
@@ -529,6 +544,7 @@ class OrderRiskControlAdapterTest {
     fun `uses position values when account exposure summary is absent`() = runBlocking {
         val properties = OrderRiskProperties().apply {
             maxAccountExposureNotional = 1_000.0
+            accountExposure.markets = listOf(StockOrderMarket.OVERSEAS_US)
         }
         val marketService = FakeMarketServicePort(
             snapshot = AccountSnapshotDto(
@@ -557,6 +573,7 @@ class OrderRiskControlAdapterTest {
     fun `rejects buy when configured account exposure cannot be assessed`() = runBlocking {
         val properties = OrderRiskProperties().apply {
             maxAccountExposureNotional = 1_000.0
+            accountExposure.markets = listOf(StockOrderMarket.OVERSEAS_US)
         }
         val marketService = FakeMarketServicePort(
             snapshot = AccountSnapshotDto(
@@ -834,6 +851,7 @@ class OrderRiskControlAdapterTest {
 
     private class FakeOrderRiskSubmissionReader(
         private val activeBuyNotional: Double = 0.0,
+        private val activeBuyNotionalByMarket: Map<OrderIntentSubmissionMarket, Double> = emptyMap(),
         private val activeSellQuantity: Long = 0,
         private val brokerSubmittedCount: Long = 0,
         private val duplicateExists: Boolean = false,
@@ -871,7 +889,7 @@ class OrderRiskControlAdapterTest {
 
         override suspend fun sumActiveBuyNotional(market: OrderIntentSubmissionMarket): Double {
             activeBuyNotionalMarkets += market
-            return activeBuyNotional
+            return activeBuyNotionalByMarket[market] ?: activeBuyNotional
         }
 
         override suspend fun sumActiveSellQuantity(
@@ -891,6 +909,7 @@ class OrderRiskControlAdapterTest {
             positions = emptyList(),
             totalEvaluationAmount = 0.0,
         ),
+        private val snapshotsByMarket: Map<StockOrderMarket, AccountSnapshotDto> = emptyMap(),
     ) : MarketServicePort {
         val queries: MutableList<AccountSnapshotQuery> = mutableListOf()
 
@@ -916,7 +935,7 @@ class OrderRiskControlAdapterTest {
 
         override fun findAccountSnapshot(query: AccountSnapshotQuery): AccountSnapshotDto {
             queries += query
-            return snapshot
+            return snapshotsByMarket[query.market] ?: snapshot
         }
     }
 }

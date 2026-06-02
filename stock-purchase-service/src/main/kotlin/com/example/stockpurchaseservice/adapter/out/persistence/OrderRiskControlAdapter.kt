@@ -205,23 +205,35 @@ internal class OrderRiskControlAdapter(
         val sourceCurrency = command.market.notionalCurrency()
         val orderNotionalInBase = orderNotional.toRiskCurrency(sourceCurrency)
             ?: return "account exposure cannot be assessed: missing FX rate from $sourceCurrency to ${properties.baseCurrency()}"
-        val activeBuyNotional = orderRiskSubmissionReader.sumActiveBuyNotional(command.market.toEntity())
-        val activeBuyNotionalInBase = activeBuyNotional.toRiskCurrency(sourceCurrency)
-            ?: return "account exposure cannot be assessed: missing FX rate from $sourceCurrency to ${properties.baseCurrency()}"
-        val snapshot = runCatching {
-            marketServicePort.findAccountSnapshot(command.toAccountSnapshotQuery())
-        }.getOrElse { exception ->
-            return "account exposure cannot be assessed: ${exception.message ?: exception::class.java.simpleName}"
+        val exposureMarkets = properties.accountExposure.marketsForAssessment(command.market)
+        val activeBuyNotionalsInBase = exposureMarkets.map { market ->
+            val activeBuyNotional = orderRiskSubmissionReader.sumActiveBuyNotional(market.toEntity())
+            val marketCurrency = market.notionalCurrency()
+            activeBuyNotional.toRiskCurrency(marketCurrency)
+                ?: return "account exposure cannot be assessed: missing FX rate from $marketCurrency to ${properties.baseCurrency()}"
         }
-        val currentExposure = snapshot.exposureNotional()
-            ?: return "account exposure cannot be assessed: broker snapshot has no evaluation amount"
-        val currentExposureInBase = currentExposure.toRiskCurrency(snapshot.currency)
-            ?: return "account exposure cannot be assessed: missing FX rate from ${snapshot.currency} to ${properties.baseCurrency()}"
+        val currentExposuresInBase = exposureMarkets.map { market ->
+            val snapshot = runCatching {
+                marketServicePort.findAccountSnapshot(market.toAccountSnapshotQuery())
+            }.getOrElse { exception ->
+                return "account exposure cannot be assessed: market=$market " +
+                    (exception.message ?: exception::class.java.simpleName)
+            }
+            val currentExposure = snapshot.exposureNotional()
+                ?: return "account exposure cannot be assessed: broker snapshot has no evaluation amount for market=$market"
+            currentExposure.toRiskCurrency(snapshot.currency)
+                ?: return "account exposure cannot be assessed: missing FX rate from " +
+                    "${snapshot.currency} to ${properties.baseCurrency()}"
+        }
 
-        val projectedExposure = currentExposureInBase.amount + activeBuyNotionalInBase.amount + orderNotionalInBase.amount
+        val currentExposureInBase = currentExposuresInBase.sumOf { it.amount }
+        val activeBuyNotionalInBase = activeBuyNotionalsInBase.sumOf { it.amount }
+        val projectedExposure = currentExposureInBase + activeBuyNotionalInBase + orderNotionalInBase.amount
         return if (projectedExposure > limit) {
-            "account exposure notional $projectedExposure exceeds limit ${limit.forLimitMessage(orderNotionalInBase)} " +
-                "(current=${currentExposureInBase.forMessage()} active=${activeBuyNotionalInBase.forMessage()} " +
+            "account exposure notional ${projectedExposure.forBaseCurrencyMessage()} " +
+                "exceeds limit ${limit.forBaseCurrencyMessage()} " +
+                "(current=${currentExposureInBase.forBaseCurrencyMessage()} " +
+                "active=${activeBuyNotionalInBase.forBaseCurrencyMessage()} " +
                 "order=${orderNotionalInBase.forMessage()})"
         } else {
             null
@@ -256,8 +268,16 @@ internal class OrderRiskControlAdapter(
     }
 
     private fun OrderRiskAssessmentCommand.toAccountSnapshotQuery(): AccountSnapshotQuery {
-        return when (market) {
-            StockOrderMarket.DOMESTIC -> AccountSnapshotQuery(market = StockOrderMarket.DOMESTIC)
+        return market.toAccountSnapshotQuery()
+    }
+
+    private fun StockOrderMarket.toAccountSnapshotQuery(): AccountSnapshotQuery {
+        return when (this) {
+            StockOrderMarket.DOMESTIC -> AccountSnapshotQuery(
+                market = StockOrderMarket.DOMESTIC,
+                exchange = "KRX",
+                currency = properties.currencyConversion.domesticCurrency,
+            )
             StockOrderMarket.OVERSEAS_US -> AccountSnapshotQuery(
                 market = StockOrderMarket.OVERSEAS_US,
                 exchange = properties.accountExposure.overseasExchange,
@@ -329,6 +349,10 @@ internal class OrderRiskControlAdapter(
         return toString()
     }
 
+    private fun Double.forBaseCurrencyMessage(): String {
+        return "$this ${properties.baseCurrency()}"
+    }
+
     private fun OrderRiskProperties.baseCurrency(): String {
         return currencyConversion.baseCurrency.normalizedCurrency()
     }
@@ -345,6 +369,14 @@ internal class OrderRiskControlAdapter(
             StockOrderMarket.DOMESTIC -> OrderIntentSubmissionMarket.DOMESTIC
             StockOrderMarket.OVERSEAS_US -> OrderIntentSubmissionMarket.OVERSEAS_US
         }
+    }
+
+    private fun OrderRiskProperties.AccountExposureProperties.marketsForAssessment(
+        currentMarket: StockOrderMarket,
+    ): List<StockOrderMarket> {
+        return markets
+            .distinct()
+            .ifEmpty { listOf(currentMarket) }
     }
 
     private fun String.normalizedCurrency(): String {

@@ -244,6 +244,8 @@ akra.order.risk.enabled-strategy-prefixes[0]=laor-v4-live
 akra.order.risk.symbol-max-order-notional.TQQQ=1000
 akra.order.risk.strategy-trading-environments[laor-v4-live]=LIVE
 akra.order.risk.strategy-trading-environments[laor-v4-paper]=MOCK
+akra.order.risk.account-exposure.markets[0]=DOMESTIC
+akra.order.risk.account-exposure.markets[1]=OVERSEAS_US
 akra.order.risk.account-exposure.overseas-exchange=NASD
 akra.order.risk.account-exposure.overseas-currency=USD
 akra.order.risk.account-cash.enabled=true
@@ -404,10 +406,10 @@ GET /operations/trading/account-snapshot?market=DOMESTIC&exchange=KRX&currency=K
 This calls the broker wrapper's domestic or overseas balance lookup and returns current positions with quantity, average purchase price, current price, purchase amount, evaluation amount, profit/loss, and legacy `availableCashAmount` when KIS provides those fields.
 The response also includes `cashCurrency`, `orderableCashAmount`, `settledCashAmount`, and `withdrawableCashAmount` when those KIS summary aliases are present. `availableCashAmount` remains as a legacy compatibility field and is derived from the first available broker cash bucket. Risk checks can normalize configured domestic and overseas currencies through the configured FX provider. The default provider uses static `rates-to-base` settings, the optional HTTP provider can call an operator-managed FX endpoint, and `provider=kis-wrapper` can use the root wrapper's KIS overseas daily chart price endpoint for configured currency pairs. KIS symbol mapping, mock/real execution evidence, and broader account cash/exposure modeling still require additional hardening.
 
-When `akra.order.risk.max-account-exposure-notional` is set, buy order risk checks use the market-specific account snapshot to reject orders whose projected exposure would exceed the configured limit:
+When `akra.order.risk.max-account-exposure-notional` is set, buy order risk checks use the configured account exposure markets to reject orders whose projected whole-account exposure would exceed the configured limit. By default the guard includes both `DOMESTIC` and `OVERSEAS_US`:
 
 ```text
-current broker evaluation amount + active pending buy notional + new order notional
+sum(configured broker evaluation amounts) + sum(configured active pending buy notionals) + new order notional
 ```
 
 The configured exposure limit is interpreted in `akra.order.risk.currency-conversion.base-currency`. Domestic and overseas order/cash/exposure amounts are converted through the configured FX provider when the market currency differs from the base currency. With `provider=static`, the guard uses `akra.order.risk.currency-conversion.rates-to-base.*`. With `provider=http`, it calls the configured HTTP endpoint with `sourceCurrency` and `baseCurrency` query parameters and expects a positive `rateToBase`, `rate`, or `exchangeRate` field in the JSON response. With `provider=kis-wrapper`, it resolves the configured pair such as `KRW-USD`, calls `/open-api/overseas/quotations/fx-rate`, and optionally inverts the broker quote before returning a rate to the base currency. If a required FX rate is missing or the provider fails, the guard rejects the buy order instead of comparing unlike currencies.
