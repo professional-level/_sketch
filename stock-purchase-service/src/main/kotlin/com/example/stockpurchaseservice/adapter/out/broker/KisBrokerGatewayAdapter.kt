@@ -868,10 +868,16 @@ private fun JsonNode.toBrokerHistoryItem(): BrokerOrderHistoryItem? {
     val orderedPrice = textOrNull(
         "ft_ord_unpr",
         "FT_ORD_UNPR",
+        "ft_ord_unpr3",
+        "FT_ORD_UNPR3",
         "ord_unpr",
         "ORD_UNPR",
+        "ord_unpr3",
+        "ORD_UNPR3",
         "ovrs_ord_unpr",
         "OVRS_ORD_UNPR",
+        "ovrs_ord_unpr3",
+        "OVRS_ORD_UNPR3",
     ).toDoubleValue()
     val filledQuantity = longValue(
         "ft_ccld_qty",

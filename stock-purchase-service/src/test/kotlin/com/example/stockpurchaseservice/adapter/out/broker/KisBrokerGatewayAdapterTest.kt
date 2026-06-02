@@ -1397,6 +1397,52 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `maps overseas official order price alias for status disambiguation`() {
+        val adapter = overseasHistoryAdapter(
+            """
+            {
+              "rt_cd": "0",
+              "ctx_area_fk200": "",
+              "ctx_area_nk200": "",
+              "output": [
+                {
+                  "ODNO": "alias-price-order",
+                  "PDNO": "TQQQ",
+                  "ORD_DT": "20260602",
+                  "ORD_TMD": "093000",
+                  "FT_ORD_QTY": "3",
+                  "FT_ORD_UNPR3": "112.5",
+                  "TOT_CCLD_QTY": "0",
+                  "RMN_QTY": "3",
+                  "SLL_BUY_DVSN_NAME": "BUY"
+                }
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        val item = adapter.findOrderHistory(historyQuery()).single()
+        val status = listOf(item).findStatusFor(
+            BrokerOrderStatusQuery(
+                orderIntentId = UUID.randomUUID(),
+                internalOrderId = UUID.randomUUID(),
+                externalOrderId = null,
+                symbol = "TQQQ",
+                side = OrderIntentSide.BUY,
+                orderedQuantity = 3,
+                submittedPrice = 112.5,
+                market = StockOrderMarket.OVERSEAS_US,
+                submittedAt = ZonedDateTime.parse("2026-06-02T09:00:00+09:00"),
+            ),
+        )
+
+        assertEquals(112.5, item.orderedPrice)
+        assertEquals(BrokerOrderStatus.SUBMITTED, status.status)
+        assertEquals("alias-price-order", status.externalOrderId)
+        assertEquals(112.5, status.orderedPrice)
+    }
+
+    @Test
     fun `maps overseas english rejected status`() {
         val adapter = overseasHistoryAdapter(
             """
