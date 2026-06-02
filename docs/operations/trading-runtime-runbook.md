@@ -164,6 +164,8 @@ $env:KIS_BROKER_SMOKE_HISTORY_POLL_SECONDS='5'
 
 Run the submit/cancel smoke only during a KIS mock overseas order window. Use a small quantity and a deliberately low buy limit price so the mock order is likely to remain cancelable. If KIS rejects the order, fills it immediately, or does not expose it in history within the polling window, treat the smoke as failed and inspect the wrapper logs plus KIS response payload before retrying.
 
+After the cancel response, the smoke polls order history again and requires the submitted broker order to map to internal `CANCELLED` status through `KisBrokerGatewayAdapter.findStatusFor`. This verifies the submit response id, order-history row identity, and cancellation status mapping together instead of only checking that the cancel endpoint returned an order id.
+
 The root KIS wrapper must preserve KIS order and cancel business responses as a successful HTTP response body, even when `rt_cd != 0`. `stock-purchase-service` classifies that body as `BrokerOrderRejectedException`. A wrapper HTTP 5xx during submit remains a submission-unknown candidate because the broker order id may not be known.
 When the submit/cancel smoke is rejected by KIS, the failure message includes the broker return code, message code, `msg1`, the smoke configuration, and the submitted broker command so the operator can distinguish account/window/product rejection from wrapper mapping failures.
 

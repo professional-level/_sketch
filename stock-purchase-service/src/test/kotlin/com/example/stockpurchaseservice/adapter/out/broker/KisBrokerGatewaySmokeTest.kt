@@ -2,6 +2,9 @@ package com.example.stockpurchaseservice.adapter.out.broker
 
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderRejectedException
+import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatus
+import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatusDto
+import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatusQuery
 import com.example.stockpurchaseservice.application.port.out.StockOrderMarket
 import com.example.stockpurchaseservice.application.port.out.StockOrderType
 import org.junit.jupiter.api.Assumptions.assumeTrue
@@ -123,6 +126,16 @@ class KisBrokerGatewaySmokeTest {
         }
 
         assertTrue(cancelled.externalOrderId.isNotBlank())
+
+        val cancelledStatus = awaitOrderStatus(adapter, config, submitted.externalOrderId, submitted.branchOrderNumber)
+        assertEquals(
+            BrokerOrderStatus.CANCELLED,
+            cancelledStatus.status,
+            "Cancelled mock order did not map to broker CANCELLED status " +
+                "after attempts=${config.historyAttempts}, " +
+                "pollSeconds=${config.historyPollInterval.seconds}, " +
+                "symbol=${config.symbol}, orderId=${submitted.externalOrderId}, latestStatus=$cancelledStatus",
+        )
     }
 
     private fun <T> runBrokerSmokeStep(
@@ -184,6 +197,35 @@ class KisBrokerGatewaySmokeTest {
             Thread.sleep(config.historyPollInterval.toMillis())
         }
         return null
+    }
+
+    private fun awaitOrderStatus(
+        adapter: KisBrokerGatewayAdapter,
+        config: SmokeConfig,
+        externalOrderId: String,
+        branchOrderNumber: String?,
+    ): BrokerOrderStatusDto {
+        var latestStatus: BrokerOrderStatusDto? = null
+        repeat(config.historyAttempts) {
+            latestStatus = adapter.findOrderHistory(config.historyQuery(isMock = true)).findStatusFor(
+                BrokerOrderStatusQuery(
+                    orderIntentId = UUID.randomUUID(),
+                    internalOrderId = UUID.randomUUID(),
+                    externalOrderId = externalOrderId,
+                    branchOrderNumber = branchOrderNumber,
+                    symbol = config.symbol,
+                    exchange = config.exchange,
+                    side = OrderIntentSide.BUY,
+                    orderedQuantity = config.quantity.toLong(),
+                    submittedPrice = config.price,
+                    market = StockOrderMarket.OVERSEAS_US,
+                    submittedAt = ZonedDateTime.now(BROKER_ORDER_ZONE),
+                ),
+            )
+            if (latestStatus?.status == BrokerOrderStatus.CANCELLED) return latestStatus!!
+            Thread.sleep(config.historyPollInterval.toMillis())
+        }
+        return latestStatus ?: fail("Broker status polling did not run for orderId=$externalOrderId")
     }
 
     private data class SmokeConfig(
