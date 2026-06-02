@@ -255,6 +255,9 @@ internal fun OpenApiResponse.toPostStockOrderResponse(): ApiResponse.StockOrder 
                 "ORD_GNO_BRNO",
                 "ordGnoBrno",
                 "ord_gno_brno",
+                "ORD_ORGNO",
+                "ordOrgno",
+                "ord_orgno",
             )
             oDNO = outputNode.text("ODNO", "odno", "ordNo", "ORD_NO", "ord_no", "orderNo", "order_no", "ORDER_NO")
             oRDTMD = outputNode.text("ORD_TMD", "ord_tmd", "ordTmd", "THCO_ORD_TMD", "thco_ord_tmd", "thcoOrdTmd")
