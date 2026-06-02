@@ -77,6 +77,43 @@ docs/operations/sql/20260602_create_kis_token_refresh_lock.mysql.sql
 
 The JDBC adapter shares issued tokens through the configured application database and uses `kis_token_refresh_lock` to prevent multiple wrapper instances from refreshing the same real/mock token scope at the same time. The lock is a short TTL row lock, so keep application clocks sane, monitor refresh timeout failures, and size `lock-ttl` above the expected KIS token issuance latency.
 
+## KIS Mock Broker Smoke Test
+
+`stock-purchase-service` includes a disabled-by-default smoke test for the broker gateway contract against a running root KIS wrapper. It is not part of CI. The test hard-codes broker commands with `isMock=true`, so it should be run only against a wrapper instance that has valid KIS mock credentials configured.
+
+Query-only smoke:
+
+```powershell
+# Optional when the shell does not already use JDK 17.
+$env:JAVA_HOME='C:\path\to\jdk17'
+$env:Path="$env:JAVA_HOME\bin;$env:Path"
+$env:KIS_BROKER_SMOKE_ENABLED='true'
+$env:KIS_BROKER_SMOKE_BASE_URL='http://localhost:8079'
+.\gradlew.bat :stock-purchase-service:test --tests "com.example.stockpurchaseservice.adapter.out.broker.KisBrokerGatewaySmokeTest"
+```
+
+This verifies:
+
+- overseas mock account snapshot through `/open-api/overseas/trading/inquire-balance`
+- overseas mock order history through `/open-api/overseas/trading/inquire-ccnl`
+- JSON/protobuf mapping through the same `KisBrokerGatewayAdapter` used by `stock-purchase-service`
+
+Submit/query/cancel smoke is opt-in because it places a mock order:
+
+```powershell
+$env:KIS_BROKER_SMOKE_SUBMIT_ENABLED='true'
+$env:KIS_BROKER_SMOKE_SYMBOL='TQQQ'
+$env:KIS_BROKER_SMOKE_EXCHANGE='NASD'
+$env:KIS_BROKER_SMOKE_CURRENCY='USD'
+$env:KIS_BROKER_SMOKE_PRICE='1'
+$env:KIS_BROKER_SMOKE_QUANTITY='1'
+$env:KIS_BROKER_SMOKE_HISTORY_ATTEMPTS='6'
+$env:KIS_BROKER_SMOKE_HISTORY_POLL_SECONDS='5'
+.\gradlew.bat :stock-purchase-service:test --tests "com.example.stockpurchaseservice.adapter.out.broker.KisBrokerGatewaySmokeTest"
+```
+
+Run the submit/cancel smoke only during a KIS mock overseas order window. Use a small quantity and a deliberately low buy limit price so the mock order is likely to remain cancelable. If KIS rejects the order, fills it immediately, or does not expose it in history within the polling window, treat the smoke as failed and inspect the wrapper logs plus KIS response payload before retrying.
+
 ## Startup Safety Checks
 
 `stock-purchase-service` fails startup under a production-like profile (`prod`, `production`, or `live`) when unsafe local defaults are still active.
