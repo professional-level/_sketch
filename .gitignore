@@ -16,6 +16,11 @@ gradle/wrapper/gradle-wrapper.jar
 .springBeans
 .sts4-cache
 application-secret.properties
+.env
+.env.*
+!.env.example
+kis-token-cache.json
+*.kis-token-cache.json
 bin/
 !**/src/main/**/bin/
 !**/src/test/**/bin/
