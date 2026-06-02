@@ -348,6 +348,7 @@ Before enabling real orders:
 
 - Replace placeholder values in `docs/operations/kubernetes/trading-runtime.yaml` or the equivalent deployment manifest; do not apply the checked-in placeholders to a real cluster.
 - Build immutable service images with `.github/workflows/container-images.yml` or an equivalent pipeline, then replace `REPLACE_IMAGE_TAG` with the Git SHA tag.
+- Use `docs/operations/kubernetes/deploy-trading-runtime.ps1` or an equivalent rollout pipeline so image tag rendering, SQL migration ConfigMap refresh, migration Job execution, and Deployment rollout checks happen in a fixed order.
 - Set `spring.profiles.active=prod` or another configured production profile.
 - Apply required DB migrations explicitly and set `spring.jpa.hibernate.ddl-auto=validate` or `none`; do not use `update` in production.
 - Point `akra.order.kis-open-api.base-url` and `akra.market-data.kis-open-api.base-url` to the deployed broker wrapper.

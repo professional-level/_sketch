@@ -28,6 +28,30 @@ The workflow tags each image with the Git SHA and `latest` on push or manual
 dispatch. Prefer the immutable Git SHA tag when replacing `REPLACE_IMAGE_TAG` in
 the template.
 
+To validate the checked-in template without applying it:
+
+```powershell
+.\deploy-trading-runtime.ps1 `
+  -ImageTag 0123456789abcdef `
+  -DryRun `
+  -AllowTemplatePlaceholders
+```
+
+For an actual rollout, first create a prepared manifest copy where every
+`REPLACE_...` value has been replaced by the deployment secret manager or
+cluster-specific values. Then run:
+
+```powershell
+.\deploy-trading-runtime.ps1 `
+  -ImageTag <git-sha> `
+  -ManifestPath .\trading-runtime.prepared.yaml
+```
+
+The helper refuses unresolved placeholders during real rollout. It renders the
+image tag, applies the manifest, updates the SQL migration ConfigMap, recreates
+and unsuspends the migration Job, waits for it to complete, then restarts and
+waits for the service Deployments.
+
 For a local dry build, stage the boot jar and build with the matching
 Dockerfile:
 
