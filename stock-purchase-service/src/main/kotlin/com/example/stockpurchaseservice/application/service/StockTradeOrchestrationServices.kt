@@ -468,7 +468,7 @@ private fun makeSellOrderByStrategy(order: Order): SellingOrder? {
                 strategyId = order.strategyId ?: "${order.strategyType}:${order.stockId.value}",
                 purchasedAt = order.purchasedAt,
             )
-            strategy.createSellingOrder(order.id)
+            strategy.createSellingOrder(order.id)?.copy(quantity = order.quantity)
         }
     }
 }

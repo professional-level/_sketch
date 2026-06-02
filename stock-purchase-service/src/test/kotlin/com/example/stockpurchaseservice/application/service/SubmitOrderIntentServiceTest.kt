@@ -310,6 +310,56 @@ class SubmitOrderIntentServiceTest {
     }
 
     @Test
+    fun `stores sell submission unknown without publishing rejected when broker result is unclear`() = runBlocking {
+        val marketPort = FakeMarketServicePort(
+            sellFailure = BrokerOrderSubmissionUnknownException("timeout after sell submit"),
+        )
+        val processedEventPort = FakeProcessedEventPort()
+        val submissionPort = FakeOrderIntentSubmissionPort()
+        val eventPort = FakeOrderExecutionEventPort()
+        val alertPort = FakeOperationalAlertPort()
+        val service = SubmitOrderIntentService(
+            marketPort,
+            processedEventPort,
+            submissionPort,
+            eventPort,
+            FakeOrderRiskControlPort(),
+            alertPort,
+        )
+        val eventId = UUID.randomUUID()
+
+        val result = service.execute(
+            SubmitOrderIntentCommand(
+                eventId = eventId,
+                idempotencyKey = "unknown-sell",
+                strategyExecutionId = "laor-v4-strategy:TQQQ",
+                symbol = "TQQQ",
+                side = OrderIntentSide.SELL,
+                orderType = OrderIntentType.LIMIT,
+                price = 112.0,
+                quantity = 3,
+                orderTag = "TARGET_SELL",
+                createdAt = ZonedDateTime.parse("2026-05-30T09:00:00+09:00"),
+                exchange = "NYSE",
+            ),
+        )
+
+        assertEquals(OrderIntentSubmissionStatus.SUBMISSION_UNKNOWN, result.status)
+        assertEquals(eventId, processedEventPort.succeeded.single())
+        with(submissionPort.unknown.single()) {
+            assertEquals(eventId, orderIntentId)
+            assertEquals(OrderIntentSide.SELL, side)
+            assertEquals(OrderIntentType.LIMIT, orderType)
+            assertEquals(StockOrderMarket.OVERSEAS_US, market)
+            assertEquals("NYSE", exchange)
+        }
+        assertEquals(eventId, alertPort.submissionUnknown.single().orderIntentId)
+        assertEquals("timeout after sell submit", alertPort.submissionUnknown.single().reason)
+        assertEquals(emptyList(), eventPort.submitted)
+        assertEquals(emptyList(), eventPort.rejected)
+    }
+
+    @Test
     fun `stores broker rejection as rejected submission without marking event failed`() = runBlocking {
         val rejection = BrokerOrderRejectedException(
             message = "stock order rejected by broker: APBK001 insufficient buying power",
@@ -353,6 +403,57 @@ class SubmitOrderIntentServiceTest {
         assertEquals(StockOrderMarket.OVERSEAS_US, submissionPort.rejected.single().market)
         assertEquals("stock order rejected by broker: APBK001 insufficient buying power", submissionPort.rejected.single().statusReason)
         assertEquals("stock order rejected by broker: APBK001 insufficient buying power", eventPort.rejected.single().reason)
+        assertEquals(eventId, alertPort.orderSubmissionFailed.single().orderIntentId)
+        assertEquals(emptyList(), eventPort.submitted)
+    }
+
+    @Test
+    fun `stores sell broker rejection as rejected submission without marking event failed`() = runBlocking {
+        val rejection = BrokerOrderRejectedException(
+            message = "stock sell rejected by broker: APBK002 insufficient position",
+            brokerReturnCode = "1",
+            brokerMessageCode = "APBK002",
+        )
+        val marketPort = FakeMarketServicePort(sellFailure = rejection)
+        val processedEventPort = FakeProcessedEventPort()
+        val submissionPort = FakeOrderIntentSubmissionPort()
+        val eventPort = FakeOrderExecutionEventPort()
+        val alertPort = FakeOperationalAlertPort()
+        val service = SubmitOrderIntentService(
+            marketPort,
+            processedEventPort,
+            submissionPort,
+            eventPort,
+            FakeOrderRiskControlPort(),
+            alertPort,
+        )
+        val eventId = UUID.randomUUID()
+
+        val result = service.execute(
+            SubmitOrderIntentCommand(
+                eventId = eventId,
+                idempotencyKey = "broker-rejected-sell",
+                strategyExecutionId = "laor-v4-strategy:TQQQ",
+                symbol = "TQQQ",
+                side = OrderIntentSide.SELL,
+                orderType = OrderIntentType.LIMIT,
+                price = 112.0,
+                quantity = 3,
+                orderTag = "TARGET_SELL",
+                exchange = "NYSE",
+                createdAt = ZonedDateTime.parse("2026-05-30T09:00:00+09:00"),
+            ),
+        )
+
+        assertEquals(OrderIntentSubmissionStatus.REJECTED, result.status)
+        assertEquals(eventId, processedEventPort.succeeded.single())
+        assertEquals(emptyList(), processedEventPort.failed)
+        with(submissionPort.rejected.single()) {
+            assertEquals(StockOrderMarket.OVERSEAS_US, market)
+            assertEquals(OrderIntentSide.SELL, side)
+            assertEquals("stock sell rejected by broker: APBK002 insufficient position", statusReason)
+        }
+        assertEquals("stock sell rejected by broker: APBK002 insufficient position", eventPort.rejected.single().reason)
         assertEquals(eventId, alertPort.orderSubmissionFailed.single().orderIntentId)
         assertEquals(emptyList(), eventPort.submitted)
     }
@@ -487,6 +588,7 @@ class SubmitOrderIntentServiceTest {
 
     private class FakeMarketServicePort(
         private val buyFailure: RuntimeException? = null,
+        private val sellFailure: RuntimeException? = null,
     ) : MarketServicePort {
         val buyOrders: MutableList<PurchaseOrderDto> = mutableListOf()
         val sellOrders: MutableList<SellingOrderDto> = mutableListOf()
@@ -501,6 +603,7 @@ class SubmitOrderIntentServiceTest {
         }
 
         override fun sellStock(order: SellingOrderDto): BrokerOrderSubmissionDto {
+            sellFailure?.let { throw it }
             sellOrders += order
             return BrokerOrderSubmissionDto(
                 externalOrderId = "broker-sell-${sellOrders.size}",
