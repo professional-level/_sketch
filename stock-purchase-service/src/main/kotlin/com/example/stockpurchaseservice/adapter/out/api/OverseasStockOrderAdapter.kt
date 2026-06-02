@@ -29,6 +29,8 @@ import java.time.ZonedDateTime
 internal class OverseasStockOrderAdapter(
     private val brokerGateway: BrokerGateway,
     @Value("\${akra.order.overseas.mock:true}") private val isMockOrder: Boolean,
+    @Value("\${akra.order.status-lookup.backfill-days:1}") private val statusLookupBackfillDays: Long = 1,
+    @Value("\${akra.order.status-lookup.forward-days:1}") private val statusLookupForwardDays: Long = 1,
 ) : OverseasStockOrderPort {
 
     override fun buyStock(order: PurchaseOrderDto): BrokerOrderSubmissionDto {
@@ -61,12 +63,16 @@ internal class OverseasStockOrderAdapter(
     }
 
     override fun findOrderSubmissionStatus(query: BrokerOrderStatusQuery): BrokerOrderStatusDto {
+        val lookupWindow = query.toBrokerOrderHistoryLookupWindow(
+            backfillDays = statusLookupBackfillDays,
+            forwardDays = statusLookupForwardDays,
+        )
         return brokerGateway.findOrderHistory(
             BrokerOrderHistoryQuery(
                 market = StockOrderMarket.OVERSEAS_US,
                 symbol = query.symbol,
-                from = query.submittedAt ?: ZonedDateTime.now(BROKER_ORDER_ZONE),
-                to = query.submittedAt ?: ZonedDateTime.now(BROKER_ORDER_ZONE),
+                from = lookupWindow.from,
+                to = lookupWindow.to,
                 isMock = isMockOrder,
             ),
         ).findStatusFor(query)

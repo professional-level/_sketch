@@ -165,12 +165,15 @@ Before enabling real orders:
 - Point `akra.temporal.target` to the managed Temporal frontend.
 - Set real-vs-mock trading flags intentionally for the account being operated.
 - Confirm risk guard limits are set for order notional, account pending buy notional, broker account exposure/cash, symbol notional, daily order count, disabled strategies, and strategy trading environments.
+- Confirm broker order status lookup windows are wide enough for `SUBMISSION_UNKNOWN` and `CANCEL_PENDING` recovery without creating excessive KIS query load.
 - Configure domestic and US order windows, holidays, early-close dates, and LOC/MOC cutoffs until an exchange calendar sync is available.
 - Confirm `application-secret.properties` is not included in the built artifact or Git diff, or omit it entirely and inject the KIS values at runtime.
 
-Risk and trading-hours guard keys:
+Broker recovery, risk, and trading-hours guard keys:
 
 ```properties
+akra.order.status-lookup.backfill-days=1
+akra.order.status-lookup.forward-days=1
 akra.order.risk.max-order-notional=1000
 akra.order.risk.max-account-pending-buy-notional=5000
 akra.order.risk.max-account-exposure-notional=20000
@@ -315,5 +318,6 @@ When Kafka, Temporal, or an application service restarts:
 Manual recovery checks:
 
 - Re-run reconciliation from the durable cursor if broker executions may have been missed.
+- Keep `akra.order.status-lookup.backfill-days` and `akra.order.status-lookup.forward-days` aligned with KIS order-history retention and the operational delay expected before unknown/cancel-pending recovery runs.
 - Inspect unmatched executions before manually adjusting strategy state.
 - Do not clear outbox or processed-event records unless the replay impact is understood.

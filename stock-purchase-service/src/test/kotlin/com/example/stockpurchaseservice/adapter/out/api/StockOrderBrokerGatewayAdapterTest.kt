@@ -149,9 +149,42 @@ class StockOrderBrokerGatewayAdapterTest {
             assertEquals(StockOrderMarket.OVERSEAS_US, market)
             assertEquals("TQQQ", symbol)
             assertEquals("", externalOrderId)
-            assertEquals(submittedAt, from)
-            assertEquals(submittedAt, to)
+            assertEquals(submittedAt.minusDays(1), from)
+            assertEquals(submittedAt.plusDays(1), to)
             assertEquals(false, isMock)
+        }
+    }
+
+    @Test
+    fun `domestic status lookup uses configured broker history window`() {
+        val brokerGateway = FakeBrokerGateway()
+        val adapter = DomesticStockOrderAdapter(
+            brokerGateway = brokerGateway,
+            isMockOrder = true,
+            statusLookupBackfillDays = 3,
+            statusLookupForwardDays = 2,
+        )
+        val submittedAt = ZonedDateTime.parse("2026-06-02T09:00:00+09:00")
+
+        adapter.findOrderSubmissionStatus(
+            BrokerOrderStatusQuery(
+                orderIntentId = UUID.fromString("00000000-0000-0000-0000-000000000031"),
+                internalOrderId = UUID.fromString("00000000-0000-0000-0000-000000000032"),
+                externalOrderId = "domestic-order-1",
+                symbol = "005930",
+                side = OrderIntentSide.BUY,
+                market = StockOrderMarket.DOMESTIC,
+                submittedAt = submittedAt,
+            ),
+        )
+
+        with(brokerGateway.historyQueries.single()) {
+            assertEquals(StockOrderMarket.DOMESTIC, market)
+            assertEquals("", symbol)
+            assertEquals("domestic-order-1", externalOrderId)
+            assertEquals(submittedAt.minusDays(3), from)
+            assertEquals(submittedAt.plusDays(2), to)
+            assertEquals(true, isMock)
         }
     }
 
