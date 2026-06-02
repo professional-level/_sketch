@@ -36,6 +36,7 @@ dependencies {
     implementation("io.vertx:vertx-jdbc-client:4.5.7")
     implementation("io.agroal:agroal-pool:2.3")
     runtimeOnly("com.h2database:h2:2.2.224")
+    runtimeOnly("com.mysql:mysql-connector-j")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test:3.2.4")
     testImplementation(kotlin("test"))

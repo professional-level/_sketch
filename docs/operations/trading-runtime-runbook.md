@@ -13,6 +13,7 @@ The root sketch app reads KIS credentials from runtime-injected Spring `Environm
 - Keep real account numbers, app keys, app secrets, and tokens outside Git.
 - Gradle excludes `application-secret.properties` from processed resources for the root app and subprojects; keep this exclusion in place if build scripts are refactored.
 - For a real deployment, provide these values through environment variables, Kubernetes/Vault-injected properties, or another runtime secret source instead of packaging them in the application jar.
+- `docs/operations/kubernetes/trading-runtime.yaml` provides a Kubernetes-style template that mounts KIS credentials as Secret files and injects production profile configuration through mounted ConfigMaps.
 
 Required keys:
 
@@ -345,6 +346,7 @@ These waivers should not be enabled for real capital.
 
 Before enabling real orders:
 
+- Replace placeholder values in `docs/operations/kubernetes/trading-runtime.yaml` or the equivalent deployment manifest; do not apply the checked-in placeholders to a real cluster.
 - Set `spring.profiles.active=prod` or another configured production profile.
 - Apply required DB migrations explicitly and set `spring.jpa.hibernate.ddl-auto=validate` or `none`; do not use `update` in production.
 - Point `akra.order.kis-open-api.base-url` and `akra.market-data.kis-open-api.base-url` to the deployed broker wrapper.
@@ -360,7 +362,7 @@ Before enabling real orders:
 - Configure `akra.trading-calendar.us.*` in `strategy-execution-service` separately from purchase-service risk windows. The daily active-strategy run resolves the order session date from the requested timestamp and market close, then skips strategy execution when that target US session is closed. If the Temporal trigger lands before the resolved session open or after the prior session close, generated order intents use the resolved session open timestamp for `createdAt` so `stock-purchase-service` evaluates trading-hours risk against the intended order session.
 - Confirm `strategy-execution-service` starts successfully under a production-like profile after any trading-calendar change; startup validation now rejects malformed zone/date/time values and early-close times outside the regular session.
 - Confirm the legacy `stock-purchase-service` scheduler gate is acceptable for the deployment. By default it runs sell-order creation and simulation when any enabled market's configured order window is open, and it runs submission recovery plus reconciliation when any enabled market is on a configured trading date. Jobs skip only when every enabled market is outside its configured order window or trading date. Disabling `akra.order.risk.trading-hours.enabled` restores the old weekday-only scheduler behavior.
-- Confirm `application-secret.properties` is not included in the built artifact or Git diff, or omit it entirely and inject the KIS values at runtime. The root KIS wrapper, `stock-purchase-service`, and `strategy-execution-service` block this property source by default under production-like profiles.
+- Confirm `application-secret.properties` is not included in the built artifact or Git diff, or omit it entirely and inject the KIS values at runtime. The root KIS wrapper, `stock-search-service`, `stock-purchase-service`, and `strategy-execution-service` block this property source by default under production-like profiles.
 
 Broker recovery, risk, and trading-hours guard keys:
 

@@ -1,0 +1,478 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: akra-trading
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kis-broker-secrets
+  namespace: akra-trading
+type: Opaque
+stringData:
+  app-key: REPLACE_WITH_REAL_APP_KEY
+  app-secret: REPLACE_WITH_REAL_APP_SECRET
+  mock-app-key: REPLACE_WITH_MOCK_APP_KEY
+  mock-app-secret: REPLACE_WITH_MOCK_APP_SECRET
+  account: REPLACE_WITH_REAL_ACCOUNT
+  account-tail: REPLACE_WITH_REAL_ACCOUNT_TAIL
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: trading-database-secrets
+  namespace: akra-trading
+type: Opaque
+stringData:
+  host: mysql.trading-infra.svc.cluster.local
+  port: "3306"
+  database: akra_trading
+  username: akra_trading
+  password: REPLACE_WITH_DATABASE_PASSWORD
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: akra-trading-runtime-config
+  namespace: akra-trading
+data:
+  kis-wrapper.application-prod.properties: |
+    server.port=8079
+    spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+    spring.datasource.url=jdbc:mysql://mysql.trading-infra.svc.cluster.local:3306/akra_trading?useSSL=true&serverTimezone=UTC
+    spring.datasource.username=akra_trading
+    spring.jpa.database-platform=org.hibernate.dialect.MySQL8Dialect
+    spring.jpa.hibernate.ddl-auto=validate
+    akra.runtime.safety.enabled=true
+    akra.runtime.safety.allow-file-token-persistence-in-production=false
+    akra.runtime.safety.allow-application-secret-property-source-in-production=false
+    akra.kis.token.persistence.enabled=true
+    akra.kis.token.persistence.type=jdbc
+    akra.kis.token.persistence.lock-ttl=30s
+    akra.kis.token.persistence.lock-wait-timeout=10s
+    akra.kis.token.persistence.lock-retry-delay=100ms
+  stock-search.application-prod.properties: |
+    server.port=8082
+    spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+    spring.datasource.url=jdbc:mysql://mysql.trading-infra.svc.cluster.local:3306/akra_trading?useSSL=true&serverTimezone=UTC
+    spring.datasource.username=akra_trading
+    spring.jpa.database-platform=org.hibernate.dialect.MySQL8Dialect
+    spring.jpa.hibernate.ddl-auto=validate
+    spring.kafka.bootstrap-servers=kafka-0.kafka.trading-infra.svc.cluster.local:9092,kafka-1.kafka.trading-infra.svc.cluster.local:9092,kafka-2.kafka.trading-infra.svc.cluster.local:9092
+    akra.temporal.enabled=true
+    akra.temporal.target=temporal-frontend.trading-infra.svc.cluster.local:7233
+    akra.temporal.namespace=default
+    akra.temporal.task-queue=stock-search-scheduler
+    akra.runtime.safety.enabled=true
+    akra.runtime.safety.allow-local-temporal-target-in-production=false
+    akra.runtime.safety.allow-application-secret-property-source-in-production=false
+  strategy-execution.application-prod.properties: |
+    server.port=8080
+    spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+    spring.datasource.url=jdbc:mysql://mysql.trading-infra.svc.cluster.local:3306/akra_trading?useSSL=true&serverTimezone=UTC
+    spring.datasource.username=akra_trading
+    spring.jpa.database-platform=org.hibernate.dialect.MySQL8Dialect
+    spring.jpa.hibernate.ddl-auto=validate
+    spring.kafka.bootstrap-servers=kafka-0.kafka.trading-infra.svc.cluster.local:9092,kafka-1.kafka.trading-infra.svc.cluster.local:9092,kafka-2.kafka.trading-infra.svc.cluster.local:9092
+    management.endpoints.web.exposure.include=health,info,metrics,prometheus
+    management.endpoint.health.probes.enabled=true
+    management.metrics.tags.application=strategy-execution-service
+    akra.temporal.enabled=true
+    akra.temporal.target=temporal-frontend.trading-infra.svc.cluster.local:7233
+    akra.temporal.namespace=default
+    akra.temporal.task-queue=strategy-execution-scheduler
+    akra.market-data.kis-open-api.base-url=http://kis-wrapper.akra-trading.svc.cluster.local:8079
+    akra.order-intent.default-trading-environment=LIVE
+    akra.order-intent.strategy-trading-environments[laor-v4-live]=LIVE
+    akra.order-intent.strategy-trading-environments[laor-v4-paper]=MOCK
+    akra.trading-calendar.us.enabled=true
+    akra.trading-calendar.us.zone-id=America/New_York
+    akra.trading-calendar.us.default-us-equity-calendar-enabled=true
+    akra.trading-calendar.us.regular-open=09:30
+    akra.trading-calendar.us.regular-close=16:00
+    akra.runtime.safety.enabled=true
+    akra.runtime.safety.allow-local-temporal-target-in-production=false
+    akra.runtime.safety.allow-local-market-data-endpoint-in-production=false
+    akra.runtime.safety.allow-mock-order-intent-in-production=false
+    akra.runtime.safety.allow-disabled-trading-calendar-in-production=false
+    akra.runtime.safety.allow-application-secret-property-source-in-production=false
+  stock-purchase.application-prod.properties: |
+    server.port=8083
+    spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+    spring.datasource.url=jdbc:mysql://mysql.trading-infra.svc.cluster.local:3306/akra_trading?useSSL=true&serverTimezone=UTC
+    spring.datasource.username=akra_trading
+    spring.jpa.database-platform=org.hibernate.dialect.MySQL8Dialect
+    spring.jpa.hibernate.ddl-auto=validate
+    spring.kafka.bootstrap-servers=kafka-0.kafka.trading-infra.svc.cluster.local:9092,kafka-1.kafka.trading-infra.svc.cluster.local:9092,kafka-2.kafka.trading-infra.svc.cluster.local:9092
+    management.endpoints.web.exposure.include=health,info,metrics,prometheus
+    management.endpoint.health.probes.enabled=true
+    management.metrics.tags.application=stock-purchase-service
+    akra.order.kis-open-api.base-url=http://kis-wrapper.akra-trading.svc.cluster.local:8079
+    akra.order.domestic.mock=false
+    akra.order.overseas.mock=false
+    akra.order.overseas.default-exchange=NASD
+    akra.order.status-lookup.backfill-days=1
+    akra.order.status-lookup.forward-days=1
+    akra.order.execution-reconciliation.backfill-days=7
+    akra.order.risk.enabled=true
+    akra.order.risk.duplicate-order-kill-switch-enabled=true
+    akra.order.risk.account-cash.enabled=true
+    akra.order.risk.sell-position.enabled=true
+    akra.order.risk.trading-hours.enabled=true
+    akra.order.risk.max-order-notional=1000
+    akra.order.risk.max-account-pending-buy-notional=5000
+    akra.order.risk.max-account-exposure-notional=20000
+    akra.order.risk.max-daily-order-count=20
+    akra.order.risk.enabled-strategy-prefixes[0]=laor-v4-live
+    akra.order.risk.symbol-max-order-notional.TQQQ=1000
+    akra.order.risk.strategy-trading-environments[laor-v4-live]=LIVE
+    akra.order.risk.strategy-trading-environments[laor-v4-paper]=MOCK
+    akra.order.risk.currency-conversion.provider=static
+    akra.order.risk.currency-conversion.base-currency=USD
+    akra.order.risk.currency-conversion.domestic-currency=KRW
+    akra.order.risk.currency-conversion.overseas-us-currency=USD
+    akra.order.risk.currency-conversion.rates-to-base.KRW=0.00075
+    akra.order.risk.trading-hours.domestic.regular-open=09:00
+    akra.order.risk.trading-hours.domestic.regular-close=15:30
+    akra.order.risk.trading-hours.overseas-us.regular-open=09:30
+    akra.order.risk.trading-hours.overseas-us.regular-close=16:00
+    akra.order.risk.trading-hours.overseas-us.default-us-equity-calendar-enabled=true
+    akra.order.risk.trading-hours.overseas-us.early-close-time=13:00
+    akra.order.risk.trading-hours.overseas-us.loc-cutoff=15:50
+    akra.order.risk.trading-hours.overseas-us.moc-cutoff=15:50
+    akra.runtime.safety.enabled=true
+    akra.runtime.safety.allow-local-broker-endpoint-in-production=false
+    akra.runtime.safety.allow-mock-trading-in-production=false
+    akra.runtime.safety.allow-disabled-risk-controls-in-production=false
+    akra.runtime.safety.allow-application-secret-property-source-in-production=false
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: akra-trading-schema-migration
+  namespace: akra-trading
+spec:
+  suspend: true
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: mysql-migration
+          image: mysql:8.4
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: trading-database-secrets
+                  key: host
+            - name: DB_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: trading-database-secrets
+                  key: port
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: trading-database-secrets
+                  key: database
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: trading-database-secrets
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: trading-database-secrets
+                  key: password
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              for file in /migrations/*.sql; do
+                echo "applying ${file}"
+                mysql --protocol=TCP -h "${DB_HOST}" -P "${DB_PORT}" -u "${DB_USER}" -p"${DB_PASSWORD}" "${DB_NAME}" < "${file}"
+              done
+          volumeMounts:
+            - name: sql-migrations
+              mountPath: /migrations
+              readOnly: true
+      volumes:
+        - name: sql-migrations
+          configMap:
+            name: akra-sql-migrations
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kis-wrapper
+  namespace: akra-trading
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: kis-wrapper
+  template:
+    metadata:
+      labels:
+        app: kis-wrapper
+    spec:
+      containers:
+        - name: app
+          image: ghcr.io/professional-level/_sketch/kis-wrapper:REPLACE_IMAGE_TAG
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8079
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: prod
+            - name: SPRING_CONFIG_ADDITIONAL_LOCATION
+              value: file:/etc/akra/config/
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: trading-database-secrets
+                  key: password
+            - name: KIS_APP_KEY_FILE
+              value: /run/secrets/kis/app-key
+            - name: KIS_APP_SECRET_FILE
+              value: /run/secrets/kis/app-secret
+            - name: KIS_MOCK_APP_KEY_FILE
+              value: /run/secrets/kis/mock-app-key
+            - name: KIS_MOCK_APP_SECRET_FILE
+              value: /run/secrets/kis/mock-app-secret
+            - name: KIS_ACCOUNT_FILE
+              value: /run/secrets/kis/account
+            - name: KIS_ACCOUNT_TAIL_FILE
+              value: /run/secrets/kis/account-tail
+          readinessProbe:
+            tcpSocket:
+              port: 8079
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 8079
+            periodSeconds: 30
+          volumeMounts:
+            - name: runtime-config
+              mountPath: /etc/akra/config/application-prod.properties
+              subPath: kis-wrapper.application-prod.properties
+              readOnly: true
+            - name: kis-secrets
+              mountPath: /run/secrets/kis
+              readOnly: true
+      volumes:
+        - name: runtime-config
+          configMap:
+            name: akra-trading-runtime-config
+        - name: kis-secrets
+          secret:
+            secretName: kis-broker-secrets
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stock-search-service
+  namespace: akra-trading
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: stock-search-service
+  template:
+    metadata:
+      labels:
+        app: stock-search-service
+    spec:
+      containers:
+        - name: app
+          image: ghcr.io/professional-level/_sketch/stock-search-service:REPLACE_IMAGE_TAG
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8082
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: prod
+            - name: SPRING_CONFIG_ADDITIONAL_LOCATION
+              value: file:/etc/akra/config/
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: trading-database-secrets
+                  key: password
+          readinessProbe:
+            tcpSocket:
+              port: 8082
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 8082
+            periodSeconds: 30
+          volumeMounts:
+            - name: runtime-config
+              mountPath: /etc/akra/config/application-prod.properties
+              subPath: stock-search.application-prod.properties
+              readOnly: true
+      volumes:
+        - name: runtime-config
+          configMap:
+            name: akra-trading-runtime-config
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: strategy-execution-service
+  namespace: akra-trading
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: strategy-execution-service
+  template:
+    metadata:
+      labels:
+        app: strategy-execution-service
+    spec:
+      containers:
+        - name: app
+          image: ghcr.io/professional-level/_sketch/strategy-execution-service:REPLACE_IMAGE_TAG
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: prod
+            - name: SPRING_CONFIG_ADDITIONAL_LOCATION
+              value: file:/etc/akra/config/
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: trading-database-secrets
+                  key: password
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8080
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8080
+            periodSeconds: 30
+          volumeMounts:
+            - name: runtime-config
+              mountPath: /etc/akra/config/application-prod.properties
+              subPath: strategy-execution.application-prod.properties
+              readOnly: true
+      volumes:
+        - name: runtime-config
+          configMap:
+            name: akra-trading-runtime-config
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stock-purchase-service
+  namespace: akra-trading
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: stock-purchase-service
+  template:
+    metadata:
+      labels:
+        app: stock-purchase-service
+    spec:
+      containers:
+        - name: app
+          image: ghcr.io/professional-level/_sketch/stock-purchase-service:REPLACE_IMAGE_TAG
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8083
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: prod
+            - name: SPRING_CONFIG_ADDITIONAL_LOCATION
+              value: file:/etc/akra/config/
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: trading-database-secrets
+                  key: password
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8083
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8083
+            periodSeconds: 30
+          volumeMounts:
+            - name: runtime-config
+              mountPath: /etc/akra/config/application-prod.properties
+              subPath: stock-purchase.application-prod.properties
+              readOnly: true
+      volumes:
+        - name: runtime-config
+          configMap:
+            name: akra-trading-runtime-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kis-wrapper
+  namespace: akra-trading
+spec:
+  selector:
+    app: kis-wrapper
+  ports:
+    - name: http
+      port: 8079
+      targetPort: 8079
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: stock-search-service
+  namespace: akra-trading
+spec:
+  selector:
+    app: stock-search-service
+  ports:
+    - name: http
+      port: 8082
+      targetPort: 8082
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: strategy-execution-service
+  namespace: akra-trading
+spec:
+  selector:
+    app: strategy-execution-service
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: stock-purchase-service
+  namespace: akra-trading
+spec:
+  selector:
+    app: stock-purchase-service
+  ports:
+    - name: http
+      port: 8083
+      targetPort: 8083
