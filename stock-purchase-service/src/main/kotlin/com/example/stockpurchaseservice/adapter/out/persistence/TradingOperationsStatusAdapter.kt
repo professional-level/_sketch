@@ -2,15 +2,18 @@ package com.example.stockpurchaseservice.adapter.out.persistence
 
 import com.example.common.PersistenceAdapter
 import com.example.stockpurchaseservice.adapter.out.persistence.entity.ExecutionReconciliationCursorEntity
+import com.example.stockpurchaseservice.adapter.out.persistence.entity.OrderExecutionOutboxEventStatus
 import com.example.stockpurchaseservice.adapter.out.persistence.entity.UnmatchedExecutionEntity
 import com.example.stockpurchaseservice.adapter.out.persistence.entity.UnmatchedExecutionType
 import com.example.stockpurchaseservice.adapter.out.persistence.repository.ExecutionReconciliationCursorRepository
+import com.example.stockpurchaseservice.adapter.out.persistence.repository.OrderExecutionOutboxEventRepository
 import com.example.stockpurchaseservice.adapter.out.persistence.repository.OrderIntentSubmissionRepository
 import com.example.stockpurchaseservice.adapter.out.persistence.repository.UnmatchedExecutionRepository
 import com.example.stockpurchaseservice.application.port.out.ExecutionReconciliationCursorStatus
 import com.example.stockpurchaseservice.application.port.out.ExecutionTypeDto
 import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionStatusDto
 import com.example.stockpurchaseservice.application.port.out.OrderSubmissionStatusCount
+import com.example.stockpurchaseservice.application.port.out.OutboxStatusCount
 import com.example.stockpurchaseservice.application.port.out.TradingOperationsStatusPort
 import com.example.stockpurchaseservice.application.port.out.TradingOperationsStatusSnapshot
 import com.example.stockpurchaseservice.application.port.out.UnmatchedExecutionStatus
@@ -18,17 +21,25 @@ import com.example.stockpurchaseservice.application.port.out.UnmatchedExecutionS
 @PersistenceAdapter
 internal class TradingOperationsStatusAdapter(
     private val orderIntentSubmissionRepository: OrderIntentSubmissionRepository,
+    private val orderExecutionOutboxEventRepository: OrderExecutionOutboxEventRepository,
     private val executionReconciliationCursorRepository: ExecutionReconciliationCursorRepository,
     private val unmatchedExecutionRepository: UnmatchedExecutionRepository,
 ) : TradingOperationsStatusPort {
 
     override suspend fun loadStatus(): TradingOperationsStatusSnapshot {
         val orderCounts = orderIntentSubmissionRepository.countByStatus()
+        val outboxCounts = orderExecutionOutboxEventRepository.countByStatus()
         return TradingOperationsStatusSnapshot(
             orderSubmissionStatusCounts = OrderIntentSubmissionStatusDto.values().map { status ->
                 OrderSubmissionStatusCount(
                     status = status,
                     count = orderCounts.entries.firstOrNull { it.key.toDto() == status }?.value ?: 0L,
+                )
+            },
+            orderExecutionOutboxStatusCounts = OrderExecutionOutboxEventStatus.values().map { status ->
+                OutboxStatusCount(
+                    status = status.name,
+                    count = outboxCounts[status] ?: 0L,
                 )
             },
             reconciliationCursors = executionReconciliationCursorRepository.findAllCursors()

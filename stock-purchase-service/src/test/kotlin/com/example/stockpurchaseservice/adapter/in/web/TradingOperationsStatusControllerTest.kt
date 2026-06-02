@@ -6,6 +6,7 @@ import com.example.stockpurchaseservice.application.port.out.ExecutionReconcilia
 import com.example.stockpurchaseservice.application.port.out.ExecutionTypeDto
 import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionStatusDto
 import com.example.stockpurchaseservice.application.port.out.OrderSubmissionStatusCount
+import com.example.stockpurchaseservice.application.port.out.OutboxStatusCount
 import com.example.stockpurchaseservice.application.port.out.TradingOperationsStatusSnapshot
 import com.example.stockpurchaseservice.application.port.out.UnmatchedExecutionStatus
 import java.time.ZonedDateTime
@@ -29,6 +30,7 @@ class TradingOperationsStatusControllerTest {
         assertEquals(1, useCase.callCount)
         assertEquals(result.generatedAt, response.generatedAt)
         assertEquals(result.snapshot.orderSubmissionStatusCounts, response.orderSubmissionStatusCounts)
+        assertEquals(result.snapshot.orderExecutionOutboxStatusCounts, response.orderExecutionOutboxStatusCounts)
         assertEquals(result.snapshot.reconciliationCursors, response.reconciliationCursors)
         assertEquals(result.snapshot.unmatchedExecutionCount, response.unmatchedExecutionCount)
         assertEquals(result.snapshot.recentUnmatchedExecutions, response.recentUnmatchedExecutions)
@@ -38,6 +40,10 @@ class TradingOperationsStatusControllerTest {
         return TradingOperationsStatusSnapshot(
             orderSubmissionStatusCounts = listOf(
                 OrderSubmissionStatusCount(OrderIntentSubmissionStatusDto.SUBMISSION_UNKNOWN, 1),
+            ),
+            orderExecutionOutboxStatusCounts = listOf(
+                OutboxStatusCount("FAILED", 2),
+                OutboxStatusCount("PENDING", 5),
             ),
             reconciliationCursors = listOf(
                 ExecutionReconciliationCursorStatus(

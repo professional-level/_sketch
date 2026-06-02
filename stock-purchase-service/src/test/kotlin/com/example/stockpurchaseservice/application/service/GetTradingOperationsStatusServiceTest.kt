@@ -3,6 +3,7 @@ package com.example.stockpurchaseservice.application.service
 import com.example.stockpurchaseservice.application.port.out.ExecutionTypeDto
 import com.example.stockpurchaseservice.application.port.out.OrderIntentSubmissionStatusDto
 import com.example.stockpurchaseservice.application.port.out.OrderSubmissionStatusCount
+import com.example.stockpurchaseservice.application.port.out.OutboxStatusCount
 import com.example.stockpurchaseservice.application.port.out.TradingOperationsStatusPort
 import com.example.stockpurchaseservice.application.port.out.TradingOperationsStatusSnapshot
 import com.example.stockpurchaseservice.application.port.out.UnmatchedExecutionStatus
@@ -36,6 +37,9 @@ class GetTradingOperationsStatusServiceTest {
         return TradingOperationsStatusSnapshot(
             orderSubmissionStatusCounts = listOf(
                 OrderSubmissionStatusCount(OrderIntentSubmissionStatusDto.SUBMITTED, 2),
+            ),
+            orderExecutionOutboxStatusCounts = listOf(
+                OutboxStatusCount("PENDING", 1),
             ),
             reconciliationCursors = emptyList(),
             unmatchedExecutionCount = 1,

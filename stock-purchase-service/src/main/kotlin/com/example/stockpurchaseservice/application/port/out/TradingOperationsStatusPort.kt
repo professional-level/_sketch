@@ -8,6 +8,7 @@ interface TradingOperationsStatusPort {
 
 data class TradingOperationsStatusSnapshot(
     val orderSubmissionStatusCounts: List<OrderSubmissionStatusCount>,
+    val orderExecutionOutboxStatusCounts: List<OutboxStatusCount>,
     val reconciliationCursors: List<ExecutionReconciliationCursorStatus>,
     val unmatchedExecutionCount: Long,
     val recentUnmatchedExecutions: List<UnmatchedExecutionStatus>,
@@ -15,6 +16,11 @@ data class TradingOperationsStatusSnapshot(
 
 data class OrderSubmissionStatusCount(
     val status: OrderIntentSubmissionStatusDto,
+    val count: Long,
+)
+
+data class OutboxStatusCount(
+    val status: String,
     val count: Long,
 )
 

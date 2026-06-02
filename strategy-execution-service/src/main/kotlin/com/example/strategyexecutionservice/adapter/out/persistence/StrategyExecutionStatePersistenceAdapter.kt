@@ -46,6 +46,10 @@ internal class StrategyExecutionStatePersistenceAdapter(
         return finalPriceBatingV1StrategyExecutionRepository.findById(executionId).awaitSuspending()?.toDto()
     }
 
+    override suspend fun findActiveFinalPriceBatingV1Strategies(): List<FinalPriceBatingV1ExecutionState> {
+        return finalPriceBatingV1StrategyExecutionRepository.findActive().map { it.toDto() }
+    }
+
     override suspend fun saveFinalPriceBatingV1Strategy(state: FinalPriceBatingV1ExecutionState) {
         finalPriceBatingV1StrategyExecutionRepository.upsert(FinalPriceBatingV1StrategyExecutionEntity.from(state))
     }

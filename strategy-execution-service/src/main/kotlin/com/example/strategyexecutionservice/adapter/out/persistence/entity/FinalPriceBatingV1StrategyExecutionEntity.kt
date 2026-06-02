@@ -33,6 +33,16 @@ internal class FinalPriceBatingV1StrategyExecutionEntity private constructor(
     val filledQuantity: Long,
     @Column
     val averageFilledPrice: Double?,
+    @Column
+    val sellTargetPrice: Double?,
+    @Column(nullable = false)
+    val sellQuantity: Long,
+    @Column
+    val sellIntentCreatedAt: ZonedDateTime?,
+    @Column(nullable = false)
+    val soldQuantity: Long,
+    @Column
+    val averageSoldPrice: Double?,
     @Column(nullable = false)
     val startedAt: ZonedDateTime,
     @Column
@@ -49,6 +59,11 @@ internal class FinalPriceBatingV1StrategyExecutionEntity private constructor(
             status = status.toDto(),
             filledQuantity = filledQuantity,
             averageFilledPrice = averageFilledPrice,
+            sellTargetPrice = sellTargetPrice,
+            sellQuantity = sellQuantity,
+            sellIntentCreatedAt = sellIntentCreatedAt,
+            soldQuantity = soldQuantity,
+            averageSoldPrice = averageSoldPrice,
             startedAt = startedAt,
             completedAt = completedAt,
         )
@@ -66,6 +81,11 @@ internal class FinalPriceBatingV1StrategyExecutionEntity private constructor(
                 status = FinalPriceBatingV1StrategyExecutionStatus.from(dto.status),
                 filledQuantity = dto.filledQuantity,
                 averageFilledPrice = dto.averageFilledPrice,
+                sellTargetPrice = dto.sellTargetPrice,
+                sellQuantity = dto.sellQuantity,
+                sellIntentCreatedAt = dto.sellIntentCreatedAt,
+                soldQuantity = dto.soldQuantity,
+                averageSoldPrice = dto.averageSoldPrice,
                 startedAt = dto.startedAt,
                 completedAt = dto.completedAt,
             )

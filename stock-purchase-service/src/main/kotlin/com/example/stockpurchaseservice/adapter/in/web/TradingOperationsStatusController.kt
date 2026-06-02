@@ -5,6 +5,7 @@ import com.example.stockpurchaseservice.application.port.`in`.GetTradingOperatio
 import com.example.stockpurchaseservice.application.port.`in`.TradingOperationsStatusResult
 import com.example.stockpurchaseservice.application.port.out.ExecutionReconciliationCursorStatus
 import com.example.stockpurchaseservice.application.port.out.OrderSubmissionStatusCount
+import com.example.stockpurchaseservice.application.port.out.OutboxStatusCount
 import com.example.stockpurchaseservice.application.port.out.UnmatchedExecutionStatus
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping
@@ -25,6 +26,7 @@ internal class TradingOperationsStatusController(
 internal data class TradingOperationsStatusResponse(
     val generatedAt: ZonedDateTime,
     val orderSubmissionStatusCounts: List<OrderSubmissionStatusCount>,
+    val orderExecutionOutboxStatusCounts: List<OutboxStatusCount>,
     val reconciliationCursors: List<ExecutionReconciliationCursorStatus>,
     val unmatchedExecutionCount: Long,
     val recentUnmatchedExecutions: List<UnmatchedExecutionStatus>,
@@ -34,6 +36,7 @@ private fun TradingOperationsStatusResult.toResponse(): TradingOperationsStatusR
     return TradingOperationsStatusResponse(
         generatedAt = generatedAt,
         orderSubmissionStatusCounts = snapshot.orderSubmissionStatusCounts,
+        orderExecutionOutboxStatusCounts = snapshot.orderExecutionOutboxStatusCounts,
         reconciliationCursors = snapshot.reconciliationCursors,
         unmatchedExecutionCount = snapshot.unmatchedExecutionCount,
         recentUnmatchedExecutions = snapshot.recentUnmatchedExecutions,

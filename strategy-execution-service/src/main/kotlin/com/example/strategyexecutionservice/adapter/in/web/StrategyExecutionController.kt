@@ -1,7 +1,9 @@
 package com.example.strategyexecutionservice.adapter.`in`.web
 
 import com.example.common.WebAdapter
+import com.example.strategyexecutionservice.application.port.`in`.FinalPriceBatingV1StrategyExecutionView
 import com.example.strategyexecutionservice.application.port.`in`.LaorV4StrategyExecutionView
+import com.example.strategyexecutionservice.application.port.`in`.QueryFinalPriceBatingV1StrategyExecutionUseCase
 import com.example.strategyexecutionservice.application.port.`in`.QueryLaorV4StrategyExecutionUseCase
 import com.example.strategyexecutionservice.application.port.`in`.RegisterLaorV4StrategyExecutionCommand
 import com.example.strategyexecutionservice.application.port.`in`.RegisterLaorV4StrategyExecutionResult
@@ -21,6 +23,7 @@ import java.time.ZonedDateTime
 class StrategyExecutionController(
     private val registerLaorV4StrategyExecutionUseCase: RegisterLaorV4StrategyExecutionUseCase,
     private val queryLaorV4StrategyExecutionUseCase: QueryLaorV4StrategyExecutionUseCase,
+    private val queryFinalPriceBatingV1StrategyExecutionUseCase: QueryFinalPriceBatingV1StrategyExecutionUseCase,
 ) {
 
     @PostMapping("/laor-v4")
@@ -40,6 +43,20 @@ class StrategyExecutionController(
         @PathVariable executionId: String,
     ): ResponseEntity<LaorV4StrategyExecutionResponse> {
         return queryLaorV4StrategyExecutionUseCase.find(executionId)
+            ?.let { ResponseEntity.ok(it.toResponse()) }
+            ?: ResponseEntity.notFound().build()
+    }
+
+    @GetMapping("/final-price-bating-v1")
+    suspend fun getActiveFinalPriceBatingV1StrategyExecutions(): List<FinalPriceBatingV1StrategyExecutionResponse> {
+        return queryFinalPriceBatingV1StrategyExecutionUseCase.findActive().map { it.toResponse() }
+    }
+
+    @GetMapping("/final-price-bating-v1/{executionId}")
+    suspend fun getFinalPriceBatingV1StrategyExecution(
+        @PathVariable executionId: String,
+    ): ResponseEntity<FinalPriceBatingV1StrategyExecutionResponse> {
+        return queryFinalPriceBatingV1StrategyExecutionUseCase.find(executionId)
             ?.let { ResponseEntity.ok(it.toResponse()) }
             ?: ResponseEntity.notFound().build()
     }
@@ -88,6 +105,32 @@ class StrategyExecutionController(
             lastExecutedAt = lastExecutedAt,
         )
     }
+
+    private fun FinalPriceBatingV1StrategyExecutionView.toResponse(): FinalPriceBatingV1StrategyExecutionResponse {
+        return FinalPriceBatingV1StrategyExecutionResponse(
+            executionId = executionId,
+            symbol = symbol,
+            market = market,
+            status = status.name,
+            budget = budget,
+            targetBuyPrice = targetBuyPrice,
+            quantity = quantity,
+            filledQuantity = filledQuantity,
+            averageFilledPrice = averageFilledPrice,
+            remainingBuyQuantity = remainingBuyQuantity,
+            sellTargetPrice = sellTargetPrice,
+            sellQuantity = sellQuantity,
+            soldQuantity = soldQuantity,
+            averageSoldPrice = averageSoldPrice,
+            remainingSellQuantity = remainingSellQuantity,
+            currentCash = currentCash,
+            currentHoldingQuantity = currentHoldingQuantity,
+            currentAveragePrice = currentAveragePrice,
+            sellIntentCreatedAt = sellIntentCreatedAt,
+            startedAt = startedAt,
+            completedAt = completedAt,
+        )
+    }
 }
 
 data class RegisterLaorV4StrategyExecutionRequest(
@@ -126,4 +169,28 @@ data class LaorV4StrategyExecutionResponse(
     val reverseModeElapsedDays: Int,
     val lastExecutionRunId: String?,
     val lastExecutedAt: ZonedDateTime?,
+)
+
+data class FinalPriceBatingV1StrategyExecutionResponse(
+    val executionId: String,
+    val symbol: String,
+    val market: String,
+    val status: String,
+    val budget: Double,
+    val targetBuyPrice: Double,
+    val quantity: Long,
+    val filledQuantity: Long,
+    val averageFilledPrice: Double?,
+    val remainingBuyQuantity: Long,
+    val sellTargetPrice: Double?,
+    val sellQuantity: Long,
+    val soldQuantity: Long,
+    val averageSoldPrice: Double?,
+    val remainingSellQuantity: Long,
+    val currentCash: Double,
+    val currentHoldingQuantity: Long,
+    val currentAveragePrice: Double?,
+    val sellIntentCreatedAt: ZonedDateTime?,
+    val startedAt: ZonedDateTime,
+    val completedAt: ZonedDateTime?,
 )

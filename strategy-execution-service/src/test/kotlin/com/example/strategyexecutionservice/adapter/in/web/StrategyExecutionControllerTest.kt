@@ -1,6 +1,8 @@
 package com.example.strategyexecutionservice.adapter.`in`.web
 
+import com.example.strategyexecutionservice.application.port.`in`.FinalPriceBatingV1StrategyExecutionView
 import com.example.strategyexecutionservice.application.port.`in`.LaorV4StrategyExecutionView
+import com.example.strategyexecutionservice.application.port.`in`.QueryFinalPriceBatingV1StrategyExecutionUseCase
 import com.example.strategyexecutionservice.application.port.`in`.QueryLaorV4StrategyExecutionUseCase
 import com.example.strategyexecutionservice.application.port.`in`.RegisterLaorV4StrategyExecutionCommand
 import com.example.strategyexecutionservice.application.port.`in`.RegisterLaorV4StrategyExecutionResult
@@ -19,7 +21,7 @@ class StrategyExecutionControllerTest {
     @Test
     fun `registers laor v4 request with generated execution id`() = runBlocking {
         val useCase = FakeRegisterLaorV4StrategyExecutionUseCase()
-        val controller = StrategyExecutionController(useCase, FakeQueryLaorV4StrategyExecutionUseCase())
+        val controller = controller(registerUseCase = useCase)
 
         val response = controller.registerLaorV4StrategyExecution(
             RegisterLaorV4StrategyExecutionRequest(
@@ -47,6 +49,7 @@ class StrategyExecutionControllerTest {
         val controller = StrategyExecutionController(
             FakeRegisterLaorV4StrategyExecutionUseCase(),
             FakeQueryLaorV4StrategyExecutionUseCase(states = listOf(execution)),
+            FakeQueryFinalPriceBatingV1StrategyExecutionUseCase(),
         )
 
         val response = controller.getLaorV4StrategyExecution("laor-v4:TQQQ")
@@ -73,11 +76,72 @@ class StrategyExecutionControllerTest {
                     view(executionId = "laor-v4:SOXL", symbol = LaorV4StrategySymbol.SOXL),
                 ),
             ),
+            FakeQueryFinalPriceBatingV1StrategyExecutionUseCase(),
         )
 
         val response = controller.getActiveLaorV4StrategyExecutions()
 
         assertEquals(listOf("laor-v4:TQQQ", "laor-v4:SOXL"), response.map { it.executionId })
+    }
+
+    @Test
+    fun `gets final price bating strategy execution state for operations`() = runBlocking {
+        val execution = finalPriceView(
+            filledQuantity = 4,
+            averageFilledPrice = 95.0,
+            soldQuantity = 1,
+            averageSoldPrice = 100.0,
+        )
+        val controller = controller(
+            finalPriceQueryUseCase = FakeQueryFinalPriceBatingV1StrategyExecutionUseCase(states = listOf(execution)),
+        )
+
+        val response = controller.getFinalPriceBatingV1StrategyExecution("FinalPriceBatingV1:005930")
+
+        assertEquals(200, response.statusCode.value())
+        with(checkNotNull(response.body)) {
+            assertEquals("FinalPriceBatingV1:005930", executionId)
+            assertEquals("005930", symbol)
+            assertEquals("KRX", market)
+            assertEquals("ACTIVE", status)
+            assertEquals(4L, filledQuantity)
+            assertEquals(95.0, averageFilledPrice)
+            assertEquals(6L, remainingBuyQuantity)
+            assertEquals(3L, currentHoldingQuantity)
+            assertEquals(720.0, currentCash)
+            assertEquals(95.0, currentAveragePrice)
+            assertEquals(1L, soldQuantity)
+            assertEquals(9L, remainingSellQuantity)
+        }
+    }
+
+    @Test
+    fun `lists active final price bating strategy execution states`() = runBlocking {
+        val controller = controller(
+            finalPriceQueryUseCase = FakeQueryFinalPriceBatingV1StrategyExecutionUseCase(
+                states = listOf(
+                    finalPriceView(executionId = "FinalPriceBatingV1:005930"),
+                    finalPriceView(executionId = "FinalPriceBatingV1:000660", symbol = "000660"),
+                ),
+            ),
+        )
+
+        val response = controller.getActiveFinalPriceBatingV1StrategyExecutions()
+
+        assertEquals(listOf("FinalPriceBatingV1:005930", "FinalPriceBatingV1:000660"), response.map { it.executionId })
+    }
+
+    private fun controller(
+        registerUseCase: RegisterLaorV4StrategyExecutionUseCase = FakeRegisterLaorV4StrategyExecutionUseCase(),
+        laorQueryUseCase: QueryLaorV4StrategyExecutionUseCase = FakeQueryLaorV4StrategyExecutionUseCase(),
+        finalPriceQueryUseCase: QueryFinalPriceBatingV1StrategyExecutionUseCase =
+            FakeQueryFinalPriceBatingV1StrategyExecutionUseCase(),
+    ): StrategyExecutionController {
+        return StrategyExecutionController(
+            registerUseCase,
+            laorQueryUseCase,
+            finalPriceQueryUseCase,
+        )
     }
 
     private class FakeRegisterLaorV4StrategyExecutionUseCase : RegisterLaorV4StrategyExecutionUseCase {
@@ -111,6 +175,18 @@ class StrategyExecutionControllerTest {
         }
     }
 
+    private class FakeQueryFinalPriceBatingV1StrategyExecutionUseCase(
+        private val states: List<FinalPriceBatingV1StrategyExecutionView> = emptyList(),
+    ) : QueryFinalPriceBatingV1StrategyExecutionUseCase {
+        override suspend fun find(executionId: String): FinalPriceBatingV1StrategyExecutionView? {
+            return states.firstOrNull { it.executionId == executionId }
+        }
+
+        override suspend fun findActive(): List<FinalPriceBatingV1StrategyExecutionView> {
+            return states
+        }
+    }
+
     private fun view(
         executionId: String,
         symbol: LaorV4StrategySymbol = LaorV4StrategySymbol.TQQQ,
@@ -136,6 +212,40 @@ class StrategyExecutionControllerTest {
             reverseModeElapsedDays = 0,
             lastExecutionRunId = "ACTIVE_STRATEGIES_DAILY:2026-06-02",
             lastExecutedAt = ZonedDateTime.parse("2026-06-02T09:00:00+09:00"),
+        )
+    }
+
+    private fun finalPriceView(
+        executionId: String = "FinalPriceBatingV1:005930",
+        symbol: String = "005930",
+        filledQuantity: Long = 0,
+        averageFilledPrice: Double? = null,
+        soldQuantity: Long = 0,
+        averageSoldPrice: Double? = null,
+    ): FinalPriceBatingV1StrategyExecutionView {
+        return FinalPriceBatingV1StrategyExecutionView(
+            executionId = executionId,
+            symbol = symbol,
+            market = "KRX",
+            status = StrategyExecutionLifecycleStatus.ACTIVE,
+            budget = 1_000.0,
+            targetBuyPrice = 90.0,
+            quantity = 10,
+            filledQuantity = filledQuantity,
+            averageFilledPrice = averageFilledPrice,
+            remainingBuyQuantity = 10L - filledQuantity,
+            sellTargetPrice = averageFilledPrice?.let { it * 1.03 },
+            sellQuantity = 10,
+            soldQuantity = soldQuantity,
+            averageSoldPrice = averageSoldPrice,
+            remainingSellQuantity = 10L - soldQuantity,
+            currentCash = 1_000.0 - ((averageFilledPrice ?: 90.0) * filledQuantity) +
+                ((averageSoldPrice ?: 0.0) * soldQuantity),
+            currentHoldingQuantity = filledQuantity - soldQuantity,
+            currentAveragePrice = averageFilledPrice,
+            sellIntentCreatedAt = ZonedDateTime.parse("2026-06-02T09:01:00+09:00"),
+            startedAt = ZonedDateTime.parse("2026-06-02T09:00:00+09:00"),
+            completedAt = null,
         )
     }
 }
