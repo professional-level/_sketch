@@ -320,6 +320,7 @@ class RecoverUnknownOrderSubmissionsService(
             orderIntentId = orderIntentId,
             internalOrderId = internalOrderId,
             externalOrderId = externalOrderId,
+            branchOrderNumber = branchOrderNumber,
             symbol = symbol,
             exchange = exchange,
             side = side,

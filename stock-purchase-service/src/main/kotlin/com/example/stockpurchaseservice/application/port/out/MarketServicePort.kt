@@ -82,6 +82,7 @@ data class BrokerOrderStatusQuery(
     val orderIntentId: UUID,
     val internalOrderId: UUID,
     val externalOrderId: String?,
+    val branchOrderNumber: String? = null,
     val symbol: String,
     val exchange: String = DEFAULT_OVERSEAS_ORDER_EXCHANGE,
     val side: OrderIntentSide,

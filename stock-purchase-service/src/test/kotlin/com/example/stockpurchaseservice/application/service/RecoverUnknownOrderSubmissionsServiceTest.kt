@@ -43,7 +43,7 @@ class RecoverUnknownOrderSubmissionsServiceTest {
 
     @Test
     fun `recovers unknown submission to submitted event`() = runBlocking {
-        val submissionPort = FakeOrderIntentSubmissionPort(listOf(submission(exchange = "NYSE")))
+        val submissionPort = FakeOrderIntentSubmissionPort(listOf(submission(exchange = "NYSE", branchOrderNumber = "00001")))
         val eventPort = FakeOrderExecutionEventPort()
         val marketService = FakeMarketServicePort(
             status = BrokerOrderStatusDto(
@@ -63,6 +63,7 @@ class RecoverUnknownOrderSubmissionsServiceTest {
 
         assertEquals("broker-1", submissionPort.submitted.single().externalOrderId)
         assertEquals("NYSE", marketService.queries.single().exchange)
+        assertEquals("00001", marketService.queries.single().branchOrderNumber)
         assertEquals(3L, marketService.queries.single().orderedQuantity)
         assertEquals(112.0, marketService.queries.single().submittedPrice)
         assertEquals("broker-1", eventPort.submitted.single().brokerOrderId)
@@ -548,6 +549,7 @@ class RecoverUnknownOrderSubmissionsServiceTest {
         idempotencyKey: String = "unknown-buy",
         side: OrderIntentSide = OrderIntentSide.BUY,
         orderTag: String = "FIRST_BUY",
+        branchOrderNumber: String? = null,
     ): OrderIntentSubmissionDto {
         return OrderIntentSubmissionDto(
             orderIntentId = ORDER_INTENT_ID,
@@ -562,6 +564,7 @@ class RecoverUnknownOrderSubmissionsServiceTest {
             orderTag = orderTag,
             internalOrderId = INTERNAL_ORDER_ID,
             externalOrderId = externalOrderId,
+            branchOrderNumber = branchOrderNumber,
             submittedAt = ZonedDateTime.parse("2026-05-30T09:00:00+09:00"),
         )
     }

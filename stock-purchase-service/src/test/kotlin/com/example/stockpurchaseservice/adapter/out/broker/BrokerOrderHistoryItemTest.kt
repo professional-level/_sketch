@@ -100,6 +100,28 @@ class BrokerOrderHistoryItemTest {
     }
 
     @Test
+    fun `uses branch order number to disambiguate broker order id matches`() {
+        val status = listOf(
+            row(externalOrderId = "broker-1", branchOrderNumber = "00001", orderedQuantity = 1),
+            row(externalOrderId = "broker-1", branchOrderNumber = "00002", orderedQuantity = 3),
+        ).findStatusFor(query(externalOrderId = "broker-1", branchOrderNumber = "00002"))
+
+        assertEquals(BrokerOrderStatus.SUBMITTED, status.status)
+        assertEquals("broker-1", status.externalOrderId)
+        assertEquals(3L, status.orderedQuantity)
+    }
+
+    @Test
+    fun `keeps broader candidates when broker rows do not expose matching branch order number`() {
+        val status = listOf(
+            row(externalOrderId = "broker-1", branchOrderNumber = "00001"),
+        ).findStatusFor(query(externalOrderId = "broker-1", branchOrderNumber = "00002"))
+
+        assertEquals(BrokerOrderStatus.SUBMITTED, status.status)
+        assertEquals("broker-1", status.externalOrderId)
+    }
+
+    @Test
     fun `preserves original fill details when terminal cancel row has no fill quantity`() {
         val status = listOf(
             row(
@@ -182,6 +204,7 @@ class BrokerOrderHistoryItemTest {
 
     private fun query(
         externalOrderId: String?,
+        branchOrderNumber: String? = null,
         orderedQuantity: Long? = null,
         submittedPrice: Double? = null,
     ): BrokerOrderStatusQuery {
@@ -189,6 +212,7 @@ class BrokerOrderHistoryItemTest {
             orderIntentId = UUID.randomUUID(),
             internalOrderId = UUID.randomUUID(),
             externalOrderId = externalOrderId,
+            branchOrderNumber = branchOrderNumber,
             symbol = "TQQQ",
             side = OrderIntentSide.BUY,
             orderedQuantity = orderedQuantity,
@@ -209,12 +233,13 @@ class BrokerOrderHistoryItemTest {
         averageExecutionPrice: Double? = null,
         orderedQuantity: Long = 3,
         orderedPrice: Double? = null,
+        branchOrderNumber: String? = "00001",
     ): BrokerOrderHistoryItem {
         return BrokerOrderHistoryItem(
             externalOrderId = externalOrderId,
             externalExecutionId = externalExecutionId,
             originalOrderId = originalOrderId,
-            branchOrderNumber = "00001",
+            branchOrderNumber = branchOrderNumber,
             symbol = "TQQQ",
             stockName = "TQQQ",
             orderedAt = ORDERED_AT,

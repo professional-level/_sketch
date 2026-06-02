@@ -221,6 +221,7 @@ internal fun List<BrokerOrderHistoryItem>.findStatusFor(query: BrokerOrderStatus
         }
     }
     val candidates = baseCandidates
+        .narrowByBranchOrderNumber(query)
         .narrowByOrderedQuantity(query)
         .narrowBySubmittedPrice(query)
     val terminalCandidates = candidates.filter { row ->
@@ -260,6 +261,15 @@ internal fun List<BrokerOrderHistoryItem>.findStatusFor(query: BrokerOrderStatus
             reason = "ambiguous broker orders: ${candidates.joinToString { it.externalOrderId }}",
         )
     }
+}
+
+private fun List<BrokerOrderHistoryItem>.narrowByBranchOrderNumber(
+    query: BrokerOrderStatusQuery,
+): List<BrokerOrderHistoryItem> {
+    val branchOrderNumber = query.branchOrderNumber?.trim()?.takeIf { it.isNotBlank() } ?: return this
+    return filter { it.branchOrderNumber?.trim() == branchOrderNumber }
+        .takeIf { it.isNotEmpty() }
+        ?: this
 }
 
 private fun List<BrokerOrderHistoryItem>.narrowByOrderedQuantity(
