@@ -63,11 +63,15 @@ internal class OrderTradingHoursPolicy(
 
     private fun OrderRiskProperties.MarketTradingHours.effectiveClose(date: LocalDate): LocalTime? {
         val regularCloseTime = regularClose.toLocalTimeOrNull() ?: return null
-        val earlyCloseDates = earlyCloseDates.mapNotNull { it.toLocalDateOrNull() }.toSet()
-        if (date !in earlyCloseDates) return regularCloseTime
-        val configuredEarlyCloseTime = earlyCloseTime
+        val configuredEarlyCloseTime = earlyCloseTimes[date.toString()] ?: earlyCloseTimeForListedDate(date)
+        if (configuredEarlyCloseTime == null) return regularCloseTime
         if (configuredEarlyCloseTime.isNullOrBlank()) return null
         return configuredEarlyCloseTime.toLocalTimeOrNull()
+    }
+
+    private fun OrderRiskProperties.MarketTradingHours.earlyCloseTimeForListedDate(date: LocalDate): String? {
+        val earlyCloseDates = earlyCloseDates.mapNotNull { it.toLocalDateOrNull() }.toSet()
+        return earlyCloseTime.takeIf { date in earlyCloseDates }
     }
 
     private fun OrderRiskProperties.MarketTradingHours.orderCutoff(

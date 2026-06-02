@@ -238,6 +238,7 @@ akra.order.risk.trading-hours.domestic.holidays[0]=2026-10-05
 akra.order.risk.trading-hours.overseas-us.holidays[0]=2026-07-03
 akra.order.risk.trading-hours.overseas-us.early-close-dates[0]=2026-11-27
 akra.order.risk.trading-hours.overseas-us.early-close-time=13:00
+akra.order.risk.trading-hours.overseas-us.early-close-times[2026-11-27]=13:00
 akra.order.risk.trading-hours.overseas-us.loc-cutoff=15:50
 akra.order.risk.trading-hours.overseas-us.moc-cutoff=15:50
 ```

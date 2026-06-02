@@ -90,6 +90,7 @@ class OrderRiskProperties {
         var weekdaysOnly: Boolean = true
         var holidays: List<String> = emptyList()
         var earlyCloseDates: List<String> = emptyList()
+        var earlyCloseTimes: MutableMap<String, String> = mutableMapOf()
         var earlyCloseTime: String? = null
         var regularOpen: String = "00:00"
         var regularClose: String = "23:59"

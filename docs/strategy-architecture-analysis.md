@@ -551,7 +551,7 @@ broker API 자체가 idempotency key를 지원하지 않는다면, purchase-serv
 - root sketch app의 KIS secret key 이름은 `src/main/resources/application-secret.properties.example` 템플릿으로 문서화했고, classpath secret 파일 없이 런타임 환경변수/secret source로도 주입할 수 있다. 운영 재시작 절차는 `docs/operations/trading-runtime-runbook.md`에 정리했다.
 - Kafka와 Temporal activity 경계의 MDC trace propagation은 적용됐다. Temporal SDK interceptor, OpenTelemetry exporter wiring, 운영 대시보드 UI는 아직 남아 있다.
 - 단발성 전략의 entry buy는 execution-service로 들어왔지만, sell policy와 completion lifecycle은 추가 정리가 필요하다.
-- daily execution schedule은 설정 기반 US trading calendar를 거쳐 실행된다. 주말과 설정된 휴장일은 active strategy 실행을 skip하며, 휴장일 데이터 자동 동기화와 조기폐장/LOC/MOC 마감 시간 정책은 남아 있다.
+- daily execution schedule은 설정 기반 US trading calendar를 거쳐 실행된다. 주말과 설정된 휴장일은 active strategy 실행을 skip하며, stock-purchase-service 주문 guard는 설정 기반 조기폐장과 날짜별 조기폐장 시간 override를 적용한다. 휴장일/조기폐장 데이터 자동 동기화와 broker live-market acceptance 검증은 남아 있다.
 - outbox 저장과 Kafka 발행은 분리되었고, publisher 실패 시 `nextAttemptAt` 기반 exponential backoff로 재시도한다. 여러 publisher 인스턴스가 동시에 실행될 때는 `PROCESSING` claim lease로 row 중복 발행을 줄인다. 운영 수준의 DB transaction boundary와 Kafka exactly-once 수준의 보장은 추가 hardening이 필요하다.
 
 ## Migration From Legacy Flow
@@ -601,7 +601,7 @@ stock-search-service
 15. 부분 완료: stock-purchase-service 내부 주문/조회 KIS 계약을 broker gateway anti-corruption layer로 분리한다. 주문 제출 transient 실패와 broker order id 누락은 `SUBMISSION_UNKNOWN` 복구 흐름으로 보내고, wrapper 호출 rate-limit/circuit breaker를 둔다. root wrapper의 국내 주문체결조회 응답 정규화, stock-purchase의 해외 주문체결/잔고 top-level alias 매핑, token은 fixture test, real/mock scope별 만료 기반 cache, optional local-file persistence, optional JDBC shared token store, JDBC refresh TTL lock으로 보강했다. SUBMISSION_UNKNOWN/CANCEL_PENDING 복구의 주문 상태 조회는 설정 기반 날짜 window로 조회한다. 모의투자 query/submit/query/cancel smoke test 경계와 runbook은 추가했지만, 별도 broker wrapper service 배포, secret manager 연동, 실제 KIS 모의/실계좌 실행 증적은 남아 있다.
 16. 부분 완료: stock-purchase-service의 broker 제출 전 risk guard를 추가한다. 주문 단위/종목별 금액 한도, 활성 매수 주문 기준 계좌 pending exposure 한도, KIS 국내/해외 계좌 스냅샷 기반 계좌 exposure 한도, KIS 국내/해외 orderable cash 기반 현금 사용 한도, 하루 broker 제출 건수 한도, 중복 주문 kill switch, 전략 prefix disable, order intent 및 전략 prefix 기반 mock/live broker route 검증은 적용됐다. KIS alias 기반 cash bucket 분리, 설정 기반 기준 통화 환산, HTTP FX provider 경계, root wrapper의 KIS overseas daily chart price 기반 FX provider는 추가됐다. KIS 통화쌍 symbol 설정의 실계좌 검증은 남아 있다.
 17. 부분 완료: 운영 관측성을 추가한다. 주문 제출 실패, `SUBMISSION_UNKNOWN` 지속, reconciliation 실패, 미매칭 broker execution은 log 기반 alert port, Micrometer counter, optional generic webhook, Slack incoming webhook, PagerDuty Events API v2로 노출하고, 알림 payload에 현재 trace context를 포함하며, 라오어 전략별 T/현금/보유/평단 조회 API를 추가했다. Kafka와 Temporal activity 경계의 MDC trace propagation은 적용됐고, Temporal SDK interceptor, OpenTelemetry exporter wiring, 대시보드 UI는 남아 있다.
-18. 부분 완료: daily active strategy execution에 설정 기반 US trading calendar를 추가하고, stock-purchase-service broker 제출 전 설정 기반 주문 가능 시간/LOC/MOC 마감 guard를 추가한다. 주말과 설정 휴장일 skip, 설정 기반 주문 시간 guard는 적용됐고, 휴장일/조기폐장/마감 시간 데이터 자동 동기화와 per-date cutoff 정책은 남아 있다.
+18. 부분 완료: daily active strategy execution에 설정 기반 US trading calendar를 추가하고, stock-purchase-service broker 제출 전 설정 기반 주문 가능 시간/LOC/MOC 마감 guard를 추가한다. 주말과 설정 휴장일 skip, 설정 기반 주문 시간 guard, 공통 조기폐장 시간, 날짜별 조기폐장 시간 override는 적용됐다. 휴장일/조기폐장/마감 시간 데이터 자동 동기화와 broker live-market acceptance 검증은 남아 있다.
 19. 부분 완료: 배포/설정/보안 가드를 추가한다. KIS secret 템플릿, runtime-injected KIS secret source 지원, 운영 runbook, production-like profile startup validation은 적용했고, secret manager/vault 배포 연동과 운영 DB/Kafka/Temporal 배포 자동화는 남아 있다.
 
 ### Broker Cancel Request Boundary
@@ -618,9 +618,9 @@ stock-search-service
 
 - `stock-purchase-service` now runs a config-backed trading-hours guard before broker submission through `OrderRiskControlPort`.
 - The guard blocks order intents before KIS calls when the request is outside the configured domestic or US order window, lands on a configured market holiday, or exceeds the configured LOC/MOC cutoff.
-- US early-close dates can be configured with a common early-close time; this limits LIMIT, LOC, and MOC submission windows for those dates.
+- US early-close dates can be configured with a common early-close time, and individual dates can override that close time through `early-close-times[yyyy-MM-dd]`; this limits LIMIT, LOC, and MOC submission windows for those dates.
 - Rejected intents follow the existing risk rejection path: rejected submission storage plus `OrderRejected` publication.
-- This is still not a full exchange-calendar integration. Automatic holiday/early-close synchronization, per-date cutoff data, and broker-verified live-market acceptance checks remain production hardening work.
+- This is still not a full exchange-calendar integration. Automatic holiday/early-close synchronization and broker-verified live-market acceptance checks remain production hardening work.
 
 ### Trading Operations Status API
 

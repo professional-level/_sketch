@@ -90,6 +90,42 @@ class OrderRiskControlAdapterTest {
     }
 
     @Test
+    fun `applies date specific early close before loc cutoff`() = runBlocking {
+        val properties = OrderRiskProperties().apply {
+            tradingHours.overseasUs.earlyCloseDates = listOf("2026-06-01")
+            tradingHours.overseasUs.earlyCloseTime = "13:00"
+            tradingHours.overseasUs.earlyCloseTimes["2026-06-01"] = "12:30"
+            tradingHours.overseasUs.locCutoff = "15:50"
+        }
+
+        val result = adapter(properties).assess(
+            command(
+                orderType = OrderIntentType.LOC,
+                createdAt = ZonedDateTime.parse("2026-06-01T12:31:00-04:00[America/New_York]"),
+            ),
+        )
+
+        assertFalse(result.accepted)
+        assertContains(result.reason ?: "", "allowed=09:30-12:30")
+    }
+
+    @Test
+    fun `accepts date specific early close order before override cutoff`() = runBlocking {
+        val properties = OrderRiskProperties().apply {
+            tradingHours.overseasUs.earlyCloseTimes["2026-06-01"] = "12:30"
+        }
+
+        val result = adapter(properties).assess(
+            command(
+                orderType = OrderIntentType.LIMIT,
+                createdAt = ZonedDateTime.parse("2026-06-01T12:29:00-04:00[America/New_York]"),
+            ),
+        )
+
+        assertTrue(result.accepted)
+    }
+
+    @Test
     fun `rejects order when early close configuration is invalid`() = runBlocking {
         val properties = OrderRiskProperties().apply {
             tradingHours.overseasUs.earlyCloseDates = listOf("2026-06-01")
