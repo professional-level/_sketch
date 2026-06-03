@@ -37,7 +37,7 @@ class KisBrokerGatewayAdapterTest {
         val command = brokerCommand(
             side = OrderIntentSide.BUY,
             symbol = "tqqq",
-            exchange = "NYSE",
+            exchange = "nasdaq",
             price = 112.5,
             quantity = 3,
             orderType = StockOrderType.LOC,
@@ -47,7 +47,7 @@ class KisBrokerGatewayAdapterTest {
         val body = command.toKisUsOverseasOrderRequest()
 
         assertEquals("TQQQ", body["PDNO"])
-        assertEquals("NYSE", body["OVRS_EXCG_CD"])
+        assertEquals("NASD", body["OVRS_EXCG_CD"])
         assertEquals(3, body["ORD_QTY"])
         assertEquals("112.5", body["OVRS_ORD_UNPR"])
         assertEquals("34", body["ORD_DVSN"])
@@ -955,10 +955,10 @@ class KisBrokerGatewayAdapterTest {
         )
 
         adapter.findOrderHistory(
-            historyQuery().copy(exchange = "nyse"),
+            historyQuery().copy(exchange = "nasdaq"),
         )
 
-        assertEquals("NYSE", exchangeFunction.requests.single().queryValue("ovrsExcgCd"))
+        assertEquals("NASD", exchangeFunction.requests.single().queryValue("ovrsExcgCd"))
     }
 
     @Test
@@ -1189,7 +1189,7 @@ class KisBrokerGatewayAdapterTest {
         val snapshot = adapter.findAccountSnapshot(
             BrokerAccountSnapshotQuery(
                 market = StockOrderMarket.OVERSEAS_US,
-                exchange = "nasd",
+                exchange = "nasdaq",
                 currency = "USD",
                 isMock = false,
             ),

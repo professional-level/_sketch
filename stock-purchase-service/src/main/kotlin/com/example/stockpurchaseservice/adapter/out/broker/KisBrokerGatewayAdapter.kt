@@ -761,7 +761,7 @@ private fun JsonNode.toBrokerAccountSnapshot(query: BrokerAccountSnapshotQuery):
 
     return BrokerAccountSnapshot(
         market = StockOrderMarket.OVERSEAS_US,
-        exchange = query.exchange.uppercase(),
+        exchange = query.exchange.toKisUsExchangeCode(),
         currency = query.currency.uppercase(),
         positions = rows.mapNotNull { it.toBrokerPositionSnapshot() },
         availableCashAmount = orderableCashAmount ?: settledCashAmount ?: withdrawableCashAmount,
@@ -1430,9 +1430,10 @@ private fun StockOrderType.toKisUsOrderDivision(side: OrderIntentSide, isMock: B
 }
 
 private fun String.toKisUsExchangeCode(): String {
-    val exchange = trim().uppercase().ifBlank { DEFAULT_US_EXCHANGE }
+    val rawExchange = trim().uppercase().ifBlank { DEFAULT_US_EXCHANGE }
+    val exchange = US_EXCHANGE_ALIASES[rawExchange] ?: rawExchange
     require(exchange in SUPPORTED_US_EXCHANGES) {
-        "unsupported US overseas exchange: $exchange"
+        "unsupported US overseas exchange: $rawExchange"
     }
     return exchange
 }
@@ -1445,3 +1446,4 @@ private fun Double.toBrokerPrice(): String {
 
 private const val DEFAULT_US_EXCHANGE = "NASD"
 private val SUPPORTED_US_EXCHANGES = setOf("NASD", "NYSE", "AMEX")
+private val US_EXCHANGE_ALIASES = mapOf("NASDAQ" to "NASD")
