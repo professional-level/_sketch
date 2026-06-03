@@ -87,7 +87,7 @@ class RunActiveStrategyExecutionsServiceTest {
     }
 
     @Test
-    fun `passes next order session start time to strategy run after market close`() = runBlocking {
+    fun `skips active execution after market close instead of future dating order intents`() = runBlocking {
         val statePort = FakeStrategyExecutionStatePort(
             activeStates = listOf(
                 LaorV4ExecutionState(
@@ -114,16 +114,20 @@ class RunActiveStrategyExecutionsServiceTest {
             ),
         )
 
-        service.execute(
+        val result = service.execute(
             RunActiveStrategyExecutionsCommand(
                 executionRunId = "ACTIVE_STRATEGIES_DAILY:2026-06-02",
                 requestedAt = triggerAt,
             ),
         )
 
-        val command = runStrategyExecutionUseCase.commands.single() as RunStrategyExecutionCommand.LaorV4
-        assertEquals(orderRequestedAt, command.requestedAt)
-        assertEquals(triggerAt, statePort.saved.single().lastExecutedAt)
+        assertEquals(1, result.activeStrategyCount)
+        assertEquals(0, result.executedStrategyCount)
+        assertEquals(0, result.createdOrderIntentCount)
+        assertEquals("US market order session is not open until $orderRequestedAt", result.skippedReason)
+        assertEquals(emptyList(), marketDataPort.requests)
+        assertEquals(emptyList(), runStrategyExecutionUseCase.commands)
+        assertEquals(emptyList(), statePort.saved)
     }
 
     @Test
@@ -205,7 +209,7 @@ class RunActiveStrategyExecutionsServiceTest {
     }
 
     @Test
-    fun `skips daily execution when order session date is closed`() = runBlocking {
+    fun `skips active execution before market open instead of future dating order intents`() = runBlocking {
         val statePort = FakeStrategyExecutionStatePort(
             activeStates = listOf(
                 LaorV4ExecutionState(
@@ -220,27 +224,28 @@ class RunActiveStrategyExecutionsServiceTest {
         val runStrategyExecutionUseCase = FakeRunStrategyExecutionUseCase(
             plannedState = LaorV4State(availableCash = 2_240.0),
         )
+        val triggerAt = ZonedDateTime.parse("2026-06-02T08:00:00-04:00[America/New_York]")
+        val orderRequestedAt = ZonedDateTime.parse("2026-06-02T09:30:00-04:00[America/New_York]")
         val service = RunActiveStrategyExecutionsService(
             strategyExecutionStatePort = statePort,
             marketDataPort = marketDataPort,
             runStrategyExecutionUseCase = runStrategyExecutionUseCase,
             tradingCalendarPort = FakeTradingCalendarPort(
-                closedDates = setOf(LocalDate.parse("2026-07-03")),
-                orderSessionDate = LocalDate.parse("2026-07-03"),
+                orderSessionStartAt = orderRequestedAt,
             ),
         )
 
         val result = service.execute(
             RunActiveStrategyExecutionsCommand(
-                executionRunId = "ACTIVE_STRATEGIES_DAILY:2026-07-02",
-                requestedAt = ZonedDateTime.parse("2026-07-02T20:00:00-04:00[America/New_York]"),
+                executionRunId = "ACTIVE_STRATEGIES_DAILY:2026-06-02",
+                requestedAt = triggerAt,
             ),
         )
 
         assertEquals(1, result.activeStrategyCount)
         assertEquals(0, result.executedStrategyCount)
         assertEquals(0, result.createdOrderIntentCount)
-        assertEquals("US market is closed on 2026-07-03", result.skippedReason)
+        assertEquals("US market order session is not open until $orderRequestedAt", result.skippedReason)
         assertEquals(emptyList(), marketDataPort.requests)
         assertEquals(emptyList(), runStrategyExecutionUseCase.commands)
         assertEquals(emptyList(), statePort.saved)

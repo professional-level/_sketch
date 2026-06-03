@@ -27,7 +27,7 @@ class RunActiveStrategyExecutionsService(
 
     override suspend fun execute(command: RunActiveStrategyExecutionsCommand): RunActiveStrategyExecutionsResult {
         val activeStrategies = strategyExecutionStatePort.findActiveLaorV4Strategies()
-        val requestedDate = tradingCalendarPort.orderSessionDate(TradingMarket.US, command.requestedAt)
+        val requestedDate = tradingCalendarPort.tradingDate(TradingMarket.US, command.requestedAt)
         if (!tradingCalendarPort.isTradingDay(TradingMarket.US, requestedDate)) {
             return RunActiveStrategyExecutionsResult(
                 executionRunId = command.executionRunId,
@@ -41,6 +41,15 @@ class RunActiveStrategyExecutionsService(
         var executedStrategyCount = 0
         var createdOrderIntentCount = 0
         val orderRequestedAt = tradingCalendarPort.orderSessionStartAt(TradingMarket.US, command.requestedAt)
+        if (orderRequestedAt.toInstant().isAfter(command.requestedAt.toInstant())) {
+            return RunActiveStrategyExecutionsResult(
+                executionRunId = command.executionRunId,
+                activeStrategyCount = activeStrategies.size,
+                executedStrategyCount = 0,
+                createdOrderIntentCount = 0,
+                skippedReason = "US market order session is not open until $orderRequestedAt",
+            )
+        }
 
         for (strategy in activeStrategies) {
             if (strategy.lastExecutionRunId == command.executionRunId) {

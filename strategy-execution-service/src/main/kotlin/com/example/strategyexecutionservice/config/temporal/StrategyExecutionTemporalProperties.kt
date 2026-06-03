@@ -18,9 +18,9 @@ class StrategyExecutionTemporalProperties {
         var enabled: Boolean = true
         var scheduleId: String = "strategy-execution-active-executions-daily"
         var hour: Int = 9
-        var minute: Int = 0
+        var minute: Int = 30
         var second: Int = 0
-        var timeZone: String = "Asia/Seoul"
+        var timeZone: String = "America/New_York"
         var weekdaysOnly: Boolean = true
         var executionRunIdPrefix: String = "ACTIVE_STRATEGIES_DAILY"
 
