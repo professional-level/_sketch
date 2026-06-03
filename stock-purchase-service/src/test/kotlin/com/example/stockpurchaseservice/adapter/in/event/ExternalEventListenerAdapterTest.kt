@@ -57,6 +57,37 @@ class ExternalEventListenerAdapterTest {
         assertEquals(OrderTradingEnvironment.MOCK, useCase.commands.single().tradingEnvironment)
     }
 
+    @Test
+    fun `maps sell moc order intent with zero price to no-price command`() = runBlocking {
+        val useCase = CapturingSubmitOrderIntentUseCase()
+        val adapter = ExternalEventListenerAdapter(useCase)
+        val event = Event.OrderIntentCreatedEvent.newBuilder()
+            .setEventId("00000000-0000-0000-0000-000000000102")
+            .setIdempotencyKey("intent-sell-moc-1")
+            .setStrategyExecutionId("laor-v4:TQQQ")
+            .setStrategyType(Event.StrategyExecutionType.LAOR_V4_STRATEGY)
+            .setSymbol("TQQQ")
+            .setExchange("NASD")
+            .setSide(Event.OrderIntentSide.ORDER_INTENT_SELL)
+            .setOrderType(Event.OrderIntentOrderType.ORDER_INTENT_MOC)
+            .setPrice(0.0)
+            .setQuantity(3L)
+            .setOrderTag("MOC_SELL")
+            .setCreatedAt(Timestamp.newBuilder().setSeconds(CREATED_AT_EPOCH_SECONDS).build())
+            .setTradingEnvironment(Event.OrderTradingEnvironment.ORDER_TRADING_ENVIRONMENT_LIVE)
+            .build()
+
+        adapter.orderIntents(ConsumerRecord(ORDER_INTENT_CREATED, 0, 0L, "laor-v4:TQQQ", event.toByteArray()))
+
+        val command = useCase.commands.single()
+        assertEquals(OrderIntentSide.SELL, command.side)
+        assertEquals(OrderIntentType.MOC, command.orderType)
+        assertNull(command.price)
+        assertEquals(3L, command.quantity)
+        assertEquals("MOC_SELL", command.orderTag)
+        assertEquals(OrderTradingEnvironment.LIVE, command.tradingEnvironment)
+    }
+
     private fun orderIntentRecord(): ConsumerRecord<String, ByteArray> {
         val event = Event.OrderIntentCreatedEvent.newBuilder()
             .setEventId(EVENT_ID)
