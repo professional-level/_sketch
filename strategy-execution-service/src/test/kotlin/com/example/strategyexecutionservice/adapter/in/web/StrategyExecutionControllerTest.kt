@@ -28,6 +28,7 @@ class StrategyExecutionControllerTest {
                 symbol = "tqqq",
                 budget = 10_000.0,
                 totalSplitCount = 20,
+                firstBuyLimitPercentAbovePreviousClose = 12.0,
             ),
         )
 
@@ -157,7 +158,7 @@ class StrategyExecutionControllerTest {
                 symbol = command.symbol,
                 budget = command.budget,
                 totalSplitCount = command.totalSplitCount,
-                firstBuyLimitMultiplier = command.firstBuyLimitMultiplier,
+                firstBuyLimitPercentAbovePreviousClose = command.firstBuyLimitPercentAbovePreviousClose,
                 autoRestart = command.autoRestart,
             )
         }
@@ -201,7 +202,7 @@ class StrategyExecutionControllerTest {
             status = StrategyExecutionLifecycleStatus.ACTIVE,
             cycleNo = 1,
             totalSplitCount = 20,
-            firstBuyLimitMultiplier = 1.12,
+            firstBuyLimitPercentAbovePreviousClose = 12.0,
             autoRestart = true,
             mode = LaorV4StrategyMode.NORMAL,
             progressRound = progressRound,

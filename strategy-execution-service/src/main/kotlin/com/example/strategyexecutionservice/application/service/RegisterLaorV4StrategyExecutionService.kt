@@ -26,7 +26,7 @@ class RegisterLaorV4StrategyExecutionService(
             executionId = command.executionId,
             symbol = command.symbol,
             totalSplitCount = command.totalSplitCount,
-            firstBuyLimitMultiplier = command.firstBuyLimitMultiplier,
+            firstBuyLimitPercentAbovePreviousClose = command.firstBuyLimitPercentAbovePreviousClose,
             autoRestart = command.autoRestart,
             state = LaorV4StrategyState(availableCash = command.budget),
         )
@@ -43,7 +43,7 @@ class RegisterLaorV4StrategyExecutionService(
             symbol = symbol,
             budget = state.availableCash,
             totalSplitCount = totalSplitCount,
-            firstBuyLimitMultiplier = firstBuyLimitMultiplier,
+            firstBuyLimitPercentAbovePreviousClose = firstBuyLimitPercentAbovePreviousClose,
             autoRestart = autoRestart,
         )
     }

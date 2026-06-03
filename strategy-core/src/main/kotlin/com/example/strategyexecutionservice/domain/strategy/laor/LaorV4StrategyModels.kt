@@ -3,11 +3,13 @@ package com.example.strategyexecutionservice.domain.strategy.laor
 data class LaorV4StrategyConfig(
     val symbol: LaorV4StrategySymbol,
     val totalSplitCount: Int,
-    val firstBuyLimitMultiplier: Double = DEFAULT_FIRST_BUY_LIMIT_MULTIPLIER,
+    val firstBuyLimitPercentAbovePreviousClose: Double,
 ) {
     init {
         require(totalSplitCount > 1) { "totalSplitCount must be greater than 1" }
-        require(firstBuyLimitMultiplier > 1.0) { "firstBuyLimitMultiplier must be greater than 1" }
+        require(firstBuyLimitPercentAbovePreviousClose in MIN_FIRST_BUY_LIMIT_PERCENT_ABOVE_PREVIOUS_CLOSE..MAX_FIRST_BUY_LIMIT_PERCENT_ABOVE_PREVIOUS_CLOSE) {
+            "firstBuyLimitPercentAbovePreviousClose must be between 10 and 15"
+        }
     }
 
     val reverseSellDivisionCount: Double
@@ -17,7 +19,8 @@ data class LaorV4StrategyConfig(
         get() = 1.0 - 2.0 / totalSplitCount
 
     companion object {
-        const val DEFAULT_FIRST_BUY_LIMIT_MULTIPLIER: Double = 1.12
+        const val MIN_FIRST_BUY_LIMIT_PERCENT_ABOVE_PREVIOUS_CLOSE: Double = 10.0
+        const val MAX_FIRST_BUY_LIMIT_PERCENT_ABOVE_PREVIOUS_CLOSE: Double = 15.0
     }
 }
 

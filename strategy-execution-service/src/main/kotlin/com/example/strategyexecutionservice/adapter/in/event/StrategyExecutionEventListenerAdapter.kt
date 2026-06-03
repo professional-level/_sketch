@@ -10,7 +10,6 @@ import com.example.strategyexecutionservice.application.port.`in`.RecordOrderExe
 import com.example.strategyexecutionservice.application.port.`in`.StartStrategyExecutionCommand
 import com.example.strategyexecutionservice.application.port.`in`.StartStrategyExecutionUseCase
 import com.example.strategyexecutionservice.domain.strategy.execution.OrderSide
-import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategyConfig
 import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategySymbol
 import common.ConsumerGroupId.STRATEGY_EXECUTION_SERVICE
 import common.Topic.ORDER_FILLED
@@ -117,10 +116,8 @@ private fun Event.StrategyExecutionStartRequested.toCommand(): StartStrategyExec
                 strategySymbol = strategySymbol,
                 market = event.market.ifBlank { "US" },
                 budget = event.budget,
-                totalSplitCount = parameters.totalSplitCount.takeIf { it > 0 } ?: 20,
-                firstBuyLimitMultiplier = parameters.firstBuyLimitMultiplier
-                    .takeIf { it > 0.0 }
-                    ?: LaorV4StrategyConfig.DEFAULT_FIRST_BUY_LIMIT_MULTIPLIER,
+                totalSplitCount = parameters.totalSplitCount,
+                firstBuyLimitPercentAbovePreviousClose = parameters.firstBuyLimitPercentAbovePreviousClose,
                 autoRestart = parameters.autoRestart,
                 requestedAt = requestedAt,
             )

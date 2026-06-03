@@ -81,7 +81,7 @@ class RunStrategyExecutionService(
                 config = LaorV4StrategyConfig(
                     symbol = symbol,
                     totalSplitCount = totalSplitCount,
-                    firstBuyLimitMultiplier = firstBuyLimitMultiplier,
+                    firstBuyLimitPercentAbovePreviousClose = firstBuyLimitPercentAbovePreviousClose,
                 ),
                 state = state.toDomain(),
             )

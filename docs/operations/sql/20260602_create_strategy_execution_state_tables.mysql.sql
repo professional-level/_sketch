@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS laor_v4_strategy_execution (
     executionId VARCHAR(255) NOT NULL,
     symbol VARCHAR(255) NOT NULL,
     totalSplitCount INT NOT NULL,
-    firstBuyLimitMultiplier DOUBLE NOT NULL,
+    firstBuyLimitPercentAbovePreviousClose DOUBLE NOT NULL,
     autoRestart BIT(1) NOT NULL,
     cycleNo INT NOT NULL,
     status VARCHAR(255) NOT NULL,

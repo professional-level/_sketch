@@ -97,7 +97,7 @@ class RunActiveStrategyExecutionsService(
             requestedAt = requestedAt,
             symbol = symbol,
             totalSplitCount = totalSplitCount,
-            firstBuyLimitMultiplier = firstBuyLimitMultiplier,
+            firstBuyLimitPercentAbovePreviousClose = firstBuyLimitPercentAbovePreviousClose,
             state = state.toApplication(),
             market = market.toApplication(),
         )

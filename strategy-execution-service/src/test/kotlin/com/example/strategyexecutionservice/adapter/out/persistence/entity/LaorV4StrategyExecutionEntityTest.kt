@@ -18,7 +18,7 @@ class LaorV4StrategyExecutionEntityTest {
             executionId = "laor-v4:TQQQ",
             symbol = LaorV4StrategySymbol.TQQQ,
             totalSplitCount = 20,
-            firstBuyLimitMultiplier = 1.12,
+            firstBuyLimitPercentAbovePreviousClose = 12.0,
             autoRestart = false,
             cycleNo = 3,
             status = StrategyExecutionLifecycleStatus.COMPLETED,

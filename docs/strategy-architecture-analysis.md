@@ -214,7 +214,7 @@ strategyType = LAOR_V4
 symbol = TQQQ
 budget = 10000
 totalSplitCount = 20
-firstBuyLimitMultiplier = 1.12
+firstBuyLimitPercentAbovePreviousClose = 12
 idempotencyKey = LAOR_V4:TQQQ:2026-05-31
 ```
 
@@ -247,7 +247,7 @@ status = ACTIVE
 FIRST_BUY
 side = BUY
 orderType = LOC
-price = previousClose * firstBuyLimitMultiplier
+price = previousClose * (1 + firstBuyLimitPercentAbovePreviousClose / 100)
 budget = availableCash / totalSplitCount
 ```
 
@@ -379,7 +379,7 @@ message StrategyExecutionParameters {
 ```text
 message LaorV4StartParameters {
   int32 total_split_count = 1;
-  double first_buy_limit_multiplier = 2;
+  double first_buy_limit_percent_above_previous_close = 2;
   bool auto_restart = 3;
 }
 ```

@@ -47,7 +47,7 @@ class LaorV4BacktestRunService(
             strategyType = BacktestStrategyType.LAOR_V4,
             laorV4 = LaorV4BacktestParameters(
                 totalSplitCount = totalSplitCount,
-                firstBuyLimitMultiplier = firstBuyLimitMultiplier,
+                firstBuyLimitPercentAbovePreviousClose = firstBuyLimitPercentAbovePreviousClose,
                 autoRestart = autoRestart,
             ),
             refreshMarketData = refreshMarketData,

@@ -21,7 +21,7 @@ sealed class RunStrategyExecutionCommand {
         override val requestedAt: ZonedDateTime,
         val symbol: LaorV4StrategySymbol,
         val totalSplitCount: Int,
-        val firstBuyLimitMultiplier: Double,
+        val firstBuyLimitPercentAbovePreviousClose: Double,
         val state: LaorV4State,
         val market: MarketSnapshot,
     ) : RunStrategyExecutionCommand()

@@ -133,7 +133,7 @@ object LaorV4StrategyEngine {
         market: LaorV4StrategyMarket,
     ): List<LaorV4StrategyOrder> {
         if (state.holdingQuantity == 0L) {
-            val firstBuyLimitPrice = market.previousClose * config.firstBuyLimitMultiplier
+            val firstBuyLimitPrice = market.previousClose * (1 + config.firstBuyLimitPercentAbovePreviousClose / 100)
             return listOfNotNull(
                 buyOrder(
                     type = LaorV4StrategyOrderType.LOC,

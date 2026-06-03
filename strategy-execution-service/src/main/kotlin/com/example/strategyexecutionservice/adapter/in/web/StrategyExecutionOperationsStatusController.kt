@@ -53,7 +53,7 @@ private fun LaorV4StrategyExecutionView.toResponse(): LaorV4StrategyExecutionRes
         status = status.name,
         cycleNo = cycleNo,
         totalSplitCount = totalSplitCount,
-        firstBuyLimitMultiplier = firstBuyLimitMultiplier,
+        firstBuyLimitPercentAbovePreviousClose = firstBuyLimitPercentAbovePreviousClose,
         autoRestart = autoRestart,
         mode = mode.name,
         progressRound = progressRound,

@@ -8,7 +8,6 @@ import com.example.strategyexecutionservice.application.port.`in`.QueryLaorV4Str
 import com.example.strategyexecutionservice.application.port.`in`.RegisterLaorV4StrategyExecutionCommand
 import com.example.strategyexecutionservice.application.port.`in`.RegisterLaorV4StrategyExecutionResult
 import com.example.strategyexecutionservice.application.port.`in`.RegisterLaorV4StrategyExecutionUseCase
-import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategyConfig
 import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategySymbol
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
@@ -68,7 +67,7 @@ class StrategyExecutionController(
             symbol = strategySymbol,
             budget = budget,
             totalSplitCount = totalSplitCount,
-            firstBuyLimitMultiplier = firstBuyLimitMultiplier,
+            firstBuyLimitPercentAbovePreviousClose = firstBuyLimitPercentAbovePreviousClose,
             autoRestart = autoRestart,
         )
     }
@@ -80,7 +79,7 @@ class StrategyExecutionController(
             symbol = symbol.ticker,
             budget = budget,
             totalSplitCount = totalSplitCount,
-            firstBuyLimitMultiplier = firstBuyLimitMultiplier,
+            firstBuyLimitPercentAbovePreviousClose = firstBuyLimitPercentAbovePreviousClose,
             autoRestart = autoRestart,
         )
     }
@@ -92,7 +91,7 @@ class StrategyExecutionController(
             status = status.name,
             cycleNo = cycleNo,
             totalSplitCount = totalSplitCount,
-            firstBuyLimitMultiplier = firstBuyLimitMultiplier,
+            firstBuyLimitPercentAbovePreviousClose = firstBuyLimitPercentAbovePreviousClose,
             autoRestart = autoRestart,
             mode = mode.name,
             progressRound = progressRound,
@@ -138,7 +137,7 @@ data class RegisterLaorV4StrategyExecutionRequest(
     val symbol: String,
     val budget: Double,
     val totalSplitCount: Int,
-    val firstBuyLimitMultiplier: Double = LaorV4StrategyConfig.DEFAULT_FIRST_BUY_LIMIT_MULTIPLIER,
+    val firstBuyLimitPercentAbovePreviousClose: Double,
     val autoRestart: Boolean = true,
 )
 
@@ -148,7 +147,7 @@ data class RegisterLaorV4StrategyExecutionResponse(
     val symbol: String,
     val budget: Double,
     val totalSplitCount: Int,
-    val firstBuyLimitMultiplier: Double,
+    val firstBuyLimitPercentAbovePreviousClose: Double,
     val autoRestart: Boolean,
 )
 
@@ -158,7 +157,7 @@ data class LaorV4StrategyExecutionResponse(
     val status: String,
     val cycleNo: Int,
     val totalSplitCount: Int,
-    val firstBuyLimitMultiplier: Double,
+    val firstBuyLimitPercentAbovePreviousClose: Double,
     val autoRestart: Boolean,
     val mode: String,
     val progressRound: Double,

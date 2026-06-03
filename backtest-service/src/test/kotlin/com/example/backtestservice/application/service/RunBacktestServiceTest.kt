@@ -83,7 +83,10 @@ class RunBacktestServiceTest {
                 to = LocalDate.parse("2024-01-03"),
                 initialCash = "1000".toBigDecimal(),
                 strategyType = BacktestStrategyType.LAOR_V4,
-                laorV4 = LaorV4BacktestParameters(totalSplitCount = 10),
+                laorV4 = LaorV4BacktestParameters(
+                    totalSplitCount = 10,
+                    firstBuyLimitPercentAbovePreviousClose = 12.0,
+                ),
             ),
         )
 

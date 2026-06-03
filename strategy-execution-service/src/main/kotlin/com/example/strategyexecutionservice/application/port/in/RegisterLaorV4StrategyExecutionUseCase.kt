@@ -14,14 +14,18 @@ data class RegisterLaorV4StrategyExecutionCommand(
     val symbol: LaorV4StrategySymbol,
     val budget: Double,
     val totalSplitCount: Int,
-    val firstBuyLimitMultiplier: Double = LaorV4StrategyConfig.DEFAULT_FIRST_BUY_LIMIT_MULTIPLIER,
+    val firstBuyLimitPercentAbovePreviousClose: Double,
     val autoRestart: Boolean = true,
 ) {
     init {
         require(executionId.isNotBlank()) { "executionId must not be blank" }
         require(budget > 0.0) { "budget must be positive" }
         require(totalSplitCount > 1) { "totalSplitCount must be greater than 1" }
-        require(firstBuyLimitMultiplier > 1.0) { "firstBuyLimitMultiplier must be greater than 1" }
+        require(
+            firstBuyLimitPercentAbovePreviousClose in
+                LaorV4StrategyConfig.MIN_FIRST_BUY_LIMIT_PERCENT_ABOVE_PREVIOUS_CLOSE..
+                LaorV4StrategyConfig.MAX_FIRST_BUY_LIMIT_PERCENT_ABOVE_PREVIOUS_CLOSE,
+        ) { "firstBuyLimitPercentAbovePreviousClose must be between 10 and 15" }
     }
 }
 
@@ -31,7 +35,7 @@ data class RegisterLaorV4StrategyExecutionResult(
     val symbol: LaorV4StrategySymbol,
     val budget: Double,
     val totalSplitCount: Int,
-    val firstBuyLimitMultiplier: Double,
+    val firstBuyLimitPercentAbovePreviousClose: Double,
     val autoRestart: Boolean,
 )
 

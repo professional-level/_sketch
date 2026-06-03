@@ -26,7 +26,7 @@ class QueryLaorV4StrategyExecutionService(
             status = status,
             cycleNo = cycleNo,
             totalSplitCount = totalSplitCount,
-            firstBuyLimitMultiplier = firstBuyLimitMultiplier,
+            firstBuyLimitPercentAbovePreviousClose = firstBuyLimitPercentAbovePreviousClose,
             autoRestart = autoRestart,
             mode = state.mode,
             progressRound = state.progressRound,

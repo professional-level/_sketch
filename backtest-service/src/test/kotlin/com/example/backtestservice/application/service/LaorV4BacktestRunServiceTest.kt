@@ -33,6 +33,8 @@ class LaorV4BacktestRunServiceTest {
                 from = LocalDate.parse("2024-01-02"),
                 to = LocalDate.parse("2024-01-04"),
                 initialCash = "1000".toBigDecimal(),
+                totalSplitCount = 40,
+                firstBuyLimitPercentAbovePreviousClose = 12.0,
             ),
         )
 

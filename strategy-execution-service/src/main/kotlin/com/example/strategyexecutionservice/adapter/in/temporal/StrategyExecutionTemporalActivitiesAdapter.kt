@@ -84,7 +84,7 @@ class StrategyExecutionTemporalActivitiesAdapter(
             requestedAt = requestedAt,
             symbol = LaorV4StrategySymbol.valueOf(symbol),
             totalSplitCount = totalSplitCount,
-            firstBuyLimitMultiplier = firstBuyLimitMultiplier,
+            firstBuyLimitPercentAbovePreviousClose = firstBuyLimitPercentAbovePreviousClose,
             state = state.toCommandState(),
             market = market.toCommandMarket(),
         )

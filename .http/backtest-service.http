@@ -51,7 +51,7 @@ Content-Type: application/json
   "to": "{{to}}",
   "initialCash": 10000,
   "totalSplitCount": 40,
-  "firstBuyLimitMultiplier": 1.12,
+  "firstBuyLimitPercentAbovePreviousClose": 12,
   "autoRestart": true,
   "refreshMarketData": true,
   "autoAdjust": false,

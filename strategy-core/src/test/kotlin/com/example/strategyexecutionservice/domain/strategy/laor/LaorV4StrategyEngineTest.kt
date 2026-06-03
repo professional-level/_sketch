@@ -8,12 +8,19 @@ import kotlin.test.assertNull
 class LaorV4StrategyEngineTest {
 
     @Test
-    fun `rejects first buy multiplier at or below one`() {
+    fun `rejects first buy limit percent outside documented range`() {
         assertFailsWith<IllegalArgumentException> {
             LaorV4StrategyConfig(
                 symbol = LaorV4StrategySymbol.TQQQ,
                 totalSplitCount = 20,
-                firstBuyLimitMultiplier = 1.0,
+                firstBuyLimitPercentAbovePreviousClose = 9.99,
+            )
+        }
+        assertFailsWith<IllegalArgumentException> {
+            LaorV4StrategyConfig(
+                symbol = LaorV4StrategySymbol.TQQQ,
+                totalSplitCount = 20,
+                firstBuyLimitPercentAbovePreviousClose = 15.01,
             )
         }
     }
@@ -29,7 +36,7 @@ class LaorV4StrategyEngineTest {
         )
 
         cases.forEach { case ->
-            val config = LaorV4StrategyConfig(symbol = case.symbol, totalSplitCount = case.totalSplitCount)
+            val config = config(case.symbol, case.totalSplitCount)
             val state = LaorV4StrategyState(progressRound = case.progressRound, availableCash = 0.0)
 
             assertDouble(case.expected, LaorV4StrategyEngine.normalModeStarProfitPercent(config, state))
@@ -38,7 +45,7 @@ class LaorV4StrategyEngineTest {
 
     @Test
     fun `plans first-half buys with star buy below star sell price`() {
-        val config = LaorV4StrategyConfig(symbol = LaorV4StrategySymbol.TQQQ, totalSplitCount = 20)
+        val config = config(LaorV4StrategySymbol.TQQQ, 20)
         val state = LaorV4StrategyState(
             progressRound = 4.0,
             availableCash = 32_000.0,
@@ -61,7 +68,7 @@ class LaorV4StrategyEngineTest {
 
     @Test
     fun `floors buy quantity and skips orders that cannot buy one share`() {
-        val config = LaorV4StrategyConfig(symbol = LaorV4StrategySymbol.TQQQ, totalSplitCount = 20)
+        val config = config(LaorV4StrategySymbol.TQQQ, 20)
         val state = LaorV4StrategyState(availableCash = 2_240.0)
 
         val orders = LaorV4StrategyEngine.generateOrders(
@@ -84,7 +91,7 @@ class LaorV4StrategyEngineTest {
 
     @Test
     fun `plans first reverse day MOC sell`() {
-        val config = LaorV4StrategyConfig(symbol = LaorV4StrategySymbol.TQQQ, totalSplitCount = 20)
+        val config = config(LaorV4StrategySymbol.TQQQ, 20)
         val state = LaorV4StrategyState(
             mode = LaorV4StrategyMode.REVERSE,
             progressRound = 20.0,
@@ -109,7 +116,7 @@ class LaorV4StrategyEngineTest {
 
     @Test
     fun `plans later reverse sell and available-cash-quarter buy from five-day average`() {
-        val config = LaorV4StrategyConfig(symbol = LaorV4StrategySymbol.TQQQ, totalSplitCount = 20)
+        val config = config(LaorV4StrategySymbol.TQQQ, 20)
         val state = LaorV4StrategyState(
             mode = LaorV4StrategyMode.REVERSE,
             progressRound = 18.0,
@@ -135,7 +142,7 @@ class LaorV4StrategyEngineTest {
 
     @Test
     fun `target sell followed by half buy keeps quarter T and adds buy increment`() {
-        val config = LaorV4StrategyConfig(symbol = LaorV4StrategySymbol.TQQQ, totalSplitCount = 20)
+        val config = config(LaorV4StrategySymbol.TQQQ, 20)
         val state = LaorV4StrategyState(
             progressRound = 4.0,
             availableCash = 1_000.0,
@@ -163,7 +170,7 @@ class LaorV4StrategyEngineTest {
 
     @Test
     fun `normal buy T advances by filled order unit not by spent amount ratio`() {
-        val config = LaorV4StrategyConfig(symbol = LaorV4StrategySymbol.TQQQ, totalSplitCount = 40)
+        val config = config(LaorV4StrategySymbol.TQQQ, 40)
         val state = LaorV4StrategyState(availableCash = 20_000.0)
 
         val next = LaorV4StrategyEngine.applyFills(
@@ -182,7 +189,7 @@ class LaorV4StrategyEngineTest {
 
     @Test
     fun `partial fill updates position without advancing T until order is filled`() {
-        val config = LaorV4StrategyConfig(symbol = LaorV4StrategySymbol.TQQQ, totalSplitCount = 20)
+        val config = config(LaorV4StrategySymbol.TQQQ, 20)
         val state = LaorV4StrategyState(
             progressRound = 4.0,
             availableCash = 2_000.0,
@@ -230,7 +237,7 @@ class LaorV4StrategyEngineTest {
 
     @Test
     fun `reverse buy and sell fills update T by Laor reverse formula`() {
-        val config = LaorV4StrategyConfig(symbol = LaorV4StrategySymbol.TQQQ, totalSplitCount = 20)
+        val config = config(LaorV4StrategySymbol.TQQQ, 20)
         val state = LaorV4StrategyState(
             mode = LaorV4StrategyMode.REVERSE,
             progressRound = 20.0,
@@ -276,6 +283,14 @@ class LaorV4StrategyEngineTest {
 
     private fun assertDouble(expected: Double, actual: Double) {
         assertEquals(expected, actual, 0.000001)
+    }
+
+    private fun config(symbol: LaorV4StrategySymbol, totalSplitCount: Int): LaorV4StrategyConfig {
+        return LaorV4StrategyConfig(
+            symbol = symbol,
+            totalSplitCount = totalSplitCount,
+            firstBuyLimitPercentAbovePreviousClose = 12.0,
+        )
     }
 
     private data class CalculationCase(

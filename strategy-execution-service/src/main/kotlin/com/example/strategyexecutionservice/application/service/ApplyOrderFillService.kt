@@ -52,7 +52,7 @@ class ApplyOrderFillService(
             config = LaorV4StrategyConfig(
                 symbol = current.symbol,
                 totalSplitCount = current.totalSplitCount,
-                firstBuyLimitMultiplier = current.firstBuyLimitMultiplier,
+                firstBuyLimitPercentAbovePreviousClose = current.firstBuyLimitPercentAbovePreviousClose,
             ),
             state = current.state,
         )

@@ -18,7 +18,7 @@ data class LaorV4StrategyExecutionView(
     val status: StrategyExecutionLifecycleStatus,
     val cycleNo: Int,
     val totalSplitCount: Int,
-    val firstBuyLimitMultiplier: Double,
+    val firstBuyLimitPercentAbovePreviousClose: Double,
     val autoRestart: Boolean,
     val mode: LaorV4StrategyMode,
     val progressRound: Double,

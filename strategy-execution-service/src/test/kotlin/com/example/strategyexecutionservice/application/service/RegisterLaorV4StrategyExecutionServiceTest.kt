@@ -24,6 +24,7 @@ class RegisterLaorV4StrategyExecutionServiceTest {
                 symbol = LaorV4StrategySymbol.TQQQ,
                 budget = 10_000.0,
                 totalSplitCount = 20,
+                firstBuyLimitPercentAbovePreviousClose = 12.0,
             ),
         )
 
@@ -46,6 +47,7 @@ class RegisterLaorV4StrategyExecutionServiceTest {
                     executionId = "laor-v4:TQQQ",
                     symbol = LaorV4StrategySymbol.TQQQ,
                     totalSplitCount = 20,
+                    firstBuyLimitPercentAbovePreviousClose = 12.0,
                     state = LaorV4StrategyState(availableCash = 1_000.0),
                 ),
             ),
@@ -58,6 +60,7 @@ class RegisterLaorV4StrategyExecutionServiceTest {
                 symbol = LaorV4StrategySymbol.TQQQ,
                 budget = 10_000.0,
                 totalSplitCount = 40,
+                firstBuyLimitPercentAbovePreviousClose = 12.0,
             ),
         )
 

@@ -34,6 +34,7 @@ class ApplyOrderFillServiceTest {
                 executionId = "laor-v4:TQQQ",
                 symbol = LaorV4StrategySymbol.TQQQ,
                 totalSplitCount = 20,
+                firstBuyLimitPercentAbovePreviousClose = 12.0,
                 autoRestart = false,
                 state = LaorV4StrategyState(
                     availableCash = 0.0,
@@ -82,6 +83,7 @@ class ApplyOrderFillServiceTest {
                 executionId = "laor-v4:TQQQ",
                 symbol = LaorV4StrategySymbol.TQQQ,
                 totalSplitCount = 20,
+                firstBuyLimitPercentAbovePreviousClose = 12.0,
                 autoRestart = true,
                 cycleNo = 2,
                 state = LaorV4StrategyState(
@@ -126,6 +128,7 @@ class ApplyOrderFillServiceTest {
                 executionId = "laor-v4:TQQQ",
                 symbol = LaorV4StrategySymbol.TQQQ,
                 totalSplitCount = 20,
+                firstBuyLimitPercentAbovePreviousClose = 12.0,
                 state = LaorV4StrategyState(
                     availableCash = 1000.0,
                     holdingQuantity = 1,
@@ -166,6 +169,7 @@ class ApplyOrderFillServiceTest {
                 executionId = "laor-v4:TQQQ",
                 symbol = LaorV4StrategySymbol.TQQQ,
                 totalSplitCount = 20,
+                firstBuyLimitPercentAbovePreviousClose = 12.0,
                 state = LaorV4StrategyState(
                     availableCash = 2_000.0,
                     holdingQuantity = 10,

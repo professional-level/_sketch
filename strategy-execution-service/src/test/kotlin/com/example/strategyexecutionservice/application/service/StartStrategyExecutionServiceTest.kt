@@ -173,7 +173,7 @@ class StartStrategyExecutionServiceTest {
                 symbol = command.symbol,
                 budget = command.budget,
                 totalSplitCount = command.totalSplitCount,
-                firstBuyLimitMultiplier = command.firstBuyLimitMultiplier,
+                firstBuyLimitPercentAbovePreviousClose = command.firstBuyLimitPercentAbovePreviousClose,
                 autoRestart = command.autoRestart,
             )
         }

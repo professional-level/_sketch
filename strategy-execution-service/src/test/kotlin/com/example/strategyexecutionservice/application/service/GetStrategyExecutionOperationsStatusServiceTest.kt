@@ -94,7 +94,7 @@ class GetStrategyExecutionOperationsStatusServiceTest {
             status = StrategyExecutionLifecycleStatus.ACTIVE,
             cycleNo = 2,
             totalSplitCount = 20,
-            firstBuyLimitMultiplier = 1.12,
+            firstBuyLimitPercentAbovePreviousClose = 12.0,
             autoRestart = true,
             mode = LaorV4StrategyMode.NORMAL,
             progressRound = 4.5,

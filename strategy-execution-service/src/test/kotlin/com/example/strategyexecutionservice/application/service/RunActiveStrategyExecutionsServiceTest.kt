@@ -31,7 +31,7 @@ class RunActiveStrategyExecutionsServiceTest {
                     executionId = "laor-v4-strategy:TQQQ",
                     symbol = LaorV4StrategySymbol.TQQQ,
                     totalSplitCount = 20,
-                    firstBuyLimitMultiplier = 1.12,
+                    firstBuyLimitPercentAbovePreviousClose = 12.0,
                     state = LaorV4StrategyState(availableCash = 2_240.0),
                 ),
             ),
@@ -73,7 +73,7 @@ class RunActiveStrategyExecutionsServiceTest {
         assertEquals(requestedAt, command.requestedAt)
         assertEquals(LaorV4StrategySymbol.TQQQ, command.symbol)
         assertEquals(20, command.totalSplitCount)
-        assertEquals(1.12, command.firstBuyLimitMultiplier)
+        assertEquals(12.0, command.firstBuyLimitPercentAbovePreviousClose)
         assertEquals(2_240.0, command.state.availableCash)
         assertEquals(100.0, command.market.previousClose)
 
@@ -94,6 +94,7 @@ class RunActiveStrategyExecutionsServiceTest {
                     executionId = "laor-v4-strategy:TQQQ",
                     symbol = LaorV4StrategySymbol.TQQQ,
                     totalSplitCount = 20,
+                    firstBuyLimitPercentAbovePreviousClose = 12.0,
                     state = LaorV4StrategyState(availableCash = 2_240.0),
                 ),
             ),
@@ -138,6 +139,7 @@ class RunActiveStrategyExecutionsServiceTest {
                     executionId = "laor-v4-strategy:TQQQ",
                     symbol = LaorV4StrategySymbol.TQQQ,
                     totalSplitCount = 20,
+                    firstBuyLimitPercentAbovePreviousClose = 12.0,
                     state = LaorV4StrategyState(availableCash = 2_240.0),
                     lastExecutionRunId = "ACTIVE_STRATEGIES_DAILY:2026-06-02",
                 ),
@@ -177,6 +179,7 @@ class RunActiveStrategyExecutionsServiceTest {
                     executionId = "laor-v4-strategy:TQQQ",
                     symbol = LaorV4StrategySymbol.TQQQ,
                     totalSplitCount = 20,
+                    firstBuyLimitPercentAbovePreviousClose = 12.0,
                     state = LaorV4StrategyState(availableCash = 2_240.0),
                 ),
             ),
@@ -216,6 +219,7 @@ class RunActiveStrategyExecutionsServiceTest {
                     executionId = "laor-v4-strategy:TQQQ",
                     symbol = LaorV4StrategySymbol.TQQQ,
                     totalSplitCount = 20,
+                    firstBuyLimitPercentAbovePreviousClose = 12.0,
                     state = LaorV4StrategyState(availableCash = 2_240.0),
                 ),
             ),

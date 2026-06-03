@@ -65,7 +65,7 @@ message StrategyExecutionParameters {
 
 message LaorV4StartParameters {
   int32 total_split_count = 1;
-  double first_buy_limit_multiplier = 2;
+  double first_buy_limit_percent_above_previous_close = 2;
   bool auto_restart = 3;
 }
 

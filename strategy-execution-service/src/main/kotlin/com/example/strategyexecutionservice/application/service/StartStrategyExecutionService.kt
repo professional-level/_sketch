@@ -61,7 +61,7 @@ class StartStrategyExecutionService(
                 symbol = command.strategySymbol,
                 budget = command.budget,
                 totalSplitCount = command.totalSplitCount,
-                firstBuyLimitMultiplier = command.firstBuyLimitMultiplier,
+                firstBuyLimitPercentAbovePreviousClose = command.firstBuyLimitPercentAbovePreviousClose,
                 autoRestart = command.autoRestart,
             ),
         )
@@ -81,7 +81,7 @@ class StartStrategyExecutionService(
                 requestedAt = command.requestedAt,
                 symbol = command.strategySymbol,
                 totalSplitCount = command.totalSplitCount,
-                firstBuyLimitMultiplier = command.firstBuyLimitMultiplier,
+                firstBuyLimitPercentAbovePreviousClose = command.firstBuyLimitPercentAbovePreviousClose,
                 state = LaorV4State(availableCash = command.budget),
                 market = MarketSnapshot(
                     previousClose = market.previousClose,

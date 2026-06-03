@@ -2,7 +2,6 @@ package com.example.backtestservice.application.port.`in`
 
 import com.example.backtestservice.domain.backtest.BacktestRunStatus
 import com.example.common.UseCase
-import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategyConfig
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.util.UUID
@@ -23,8 +22,8 @@ data class RunLaorV4BacktestCommand(
     val from: LocalDate,
     val to: LocalDate,
     val initialCash: BigDecimal = BigDecimal("10000"),
-    val totalSplitCount: Int = 40,
-    val firstBuyLimitMultiplier: Double = LaorV4StrategyConfig.DEFAULT_FIRST_BUY_LIMIT_MULTIPLIER,
+    val totalSplitCount: Int,
+    val firstBuyLimitPercentAbovePreviousClose: Double,
     val autoRestart: Boolean = true,
     val refreshMarketData: Boolean = true,
     val autoAdjust: Boolean = false,

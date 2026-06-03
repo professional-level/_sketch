@@ -34,7 +34,7 @@ class StrategyExecutionTemporalActivitiesAdapterTest {
                 requestedAt = "2026-06-02T09:30:00-04:00[America/New_York]",
                 symbol = "TQQQ",
                 totalSplitCount = 40,
-                firstBuyLimitMultiplier = 1.12,
+                firstBuyLimitPercentAbovePreviousClose = 12.0,
                 state = LaorV4StrategyWorkflowState(
                     mode = "NORMAL",
                     progressRound = 3.5,
@@ -61,7 +61,7 @@ class StrategyExecutionTemporalActivitiesAdapterTest {
         assertEquals("2026-06-02T09:30-04:00[America/New_York]", command.requestedAt.toString())
         assertEquals(LaorV4StrategySymbol.TQQQ, command.symbol)
         assertEquals(40, command.totalSplitCount)
-        assertEquals(1.12, command.firstBuyLimitMultiplier)
+        assertEquals(12.0, command.firstBuyLimitPercentAbovePreviousClose)
         assertEquals(LaorV4StrategyMode.NORMAL, command.state.mode)
         assertEquals(3.5, command.state.progressRound)
         assertEquals(10_000.0, command.state.availableCash)

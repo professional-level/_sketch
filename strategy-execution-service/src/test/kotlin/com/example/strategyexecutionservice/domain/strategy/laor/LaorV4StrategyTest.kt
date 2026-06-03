@@ -15,7 +15,7 @@ class LaorV4StrategyTest {
     fun `strategy generates generic order intents from Laor engine`() {
         val strategy = LaorV4Strategy(
             id = StrategyExecutionId("laor-v4-strategy:TQQQ"),
-            config = LaorV4StrategyConfig(symbol = LaorV4StrategySymbol.TQQQ, totalSplitCount = 20),
+            config = config(),
             state = LaorV4StrategyState(availableCash = 2_240.0),
         )
 
@@ -39,7 +39,7 @@ class LaorV4StrategyTest {
     fun `strategy moves into reverse before order generation when T is exhausted`() {
         val strategy = LaorV4Strategy(
             id = StrategyExecutionId("laor-v4-strategy:TQQQ"),
-            config = LaorV4StrategyConfig(symbol = LaorV4StrategySymbol.TQQQ, totalSplitCount = 20),
+            config = config(),
             state = LaorV4StrategyState(
                 progressRound = 20.0,
                 availableCash = 2_000.0,
@@ -67,7 +67,7 @@ class LaorV4StrategyTest {
     fun `strategy applies generic fills back into Laor state`() {
         val strategy = LaorV4Strategy(
             id = StrategyExecutionId("laor-v4-strategy:TQQQ"),
-            config = LaorV4StrategyConfig(symbol = LaorV4StrategySymbol.TQQQ, totalSplitCount = 20),
+            config = config(),
             state = LaorV4StrategyState(availableCash = 3_000.0),
         )
 
@@ -91,5 +91,13 @@ class LaorV4StrategyTest {
 
     private fun assertDouble(expected: Double, actual: Double) {
         assertEquals(expected, actual, 0.000001)
+    }
+
+    private fun config(): LaorV4StrategyConfig {
+        return LaorV4StrategyConfig(
+            symbol = LaorV4StrategySymbol.TQQQ,
+            totalSplitCount = 20,
+            firstBuyLimitPercentAbovePreviousClose = 12.0,
+        )
     }
 }

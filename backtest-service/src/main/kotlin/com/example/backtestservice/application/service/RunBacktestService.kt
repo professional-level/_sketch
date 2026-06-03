@@ -110,11 +110,13 @@ class RunBacktestService(
         require(command.slippageRate == BigDecimal.ZERO) {
             "LAOR_V4 backtest currently supports zero slippageRate only"
         }
+        val laorV4 = command.laorV4
+            ?: throw IllegalArgumentException("laorV4 parameters are required for LAOR_V4 backtest")
 
         val config = LaorV4StrategyConfig(
             symbol = LaorV4StrategySymbol.valueOf(command.symbol.trim().uppercase()),
-            totalSplitCount = command.laorV4.totalSplitCount,
-            firstBuyLimitMultiplier = command.laorV4.firstBuyLimitMultiplier,
+            totalSplitCount = laorV4.totalSplitCount,
+            firstBuyLimitPercentAbovePreviousClose = laorV4.firstBuyLimitPercentAbovePreviousClose,
         )
         val allCandles = historicalMarketDataPort.findDailyCandles(
             HistoricalDailyCandlesQuery(
@@ -172,7 +174,7 @@ class RunBacktestService(
             }
             val cycleClosed = state.holdingQuantity > 0 && nextState.holdingQuantity == 0L
             state = nextState
-            if (cycleClosed && command.laorV4.autoRestart) {
+            if (cycleClosed && laorV4.autoRestart) {
                 cycleNo += 1
             } else if (cycleClosed) {
                 tradingCompleted = true

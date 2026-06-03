@@ -146,7 +146,7 @@ data class RunBacktestRequest(
     val strategyType: BacktestStrategyType = BacktestStrategyType.BUY_AND_HOLD,
     val commissionRate: BigDecimal = BigDecimal.ZERO,
     val slippageRate: BigDecimal = BigDecimal.ZERO,
-    val laorV4: LaorV4BacktestRequest = LaorV4BacktestRequest(),
+    val laorV4: LaorV4BacktestRequest? = null,
     val refreshMarketData: Boolean = false,
     val autoAdjust: Boolean = false,
     val marketDataTimeoutSeconds: Long = 30,
@@ -161,7 +161,7 @@ data class RunBacktestRequest(
             strategyType = strategyType,
             commissionRate = commissionRate,
             slippageRate = slippageRate,
-            laorV4 = laorV4.toParameters(),
+            laorV4 = laorV4?.toParameters(),
             refreshMarketData = refreshMarketData,
             autoAdjust = autoAdjust,
             marketDataTimeoutSeconds = marketDataTimeoutSeconds,
@@ -170,14 +170,14 @@ data class RunBacktestRequest(
 }
 
 data class LaorV4BacktestRequest(
-    val totalSplitCount: Int = 40,
-    val firstBuyLimitMultiplier: Double = 1.12,
+    val totalSplitCount: Int,
+    val firstBuyLimitPercentAbovePreviousClose: Double,
     val autoRestart: Boolean = true,
 ) {
     fun toParameters(): LaorV4BacktestParameters {
         return LaorV4BacktestParameters(
             totalSplitCount = totalSplitCount,
-            firstBuyLimitMultiplier = firstBuyLimitMultiplier,
+            firstBuyLimitPercentAbovePreviousClose = firstBuyLimitPercentAbovePreviousClose,
             autoRestart = autoRestart,
         )
     }
@@ -209,8 +209,8 @@ data class LaorV4BacktestRunRequest(
     val from: LocalDate,
     val to: LocalDate,
     val initialCash: BigDecimal = BigDecimal("10000"),
-    val totalSplitCount: Int = 40,
-    val firstBuyLimitMultiplier: Double = 1.12,
+    val totalSplitCount: Int,
+    val firstBuyLimitPercentAbovePreviousClose: Double,
     val autoRestart: Boolean = true,
     val refreshMarketData: Boolean = true,
     val autoAdjust: Boolean = false,
@@ -224,7 +224,7 @@ data class LaorV4BacktestRunRequest(
             to = to,
             initialCash = initialCash,
             totalSplitCount = totalSplitCount,
-            firstBuyLimitMultiplier = firstBuyLimitMultiplier,
+            firstBuyLimitPercentAbovePreviousClose = firstBuyLimitPercentAbovePreviousClose,
             autoRestart = autoRestart,
             refreshMarketData = refreshMarketData,
             autoAdjust = autoAdjust,

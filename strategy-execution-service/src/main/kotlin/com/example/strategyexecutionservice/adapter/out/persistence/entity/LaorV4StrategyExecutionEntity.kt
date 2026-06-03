@@ -25,7 +25,7 @@ internal class LaorV4StrategyExecutionEntity private constructor(
     @Column(nullable = false)
     val totalSplitCount: Int,
     @Column(nullable = false)
-    val firstBuyLimitMultiplier: Double,
+    val firstBuyLimitPercentAbovePreviousClose: Double,
     @Column(nullable = false)
     val autoRestart: Boolean,
     @Column(nullable = false)
@@ -58,7 +58,7 @@ internal class LaorV4StrategyExecutionEntity private constructor(
             executionId = executionId,
             symbol = symbol.toDto(),
             totalSplitCount = totalSplitCount,
-            firstBuyLimitMultiplier = firstBuyLimitMultiplier,
+            firstBuyLimitPercentAbovePreviousClose = firstBuyLimitPercentAbovePreviousClose,
             autoRestart = autoRestart,
             cycleNo = cycleNo,
             status = status.toDto(),
@@ -82,7 +82,7 @@ internal class LaorV4StrategyExecutionEntity private constructor(
                 executionId = dto.executionId,
                 symbol = LaorV4StrategyExecutionSymbol.from(dto.symbol),
                 totalSplitCount = dto.totalSplitCount,
-                firstBuyLimitMultiplier = dto.firstBuyLimitMultiplier,
+                firstBuyLimitPercentAbovePreviousClose = dto.firstBuyLimitPercentAbovePreviousClose,
                 autoRestart = dto.autoRestart,
                 cycleNo = dto.cycleNo,
                 status = LaorV4StrategyExecutionStatus.from(dto.status),
