@@ -139,6 +139,23 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `builds real us overseas sell moc request with zero order price`() {
+        val command = brokerCommand(
+            side = OrderIntentSide.SELL,
+            symbol = "TQQQ",
+            price = 112.5,
+            quantity = 2,
+            orderType = StockOrderType.MOC,
+            isMock = false,
+        )
+
+        val body = command.toKisUsOverseasOrderRequest()
+
+        assertEquals("33", body["ORD_DVSN"])
+        assertEquals("0", body["OVRS_ORD_UNPR"])
+    }
+
+    @Test
     fun `builds domestic market order request with zero order price`() {
         val command = brokerCommand(
             market = StockOrderMarket.DOMESTIC,

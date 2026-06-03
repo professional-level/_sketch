@@ -399,7 +399,7 @@ internal fun BrokerOrderCommand.toKisUsOverseasOrderRequest(): Map<String, Any> 
         "PDNO" to symbol.uppercase(),
         "OVRS_EXCG_CD" to exchange.toKisUsExchangeCode(),
         "ORD_QTY" to quantity,
-        "OVRS_ORD_UNPR" to price.toBrokerPrice(),
+        "OVRS_ORD_UNPR" to toKisUsOverseasOrderPrice(),
         "ORD_DVSN" to orderType.toKisUsOrderDivision(side, isMock),
         "CTAC_TLNO" to "",
         "MGCO_APTM_ODNO" to "",
@@ -410,6 +410,13 @@ internal fun BrokerOrderCommand.toKisUsOverseasOrderRequest(): Map<String, Any> 
         baseRequest + ("SLL_TYPE" to "00")
     } else {
         baseRequest
+    }
+}
+
+private fun BrokerOrderCommand.toKisUsOverseasOrderPrice(): String {
+    return when {
+        !isMock && side == OrderIntentSide.SELL && orderType == StockOrderType.MOC -> "0"
+        else -> price.toBrokerPrice()
     }
 }
 
