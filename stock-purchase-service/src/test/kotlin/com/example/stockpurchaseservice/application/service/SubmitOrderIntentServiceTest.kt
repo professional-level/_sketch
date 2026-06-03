@@ -96,6 +96,72 @@ class SubmitOrderIntentServiceTest {
     }
 
     @Test
+    fun `submits buy moc order intent with zero broker price when price is omitted`() = runBlocking {
+        val marketPort = FakeMarketServicePort()
+        val processedEventPort = FakeProcessedEventPort()
+        val submissionPort = FakeOrderIntentSubmissionPort()
+        val eventPort = FakeOrderExecutionEventPort()
+        val riskPort = FakeOrderRiskControlPort()
+        val service = SubmitOrderIntentService(
+            marketPort,
+            processedEventPort,
+            submissionPort,
+            eventPort,
+            riskPort,
+            FakeOperationalAlertPort(),
+        )
+        val eventId = UUID.randomUUID()
+
+        val result = service.execute(
+            SubmitOrderIntentCommand(
+                eventId = eventId,
+                idempotencyKey = "laor-v4-strategy:TQQQ:2026-05-30:MOC_BUY:0",
+                strategyExecutionId = "laor-v4-strategy:TQQQ",
+                symbol = "TQQQ",
+                side = OrderIntentSide.BUY,
+                orderType = OrderIntentType.MOC,
+                price = null,
+                quantity = 3,
+                orderTag = "MOC_BUY",
+                exchange = "NASD",
+                createdAt = ZonedDateTime.parse("2026-05-30T09:00:00+09:00"),
+            ),
+        )
+
+        assertEquals(OrderIntentSubmissionStatus.SUBMITTED, result.status)
+        assertEquals(null, submissionPort.saved.single().submittedPrice)
+        assertEquals(null, riskPort.assessed.single().estimatedNotional)
+        with(marketPort.buyOrders.single()) {
+            assertEquals("TQQQ", stockId)
+            assertEquals(0.0, purchasePrice)
+            assertEquals(3, quantity)
+            assertEquals(StockOrderMarket.OVERSEAS_US, market)
+            assertEquals(StockOrderType.MOC, orderType)
+            assertEquals("NASD", exchange)
+        }
+        assertEquals(emptyList(), marketPort.sellOrders)
+        assertEquals("broker-buy-1", eventPort.submitted.single().brokerOrderId)
+    }
+
+    @Test
+    fun `rejects negative moc order intent price`() {
+        assertFailsWith<IllegalArgumentException> {
+            SubmitOrderIntentCommand(
+                eventId = UUID.randomUUID(),
+                idempotencyKey = "laor-v4-strategy:TQQQ:2026-05-30:MOC_SELL:negative",
+                strategyExecutionId = "laor-v4-strategy:TQQQ",
+                symbol = "TQQQ",
+                side = OrderIntentSide.SELL,
+                orderType = OrderIntentType.MOC,
+                price = -1.0,
+                quantity = 2,
+                orderTag = "MOC_SELL",
+                createdAt = ZonedDateTime.parse("2026-05-30T09:00:00+09:00"),
+            )
+        }
+    }
+
+    @Test
     fun `submits sell order intent to market port`() = runBlocking {
         val marketPort = FakeMarketServicePort()
         val processedEventPort = FakeProcessedEventPort()

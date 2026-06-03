@@ -148,7 +148,7 @@ class SubmitOrderIntentService(
                 PurchaseOrderDto(
                     orderId = orderId,
                     stockId = command.symbol,
-                    purchasePrice = checkNotNull(command.price),
+                    purchasePrice = command.price ?: 0.0,
                     quantity = quantity,
                     market = market,
                     orderType = orderType,
