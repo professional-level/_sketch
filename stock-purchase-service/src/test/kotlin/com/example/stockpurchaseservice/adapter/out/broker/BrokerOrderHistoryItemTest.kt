@@ -287,6 +287,18 @@ class BrokerOrderHistoryItemTest {
     }
 
     @Test
+    fun `treats blank broker id as absent for unknown submission recovery`() {
+        val status = listOf(
+            row(externalOrderId = "broker-1", orderedQuantity = 3, orderedPrice = 112.5),
+        ).findStatusFor(query(externalOrderId = " ", orderedQuantity = 3, submittedPrice = 112.5))
+
+        assertEquals(BrokerOrderStatus.SUBMITTED, status.status)
+        assertEquals("broker-1", status.externalOrderId)
+        assertEquals(3L, status.orderedQuantity)
+        assertEquals(112.5, status.orderedPrice)
+    }
+
+    @Test
     fun `does not use opposite side row when broker id is absent`() {
         val status = listOf(
             row(externalOrderId = "broker-1", side = OrderIntentSide.SELL, orderedQuantity = 3, orderedPrice = 112.5),

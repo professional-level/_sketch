@@ -254,9 +254,10 @@ internal data class BrokerOrderHistoryItem(
 }
 
 internal fun List<BrokerOrderHistoryItem>.findStatusFor(query: BrokerOrderStatusQuery): BrokerOrderStatusDto {
+    val requestedExternalOrderId = query.normalizedExternalOrderId()
     val baseCandidates = filter { row ->
         when {
-            query.externalOrderId != null -> row.matchesExternalOrderId(query.externalOrderId)
+            requestedExternalOrderId != null -> row.matchesExternalOrderId(requestedExternalOrderId)
             else -> row.symbol.equals(query.symbol, ignoreCase = true) &&
                 (row.side == null || row.side == query.side) &&
                 (query.submittedAt?.toBrokerOrderDate()?.let { row.orderedAt.toBrokerOrderDate() == it } ?: true)
@@ -266,31 +267,31 @@ internal fun List<BrokerOrderHistoryItem>.findStatusFor(query: BrokerOrderStatus
         .narrowByBranchOrderNumber(query)
         .narrowByOrderedQuantity(query)
         .narrowBySubmittedPrice(query)
-    val selectedCandidate = candidates.selectStatusCandidate(query)
+    val selectedCandidate = candidates.selectStatusCandidate(requestedExternalOrderId)
 
     return when {
         candidates.isEmpty() -> BrokerOrderStatusDto(
             status = BrokerOrderStatus.UNKNOWN,
-            externalOrderId = query.externalOrderId,
+            externalOrderId = requestedExternalOrderId,
             reason = "broker order not found",
         )
 
         selectedCandidate != null -> selectedCandidate
             .toStatus()
             .withBestFillFrom(candidates, selectedCandidate)
-            .normalizeExternalOrderId(query.externalOrderId)
+            .normalizeExternalOrderId(requestedExternalOrderId)
         else -> BrokerOrderStatusDto(
             status = BrokerOrderStatus.UNKNOWN,
-            externalOrderId = query.externalOrderId,
+            externalOrderId = requestedExternalOrderId,
             reason = "ambiguous broker orders: ${candidates.joinToString { it.externalOrderId }}",
         )
     }
 }
 
 private fun List<BrokerOrderHistoryItem>.selectStatusCandidate(
-    query: BrokerOrderStatusQuery,
+    externalOrderId: String?,
 ): BrokerOrderHistoryItem? {
-    val externalOrderId = query.externalOrderId ?: return singleBrokerOrderGroupOrNull()
+    externalOrderId ?: return singleBrokerOrderGroupOrNull()
         ?.selectBestLinkedOrderGroupCandidate()
     return selectCandidateForExternalOrderId(externalOrderId)
 }
@@ -413,7 +414,7 @@ private fun List<BrokerOrderHistoryItem>.narrowByBranchOrderNumber(
 private fun List<BrokerOrderHistoryItem>.narrowByOrderedQuantity(
     query: BrokerOrderStatusQuery,
 ): List<BrokerOrderHistoryItem> {
-    if (query.externalOrderId != null) return this
+    if (query.normalizedExternalOrderId() != null) return this
     val orderedQuantity = query.orderedQuantity ?: return this
     return filter { it.orderedQuantity == orderedQuantity }
         .takeIf { it.isNotEmpty() }
@@ -423,7 +424,7 @@ private fun List<BrokerOrderHistoryItem>.narrowByOrderedQuantity(
 private fun List<BrokerOrderHistoryItem>.narrowBySubmittedPrice(
     query: BrokerOrderStatusQuery,
 ): List<BrokerOrderHistoryItem> {
-    if (query.externalOrderId != null) return this
+    if (query.normalizedExternalOrderId() != null) return this
     val submittedPrice = query.submittedPrice?.takeIf { it > 0.0 } ?: return this
     return filter { row ->
         row.orderedPrice
@@ -440,6 +441,10 @@ private fun Double.matchesSubmittedPrice(submittedPrice: Double): Boolean {
 
 private fun BrokerOrderHistoryItem.matchesExternalOrderId(externalOrderId: String): Boolean {
     return this.externalOrderId == externalOrderId || originalOrderId == externalOrderId
+}
+
+private fun BrokerOrderStatusQuery.normalizedExternalOrderId(): String? {
+    return externalOrderId?.trim()?.takeIf { it.isNotBlank() }
 }
 
 private fun ZonedDateTime.toBrokerOrderDate() = withZoneSameInstant(BROKER_ORDER_ZONE).toLocalDate()
