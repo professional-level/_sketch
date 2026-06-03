@@ -415,7 +415,7 @@ internal fun BrokerOrderCommand.toKisUsOverseasOrderRequest(): Map<String, Any> 
 
 private fun BrokerOrderCommand.toKisUsOverseasOrderPrice(): String {
     return when {
-        !isMock && side == OrderIntentSide.SELL && orderType == StockOrderType.MOC -> "0"
+        !isMock && orderType == StockOrderType.MOC -> "0"
         else -> price.toBrokerPrice()
     }
 }
@@ -1418,9 +1418,7 @@ private fun StockOrderType.toKisUsOrderDivision(side: OrderIntentSide, isMock: B
         OrderIntentSide.BUY -> when (this) {
             StockOrderType.LIMIT -> "00"
             StockOrderType.LOC -> "34"
-            StockOrderType.MOC -> throw BrokerOrderRejectedException(
-                "US overseas buy MOC is not supported by KIS",
-            )
+            StockOrderType.MOC -> "32"
         }
 
         OrderIntentSide.SELL -> when (this) {
