@@ -218,6 +218,43 @@ Impact:
 - Broker-backed FX now has a verified mock wrapper mapping for `KRW -> USD`: market code `X`, symbol `FX@KRW`, `invert=true`.
 - Keep the risk provider default as `static` until the same mapping is verified in the target real-account environment.
 
+## 2026-06-03 Broker Adapter Contract And Mock Smoke Recheck
+
+Environment:
+
+- root KIS wrapper: local `:bootRun` on `http://localhost:8079`
+- broker gateway tests: `KisBrokerGatewayAdapterTest`, `KisBrokerGatewaySmokeTest`
+- query-only smoke mode: `KIS_BROKER_SMOKE_ENABLED=true`, `KIS_BROKER_SMOKE_SUBMIT_ENABLED` unset
+- submit smoke mode: `KIS_BROKER_SMOKE_ENABLED=true`, `KIS_BROKER_SMOKE_SUBMIT_ENABLED=true`
+- order input for submit recheck: mock overseas buy, `TQQQ`, `NASD`, `USD`, quantity `1`, limit price `1`
+
+Local contract coverage:
+
+- Added a deterministic `KisBrokerGatewayAdapterTest` flow that calls `submitOrder`, `findOrderHistory`, `cancelOrder`, and `findOrderHistory` again through one `KisBrokerGatewayAdapter` instance.
+- The test verifies the wrapper paths in order: overseas submit, overseas order history, overseas unfilled/cancelable lookup, overseas cancel, and overseas order history.
+- The test verifies that the final cancel history row linked by `ORGN_ODNO` recovers internal `CANCELLED` status for the original broker order id.
+- `:stock-purchase-service:test --tests "com.example.stockpurchaseservice.adapter.out.broker.KisBrokerGatewayAdapterTest"` passed.
+- `:stock-purchase-service:test` passed.
+
+Query-only smoke result:
+
+- `mock account snapshot and order history smoke()` passed against the running root wrapper.
+- JUnit XML summary: `tests=8`, `skipped=7`, `failures=0`, `errors=0`.
+- This reconfirms the mock overseas account snapshot, order history, and unfilled/cancelable lookup path.
+
+Submit smoke recheck result:
+
+- `mock submit query and cancel smoke()` reached the broker submit boundary.
+- KIS rejected the mock submit as a business rejection with return code `1` and message code `40910000`.
+- The broker message means the configured account cannot place mock investment orders.
+- JUnit summary: `tests=8`, `skipped=7`, `failures=1`, `errors=0`.
+- No broker order id was issued, so accepted-order history visibility and cancel submission remain externally unverified.
+
+Next action:
+
+- Rerun submit/query/cancel smoke with a KIS mock account enabled for overseas mock orders, or run the real-account smoke only with the explicit live-order confirmation and a target environment approved for live broker orders.
+- Keep query-only smoke and submit smoke as separate executions to avoid KIS per-second transaction limits.
+
 ## Real Account Query-Only Smoke Template
 
 No real-account smoke result is recorded yet. Use this section only after running the query-only test against a wrapper configured with runtime-injected real KIS credentials and account settings.
