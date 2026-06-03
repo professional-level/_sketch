@@ -423,12 +423,20 @@ internal fun BrokerOrderCancelCommand.toKisDomesticCancelRequest(): Map<String, 
         "ORD_DVSN" to orderType.toKisDomesticOrderDivision(),
         "RVSE_CNCL_DVSN_CD" to "02",
         "ORD_QTY" to quantity,
-        "ORD_UNPR" to price.toLong(),
+        "ORD_UNPR" to toKisDomesticCancelPrice(),
         "QTY_ALL_ORD_YN" to if (cancelAll) "Y" else "N",
         "EXCG_ID_DVSN_CD" to "KRX",
         "CNDT_PRIC" to "",
         "isMock" to isMock,
     )
+}
+
+private fun BrokerOrderCancelCommand.toKisDomesticCancelPrice(): Long {
+    return when (orderType) {
+        StockOrderType.MOC -> 0L
+        StockOrderType.LIMIT,
+        StockOrderType.LOC -> price.toLong()
+    }
 }
 
 internal fun BrokerOrderCancelCommand.toKisUsOverseasCancelRequest(): Map<String, Any> {

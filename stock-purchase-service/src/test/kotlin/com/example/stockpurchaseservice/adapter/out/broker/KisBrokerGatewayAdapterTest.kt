@@ -190,6 +190,26 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `builds domestic market cancel request with zero order price`() {
+        val command = brokerCancelCommand(
+            market = StockOrderMarket.DOMESTIC,
+            symbol = "005930",
+            originalOrderId = "domestic-order-1",
+            branchOrderNumber = "00001",
+            price = 70_000.0,
+            quantity = 2,
+            orderType = StockOrderType.MOC,
+            cancelAll = true,
+            isMock = false,
+        )
+
+        val body = command.toKisDomesticCancelRequest()
+
+        assertEquals("01", body["ORD_DVSN"])
+        assertEquals(0L, body["ORD_UNPR"])
+    }
+
+    @Test
     fun `domestic cancel request requires branch order number`() {
         val command = brokerCancelCommand(
             market = StockOrderMarket.DOMESTIC,
