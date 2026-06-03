@@ -30,7 +30,7 @@ Then refresh data and run a backtest through the `backtest-service` API:
 ```powershell
 Invoke-RestMethod `
   -Method Post `
-  -Uri http://localhost:8084/backtests/run `
+  -Uri http://localhost:8084/backtests/runs `
   -ContentType 'application/json' `
   -Body '{
     "symbol": "TQQQ",
@@ -41,7 +41,15 @@ Invoke-RestMethod `
   }'
 ```
 
-The API fetches yfinance data from the sidecar, writes normalized CSV data under `backtest-service/data/yfinance`, and runs the backtest against that data.
+The API fetches yfinance data from the sidecar, writes normalized CSV data under `data/yfinance`, stores the run under `data/backtest-runs`, and returns a summary with `runId`.
+
+Use the returned `runId` to fetch details without returning large ten-year payloads from the run request:
+
+```powershell
+Invoke-RestMethod http://localhost:8084/backtests/runs/{runId}
+Invoke-RestMethod 'http://localhost:8084/backtests/runs/{runId}/trades?page=0&size=100'
+Invoke-RestMethod 'http://localhost:8084/backtests/runs/{runId}/equity-curve?granularity=MONTHLY'
+```
 
 Direct sidecar request shape:
 
