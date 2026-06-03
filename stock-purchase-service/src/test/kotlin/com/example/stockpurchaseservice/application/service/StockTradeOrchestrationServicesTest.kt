@@ -65,6 +65,38 @@ class StockTradeOrchestrationServicesTest {
         )
     }
 
+    @Test
+    fun `legacy sell order stays submission unknown when submitted result has no broker order id`() = runBlocking {
+        val purchaseOrder = PurchaseOrder(
+            id = OrderId(UUID.fromString("22222222-2222-2222-2222-222222222222")),
+            strategyId = "final-price:TQQQ",
+            stockId = StockId("TQQQ"),
+            stockName = "ProShares UltraPro QQQ",
+            requestedAt = ZonedDateTime.parse("2026-05-20T09:00:00+09:00"),
+            strategyType = StrategyType.FinalPriceBatingV1,
+            purchasePrice = Money(100.0),
+            purchasedAt = ZonedDateTime.parse("2026-05-21T09:00:00+09:00"),
+            quantity = 7,
+            orderState = OrderState.PURCHASE_COMPLETED,
+        )
+        val repository = FakeStockOrderRepository(listOf(purchaseOrder))
+        val submitOrderIntent = FakeSubmitOrderIntentUseCase(
+            result = SubmitOrderIntentResult(
+                status = OrderIntentSubmissionStatus.SUBMITTED,
+                externalOrderId = null,
+            ),
+        )
+        val service = CreateSellOrdersByStrategyService(repository, submitOrderIntent)
+
+        service.execute()
+
+        assertEquals(
+            listOf(OrderState.SELLING_WAITING, OrderState.SUBMISSION_UNKNOWN),
+            repository.savedStates,
+        )
+        assertEquals(emptyList(), repository.savedExternalStates)
+    }
+
     private class FakeSubmitOrderIntentUseCase(
         private val result: SubmitOrderIntentResult,
     ) : SubmitOrderIntentUseCase {
