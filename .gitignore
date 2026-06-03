@@ -18,6 +18,7 @@ application-secret.properties
 !.env.example
 .docker/
 backtest-service/data/
+data/
 kis-token-cache.json
 *.kis-token-cache.json
 bin/
