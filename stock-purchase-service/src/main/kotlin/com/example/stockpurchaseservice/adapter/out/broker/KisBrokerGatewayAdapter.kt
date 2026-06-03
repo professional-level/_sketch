@@ -1281,11 +1281,18 @@ private fun WebClient.submitStockOrder(
     } ?: throw BrokerOrderSubmissionUnknownException("stock order response is empty")
 
     val order = response.body ?: throw BrokerOrderSubmissionUnknownException("stock order body is empty")
+    val brokerOrderId = order.output.getODNO().toBrokerOrderIdOrNull()
+    if (order.rtCd.isBlank()) {
+        throw BrokerOrderSubmissionUnknownException(
+            message = "stock order response has no broker return code",
+            externalOrderId = brokerOrderId,
+        )
+    }
     if (order.rtCd != "0") {
         throw order.toSubmitFailureException()
     }
 
-    val externalOrderId = order.output.getODNO().toBrokerOrderIdOrNull()
+    val externalOrderId = brokerOrderId
         ?: throw BrokerOrderSubmissionUnknownException(
             message = "stock order accepted but broker order id is missing",
         )
