@@ -2,17 +2,17 @@ package com.example.backtestservice.adapter.out.marketdata
 
 import com.example.backtestservice.application.port.out.HistoricalDailyCandlesQuery
 import com.example.backtestservice.application.port.out.HistoricalMarketDataPort
+import com.example.backtestservice.application.port.out.SaveHistoricalDailyCandlesCommand
 import com.example.backtestservice.domain.market.HistoricalCandle
 import com.example.common.PersistenceAdapter
 import org.springframework.beans.factory.annotation.Value
-import java.math.BigDecimal
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.LocalDate
 
 @PersistenceAdapter
 class CsvHistoricalMarketDataAdapter(
-    @Value("\${akra.backtest.market-data.csv-root:backtest-service/data/yfinance}")
+    @Value("\${akra.backtest.market-data.csv-root:data/yfinance}")
     private val csvRoot: String,
 ) : HistoricalMarketDataPort {
     override fun findDailyCandles(query: HistoricalDailyCandlesQuery): List<HistoricalCandle> {
@@ -28,6 +28,29 @@ class CsvHistoricalMarketDataAdapter(
             .map { it.toHistoricalCandle(columns, query) }
             .filter { it.date >= query.from && it.date <= query.to }
             .sortedBy { it.date }
+    }
+
+    override fun saveDailyCandles(command: SaveHistoricalDailyCandlesCommand) {
+        if (command.candles.isEmpty()) return
+        val root = Path.of(csvRoot)
+        Files.createDirectories(root)
+        val path = root.resolve(command.symbol.toCsvFileName())
+        val rows = sequenceOf("date,open,high,low,close,adj_close,volume") +
+            command.candles
+                .sortedBy { it.date }
+                .asSequence()
+                .map {
+                    listOf(
+                        it.date.toString(),
+                        it.open.toPlainString(),
+                        it.high.toPlainString(),
+                        it.low.toPlainString(),
+                        it.close.toPlainString(),
+                        it.adjustedClose.toPlainString(),
+                        it.volume.toString(),
+                    ).joinToString(",")
+                }
+        Files.writeString(path, rows.joinToString(System.lineSeparator()))
     }
 
     private fun String.toHistoricalCandle(

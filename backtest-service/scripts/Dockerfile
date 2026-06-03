@@ -9,5 +9,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY fetch_yfinance_daily.py .
+COPY yfinance_service.py .
 
-ENTRYPOINT ["python", "/app/fetch_yfinance_daily.py"]
+EXPOSE 8095
+
+CMD ["uvicorn", "yfinance_service:app", "--host", "0.0.0.0", "--port", "8095"]

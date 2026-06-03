@@ -5,6 +5,7 @@ import java.time.LocalDate
 
 interface HistoricalMarketDataPort {
     fun findDailyCandles(query: HistoricalDailyCandlesQuery): List<HistoricalCandle>
+    fun saveDailyCandles(command: SaveHistoricalDailyCandlesCommand)
 }
 
 data class HistoricalDailyCandlesQuery(
@@ -12,4 +13,10 @@ data class HistoricalDailyCandlesQuery(
     val market: String = "US",
     val from: LocalDate,
     val to: LocalDate,
+)
+
+data class SaveHistoricalDailyCandlesCommand(
+    val symbol: String,
+    val market: String = "US",
+    val candles: List<HistoricalCandle>,
 )

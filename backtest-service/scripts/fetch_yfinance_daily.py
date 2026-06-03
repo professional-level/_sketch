@@ -68,28 +68,48 @@ def normalized_daily_frame(frame: pd.DataFrame) -> pd.DataFrame:
     return output.dropna(subset=["open", "high", "low", "close"]).sort_values("date")
 
 
+def download_daily_candles(
+    tickers: list[str],
+    start: str,
+    end: str,
+    auto_adjust: bool = False,
+    timeout: float = 10.0,
+) -> dict[str, pd.DataFrame]:
+    data = yf.download(
+        tickers=tickers,
+        start=start,
+        end=end,
+        interval="1d",
+        group_by="ticker",
+        auto_adjust=auto_adjust,
+        actions=False,
+        progress=False,
+        threads=True,
+        timeout=timeout,
+    )
+    if data.empty:
+        raise ValueError("yfinance returned no rows")
+
+    return {
+        ticker.strip().upper(): normalized_daily_frame(ticker_frame(data, ticker))
+        for ticker in tickers
+    }
+
+
 def main() -> None:
     args = parse_args()
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    data = yf.download(
+    candles = download_daily_candles(
         tickers=args.tickers,
         start=args.start,
         end=args.end,
-        interval="1d",
-        group_by="ticker",
         auto_adjust=args.auto_adjust,
-        actions=False,
-        progress=False,
-        threads=True,
         timeout=args.timeout,
     )
-    if data.empty:
-        raise SystemExit("yfinance returned no rows")
 
-    for ticker in args.tickers:
-        normalized = normalized_daily_frame(ticker_frame(data, ticker))
+    for ticker, normalized in candles.items():
         output_path = output_dir / file_name_for(ticker)
         normalized.to_csv(output_path, index=False)
         print(f"wrote {len(normalized)} rows to {output_path}")

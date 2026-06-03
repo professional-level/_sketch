@@ -1,17 +1,8 @@
 services:
-  yfinance-fetcher:
+  yfinance-sidecar:
     build:
       context: ./backtest-service/scripts
       dockerfile: Dockerfile
     image: akra-backtest-yfinance-fetcher:local
-    volumes:
-      - ./backtest-service/data/yfinance:/data
-    command:
-      - --tickers
-      - TQQQ
-      - --start
-      - "2024-01-01"
-      - --end
-      - "2024-02-01"
-      - --output-dir
-      - /data
+    ports:
+      - "8095:8095"

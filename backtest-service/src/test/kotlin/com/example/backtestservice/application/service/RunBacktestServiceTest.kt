@@ -3,6 +3,7 @@ package com.example.backtestservice.application.service
 import com.example.backtestservice.application.port.`in`.RunBacktestCommand
 import com.example.backtestservice.application.port.out.HistoricalDailyCandlesQuery
 import com.example.backtestservice.application.port.out.HistoricalMarketDataPort
+import com.example.backtestservice.application.port.out.SaveHistoricalDailyCandlesCommand
 import com.example.backtestservice.domain.backtest.BacktestTradeSide
 import com.example.backtestservice.domain.market.HistoricalCandle
 import java.time.LocalDate
@@ -86,6 +87,9 @@ class RunBacktestServiceTest {
     ) : HistoricalMarketDataPort {
         override fun findDailyCandles(query: HistoricalDailyCandlesQuery): List<HistoricalCandle> {
             return candles.filter { it.date >= query.from && it.date <= query.to }
+        }
+
+        override fun saveDailyCandles(command: SaveHistoricalDailyCandlesCommand) {
         }
     }
 }

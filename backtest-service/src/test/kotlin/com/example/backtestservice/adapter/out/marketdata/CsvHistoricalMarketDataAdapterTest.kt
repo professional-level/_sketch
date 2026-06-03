@@ -1,6 +1,8 @@
 package com.example.backtestservice.adapter.out.marketdata
 
 import com.example.backtestservice.application.port.out.HistoricalDailyCandlesQuery
+import com.example.backtestservice.application.port.out.SaveHistoricalDailyCandlesCommand
+import com.example.backtestservice.domain.market.HistoricalCandle
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
 import java.time.LocalDate
@@ -59,5 +61,41 @@ class CsvHistoricalMarketDataAdapterTest {
         )
 
         assertEquals(emptyList(), candles)
+    }
+
+    @Test
+    fun `saves daily candles to normalized csv`() {
+        val adapter = CsvHistoricalMarketDataAdapter(tempDir.toString())
+
+        adapter.saveDailyCandles(
+            SaveHistoricalDailyCandlesCommand(
+                symbol = "tqqq",
+                candles = listOf(
+                    HistoricalCandle(
+                        symbol = "TQQQ",
+                        market = "US",
+                        date = LocalDate.parse("2024-01-02"),
+                        open = "10.1".toBigDecimal(),
+                        high = "11.2".toBigDecimal(),
+                        low = "9.9".toBigDecimal(),
+                        close = "10.8".toBigDecimal(),
+                        adjustedClose = "10.7".toBigDecimal(),
+                        volume = 12345,
+                        source = "YFINANCE",
+                    ),
+                ),
+            ),
+        )
+
+        val candles = adapter.findDailyCandles(
+            HistoricalDailyCandlesQuery(
+                symbol = "TQQQ",
+                from = LocalDate.parse("2024-01-01"),
+                to = LocalDate.parse("2024-01-31"),
+            ),
+        )
+
+        assertEquals(1, candles.size)
+        assertEquals("10.8".toBigDecimal(), candles.single().close)
     }
 }
