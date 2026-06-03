@@ -124,13 +124,15 @@ T == 0
 firstBuyLimitPrice = previousClose * firstBuyLimitMultiplier
 ```
 
-현재 기본값:
+`firstBuyLimitMultiplier`는 교본 원문에 고정값으로 제시된 개념이 아니라, 위 `10% ~ 15%` 범위를 자동화하기 위해 프로젝트 코드에서 둔 구현 옵션입니다.
+
+현재 프로젝트 구현 기본값:
 
 ```text
 firstBuyLimitMultiplier = 1.12
 ```
 
-즉 현재 구현의 기본 첫 매수 LOC 가격은 전일 종가의 `112%`입니다.
+즉 현재 구현의 기본 첫 매수 LOC 가격은 전일 종가의 `112%`, 전일 종가보다 `12%` 위입니다.
 
 ### 전반전 매수
 
@@ -249,6 +251,8 @@ starPoint = avg * (1 + normalModeStarProfitPercent / 100)
 singleBuyBudget = cash / (N - T)
 firstBuyLimitPrice = previousClose * firstBuyLimitMultiplier
 ```
+
+`firstBuyLimitMultiplier = 1.12`는 현재 코드 기본값입니다. 교본 원문은 첫 매수 LOC 가격을 전일 종가보다 `10% ~ 15%` 위로 잡는다고 설명하며, `1.12` 자체를 고정 규칙으로 정의하지 않습니다.
 
 ## 백테스트 구현 참고
 
