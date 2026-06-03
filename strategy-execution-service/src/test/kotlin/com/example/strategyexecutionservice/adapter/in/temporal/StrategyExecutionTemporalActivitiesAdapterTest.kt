@@ -74,6 +74,32 @@ class StrategyExecutionTemporalActivitiesAdapterTest {
     }
 
     @Test
+    fun `propagates laor strategy skip reason from temporal activity result`() {
+        val activeUseCase = FakeRunActiveStrategyExecutionsUseCase()
+        val useCase = FakeRunStrategyExecutionUseCase(
+            createdOrderIntentCount = 0,
+            skippedReason = "US market is closed on 2026-07-03",
+        )
+        val adapter = StrategyExecutionTemporalActivitiesAdapter(activeUseCase, useCase)
+
+        val result = adapter.runLaorV4Strategy(
+            RunLaorV4StrategyWorkflowInput(
+                executionId = "laor-v4-strategy:TQQQ",
+                executionRunId = "ACTIVE_STRATEGIES_DAILY:2026-07-03",
+                requestedAt = "2026-07-03T09:30:00-04:00[America/New_York]",
+                symbol = "TQQQ",
+                state = LaorV4StrategyWorkflowState(availableCash = 10_000.0),
+                market = StrategyMarketWorkflowSnapshot(previousClose = 100.0),
+            ),
+        )
+
+        assertEquals("laor-v4-strategy:TQQQ", result.executionId)
+        assertEquals("ACTIVE_STRATEGIES_DAILY:2026-07-03", result.executionRunId)
+        assertEquals(0, result.createdOrderIntentCount)
+        assertEquals("US market is closed on 2026-07-03", result.skippedReason)
+    }
+
+    @Test
     fun `runs active strategy executions use case from temporal activity input`() {
         val activeUseCase = FakeRunActiveStrategyExecutionsUseCase()
         val useCase = FakeRunStrategyExecutionUseCase()
@@ -166,7 +192,10 @@ class StrategyExecutionTemporalActivitiesAdapterTest {
         }
     }
 
-    private class FakeRunStrategyExecutionUseCase : RunStrategyExecutionUseCase {
+    private class FakeRunStrategyExecutionUseCase(
+        private val createdOrderIntentCount: Int = 2,
+        private val skippedReason: String? = null,
+    ) : RunStrategyExecutionUseCase {
         val commands: MutableList<RunStrategyExecutionCommand> = mutableListOf()
 
         override suspend fun execute(command: RunStrategyExecutionCommand): RunStrategyExecutionResult {
@@ -174,7 +203,8 @@ class StrategyExecutionTemporalActivitiesAdapterTest {
             return RunStrategyExecutionResult(
                 executionId = command.executionId,
                 executionRunId = command.executionRunId,
-                createdOrderIntentCount = 2,
+                createdOrderIntentCount = createdOrderIntentCount,
+                skippedReason = skippedReason,
             )
         }
     }

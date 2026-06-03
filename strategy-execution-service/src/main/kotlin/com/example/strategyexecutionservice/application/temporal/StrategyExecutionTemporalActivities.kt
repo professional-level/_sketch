@@ -71,4 +71,5 @@ data class RunLaorV4StrategyWorkflowResult(
     val executionId: String = "",
     val executionRunId: String = "",
     val createdOrderIntentCount: Int = 0,
+    val skippedReason: String? = null,
 )

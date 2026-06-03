@@ -53,6 +53,7 @@ class StrategyExecutionTemporalActivitiesAdapter(
                     executionId = result.executionId,
                     executionRunId = result.executionRunId,
                     createdOrderIntentCount = result.createdOrderIntentCount,
+                    skippedReason = result.skippedReason,
                 )
             }
         }

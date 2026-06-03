@@ -9,6 +9,8 @@ import com.example.strategyexecutionservice.application.port.`in`.RunStrategyExe
 import com.example.strategyexecutionservice.application.port.out.OrderIntentMessage
 import com.example.strategyexecutionservice.application.port.out.OrderIntentPort
 import com.example.strategyexecutionservice.application.port.out.OrderTradingEnvironment
+import com.example.strategyexecutionservice.application.port.out.TradingCalendarPort
+import com.example.strategyexecutionservice.application.port.out.TradingMarket
 import com.example.strategyexecutionservice.domain.strategy.execution.OrderIntent
 import com.example.strategyexecutionservice.domain.strategy.execution.StrategyExecutionType
 import com.example.strategyexecutionservice.domain.strategy.execution.StrategyExecutionId
@@ -23,10 +25,22 @@ import java.util.UUID
 @UseCaseImpl
 class RunStrategyExecutionService(
     private val orderIntentPort: OrderIntentPort,
+    private val tradingCalendarPort: TradingCalendarPort,
     private val tradingEnvironmentResolver: OrderIntentTradingEnvironmentResolver = OrderIntentTradingEnvironmentResolver(),
 ) : RunStrategyExecutionUseCase {
 
     override suspend fun execute(command: RunStrategyExecutionCommand): RunStrategyExecutionResult {
+        val tradingMarket = command.tradingMarket()
+        val requestedDate = tradingCalendarPort.tradingDate(tradingMarket, command.requestedAt)
+        if (!tradingCalendarPort.isTradingDay(tradingMarket, requestedDate)) {
+            return command.skipped("US market is closed on $requestedDate")
+        }
+
+        val orderRequestedAt = tradingCalendarPort.orderSessionStartAt(tradingMarket, command.requestedAt)
+        if (orderRequestedAt.toInstant().isAfter(command.requestedAt.toInstant())) {
+            return command.skipped("US market order session is not open until $orderRequestedAt")
+        }
+
         val strategy = command.toStrategyExecution()
         val plan = strategy.generateOrders(command.market.toDomain())
         val createdAt = command.requestedAt
@@ -51,6 +65,15 @@ class RunStrategyExecutionService(
         )
     }
 
+    private fun RunStrategyExecutionCommand.skipped(reason: String): RunStrategyExecutionResult {
+        return RunStrategyExecutionResult(
+            executionId = executionId,
+            executionRunId = executionRunId,
+            createdOrderIntentCount = 0,
+            skippedReason = reason,
+        )
+    }
+
     private fun RunStrategyExecutionCommand.toStrategyExecution(): LaorV4Strategy {
         return when (this) {
             is RunStrategyExecutionCommand.LaorV4 -> LaorV4Strategy(
@@ -62,6 +85,12 @@ class RunStrategyExecutionService(
                 ),
                 state = state.toDomain(),
             )
+        }
+    }
+
+    private fun RunStrategyExecutionCommand.tradingMarket(): TradingMarket {
+        return when (this) {
+            is RunStrategyExecutionCommand.LaorV4 -> TradingMarket.US
         }
     }
 
