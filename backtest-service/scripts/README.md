@@ -77,7 +77,7 @@ python backtest-service/scripts/fetch_yfinance_daily.py --tickers TQQQ AAPL --st
 Output format:
 
 ```text
-date,open,high,low,close,adj_close,volume
+date,open,high,low,close,adj_close,dividend,volume
 ```
 
-The script defaults to `--no-auto-adjust` so raw OHLC and adjusted close are available separately.
+The script defaults to `--no-auto-adjust` so raw OHLC, adjusted close, and per-share cash dividend are available separately.

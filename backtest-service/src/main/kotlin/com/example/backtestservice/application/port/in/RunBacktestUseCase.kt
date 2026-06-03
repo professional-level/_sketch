@@ -27,4 +27,5 @@ data class LaorV4BacktestParameters(
     val totalSplitCount: Int,
     val firstBuyLimitPercentAbovePreviousClose: Double,
     val autoRestart: Boolean = true,
+    val dividendReinvestment: Boolean = false,
 )

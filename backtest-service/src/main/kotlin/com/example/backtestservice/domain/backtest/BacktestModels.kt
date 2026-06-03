@@ -39,6 +39,7 @@ data class BacktestEquityPoint(
     val close: BigDecimal,
     val averagePurchasePrice: BigDecimal? = null,
     val realizedProfitLoss: BigDecimal? = null,
+    val dividendIncome: BigDecimal? = null,
     val cycleNo: Int? = null,
     val strategyMode: String? = null,
 )

@@ -53,6 +53,7 @@ Content-Type: application/json
   "totalSplitCount": 40,
   "firstBuyLimitPercentAbovePreviousClose": 12,
   "autoRestart": true,
+  "dividendReinvestment": false,
   "refreshMarketData": true,
   "autoAdjust": false,
   "marketDataTimeoutSeconds": 30

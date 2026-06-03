@@ -49,6 +49,7 @@ class LaorV4BacktestRunService(
                 totalSplitCount = totalSplitCount,
                 firstBuyLimitPercentAbovePreviousClose = firstBuyLimitPercentAbovePreviousClose,
                 autoRestart = autoRestart,
+                dividendReinvestment = dividendReinvestment,
             ),
             refreshMarketData = refreshMarketData,
             autoAdjust = autoAdjust,
@@ -63,6 +64,7 @@ class LaorV4BacktestRunService(
         val finalPositionCost = finalPoint.averagePurchasePrice.orZero() * finalPoint.positionQuantity.toBigDecimal()
         val finalHoldingUnrealizedProfitLoss = finalHoldingMarketValue - finalPositionCost
         val realizedProfitLoss = finalPoint.realizedProfitLoss.orZero()
+        val dividendIncome = finalPoint.dividendIncome.orZero()
         val finalProfit = summary.finalEquity - summary.initialCash
         val cycles = toCycleResults()
         return LaorV4BacktestRunResponse(
@@ -78,6 +80,8 @@ class LaorV4BacktestRunService(
             finalReturnPercent = finalProfit.percentOf(summary.initialCash),
             realizedProfitLoss = realizedProfitLoss,
             realizedProfitLossPercent = realizedProfitLoss.percentOf(summary.initialCash),
+            dividendIncome = dividendIncome,
+            dividendIncomePercent = dividendIncome.percentOf(summary.initialCash),
             finalCash = finalPoint.cash,
             finalHoldingQuantity = finalPoint.positionQuantity,
             finalHoldingAveragePrice = finalPoint.averagePurchasePrice.orZero(),
@@ -95,6 +99,7 @@ class LaorV4BacktestRunService(
 
     private fun BacktestRunRecord.toCycleResults(): List<LaorV4BacktestCycleResult> {
         var previousCycleRealizedProfitLoss = BigDecimal.ZERO
+        var previousCycleDividendIncome = BigDecimal.ZERO
         return equityCurve
             .groupBy { it.cycleNo ?: 1 }
             .toSortedMap()
@@ -106,6 +111,9 @@ class LaorV4BacktestRunService(
                 val cumulativeRealizedProfitLoss = lastPoint.realizedProfitLoss.orZero()
                 val cycleRealizedProfitLoss = cumulativeRealizedProfitLoss - previousCycleRealizedProfitLoss
                 previousCycleRealizedProfitLoss = cumulativeRealizedProfitLoss
+                val cumulativeDividendIncome = lastPoint.dividendIncome.orZero()
+                val cycleDividendIncome = cumulativeDividendIncome - previousCycleDividendIncome
+                previousCycleDividendIncome = cumulativeDividendIncome
                 val endingHoldingMarketValue = lastPoint.holdingMarketValue()
                 LaorV4BacktestCycleResult(
                     cycleNo = cycleNo,
@@ -116,6 +124,8 @@ class LaorV4BacktestRunService(
                     sellCount = cycleTrades.count { it.side == BacktestTradeSide.SELL },
                     realizedProfitLoss = cycleRealizedProfitLoss,
                     realizedProfitLossPercent = cycleRealizedProfitLoss.percentOf(summary.initialCash),
+                    dividendIncome = cycleDividendIncome,
+                    dividendIncomePercent = cycleDividendIncome.percentOf(summary.initialCash),
                     endingEquity = lastPoint.equity,
                     endingCash = lastPoint.cash,
                     endingHoldingQuantity = lastPoint.positionQuantity,

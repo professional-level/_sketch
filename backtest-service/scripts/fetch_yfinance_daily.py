@@ -53,6 +53,11 @@ def normalized_daily_frame(frame: pd.DataFrame) -> pd.DataFrame:
         adj_close = frame.get("adj_close")
     if adj_close is None:
         adj_close = close
+    dividend = frame.get("Dividends")
+    if dividend is None:
+        dividend = frame.get("dividends")
+    if dividend is None:
+        dividend = 0
 
     output = pd.DataFrame(
         {
@@ -62,6 +67,7 @@ def normalized_daily_frame(frame: pd.DataFrame) -> pd.DataFrame:
             "low": column(frame, "low"),
             "close": close,
             "adj_close": adj_close,
+            "dividend": dividend,
             "volume": column(frame, "volume").fillna(0).astype("int64"),
         }
     )
@@ -82,7 +88,7 @@ def download_daily_candles(
         interval="1d",
         group_by="ticker",
         auto_adjust=auto_adjust,
-        actions=False,
+        actions=True,
         progress=False,
         threads=True,
         timeout=timeout,

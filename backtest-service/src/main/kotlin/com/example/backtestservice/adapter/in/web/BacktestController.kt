@@ -173,12 +173,14 @@ data class LaorV4BacktestRequest(
     val totalSplitCount: Int,
     val firstBuyLimitPercentAbovePreviousClose: Double,
     val autoRestart: Boolean = true,
+    val dividendReinvestment: Boolean = false,
 ) {
     fun toParameters(): LaorV4BacktestParameters {
         return LaorV4BacktestParameters(
             totalSplitCount = totalSplitCount,
             firstBuyLimitPercentAbovePreviousClose = firstBuyLimitPercentAbovePreviousClose,
             autoRestart = autoRestart,
+            dividendReinvestment = dividendReinvestment,
         )
     }
 }
@@ -212,6 +214,7 @@ data class LaorV4BacktestRunRequest(
     val totalSplitCount: Int,
     val firstBuyLimitPercentAbovePreviousClose: Double,
     val autoRestart: Boolean = true,
+    val dividendReinvestment: Boolean = false,
     val refreshMarketData: Boolean = true,
     val autoAdjust: Boolean = false,
     val marketDataTimeoutSeconds: Long = 30,
@@ -226,6 +229,7 @@ data class LaorV4BacktestRunRequest(
             totalSplitCount = totalSplitCount,
             firstBuyLimitPercentAbovePreviousClose = firstBuyLimitPercentAbovePreviousClose,
             autoRestart = autoRestart,
+            dividendReinvestment = dividendReinvestment,
             refreshMarketData = refreshMarketData,
             autoAdjust = autoAdjust,
             marketDataTimeoutSeconds = marketDataTimeoutSeconds,

@@ -12,6 +12,7 @@ data class HistoricalCandle(
     val low: BigDecimal,
     val close: BigDecimal,
     val adjustedClose: BigDecimal,
+    val dividend: BigDecimal = BigDecimal.ZERO,
     val volume: Long,
     val source: String,
 )

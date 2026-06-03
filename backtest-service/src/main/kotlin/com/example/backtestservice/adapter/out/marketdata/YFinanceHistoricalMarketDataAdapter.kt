@@ -69,6 +69,7 @@ data class YFinanceDailyCandleResponse(
     val close: BigDecimal,
     @JsonProperty("adj_close")
     val adjustedClose: BigDecimal,
+    val dividend: BigDecimal = BigDecimal.ZERO,
     val volume: Long,
 ) {
     fun toHistoricalCandle(symbol: String, market: String): HistoricalCandle {
@@ -81,6 +82,7 @@ data class YFinanceDailyCandleResponse(
             low = low,
             close = close,
             adjustedClose = adjustedClose,
+            dividend = dividend,
             volume = volume,
             source = "YFINANCE",
         )

@@ -23,6 +23,7 @@ class DailyCandleResponse(BaseModel):
     low: str
     close: str
     adj_close: str
+    dividend: str
     volume: int
 
 
@@ -66,6 +67,7 @@ def daily_candles(request: DailyCandlesRequest) -> DailyCandlesResponse:
                     low=str(row.low),
                     close=str(row.close),
                     adj_close=str(row.adj_close),
+                    dividend=str(row.dividend),
                     volume=int(row.volume),
                 )
                 for row in frame.itertuples(index=False)

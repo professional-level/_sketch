@@ -41,6 +41,7 @@ class YFinanceHistoricalMarketDataAdapterTest {
                             "low": "9.9",
                             "close": "10.8",
                             "adj_close": "10.7",
+                            "dividend": "0.12",
                             "volume": 12345
                           }
                         ]
@@ -65,6 +66,7 @@ class YFinanceHistoricalMarketDataAdapterTest {
         assertEquals(1, candles.size)
         assertEquals("TQQQ", candles.single().symbol)
         assertEquals("10.8".toBigDecimal(), candles.single().close)
+        assertEquals("0.12".toBigDecimal(), candles.single().dividend)
         val request = server.takeRequest()
         assertEquals("/daily-candles", request.path)
         val body = request.body.readUtf8()

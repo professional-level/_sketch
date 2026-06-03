@@ -6,6 +6,7 @@ import com.example.backtestservice.application.port.out.SaveHistoricalDailyCandl
 import com.example.backtestservice.domain.market.HistoricalCandle
 import com.example.common.PersistenceAdapter
 import org.springframework.beans.factory.annotation.Value
+import java.math.BigDecimal
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.LocalDate
@@ -35,7 +36,7 @@ class CsvHistoricalMarketDataAdapter(
         val root = Path.of(csvRoot)
         Files.createDirectories(root)
         val path = root.resolve(command.symbol.toCsvFileName())
-        val rows = sequenceOf("date,open,high,low,close,adj_close,volume") +
+        val rows = sequenceOf("date,open,high,low,close,adj_close,dividend,volume") +
             command.candles
                 .sortedBy { it.date }
                 .asSequence()
@@ -47,6 +48,7 @@ class CsvHistoricalMarketDataAdapter(
                         it.low.toPlainString(),
                         it.close.toPlainString(),
                         it.adjustedClose.toPlainString(),
+                        it.dividend.toPlainString(),
                         it.volume.toString(),
                     ).joinToString(",")
                 }
@@ -69,6 +71,9 @@ class CsvHistoricalMarketDataAdapter(
             adjustedClose = values.optional(columns, "adj_close")
                 ?.toBigDecimal()
                 ?: values.required(columns, "close").toBigDecimal(),
+            dividend = values.optional(columns, "dividend")
+                ?.toBigDecimal()
+                ?: BigDecimal.ZERO,
             volume = values.required(columns, "volume").toLong(),
             source = "YFINANCE",
         )

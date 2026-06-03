@@ -71,7 +71,7 @@ class RunBacktestServiceTest {
             FakeHistoricalMarketDataPort(
                 listOf(
                     candle("2024-01-02", open = "10.0", high = "10.0", low = "10.0", close = "10.0"),
-                    candle("2024-01-03", open = "20.0", high = "20.0", low = "20.0", close = "20.0"),
+                    candle("2024-01-03", open = "20.0", high = "20.0", low = "20.0", close = "20.0", dividend = "0.5"),
                 ),
             ),
         )
@@ -91,12 +91,14 @@ class RunBacktestServiceTest {
         )
 
         assertEquals(BacktestStrategyType.LAOR_V4, result.strategyType)
-        assertEquals("1029.0".toBigDecimal(), result.finalEquity)
+        assertEquals("1033.0".toBigDecimal(), result.finalEquity)
         assertEquals(3, result.trades.size)
         assertEquals(listOf("FIRST_BUY", "QUARTER_SELL", "TARGET_SELL"), result.trades.map { it.orderTag })
         assertEquals(listOf(BacktestTradeSide.BUY, BacktestTradeSide.SELL, BacktestTradeSide.SELL), result.trades.map { it.side })
         assertEquals(0, result.equityCurve.last().positionQuantity)
+        assertEquals("1033.0".toBigDecimal(), result.equityCurve.last().cash)
         assertEquals("29.0".toBigDecimal(), result.equityCurve.last().realizedProfitLoss)
+        assertEquals("4.0".toBigDecimal(), result.equityCurve.last().dividendIncome)
     }
 
     private fun candle(
@@ -124,6 +126,7 @@ class RunBacktestServiceTest {
         high: String,
         low: String,
         close: String,
+        dividend: String = "0",
     ): HistoricalCandle {
         return HistoricalCandle(
             symbol = "TQQQ",
@@ -134,6 +137,7 @@ class RunBacktestServiceTest {
             low = low.toBigDecimal(),
             close = close.toBigDecimal(),
             adjustedClose = close.toBigDecimal(),
+            dividend = dividend.toBigDecimal(),
             volume = 1000,
             source = "TEST",
         )

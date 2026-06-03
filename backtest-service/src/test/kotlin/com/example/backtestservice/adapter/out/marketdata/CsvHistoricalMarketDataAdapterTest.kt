@@ -18,9 +18,9 @@ class CsvHistoricalMarketDataAdapterTest {
     fun `loads yfinance daily candles from normalized csv`() {
         tempDir.resolve("TQQQ.csv").writeText(
             """
-            date,open,high,low,close,adj_close,volume
-            2024-01-02,10.1,11.2,9.9,10.8,10.7,12345
-            2024-01-03,10.8,12.0,10.5,11.5,11.4,23456
+            date,open,high,low,close,adj_close,dividend,volume
+            2024-01-02,10.1,11.2,9.9,10.8,10.7,0,12345
+            2024-01-03,10.8,12.0,10.5,11.5,11.4,0.15,23456
             """.trimIndent(),
         )
         val adapter = CsvHistoricalMarketDataAdapter(tempDir.toString())
@@ -43,6 +43,7 @@ class CsvHistoricalMarketDataAdapterTest {
             assertEquals("10.5".toBigDecimal(), low)
             assertEquals("11.5".toBigDecimal(), close)
             assertEquals("11.4".toBigDecimal(), adjustedClose)
+            assertEquals("0.15".toBigDecimal(), dividend)
             assertEquals(23456, volume)
             assertEquals("YFINANCE", source)
         }
@@ -80,6 +81,7 @@ class CsvHistoricalMarketDataAdapterTest {
                         low = "9.9".toBigDecimal(),
                         close = "10.8".toBigDecimal(),
                         adjustedClose = "10.7".toBigDecimal(),
+                        dividend = "0.12".toBigDecimal(),
                         volume = 12345,
                         source = "YFINANCE",
                     ),
@@ -97,5 +99,6 @@ class CsvHistoricalMarketDataAdapterTest {
 
         assertEquals(1, candles.size)
         assertEquals("10.8".toBigDecimal(), candles.single().close)
+        assertEquals("0.12".toBigDecimal(), candles.single().dividend)
     }
 }

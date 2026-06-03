@@ -136,11 +136,13 @@ class RunBacktestService(
         var state = LaorV4StrategyState(availableCash = command.initialCash.toDouble())
         var cycleNo = 1
         var tradingCompleted = false
+        var dividendIncome = 0.0
         val trades = mutableListOf<BacktestTrade>()
         val equityCurve = mutableListOf<BacktestEquityPoint>()
 
         simulationCandles.forEach { candle ->
             val currentCycleNo = cycleNo
+            val dividendEligibleQuantity = state.holdingQuantity
             val plannedState = state.forOrderGeneration(config)
             val filledOrders = if (tradingCompleted) {
                 emptyList()
@@ -162,7 +164,7 @@ class RunBacktestService(
             }
             val fills = filledOrders.map { it.fill }
 
-            val nextState = if (fills.isEmpty()) {
+            var nextState = if (fills.isEmpty()) {
                 plannedState
             } else {
                 LaorV4StrategyEngine.applyFills(
@@ -172,6 +174,15 @@ class RunBacktestService(
                     closePrice = candle.close.toDouble(),
                 )
             }
+            val dailyDividendIncome = candle.dividend.toDouble() * dividendEligibleQuantity
+            if (dailyDividendIncome > 0.0) {
+                dividendIncome += dailyDividendIncome
+                if (laorV4.dividendReinvestment) {
+                    nextState = nextState.copy(
+                        availableCash = nextState.availableCash + dailyDividendIncome,
+                    )
+                }
+            }
             val cycleClosed = state.holdingQuantity > 0 && nextState.holdingQuantity == 0L
             state = nextState
             if (cycleClosed && laorV4.autoRestart) {
@@ -179,16 +190,19 @@ class RunBacktestService(
             } else if (cycleClosed) {
                 tradingCompleted = true
             }
+            val nonReinvestedDividendIncome = if (laorV4.dividendReinvestment) 0.0 else dividendIncome
 
             equityCurve += BacktestEquityPoint(
                 date = candle.date,
                 equity = state.availableCash.toBigDecimalValue() +
+                    nonReinvestedDividendIncome.toBigDecimalValue() +
                     candle.close * state.holdingQuantity.toBigDecimal(),
-                cash = state.availableCash.toBigDecimalValue(),
+                cash = state.availableCash.toBigDecimalValue() + nonReinvestedDividendIncome.toBigDecimalValue(),
                 positionQuantity = state.holdingQuantity,
                 close = candle.close,
                 averagePurchasePrice = state.averagePurchasePrice.toBigDecimalValue(),
                 realizedProfitLoss = state.realizedProfitLoss.toBigDecimalValue(),
+                dividendIncome = dividendIncome.toBigDecimalValue(),
                 cycleNo = currentCycleNo,
                 strategyMode = state.mode.name,
             )
