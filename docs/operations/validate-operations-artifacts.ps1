@@ -219,6 +219,7 @@ foreach ($expected in @(
     "kafka-0.kafka.trading-infra.svc.cluster.local",
     "temporal-frontend.trading-infra.svc.cluster.local",
     "kis-wrapper.application-prod.properties",
+    "management.metrics.tags.application=stock-search-service",
     "management.endpoints.web.exposure.include=health,info",
     "management.endpoint.health.probes.enabled=true",
     "path: /actuator/health/readiness",

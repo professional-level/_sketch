@@ -61,6 +61,9 @@ data:
     spring.jpa.database-platform=org.hibernate.dialect.MySQL8Dialect
     spring.jpa.hibernate.ddl-auto=validate
     spring.kafka.bootstrap-servers=kafka-0.kafka.trading-infra.svc.cluster.local:9092,kafka-1.kafka.trading-infra.svc.cluster.local:9092,kafka-2.kafka.trading-infra.svc.cluster.local:9092
+    management.endpoints.web.exposure.include=health,info,metrics,prometheus
+    management.endpoint.health.probes.enabled=true
+    management.metrics.tags.application=stock-search-service
     akra.temporal.enabled=true
     akra.temporal.target=temporal-frontend.trading-infra.svc.cluster.local:7233
     akra.temporal.namespace=default
@@ -369,11 +372,13 @@ spec:
                   name: trading-database-secrets
                   key: password
           readinessProbe:
-            tcpSocket:
+            httpGet:
+              path: /actuator/health/readiness
               port: 8082
             periodSeconds: 10
           livenessProbe:
-            tcpSocket:
+            httpGet:
+              path: /actuator/health/liveness
               port: 8082
             periodSeconds: 30
           volumeMounts:
