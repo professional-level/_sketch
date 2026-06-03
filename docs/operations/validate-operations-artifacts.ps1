@@ -217,7 +217,10 @@ foreach ($expected in @(
 foreach ($expected in @(
     "mysql.trading-infra.svc.cluster.local",
     "kafka-0.kafka.trading-infra.svc.cluster.local",
-    "temporal-frontend.trading-infra.svc.cluster.local"
+    "temporal-frontend.trading-infra.svc.cluster.local",
+    "MIGRATION_MANIFEST.md",
+    "grep -E '^[0-9]{8}_.+\.sql$'",
+    "migration listed in manifest is missing"
 )) {
     Assert-Contains "trading-runtime.yaml" $runtime $expected
 }

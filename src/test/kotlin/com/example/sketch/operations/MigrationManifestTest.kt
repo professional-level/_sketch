@@ -28,4 +28,24 @@ class MigrationManifestTest {
             )
         }
     }
+
+    @Test
+    fun `kubernetes migration job applies migration manifest order`() {
+        val runtimeManifest = Files.readString(
+            Path.of("docs", "operations", "kubernetes", "trading-runtime.yaml"),
+        )
+
+        assertTrue(
+            runtimeManifest.contains("MIGRATION_MANIFEST.md"),
+            "Migration Job must read the explicit migration manifest.",
+        )
+        assertTrue(
+            runtimeManifest.contains("grep -E '^[0-9]{8}_.+\\.sql$'"),
+            "Migration Job must extract SQL files from the manifest order.",
+        )
+        assertTrue(
+            !runtimeManifest.contains("for file in /migrations/*.sql"),
+            "Migration Job must not rely on lexicographic glob order.",
+        )
+    }
 }

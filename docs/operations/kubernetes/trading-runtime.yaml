@@ -190,8 +190,25 @@ spec:
             - /bin/sh
             - -ec
             - |
-              for file in /migrations/*.sql; do
-                echo "applying ${file}"
+              manifest=/migrations/MIGRATION_MANIFEST.md
+              if [ ! -f "${manifest}" ]; then
+                echo "missing migration manifest: ${manifest}" >&2
+                exit 1
+              fi
+
+              migration_files="$(grep -E '^[0-9]{8}_.+\.sql$' "${manifest}" || true)"
+              if [ -z "${migration_files}" ]; then
+                echo "migration manifest has no SQL entries: ${manifest}" >&2
+                exit 1
+              fi
+
+              printf '%s\n' "${migration_files}" | while IFS= read -r file_name; do
+                file="/migrations/${file_name}"
+                if [ ! -f "${file}" ]; then
+                  echo "migration listed in manifest is missing: ${file_name}" >&2
+                  exit 1
+                fi
+                echo "applying ${file_name}"
                 mysql --protocol=TCP -h "${DB_HOST}" -P "${DB_PORT}" -u "${DB_USER}" -p"${DB_PASSWORD}" "${DB_NAME}" < "${file}"
               done
           volumeMounts:

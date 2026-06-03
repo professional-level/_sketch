@@ -156,8 +156,10 @@ kubectl -n akra-trading create configmap akra-sql-migrations `
   --from-file=..\\sql
 ```
 
-The migration Job is checked in with `spec.suspend: true`. After verifying the
-generated `akra-sql-migrations` ConfigMap and database Secret:
+The migration Job is checked in with `spec.suspend: true` and applies SQL files
+in the order listed by `../sql/MIGRATION_MANIFEST.md`; do not rely on
+lexicographic filename order. After verifying the generated
+`akra-sql-migrations` ConfigMap and database Secret:
 
 ```powershell
 kubectl -n akra-trading patch job akra-trading-schema-migration `
