@@ -331,23 +331,23 @@ private suspend fun submitLegacySellOrder(
         return
     }
 
+    val externalOrderId = result.externalOrderId?.takeIf { it.isNotBlank() }
     when (result.status) {
         OrderIntentSubmissionStatus.SUBMITTED -> {
-            if (result.externalOrderId == null) {
+            if (externalOrderId == null) {
                 order.changeOrderState(OrderState.SUBMISSION_UNKNOWN)
             } else {
                 order.changeOrderState(OrderState.SELLING_IN_PROCESS)
-                val externalOrderId = result.externalOrderId
                 stockOrderRepository.save(order, ExternalOrderId(externalOrderId))
                 return
             }
         }
         OrderIntentSubmissionStatus.SKIPPED_DUPLICATE -> {
-            if (result.externalOrderId == null) {
+            if (externalOrderId == null) {
                 order.changeOrderState(OrderState.SUBMISSION_UNKNOWN)
             } else {
                 order.changeOrderState(OrderState.SELLING_IN_PROCESS)
-                stockOrderRepository.save(order, ExternalOrderId(result.externalOrderId))
+                stockOrderRepository.save(order, ExternalOrderId(externalOrderId))
                 return
             }
         }
@@ -355,7 +355,7 @@ private suspend fun submitLegacySellOrder(
         OrderIntentSubmissionStatus.REJECTED -> order.changeOrderState(OrderState.SUBMIT_FAILED)
     }
     if (result.status == OrderIntentSubmissionStatus.SUBMISSION_UNKNOWN) {
-        result.externalOrderId?.let { externalOrderId ->
+        externalOrderId?.let { externalOrderId ->
             stockOrderRepository.save(order, ExternalOrderId(externalOrderId))
             return
         }

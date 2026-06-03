@@ -25,18 +25,7 @@ class StockTradeOrchestrationServicesTest {
 
     @Test
     fun `legacy completed purchase submits sell order intent with persisted holding quantity`() = runBlocking {
-        val purchaseOrder = PurchaseOrder(
-            id = OrderId(UUID.fromString("11111111-1111-1111-1111-111111111111")),
-            strategyId = "final-price:TQQQ",
-            stockId = StockId("TQQQ"),
-            stockName = "ProShares UltraPro QQQ",
-            requestedAt = ZonedDateTime.parse("2026-05-20T09:00:00+09:00"),
-            strategyType = StrategyType.FinalPriceBatingV1,
-            purchasePrice = Money(100.0),
-            purchasedAt = ZonedDateTime.parse("2026-05-21T09:00:00+09:00"),
-            quantity = 7,
-            orderState = OrderState.PURCHASE_COMPLETED,
-        )
+        val purchaseOrder = completedPurchaseOrder("11111111-1111-1111-1111-111111111111")
         val repository = FakeStockOrderRepository(listOf(purchaseOrder))
         val submitOrderIntent = FakeSubmitOrderIntentUseCase(
             result = SubmitOrderIntentResult(
@@ -67,18 +56,7 @@ class StockTradeOrchestrationServicesTest {
 
     @Test
     fun `legacy sell order stays submission unknown when submitted result has no broker order id`() = runBlocking {
-        val purchaseOrder = PurchaseOrder(
-            id = OrderId(UUID.fromString("22222222-2222-2222-2222-222222222222")),
-            strategyId = "final-price:TQQQ",
-            stockId = StockId("TQQQ"),
-            stockName = "ProShares UltraPro QQQ",
-            requestedAt = ZonedDateTime.parse("2026-05-20T09:00:00+09:00"),
-            strategyType = StrategyType.FinalPriceBatingV1,
-            purchasePrice = Money(100.0),
-            purchasedAt = ZonedDateTime.parse("2026-05-21T09:00:00+09:00"),
-            quantity = 7,
-            orderState = OrderState.PURCHASE_COMPLETED,
-        )
+        val purchaseOrder = completedPurchaseOrder("22222222-2222-2222-2222-222222222222")
         val repository = FakeStockOrderRepository(listOf(purchaseOrder))
         val submitOrderIntent = FakeSubmitOrderIntentUseCase(
             result = SubmitOrderIntentResult(
@@ -95,6 +73,42 @@ class StockTradeOrchestrationServicesTest {
             repository.savedStates,
         )
         assertEquals(emptyList(), repository.savedExternalStates)
+    }
+
+    @Test
+    fun `legacy sell order treats blank submitted broker order id as submission unknown`() = runBlocking {
+        val purchaseOrder = completedPurchaseOrder("33333333-3333-3333-3333-333333333333")
+        val repository = FakeStockOrderRepository(listOf(purchaseOrder))
+        val submitOrderIntent = FakeSubmitOrderIntentUseCase(
+            result = SubmitOrderIntentResult(
+                status = OrderIntentSubmissionStatus.SUBMITTED,
+                externalOrderId = " ",
+            ),
+        )
+        val service = CreateSellOrdersByStrategyService(repository, submitOrderIntent)
+
+        service.execute()
+
+        assertEquals(
+            listOf(OrderState.SELLING_WAITING, OrderState.SUBMISSION_UNKNOWN),
+            repository.savedStates,
+        )
+        assertEquals(emptyList(), repository.savedExternalStates)
+    }
+
+    private fun completedPurchaseOrder(id: String): PurchaseOrder {
+        return PurchaseOrder(
+            id = OrderId(UUID.fromString(id)),
+            strategyId = "final-price:TQQQ",
+            stockId = StockId("TQQQ"),
+            stockName = "ProShares UltraPro QQQ",
+            requestedAt = ZonedDateTime.parse("2026-05-20T09:00:00+09:00"),
+            strategyType = StrategyType.FinalPriceBatingV1,
+            purchasePrice = Money(100.0),
+            purchasedAt = ZonedDateTime.parse("2026-05-21T09:00:00+09:00"),
+            quantity = 7,
+            orderState = OrderState.PURCHASE_COMPLETED,
+        )
     }
 
     private class FakeSubmitOrderIntentUseCase(
