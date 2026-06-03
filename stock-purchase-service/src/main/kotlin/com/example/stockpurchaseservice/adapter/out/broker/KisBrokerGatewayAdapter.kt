@@ -379,11 +379,19 @@ internal fun BrokerOrderCommand.toKisDomesticOrderRequest(): Map<String, Any> {
         "PDNO" to symbol,
         "ORD_DVSN" to orderType.toKisDomesticOrderDivision(),
         "ORD_QTY" to quantity,
-        "ORD_UNPR" to price.toLong(),
+        "ORD_UNPR" to toKisDomesticOrderPrice(),
         "EXCG_ID_DVSN_CD" to "KRX",
         "SLL_TYPE" to if (side == OrderIntentSide.SELL) "01" else "",
         "isMock" to isMock,
     )
+}
+
+private fun BrokerOrderCommand.toKisDomesticOrderPrice(): Long {
+    return when (orderType) {
+        StockOrderType.MOC -> 0L
+        StockOrderType.LIMIT,
+        StockOrderType.LOC -> price.toLong()
+    }
 }
 
 internal fun BrokerOrderCommand.toKisUsOverseasOrderRequest(): Map<String, Any> {

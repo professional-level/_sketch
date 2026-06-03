@@ -139,6 +139,30 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `builds domestic market order request with zero order price`() {
+        val command = brokerCommand(
+            market = StockOrderMarket.DOMESTIC,
+            side = OrderIntentSide.BUY,
+            symbol = "005930",
+            exchange = "KRX",
+            price = 70_000.0,
+            quantity = 2,
+            orderType = StockOrderType.MOC,
+            isMock = false,
+        )
+
+        val body = command.toKisDomesticOrderRequest()
+
+        assertEquals("005930", body["PDNO"])
+        assertEquals("01", body["ORD_DVSN"])
+        assertEquals(2, body["ORD_QTY"])
+        assertEquals(0L, body["ORD_UNPR"])
+        assertEquals("KRX", body["EXCG_ID_DVSN_CD"])
+        assertEquals("", body["SLL_TYPE"])
+        assertEquals(false, body["isMock"])
+    }
+
+    @Test
     fun `builds domestic cancel request using original broker order fields`() {
         val command = brokerCancelCommand(
             market = StockOrderMarket.DOMESTIC,
@@ -3892,6 +3916,7 @@ class KisBrokerGatewayAdapterTest {
     }
 
     private fun brokerCommand(
+        market: StockOrderMarket = StockOrderMarket.OVERSEAS_US,
         side: OrderIntentSide,
         symbol: String,
         exchange: String = "NASD",
@@ -3902,7 +3927,7 @@ class KisBrokerGatewayAdapterTest {
     ): BrokerOrderCommand {
         return BrokerOrderCommand(
             internalOrderId = UUID.randomUUID(),
-            market = StockOrderMarket.OVERSEAS_US,
+            market = market,
             side = side,
             symbol = symbol,
             exchange = exchange,
