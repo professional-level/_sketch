@@ -462,11 +462,20 @@ private fun BrokerOrderStatusDto.withBestFillFrom(
         .maxWithOrNull(compareBy<BrokerOrderHistoryItem> { it.cumulativeFilledQuantity }.thenBy { it.orderedAt })
         ?: return this
     val filledStatus = filledCandidate.toStatus()
+    val mergedOrderedQuantity = orderedQuantity ?: filledStatus.orderedQuantity
+    val mergedCumulativeFilledQuantity = filledStatus.cumulativeFilledQuantity
+    val mergedRemainingQuantity = when {
+        mergedOrderedQuantity != null && mergedCumulativeFilledQuantity != null ->
+            (mergedOrderedQuantity - mergedCumulativeFilledQuantity).coerceAtLeast(0)
+        filledStatus.remainingQuantity != null -> filledStatus.remainingQuantity
+        else -> remainingQuantity
+    }
     return copy(
         externalExecutionId = externalExecutionId ?: filledStatus.externalExecutionId,
-        orderedQuantity = orderedQuantity ?: filledStatus.orderedQuantity,
+        orderedQuantity = mergedOrderedQuantity,
         orderedPrice = orderedPrice ?: filledStatus.orderedPrice,
-        cumulativeFilledQuantity = filledStatus.cumulativeFilledQuantity,
+        cumulativeFilledQuantity = mergedCumulativeFilledQuantity,
+        remainingQuantity = mergedRemainingQuantity,
         averageExecutionPrice = averageExecutionPrice ?: filledStatus.averageExecutionPrice,
         brokerReportedAt = maxOf(
             brokerReportedAt ?: selectedCandidate.orderedAt,

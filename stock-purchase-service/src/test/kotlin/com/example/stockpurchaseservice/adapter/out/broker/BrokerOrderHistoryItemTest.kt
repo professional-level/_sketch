@@ -185,6 +185,7 @@ class BrokerOrderHistoryItemTest {
         assertEquals("broker-1", status.externalOrderId)
         assertEquals("broker-fill-1", status.externalExecutionId)
         assertEquals(1L, status.cumulativeFilledQuantity)
+        assertEquals(2L, status.remainingQuantity)
         assertEquals(112.5, status.averageExecutionPrice)
         assertEquals(112.0, status.orderedPrice)
     }
