@@ -204,6 +204,34 @@ class StockOrderBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `domestic status lookup treats blank broker order id as absent`() {
+        val brokerGateway = FakeBrokerGateway()
+        val adapter = DomesticStockOrderAdapter(brokerGateway, isMockOrder = true)
+        val submittedAt = ZonedDateTime.parse("2026-06-02T09:00:00+09:00")
+
+        adapter.findOrderSubmissionStatus(
+            BrokerOrderStatusQuery(
+                orderIntentId = UUID.fromString("00000000-0000-0000-0000-000000000041"),
+                internalOrderId = UUID.fromString("00000000-0000-0000-0000-000000000042"),
+                externalOrderId = " ",
+                branchOrderNumber = " ",
+                symbol = "005930",
+                side = OrderIntentSide.BUY,
+                market = StockOrderMarket.DOMESTIC,
+                submittedAt = submittedAt,
+            ),
+        )
+
+        with(brokerGateway.historyQueries.single()) {
+            assertEquals(StockOrderMarket.DOMESTIC, market)
+            assertEquals("005930", symbol)
+            assertEquals("", externalOrderId)
+            assertEquals(null, branchOrderNumber)
+            assertEquals(true, isMock)
+        }
+    }
+
+    @Test
     fun `overseas account snapshot passes exchange and currency to broker gateway`() {
         val brokerGateway = FakeBrokerGateway()
         val adapter = OverseasStockOrderAdapter(brokerGateway, isMockOrder = false)

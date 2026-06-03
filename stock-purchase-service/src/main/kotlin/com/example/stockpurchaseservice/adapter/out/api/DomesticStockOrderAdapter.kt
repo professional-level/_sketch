@@ -67,12 +67,14 @@ internal class DomesticStockOrderAdapter(
             backfillDays = statusLookupBackfillDays,
             forwardDays = statusLookupForwardDays,
         )
+        val externalOrderId = query.externalOrderId?.trim()?.takeIf { it.isNotBlank() }
+        val branchOrderNumber = query.branchOrderNumber?.trim()?.takeIf { it.isNotBlank() }
         return brokerGateway.findOrderHistory(
             BrokerOrderHistoryQuery(
                 market = StockOrderMarket.DOMESTIC,
-                symbol = query.symbol.takeIf { query.externalOrderId == null }.orEmpty(),
-                externalOrderId = query.externalOrderId.orEmpty(),
-                branchOrderNumber = query.branchOrderNumber,
+                symbol = query.symbol.takeIf { externalOrderId == null }.orEmpty(),
+                externalOrderId = externalOrderId.orEmpty(),
+                branchOrderNumber = branchOrderNumber,
                 from = lookupWindow.from,
                 to = lookupWindow.to,
                 isMock = isMockOrder,

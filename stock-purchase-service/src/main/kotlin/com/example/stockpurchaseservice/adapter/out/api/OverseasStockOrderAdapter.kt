@@ -70,12 +70,13 @@ internal class OverseasStockOrderAdapter(
             backfillDays = statusLookupBackfillDays,
             forwardDays = statusLookupForwardDays,
         )
+        val branchOrderNumber = query.branchOrderNumber?.trim()?.takeIf { it.isNotBlank() }
         return brokerGateway.findOrderHistory(
             BrokerOrderHistoryQuery(
                 market = StockOrderMarket.OVERSEAS_US,
                 symbol = query.symbol,
                 exchange = query.exchange.ifBlank { defaultExchange },
-                branchOrderNumber = query.branchOrderNumber,
+                branchOrderNumber = branchOrderNumber,
                 from = lookupWindow.from,
                 to = lookupWindow.to,
                 isMock = isMockOrder,
