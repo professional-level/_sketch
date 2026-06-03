@@ -6,6 +6,7 @@ import com.example.stockpurchaseservice.application.port.`in`.ReconcileExecution
 import com.example.stockpurchaseservice.application.port.`in`.SimulateStockPurchaseUseCase
 import com.example.stockpurchaseservice.config.risk.OrderRiskProperties
 import kotlinx.coroutines.runBlocking
+import org.springframework.scheduling.annotation.Scheduled
 import java.time.ZonedDateTime
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -21,6 +22,13 @@ class StockTradeSchedulerTest {
         val shouldRun = gate.shouldRunAt(ZonedDateTime.parse("2026-07-03T10:00:00-04:00[America/New_York]"))
 
         assertFalse(shouldRun)
+    }
+
+    @Test
+    fun `scheduler cron runs every day so market timezone gate controls execution`() {
+        assertEquals("0 */1 * * * *", schedulerCron("sellOrderByStrategies"))
+        assertEquals("0 */1 * * * *", schedulerCron("executionCheck"))
+        assertEquals("0 */1 * * * *", schedulerCron("simulateStockPurchase"))
     }
 
     @Test
@@ -231,5 +239,13 @@ class StockTradeSchedulerTest {
         override suspend fun execute() {
             calls += "simulate"
         }
+    }
+
+    private fun schedulerCron(methodName: String): String {
+        return checkNotNull(
+            StockTradeScheduler::class.java.declaredMethods
+                .first { it.name == methodName }
+                .getAnnotation(Scheduled::class.java),
+        ).cron
     }
 }

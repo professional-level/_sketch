@@ -23,14 +23,14 @@ internal class StockTradeScheduler(
     private val simulateStockPurchaseUseCase: SimulateStockPurchaseUseCase,
     private val scheduleGate: StockTradeScheduleGate,
 ) {
-    @Scheduled(cron = "0 */1 * ? * MON-FRI") // TODO: Adjust scheduler frequency by sell strategy.
+    @Scheduled(cron = EVERY_MINUTE_CRON)
     suspend fun sellOrderByStrategies() {
         runIfOrderSubmissionWindow("sell-order-by-strategies") {
             createSellOrdersByStrategyUseCase.execute()
         }
     }
 
-    @Scheduled(cron = "0 */1 * ? * MON-FRI") // TODO: Adjust scheduler frequency by sell strategy.
+    @Scheduled(cron = EVERY_MINUTE_CRON)
     suspend fun executionCheck() {
         runIfRecoveryTradingDate("execution-check") {
             recoverUnknownOrderSubmissionsUseCase.execute()
@@ -38,7 +38,7 @@ internal class StockTradeScheduler(
         }
     }
 
-    @Scheduled(cron = "0 */1 * ? * MON-FRI")
+    @Scheduled(cron = EVERY_MINUTE_CRON)
     suspend fun simulateStockPurchase() {
         runIfOrderSubmissionWindow("simulate-stock-purchase") {
             simulateStockPurchaseUseCase.execute()
@@ -68,6 +68,7 @@ internal class StockTradeScheduler(
     }
 
     companion object {
+        private const val EVERY_MINUTE_CRON = "0 */1 * * * *"
         private val log = LoggerFactory.getLogger(StockTradeScheduler::class.java)
     }
 }
