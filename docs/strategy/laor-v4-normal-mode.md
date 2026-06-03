@@ -1,6 +1,6 @@
 # 라오어 무한매수법 V4.0 교본 - 일반모드
 
-> 내부 프로젝트 정리 문서입니다. 사용자가 제공한 일반모드 자료를 구현과 백테스트에서 참조하기 쉽도록 재구성했습니다. 외부 배포용 문서가 아닙니다.
+> 내부 프로젝트 정리 문서입니다. 사용자가 제공한 일반모드 자료를 교본 형태로 재구성했습니다. 외부 배포용 문서가 아닙니다.
 
 ## 범위
 
@@ -118,22 +118,6 @@ T == 0
 - 전일 종가보다 충분히 큰 가격으로 LOC 매수를 시도합니다.
 - 자료 기준으로는 일반적으로 전일 종가보다 `10% ~ 15%` 위 가격을 사용합니다.
 
-프로젝트 구현 대응:
-
-```text
-firstBuyLimitPrice = previousClose * firstBuyLimitMultiplier
-```
-
-`firstBuyLimitMultiplier`는 교본 원문에 고정값으로 제시된 개념이 아니라, 위 `10% ~ 15%` 범위를 자동화하기 위해 프로젝트 코드에서 둔 구현 옵션입니다.
-
-현재 프로젝트 구현 기본값:
-
-```text
-firstBuyLimitMultiplier = 1.12
-```
-
-즉 현재 구현의 기본 첫 매수 LOC 가격은 전일 종가의 `112%`, 전일 종가보다 `12%` 위입니다.
-
 ### 전반전 매수
 
 조건:
@@ -224,50 +208,9 @@ qty == 0
 
 큰수매수의 상세 규칙은 별도 문서로 분리합니다.
 
-## 프로젝트 구현 매핑
+## 이후 정리 대상
 
-| 교본 개념 | 현재 프로젝트 코드 |
-| --- | --- |
-| 종목별 목표수익률 | `LaorV4StrategySymbol.targetProfitPercent` |
-| 전체 분할 수 `N` | `LaorV4StrategyConfig.totalSplitCount` |
-| 첫 매수 LOC 배율 | `LaorV4StrategyConfig.firstBuyLimitMultiplier` |
-| T값 | `LaorV4StrategyState.progressRound` |
-| 남은 현금 | `LaorV4StrategyState.availableCash` |
-| 평균단가 | `LaorV4StrategyState.averagePurchasePrice` |
-| 보유 수량 | `LaorV4StrategyState.holdingQuantity` |
-| 일반/리버스 모드 | `LaorV4StrategyState.mode` |
-| 첫 매수 | `LaorV4StrategyOrderTag.FIRST_BUY` |
-| 별지점 절반 매수 | `LaorV4StrategyOrderTag.STAR_HALF_BUY` |
-| 평단 절반 매수 | `LaorV4StrategyOrderTag.AVG_HALF_BUY` |
-| 별지점 전체 매수 | `LaorV4StrategyOrderTag.STAR_FULL_BUY` |
-| 쿼터매도 | `LaorV4StrategyOrderTag.QUARTER_SELL` |
-| 최종 지정가매도 | `LaorV4StrategyOrderTag.TARGET_SELL` |
-
-현재 코드에 반영된 핵심 공식:
-
-```text
-normalModeStarProfitPercent = targetProfitPercent * (1 - (2 * T / N))
-starPoint = avg * (1 + normalModeStarProfitPercent / 100)
-singleBuyBudget = cash / (N - T)
-firstBuyLimitPrice = previousClose * firstBuyLimitMultiplier
-```
-
-`firstBuyLimitMultiplier = 1.12`는 현재 코드 기본값입니다. 교본 원문은 첫 매수 LOC 가격을 전일 종가보다 `10% ~ 15%` 위로 잡는다고 설명하며, `1.12` 자체를 고정 규칙으로 정의하지 않습니다.
-
-## 백테스트 구현 참고
-
-일봉 OHLC 기준 백테스트에서는 다음 체결 가정을 사용할 수 있습니다.
-
-- LOC 매수: 종가가 LOC 매수가 이하이면 체결
-- LOC 매도: 종가가 LOC 매도가 이상이면 체결
-- 지정가매도: 일중 고가가 지정가 이상이면 체결
-- 지정가매수: 일중 저가가 지정가 이하이면 체결
-
-동일 거래일에 매도와 매수가 함께 체결될 수 있으므로, T값 계산은 복합 체결을 고려해야 합니다.
-
-## 현재 구현과 추가 확인이 필요한 부분
-
-다음 항목은 일반모드 교본에는 포함되지만, 현재 구현과 1:1로 완전히 대응되는지 별도 점검이 필요합니다.
+다음 항목은 별도 교본 또는 운영 절차로 분리합니다.
 
 - 큰 하락 대비 하단 LOC 매수 사다리 생성 규칙
 - 큰수매수 상세 규칙

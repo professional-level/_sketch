@@ -1,6 +1,6 @@
 # 라오어 무한매수법 V4.0 교본 - 소진후 리버스모드
 
-> 내부 프로젝트 정리 문서입니다. 사용자가 제공한 소진후 리버스모드 자료를 구현과 백테스트에서 참조하기 쉽도록 재구성했습니다. 외부 배포용 문서가 아닙니다.
+> 내부 프로젝트 정리 문서입니다. 사용자가 제공한 소진후 리버스모드 자료를 교본 형태로 재구성했습니다. 외부 배포용 문서가 아닙니다.
 
 ## 범위
 
@@ -213,47 +213,9 @@ close > avg * (1 - targetProfitPercent / 100)
 
 전략 시작 직전에 설정한 원금 안에서 일반모드와 리버스모드를 모두 해결하는 것이 기본 원칙입니다. 손실이 싫더라도 리버스모드 규칙을 유지해야 교본 기준의 무한매수법으로 볼 수 있습니다.
 
-## 프로젝트 구현 매핑
+## 이후 정리 대상
 
-| 교본 개념 | 현재 프로젝트 코드 |
-| --- | --- |
-| 리버스 진입 조건 | `progressRound > totalSplitCount - 1` |
-| 리버스 별지점 | `recentClosePrices.takeLast(5).average()` |
-| 첫날 리버스 매도 | `REVERSE_MOC_SELL` |
-| 둘째 날 이후 리버스 매도 | `REVERSE_LOC_SELL` |
-| 리버스 매수 | `REVERSE_BUY` |
-| 리버스 매도 수량 분모 | `LaorV4StrategyConfig.reverseSellDivisionCount = totalSplitCount / 2.0` |
-| 리버스 매도 후 T 계수 | `LaorV4StrategyConfig.reverseSellFactor = 1.0 - 2.0 / totalSplitCount` |
-| 리버스 매수 예산 비율 | `REVERSE_BUY_AVAILABLE_CASH_RATIO = 0.25` |
-| 리버스 종료 조건 | `closePrice > averagePurchasePrice * (1 - targetProfitPercent / 100)` |
-
-현재 코드에 반영된 핵심 공식:
-
-```text
-shouldEnterReverse = T > N - 1
-reverseSellQuantity = floor(qty / (N / 2))
-reverseStarPoint = average(last 5 close prices)
-reverseBuyPrice = reverseStarPoint - 0.01
-reverseBuyBudget = cash * 0.25
-reverseSellT = T * (1 - 2 / N)
-reverseBuyT = T + (N - T) * 0.25
-shouldExitReverse = close > avg * (1 - targetProfitPercent / 100)
-```
-
-## 백테스트 구현 참고
-
-일봉 OHLC 기준 백테스트에서는 다음 체결 가정을 사용할 수 있습니다.
-
-- `MOC` 매도: 종가에 체결
-- `LOC` 매도: 종가가 LOC 매도가 이상이면 종가에 체결
-- `LOC` 매수: 종가가 LOC 매수가 이하이면 종가에 체결
-- 리버스 별지점 계산에는 직전 5거래일 종가가 필요
-- 리버스 첫날은 매도만 있고 매수는 없어야 함
-- 둘째 날부터는 매도와 매수가 같은 날 동시에 체결될 수 있음
-
-## 현재 구현과 추가 확인이 필요한 부분
-
-다음 항목은 교본 기준과 구현 기준을 계속 대조해야 합니다.
+다음 항목은 별도 교본 또는 운영 절차로 분리합니다.
 
 - 리버스모드 종료 판단 시점: 종가 확인 후 당일 즉시 일반모드로 볼지, 다음 거래일부터 일반모드로 볼지
 - 리버스 첫날 `MOC` 매도 후 당일 종료 조건도 평가할지 여부
