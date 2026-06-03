@@ -1,10 +1,13 @@
 package com.example.stockpurchaseservice.adapter.out.broker
 
 import com.example.stockpurchaseservice.application.port.`in`.OrderIntentSide
+import com.example.stockpurchaseservice.application.port.out.BrokerOrderQueryFailedException
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderRejectedException
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatus
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatusDto
 import com.example.stockpurchaseservice.application.port.out.BrokerOrderStatusQuery
+import com.example.stockpurchaseservice.application.port.out.BrokerOrderSubmissionUnknownException
+import com.example.stockpurchaseservice.application.port.out.BrokerOrderTemporaryUnavailableException
 import com.example.stockpurchaseservice.application.port.out.StockOrderMarket
 import com.example.stockpurchaseservice.application.port.out.StockOrderType
 import org.junit.jupiter.api.Assumptions.assumeTrue
@@ -338,6 +341,42 @@ class KisBrokerGatewaySmokeTest {
                     "returnCode=${exception.brokerReturnCode}, " +
                     "messageCode=${exception.brokerMessageCode}, " +
                     "brokerMessage=${exception.brokerMessage}, " +
+                    "config=${config.redacted()}, command=$command",
+            )
+        } catch (exception: BrokerOrderSubmissionUnknownException) {
+            fail(
+                "$step status unknown after KIS $brokerEnvironment broker submission: " +
+                    "externalOrderId=${exception.externalOrderId}, " +
+                    "message=${exception.message}, " +
+                    "cause=${exception.cause?.javaClass?.simpleName}, " +
+                    "causeMessage=${exception.cause?.message}, " +
+                    "config=${config.redacted()}, command=$command",
+            )
+        } catch (exception: BrokerOrderTemporaryUnavailableException) {
+            fail(
+                "$step temporarily unavailable during KIS $brokerEnvironment broker smoke: " +
+                    "returnCode=${exception.brokerReturnCode}, " +
+                    "messageCode=${exception.brokerMessageCode}, " +
+                    "brokerMessage=${exception.brokerMessage}, " +
+                    "message=${exception.message}, " +
+                    "config=${config.redacted()}, command=$command",
+            )
+        } catch (exception: BrokerOrderQueryFailedException) {
+            fail(
+                "$step query prerequisite failed during KIS $brokerEnvironment broker smoke: " +
+                    "returnCode=${exception.brokerReturnCode}, " +
+                    "messageCode=${exception.brokerMessageCode}, " +
+                    "brokerMessage=${exception.brokerMessage}, " +
+                    "message=${exception.message}, " +
+                    "config=${config.redacted()}, command=$command",
+            )
+        } catch (exception: RuntimeException) {
+            fail(
+                "$step failed during KIS $brokerEnvironment broker smoke: " +
+                    "exception=${exception::class.java.simpleName}, " +
+                    "message=${exception.message}, " +
+                    "cause=${exception.cause?.javaClass?.simpleName}, " +
+                    "causeMessage=${exception.cause?.message}, " +
                     "config=${config.redacted()}, command=$command",
             )
         }
