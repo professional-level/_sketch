@@ -1,5 +1,6 @@
 package com.example.stockpurchaseservice.config.runtime
 
+import com.example.stockpurchaseservice.config.observability.OperationalAlertProperties
 import com.example.stockpurchaseservice.config.risk.OrderRiskProperties
 import java.time.Duration
 import java.time.LocalDate
@@ -17,6 +18,7 @@ class StockPurchaseRuntimeSafetyValidator(
     private val environment: Environment,
     private val properties: StockPurchaseRuntimeSafetyProperties,
     private val orderRiskProperties: OrderRiskProperties,
+    private val operationalAlertProperties: OperationalAlertProperties,
     @Value("\${akra.order.kis-open-api.base-url:http://localhost:8079}")
     private val brokerBaseUrl: String,
     @Value("\${akra.order.domestic.mock:true}")
@@ -53,6 +55,14 @@ class StockPurchaseRuntimeSafetyValidator(
                 overseasUsCurrency = orderRiskProperties.currencyConversion.overseasUsCurrency,
                 staticRatesToBase = orderRiskProperties.currencyConversion.ratesToBase,
                 httpFxRateBaseUrl = orderRiskProperties.currencyConversion.http.baseUrl,
+                operationalAlertWebhookEnabled = operationalAlertProperties.webhook.enabled,
+                operationalAlertWebhookUrl = operationalAlertProperties.webhook.url,
+                operationalAlertSlackEnabled = operationalAlertProperties.slack.enabled,
+                operationalAlertSlackUrl = operationalAlertProperties.slack.url,
+                operationalAlertPagerDutyEnabled = operationalAlertProperties.pagerDuty.enabled,
+                operationalAlertPagerDutyUrl = operationalAlertProperties.pagerDuty.url,
+                operationalAlertPagerDutyRoutingKey = operationalAlertProperties.pagerDuty.routingKey,
+                operationalAlertPagerDutySource = operationalAlertProperties.pagerDuty.source,
                 applicationSecretPropertySources = environment.applicationSecretPropertySourceNames(),
                 tradingHoursWindows = listOf(
                     orderRiskProperties.tradingHours.domestic.toRuntimeSafetyInput("DOMESTIC"),
@@ -150,6 +160,14 @@ object StockPurchaseRuntimeSafetyRules {
         val overseasUsCurrency: String,
         val staticRatesToBase: Map<String, Double>,
         val httpFxRateBaseUrl: String,
+        val operationalAlertWebhookEnabled: Boolean,
+        val operationalAlertWebhookUrl: String,
+        val operationalAlertSlackEnabled: Boolean,
+        val operationalAlertSlackUrl: String,
+        val operationalAlertPagerDutyEnabled: Boolean,
+        val operationalAlertPagerDutyUrl: String,
+        val operationalAlertPagerDutyRoutingKey: String,
+        val operationalAlertPagerDutySource: String,
         val applicationSecretPropertySources: List<String>,
         val tradingHoursWindows: List<TradingHoursWindowInput>,
         val kisWrapperFxPairKeysWithSymbol: Collection<String>,
@@ -248,8 +266,62 @@ object StockPurchaseRuntimeSafetyRules {
                 violations += validateCurrencyConversion(input)
             }
         }
+        violations += validateOperationalAlertRoutes(input)
 
         return violations
+    }
+
+    private fun validateOperationalAlertRoutes(input: Input): List<String> {
+        val violations = mutableListOf<String>()
+        validateAlertUrl(
+            enabled = input.operationalAlertWebhookEnabled,
+            route = "webhook",
+            property = "akra.observability.operational-alerts.webhook.url",
+            url = input.operationalAlertWebhookUrl,
+            violations = violations,
+        )
+        validateAlertUrl(
+            enabled = input.operationalAlertSlackEnabled,
+            route = "Slack",
+            property = "akra.observability.operational-alerts.slack.url",
+            url = input.operationalAlertSlackUrl,
+            violations = violations,
+        )
+        validateAlertUrl(
+            enabled = input.operationalAlertPagerDutyEnabled,
+            route = "PagerDuty",
+            property = "akra.observability.operational-alerts.pager-duty.url",
+            url = input.operationalAlertPagerDutyUrl,
+            violations = violations,
+        )
+        if (input.operationalAlertPagerDutyEnabled) {
+            if (input.operationalAlertPagerDutyRoutingKey.isBlank()) {
+                violations += "prod/live profile must configure a non-blank PagerDuty routing key " +
+                    "(akra.observability.operational-alerts.pager-duty.routing-key)"
+            }
+            if (input.operationalAlertPagerDutySource.isBlank()) {
+                violations += "prod/live profile must configure a non-blank PagerDuty source " +
+                    "(akra.observability.operational-alerts.pager-duty.source)"
+            }
+        }
+        return violations
+    }
+
+    private fun validateAlertUrl(
+        enabled: Boolean,
+        route: String,
+        property: String,
+        url: String,
+        violations: MutableList<String>,
+    ) {
+        if (!enabled) return
+        if (url.isBlank()) {
+            violations += "prod/live profile must configure a non-blank operational alert $route URL ($property)"
+            return
+        }
+        if (isLocalEndpoint(url)) {
+            violations += "prod/live profile cannot use a local operational alert $route URL ($property=$url)"
+        }
     }
 
     private fun validateTradingHours(windows: List<TradingHoursWindowInput>): List<String> {

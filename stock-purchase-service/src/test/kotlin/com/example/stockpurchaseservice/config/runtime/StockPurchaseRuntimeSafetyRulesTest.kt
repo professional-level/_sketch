@@ -328,6 +328,79 @@ class StockPurchaseRuntimeSafetyRulesTest {
     }
 
     @Test
+    fun `blocks enabled operational alert routes without destinations in production profile`() {
+        val violations = StockPurchaseRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                brokerBaseUrl = "https://broker-wrapper.example.com",
+                domesticMockOrder = false,
+                overseasMockOrder = false,
+                operationalAlertWebhookEnabled = true,
+                operationalAlertWebhookUrl = " ",
+                operationalAlertSlackEnabled = true,
+                operationalAlertSlackUrl = "",
+                operationalAlertPagerDutyEnabled = true,
+                operationalAlertPagerDutyUrl = " ",
+                operationalAlertPagerDutyRoutingKey = "",
+                operationalAlertPagerDutySource = " ",
+            ),
+        )
+
+        assertEquals(5, violations.size)
+        assertTrue(violations.any { it.contains("operational alert webhook URL") })
+        assertTrue(violations.any { it.contains("operational alert Slack URL") })
+        assertTrue(violations.any { it.contains("operational alert PagerDuty URL") })
+        assertTrue(violations.any { it.contains("PagerDuty routing key") })
+        assertTrue(violations.any { it.contains("PagerDuty source") })
+    }
+
+    @Test
+    fun `blocks local operational alert endpoints in production profile`() {
+        val violations = StockPurchaseRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                brokerBaseUrl = "https://broker-wrapper.example.com",
+                domesticMockOrder = false,
+                overseasMockOrder = false,
+                operationalAlertWebhookEnabled = true,
+                operationalAlertWebhookUrl = "http://localhost:9000/alerts",
+                operationalAlertSlackEnabled = true,
+                operationalAlertSlackUrl = "http://127.0.0.1:9000/slack",
+                operationalAlertPagerDutyEnabled = true,
+                operationalAlertPagerDutyUrl = "http://host.docker.internal:9000/pagerduty",
+                operationalAlertPagerDutyRoutingKey = "routing-key",
+            ),
+        )
+
+        assertEquals(3, violations.size)
+        assertTrue(violations.any { it.contains("local operational alert webhook URL") })
+        assertTrue(violations.any { it.contains("local operational alert Slack URL") })
+        assertTrue(violations.any { it.contains("local operational alert PagerDuty URL") })
+    }
+
+    @Test
+    fun `allows configured operational alert routes in production profile`() {
+        val violations = StockPurchaseRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                brokerBaseUrl = "https://broker-wrapper.example.com",
+                domesticMockOrder = false,
+                overseasMockOrder = false,
+                operationalAlertWebhookEnabled = true,
+                operationalAlertWebhookUrl = "https://alerts.example.com/trading",
+                operationalAlertSlackEnabled = true,
+                operationalAlertSlackUrl = "https://hooks.slack.example.com/services/trading",
+                operationalAlertPagerDutyEnabled = true,
+                operationalAlertPagerDutyUrl = "https://events.pagerduty.com/v2/enqueue",
+                operationalAlertPagerDutyRoutingKey = "routing-key",
+                operationalAlertPagerDutySource = "stock-purchase-service-live",
+            ),
+        )
+
+        assertTrue(violations.isEmpty())
+    }
+
+    @Test
     fun `blocks malformed trading hours configuration in production profile`() {
         val violations = StockPurchaseRuntimeSafetyRules.validate(
             input(
@@ -473,6 +546,14 @@ class StockPurchaseRuntimeSafetyRulesTest {
         overseasUsCurrency: String = "USD",
         staticRatesToBase: Map<String, Double> = mapOf("KRW" to 0.001),
         httpFxRateBaseUrl: String = "https://fx.example.com",
+        operationalAlertWebhookEnabled: Boolean = false,
+        operationalAlertWebhookUrl: String = "",
+        operationalAlertSlackEnabled: Boolean = false,
+        operationalAlertSlackUrl: String = "",
+        operationalAlertPagerDutyEnabled: Boolean = false,
+        operationalAlertPagerDutyUrl: String = "https://events.pagerduty.com/v2/enqueue",
+        operationalAlertPagerDutyRoutingKey: String = "",
+        operationalAlertPagerDutySource: String = "stock-purchase-service",
         applicationSecretPropertySources: List<String> = emptyList(),
         tradingHoursWindows: List<StockPurchaseRuntimeSafetyRules.TradingHoursWindowInput> = listOf(
             tradingHoursWindow("DOMESTIC", zoneId = "Asia/Seoul", regularOpen = "09:00", regularClose = "15:30"),
@@ -517,6 +598,14 @@ class StockPurchaseRuntimeSafetyRulesTest {
         overseasUsCurrency = overseasUsCurrency,
         staticRatesToBase = staticRatesToBase,
         httpFxRateBaseUrl = httpFxRateBaseUrl,
+        operationalAlertWebhookEnabled = operationalAlertWebhookEnabled,
+        operationalAlertWebhookUrl = operationalAlertWebhookUrl,
+        operationalAlertSlackEnabled = operationalAlertSlackEnabled,
+        operationalAlertSlackUrl = operationalAlertSlackUrl,
+        operationalAlertPagerDutyEnabled = operationalAlertPagerDutyEnabled,
+        operationalAlertPagerDutyUrl = operationalAlertPagerDutyUrl,
+        operationalAlertPagerDutyRoutingKey = operationalAlertPagerDutyRoutingKey,
+        operationalAlertPagerDutySource = operationalAlertPagerDutySource,
         applicationSecretPropertySources = applicationSecretPropertySources,
         tradingHoursWindows = tradingHoursWindows,
         kisWrapperFxPairKeysWithSymbol = kisWrapperFxPairKeysWithSymbol,
