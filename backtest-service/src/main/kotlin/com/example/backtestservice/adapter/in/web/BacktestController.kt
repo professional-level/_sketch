@@ -8,10 +8,14 @@ import com.example.backtestservice.application.port.`in`.ExecuteBacktestRunUseCa
 import com.example.backtestservice.application.port.`in`.FindBacktestEquityCurveQuery
 import com.example.backtestservice.application.port.`in`.FindBacktestRunUseCase
 import com.example.backtestservice.application.port.`in`.FindBacktestTradesQuery
+import com.example.backtestservice.application.port.`in`.FindLaorV4BacktestRunUseCase
 import com.example.backtestservice.application.port.`in`.ImportHistoricalMarketDataCommand
 import com.example.backtestservice.application.port.`in`.ImportHistoricalMarketDataResult
 import com.example.backtestservice.application.port.`in`.ImportHistoricalMarketDataUseCase
 import com.example.backtestservice.application.port.`in`.LaorV4BacktestParameters
+import com.example.backtestservice.application.port.`in`.LaorV4BacktestRunResponse
+import com.example.backtestservice.application.port.`in`.RunLaorV4BacktestCommand
+import com.example.backtestservice.application.port.`in`.RunLaorV4BacktestUseCase
 import com.example.backtestservice.domain.backtest.BacktestRunSummary
 import com.example.backtestservice.domain.backtest.BacktestStrategyType
 import com.example.common.WebAdapter
@@ -34,6 +38,8 @@ import java.util.UUID
 class BacktestController(
     private val executeBacktestRunUseCase: ExecuteBacktestRunUseCase,
     private val findBacktestRunUseCase: FindBacktestRunUseCase,
+    private val runLaorV4BacktestUseCase: RunLaorV4BacktestUseCase,
+    private val findLaorV4BacktestRunUseCase: FindLaorV4BacktestRunUseCase,
     private val importHistoricalMarketDataUseCase: ImportHistoricalMarketDataUseCase,
 ) {
     @PostMapping("/run")
@@ -90,6 +96,23 @@ class BacktestController(
             .mapNotFound()
     }
 
+    @PostMapping("/laor-v4/runs")
+    fun createLaorV4BacktestRun(@RequestBody request: LaorV4BacktestRunRequest): Mono<LaorV4BacktestRunResponse> {
+        return blocking {
+            runLaorV4BacktestUseCase.execute(request.toCommand())
+        }
+            .mapRequestErrors()
+    }
+
+    @GetMapping("/laor-v4/runs/{runId}")
+    fun findLaorV4BacktestRun(@PathVariable runId: UUID): Mono<LaorV4BacktestRunResponse> {
+        return blocking {
+            findLaorV4BacktestRunUseCase.find(runId)
+        }
+            .mapRequestErrors()
+            .mapNotFound()
+    }
+
     @PostMapping("/market-data/import")
     fun importMarketData(@RequestBody request: ImportHistoricalMarketDataRequest): Mono<ImportHistoricalMarketDataResult> {
         return blocking {
@@ -109,6 +132,12 @@ class BacktestController(
     private fun <T> Mono<T>.mapNotFound(): Mono<T> {
         return onErrorMap(NoSuchElementException::class.java) {
             ResponseStatusException(HttpStatus.NOT_FOUND, it.message, it)
+        }
+    }
+
+    private fun <T> Mono<T>.mapRequestErrors(): Mono<T> {
+        return onErrorMap(IllegalArgumentException::class.java) {
+            ResponseStatusException(HttpStatus.BAD_REQUEST, it.message, it)
         }
     }
 }
@@ -175,6 +204,36 @@ data class ImportHistoricalMarketDataRequest(
             to = to,
             autoAdjust = autoAdjust,
             timeoutSeconds = timeoutSeconds,
+        )
+    }
+}
+
+data class LaorV4BacktestRunRequest(
+    val symbol: String,
+    val market: String = "US",
+    val from: LocalDate,
+    val to: LocalDate,
+    val initialCash: BigDecimal = BigDecimal("10000"),
+    val totalSplitCount: Int = 40,
+    val firstBuyLimitMultiplier: Double = 1.12,
+    val autoRestart: Boolean = true,
+    val refreshMarketData: Boolean = true,
+    val autoAdjust: Boolean = false,
+    val marketDataTimeoutSeconds: Long = 30,
+) {
+    fun toCommand(): RunLaorV4BacktestCommand {
+        return RunLaorV4BacktestCommand(
+            symbol = symbol,
+            market = market,
+            from = from,
+            to = to,
+            initialCash = initialCash,
+            totalSplitCount = totalSplitCount,
+            firstBuyLimitMultiplier = firstBuyLimitMultiplier,
+            autoRestart = autoRestart,
+            refreshMarketData = refreshMarketData,
+            autoAdjust = autoAdjust,
+            marketDataTimeoutSeconds = marketDataTimeoutSeconds,
         )
     }
 }
