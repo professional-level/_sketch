@@ -2,12 +2,18 @@ package com.example.sketch.configure
 
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.PropertySource
+import org.springframework.context.annotation.PropertySources
 import org.springframework.core.env.Environment
 import java.nio.file.Files
 import java.nio.file.Path
 
 @Configuration
-@PropertySource(value = ["classpath:application-secret.properties"], ignoreResourceNotFound = true)
+@PropertySources(
+    value = [
+        PropertySource(value = ["classpath:application-secret.properties"], ignoreResourceNotFound = true),
+        PropertySource(value = ["file:src/main/resources/application-secret.properties"], ignoreResourceNotFound = true),
+    ],
+)
 class Property(
     env: Environment,
 ) {
