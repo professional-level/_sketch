@@ -117,7 +117,7 @@ class CancelOrderSubmissionServiceTest {
                 originalSubmission(
                     symbol = "005930",
                     externalOrderId = "domestic-order-1",
-                    branchOrderNumber = "00001",
+                    branchOrderNumber = " 00001 ",
                 ),
             ),
         )
@@ -135,6 +135,32 @@ class CancelOrderSubmissionServiceTest {
             assertEquals(StockOrderMarket.DOMESTIC, market)
             assertEquals("domestic-order-1", originalOrderId)
             assertEquals("00001", branchOrderNumber)
+        }
+    }
+
+    @Test
+    fun `trims original broker order id before cancel lookup and submission`() = runBlocking {
+        val marketPort = FakeMarketServicePort()
+        val submissionPort = FakeOrderIntentSubmissionPort(
+            originalSubmission(externalOrderId = "broker-order-1", exchange = " NYSE "),
+        )
+        val service = CancelOrderSubmissionService(
+            marketPort,
+            FakeProcessedEventPort(),
+            FakeOperationalAlertPort(),
+            submissionPort,
+        )
+
+        service.execute(
+            cancelCommand(
+                originalBrokerOrderId = " broker-order-1 ",
+                exchange = "AMEX",
+            ),
+        )
+
+        with(marketPort.cancelOrders.single()) {
+            assertEquals("broker-order-1", originalOrderId)
+            assertEquals("NYSE", exchange)
         }
     }
 
@@ -180,6 +206,30 @@ class CancelOrderSubmissionServiceTest {
         assertEquals(OrderIntentSubmissionStatusDto.CANCEL_PENDING, submissionPort.cancelPending.single().status)
         assertEquals("cancel response timed out", submissionPort.cancelPending.single().statusReason)
         assertEquals(eventId, alertPort.unknownCancellations.single().cancellationRequestId)
+        assertEquals(emptyList(), processedEventPort.failed)
+    }
+
+    @Test
+    fun `does not expose blank broker id from unknown cancel submission`() = runBlocking {
+        val marketPort = FakeMarketServicePort(
+            cancelException = BrokerOrderSubmissionUnknownException(
+                message = "cancel response timed out",
+                externalOrderId = " ",
+            ),
+        )
+        val processedEventPort = FakeProcessedEventPort()
+        val alertPort = FakeOperationalAlertPort()
+        val submissionPort = FakeOrderIntentSubmissionPort(
+            originalSubmission(externalOrderId = "broker-order-1", branchOrderNumber = " 00001 "),
+        )
+        val service = CancelOrderSubmissionService(marketPort, processedEventPort, alertPort, submissionPort)
+
+        val result = service.execute(cancelCommand())
+
+        assertEquals(CancelOrderSubmissionStatus.SUBMISSION_UNKNOWN, result.status)
+        assertEquals(null, result.brokerOrderId)
+        assertEquals("00001", alertPort.unknownCancellations.single().branchOrderNumber)
+        assertEquals(OrderIntentSubmissionStatusDto.CANCEL_PENDING, submissionPort.cancelPending.single().status)
         assertEquals(emptyList(), processedEventPort.failed)
     }
 

@@ -38,13 +38,14 @@ class CancelOrderSubmissionService(
 
         var originalSubmission: OrderIntentSubmissionDto? = null
         return try {
-            originalSubmission = orderIntentSubmissionPort.findByExternalOrderId(command.originalBrokerOrderId)
+            val originalBrokerOrderId = command.originalBrokerOrderId.trim()
+            originalSubmission = orderIntentSubmissionPort.findByExternalOrderId(originalBrokerOrderId)
             val submission = marketService.cancelOrder(command.toCancelOrderDto(originalSubmission))
             markOriginalOrderCancelPending(originalSubmission, command, "cancel request accepted by broker")
             processedEventPort.markSuccess(command.eventId)
             CancelOrderSubmissionResult(
                 status = CancelOrderSubmissionStatus.ACCEPTED,
-                brokerOrderId = submission.externalOrderId,
+                brokerOrderId = submission.externalOrderId.nonBlank(),
             )
         } catch (exception: BrokerOrderSubmissionUnknownException) {
             markOriginalOrderCancelPending(originalSubmission, command, exception.message)
@@ -54,7 +55,7 @@ class CancelOrderSubmissionService(
             processedEventPort.markSuccess(command.eventId)
             CancelOrderSubmissionResult(
                 status = CancelOrderSubmissionStatus.SUBMISSION_UNKNOWN,
-                brokerOrderId = exception.externalOrderId,
+                brokerOrderId = exception.externalOrderId.nonBlank(),
             )
         } catch (exception: BrokerOrderRejectedException) {
             runCatching {
@@ -81,18 +82,18 @@ class CancelOrderSubmissionService(
         originalSubmission: OrderIntentSubmissionDto?,
     ): CancelOrderDto {
         val market = originalSubmission?.market ?: symbol.toStockOrderMarket()
-        val resolvedBranchOrderNumber = branchOrderNumber ?: originalSubmission?.branchOrderNumber
+        val resolvedBranchOrderNumber = branchOrderNumber.nonBlank() ?: originalSubmission?.branchOrderNumber.nonBlank()
         return CancelOrderDto(
             orderId = toInternalOrderId(),
             stockId = symbol,
-            originalOrderId = originalBrokerOrderId,
+            originalOrderId = originalBrokerOrderId.trim(),
             branchOrderNumber = resolvedBranchOrderNumber,
             quantity = quantity.toInt(),
             market = market,
             orderType = orderType.toStockOrderType(),
             price = price,
             cancelAll = cancelAll,
-            exchange = originalSubmission?.exchange?.takeIf { it.isNotBlank() } ?: exchange,
+            exchange = originalSubmission?.exchange.nonBlank() ?: exchange,
         )
     }
 
@@ -105,8 +106,8 @@ class CancelOrderSubmissionService(
             idempotencyKey = idempotencyKey,
             strategyExecutionId = strategyExecutionId,
             symbol = symbol,
-            originalBrokerOrderId = originalBrokerOrderId,
-            branchOrderNumber = branchOrderNumber ?: originalSubmission?.branchOrderNumber,
+            originalBrokerOrderId = originalBrokerOrderId.trim(),
+            branchOrderNumber = branchOrderNumber.nonBlank() ?: originalSubmission?.branchOrderNumber.nonBlank(),
             reason = reason,
             occurredAt = ZonedDateTime.now(),
         )
@@ -143,5 +144,9 @@ class CancelOrderSubmissionService(
             OrderIntentType.MOC -> StockOrderType.MOC
             OrderIntentType.LIMIT -> StockOrderType.LIMIT
         }
+    }
+
+    private fun String?.nonBlank(): String? {
+        return this?.trim()?.takeIf { it.isNotBlank() }
     }
 }
