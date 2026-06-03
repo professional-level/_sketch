@@ -92,6 +92,7 @@ docs/operations/sql/20260602_create_kis_token_refresh_lock.mysql.sql
 ```
 
 The JDBC adapter shares issued tokens through the configured application database and uses `kis_token_refresh_lock` to prevent multiple wrapper instances from refreshing the same real/mock token scope at the same time. The lock is a short TTL row lock, so keep application clocks sane, monitor refresh timeout failures, and size `lock-ttl` above the expected KIS token issuance latency.
+Under production-like profiles, startup validation rejects non-positive token refresh/fallback durations, unsupported persistence types, and unsafe JDBC lock timing such as non-positive TTL/wait/retry values or a retry delay larger than the wait timeout.
 
 ## KIS Broker Smoke Tests
 
@@ -269,6 +270,9 @@ Blocked by default:
 
 - `akra.temporal.enabled=true` and `akra.temporal.target` points at a local endpoint such as `localhost`, `host.docker.internal`, `127.0.0.1`, `0.0.0.0`, or `::1`.
 - `akra.temporal.enabled=true` and `akra.temporal.target` is blank.
+- `akra.temporal.enabled=true` and `akra.temporal.namespace` or `akra.temporal.task-queue` is blank.
+- `akra.temporal.enabled=true`, `akra.temporal.schedules.top-volume.enabled=true`, and the top-volume schedule id is blank.
+- `akra.temporal.enabled=true`, `akra.temporal.schedules.top-volume.enabled=true`, and the top-volume schedule interval is non-positive or shorter than 1 minute.
 - `spring.jpa.hibernate.ddl-auto` is set to an automatic schema mutation mode such as `update`, `create`, or `create-drop`.
 - A local `application-secret.properties` property source is loaded.
 
@@ -300,6 +304,8 @@ Blocked by default:
 - `provider=static` with a missing or non-positive `rates-to-base.<currency>` entry for any configured market currency that differs from the risk base currency.
 - `provider=http` with blank `akra.order.risk.currency-conversion.http.base-url`.
 - `provider=kis-wrapper` with no configured pair symbol such as `akra.order.risk.currency-conversion.kis-wrapper.pairs.KRW-USD.symbol` for a required market-currency-to-base-currency pair.
+- An enabled operational alert webhook, Slack route, or PagerDuty route has a blank destination or points at a local endpoint.
+- PagerDuty alerts are enabled but the routing key or source is blank.
 - A local `application-secret.properties` property source is loaded.
 
 Temporary waiver properties exist for controlled tests only:
@@ -322,6 +328,10 @@ akra.runtime.safety.allow-application-secret-property-source-in-production=true
 - `akra.trading-calendar.us.enabled=false`.
 - `akra.trading-calendar.us.default-us-equity-calendar-enabled=false`.
 - `akra.trading-calendar.us.zone-id`, `regular-open`, `regular-close`, `holidays[]`, `early-close-days[]`, or `early-close-times[...]` contain malformed values, or an early-close time falls outside the regular session.
+- The active execution Temporal schedule id or execution run id prefix is blank.
+- The active execution schedule hour/minute/second or time zone is malformed.
+- The active execution schedule time zone does not match `akra.trading-calendar.us.zone-id`.
+- The active execution schedule time is before the configured US regular open or at/after the configured US regular close.
 - A local `application-secret.properties` property source is loaded.
 
 Temporary waiver properties:
@@ -334,7 +344,7 @@ akra.runtime.safety.allow-disabled-trading-calendar-in-production=true
 akra.runtime.safety.allow-application-secret-property-source-in-production=true
 ```
 
-The root KIS wrapper fails startup under a production-like profile when `spring.jpa.hibernate.ddl-auto` is an automatic schema mutation mode. It also fails when `akra.kis.token.persistence.enabled=true` and `akra.kis.token.persistence.type=file`, or when a local `application-secret.properties` property source is loaded. Use JDBC token persistence, environment variables, `*_FILE` secret mounts, a managed token/secret store, or a controlled temporary waiver:
+The root KIS wrapper fails startup under a production-like profile when `spring.jpa.hibernate.ddl-auto` is an automatic schema mutation mode. It also fails when `akra.kis.token.refresh-before-expiry` or `akra.kis.token.fallback-ttl` is non-positive, when token persistence is enabled with an unsupported type, when JDBC token lock TTL/wait/retry settings are unsafe, when `akra.kis.token.persistence.enabled=true` and `akra.kis.token.persistence.type=file`, or when a local `application-secret.properties` property source is loaded. Use JDBC token persistence, environment variables, `*_FILE` secret mounts, a managed token/secret store, or a controlled temporary waiver:
 
 ```properties
 akra.runtime.safety.allow-file-token-persistence-in-production=true
@@ -359,8 +369,9 @@ Before enabling real orders:
 - Apply required DB migrations explicitly and set `spring.jpa.hibernate.ddl-auto=validate` or `none`; do not use `update` in production.
 - Point `akra.order.kis-open-api.base-url` and `akra.market-data.kis-open-api.base-url` to the deployed broker wrapper.
 - Point each service's `akra.temporal.target` to the managed Temporal frontend.
-- Confirm `stock-search-service` starts successfully under a production-like profile before enabling strategy discovery schedules; startup validation rejects local Temporal targets, automatic DDL, and local secret property sources.
+- Confirm `stock-search-service` starts successfully under a production-like profile before enabling strategy discovery schedules; startup validation rejects local Temporal targets, blank namespace/task queue, unsafe top-volume schedule settings, automatic DDL, and local secret property sources.
 - Use JDBC or managed external storage for shared KIS tokens; do not use local-file token persistence for multi-instance production deployments.
+- Confirm root KIS wrapper token settings are positive and supported. For JDBC token persistence, set a positive `lock-ttl`, `lock-wait-timeout`, and `lock-retry-delay`, and keep the retry delay no larger than the wait timeout.
 - Set real-vs-mock trading flags intentionally for the account being operated.
 - Confirm `strategy-execution-service` order-intent trading environment settings and `stock-purchase-service` broker mock/live flags agree for each strategy prefix.
 - Confirm risk guard limits are set for order notional, account pending buy notional, broker account exposure/cash, symbol notional, daily order count, strategy allow-list, strategy trading environments, and FX conversion provider/rates/pairs. `stock-purchase-service` startup now enforces these settings under production-like profiles unless the disabled-risk-control waiver is explicitly set.
@@ -368,8 +379,9 @@ Before enabling real orders:
 - Confirm broker order status lookup windows are wide enough for `SUBMISSION_UNKNOWN` and `CANCEL_PENDING` recovery without creating excessive KIS query load.
 - Configure domestic and US order windows, holidays, early-close dates, and LOC/MOC cutoffs until an exchange calendar sync is available.
 - Configure `akra.trading-calendar.us.*` in `strategy-execution-service` separately from purchase-service risk windows. The daily active-strategy run resolves the order session date from the requested timestamp and market close, then skips strategy execution when that target US session is closed. If the Temporal trigger lands before the resolved session open or after the prior session close, generated order intents use the resolved session open timestamp for `createdAt` so `stock-purchase-service` evaluates trading-hours risk against the intended order session.
-- Confirm `strategy-execution-service` starts successfully under a production-like profile after any trading-calendar change; startup validation now rejects malformed zone/date/time values and early-close times outside the regular session.
+- Confirm `strategy-execution-service` starts successfully under a production-like profile after any trading-calendar or active-execution schedule change; startup validation now rejects malformed zone/date/time values, early-close times outside the regular session, schedule/calendar time-zone mismatches, and active-execution schedule times outside the configured regular session.
 - Confirm the legacy `stock-purchase-service` scheduler gate is acceptable for the deployment. By default it runs sell-order creation and simulation when any enabled market's configured order window is open, and it runs submission recovery plus reconciliation when any enabled market is on a configured trading date. Jobs skip only when every enabled market is outside its configured order window or trading date. Disabling `akra.order.risk.trading-hours.enabled` restores the old weekday-only scheduler behavior.
+- If operational alerts are enabled, configure non-local webhook, Slack, or PagerDuty destinations through runtime secrets/config. Startup validation rejects enabled alert routes with blank or local destinations and rejects PagerDuty routes without a routing key and source.
 - Confirm `application-secret.properties` is not included in the built artifact or Git diff, or omit it entirely and inject the KIS values at runtime. The root KIS wrapper, `stock-search-service`, `stock-purchase-service`, and `strategy-execution-service` block this property source by default under production-like profiles.
 
 Broker recovery, risk, and trading-hours guard keys:
