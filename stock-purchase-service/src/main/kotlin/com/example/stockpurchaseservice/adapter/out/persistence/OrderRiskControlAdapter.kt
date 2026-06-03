@@ -115,7 +115,12 @@ internal class OrderRiskControlAdapter(
         val limit = symbolLimit ?: properties.maxOrderNotional
         if (limit == null) return null
         if (limit <= 0.0) return "invalid max order notional: $limit"
-        val rawNotional = command.estimatedNotional ?: return null
+        val rawNotional = command.estimatedNotional
+            ?: return if (command.side == OrderIntentSide.BUY) {
+                "order notional cannot be assessed: order notional is missing for ${command.symbol}"
+            } else {
+                null
+            }
         val notional = rawNotional
             .toRiskCurrency(command.market.notionalCurrency())
             ?: return "order notional cannot be assessed: missing FX rate from " +
@@ -165,7 +170,8 @@ internal class OrderRiskControlAdapter(
         if (command.side != OrderIntentSide.BUY) return null
 
         val sourceCurrency = command.market.notionalCurrency()
-        val rawOrderNotional = command.estimatedNotional ?: return null
+        val rawOrderNotional = command.estimatedNotional
+            ?: return "account pending buy notional cannot be assessed: order notional is missing for ${command.symbol}"
         val orderNotional = rawOrderNotional
             .toRiskCurrency(sourceCurrency)
             ?: return "account pending buy notional cannot be assessed: missing FX rate from " +

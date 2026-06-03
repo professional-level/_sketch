@@ -192,6 +192,21 @@ class OrderRiskControlAdapterTest {
     }
 
     @Test
+    fun `rejects buy when pending buy notional guard cannot price moc order`() = runBlocking {
+        val properties = OrderRiskProperties().apply {
+            maxAccountPendingBuyNotional = 1_000.0
+        }
+
+        val result = adapter(properties).assess(
+            command(orderType = OrderIntentType.MOC, limitPrice = null),
+        )
+
+        assertFalse(result.accepted)
+        assertContains(result.reason ?: "", "account pending buy notional cannot be assessed")
+        assertContains(result.reason ?: "", "order notional is missing for TQQQ")
+    }
+
+    @Test
     fun `converts domestic order notional to risk base currency before applying order limit`() = runBlocking {
         val properties = OrderRiskProperties().apply {
             tradingHours.enabled = false
@@ -211,6 +226,21 @@ class OrderRiskControlAdapterTest {
         assertFalse(result.accepted)
         assertContains(result.reason ?: "", "order notional 1500.0 USD exceeds limit 1000.0 USD")
         assertContains(result.reason ?: "", "(raw=1500000.0 KRW rate=0.001)")
+    }
+
+    @Test
+    fun `rejects buy when order notional guard cannot price moc order`() = runBlocking {
+        val properties = OrderRiskProperties().apply {
+            maxOrderNotional = 1_000.0
+        }
+
+        val result = adapter(properties).assess(
+            command(orderType = OrderIntentType.MOC, limitPrice = null),
+        )
+
+        assertFalse(result.accepted)
+        assertContains(result.reason ?: "", "order notional cannot be assessed")
+        assertContains(result.reason ?: "", "order notional is missing for TQQQ")
     }
 
     @Test
