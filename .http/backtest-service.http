@@ -1,0 +1,38 @@
+@backtestHost = http://localhost:8084
+@symbol = TQQQ
+@from = 2024-01-01
+@to = 2024-01-10
+
+# Prerequisite:
+# docker compose -f docker-compose.backtest.yml up -d --build yfinance-sidecar
+
+### Import daily market data from yfinance sidecar
+POST {{backtestHost}}/backtests/market-data/import
+Content-Type: application/json
+
+{
+  "symbol": "{{symbol}}",
+  "market": "US",
+  "from": "{{from}}",
+  "to": "{{to}}",
+  "autoAdjust": false,
+  "timeoutSeconds": 30
+}
+
+### Run backtest with market data refresh
+POST {{backtestHost}}/backtests/run
+Content-Type: application/json
+
+{
+  "symbol": "{{symbol}}",
+  "market": "US",
+  "from": "{{from}}",
+  "to": "{{to}}",
+  "initialCash": 10000,
+  "strategyType": "BUY_AND_HOLD",
+  "commissionRate": 0,
+  "slippageRate": 0,
+  "refreshMarketData": true,
+  "autoAdjust": false,
+  "marketDataTimeoutSeconds": 30
+}
