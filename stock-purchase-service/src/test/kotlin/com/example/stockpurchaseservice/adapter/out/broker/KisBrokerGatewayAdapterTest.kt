@@ -319,6 +319,7 @@ class KisBrokerGatewayAdapterTest {
             brokerCancelCommand(
                 market = StockOrderMarket.OVERSEAS_US,
                 symbol = "TQQQ",
+                exchange = "nasd",
                 originalOrderId = "overseas-order-1",
                 branchOrderNumber = null,
                 price = 112.5,
@@ -954,10 +955,39 @@ class KisBrokerGatewayAdapterTest {
         )
 
         adapter.findOrderHistory(
-            historyQuery().copy(exchange = "NYSE"),
+            historyQuery().copy(exchange = "nyse"),
         )
 
         assertEquals("NYSE", exchangeFunction.requests.single().queryValue("ovrsExcgCd"))
+    }
+
+    @Test
+    fun `mock overseas order history preserves symbol and exchange filters`() {
+        val exchangeFunction = StubExchangeFunction(
+            responses = listOf(
+                """
+                {
+                  "rt_cd": "0",
+                  "ctx_area_fk200": "",
+                  "ctx_area_nk200": "",
+                  "output": []
+                }
+                """.trimIndent(),
+            ),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+
+        adapter.findOrderHistory(
+            historyQuery().copy(symbol = "tqqq", exchange = "nasd", isMock = true),
+        )
+
+        assertEquals("true", exchangeFunction.requests.single().queryValue("isMock"))
+        assertEquals("TQQQ", exchangeFunction.requests.single().queryValue("pdno"))
+        assertEquals("NASD", exchangeFunction.requests.single().queryValue("ovrsExcgCd"))
     }
 
     @Test
@@ -1159,7 +1189,7 @@ class KisBrokerGatewayAdapterTest {
         val snapshot = adapter.findAccountSnapshot(
             BrokerAccountSnapshotQuery(
                 market = StockOrderMarket.OVERSEAS_US,
-                exchange = "NASD",
+                exchange = "nasd",
                 currency = "USD",
                 isMock = false,
             ),

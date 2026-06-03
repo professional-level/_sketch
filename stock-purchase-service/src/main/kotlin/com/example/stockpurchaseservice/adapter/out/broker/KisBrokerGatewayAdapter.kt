@@ -506,7 +506,7 @@ private fun WebClient.fetchDomesticCancelableOrderPage(
 private fun BrokerOrderCancelableQuery.toKisOverseasCancelableOrderQuery(): Map<String, String> {
     return mapOf(
         "isMock" to isMock.toString(),
-        "ovrsExcgCd" to exchange.uppercase(),
+        "ovrsExcgCd" to exchange.toKisUsExchangeCode(),
         "sortSqn" to "DS",
         "ctxAreaFk200" to pageCursor.foreignKeyContext,
         "ctxAreaNk200" to pageCursor.nextKeyContext,
@@ -669,7 +669,7 @@ private fun BrokerOrderHistoryQuery.toKisDomesticExecutionOrderQuery(): Map<Stri
 private fun BrokerAccountSnapshotQuery.toKisOverseasBalanceQuery(): Map<String, String> {
     return mapOf(
         "isMock" to isMock.toString(),
-        "ovrsExcgCd" to exchange.uppercase(),
+        "ovrsExcgCd" to exchange.toKisUsExchangeCode(),
         "trCrcyCd" to currency.uppercase(),
         "ctxAreaFk200" to pageCursor.foreignKeyContext,
         "ctxAreaNk200" to pageCursor.nextKeyContext,
@@ -694,12 +694,12 @@ private fun BrokerAccountSnapshotQuery.toKisDomesticBalanceQuery(): Map<String, 
 internal fun BrokerOrderHistoryQuery.toKisOverseasExecutionOrderQuery(): Map<String, String> {
     return mapOf(
         "isMock" to isMock.toString(),
-        "pdno" to if (isMock) "" else symbol.ifBlank { "%" }.uppercase(),
+        "pdno" to symbol.ifBlank { if (isMock) "" else "%" }.uppercase(),
         "ordStrtDt" to from.toKisDate(),
         "ordEndDt" to to.toKisDate(),
         "sllBuyDvsn" to "00",
         "ccldNccsDvsn" to "00",
-        "ovrsExcgCd" to if (isMock) "" else exchange.uppercase(),
+        "ovrsExcgCd" to exchange.toKisUsExchangeCode(),
         "sortSqn" to "DS",
         "ordDt" to "",
         "ordGnoBrno" to branchOrderNumber.orEmpty(),
