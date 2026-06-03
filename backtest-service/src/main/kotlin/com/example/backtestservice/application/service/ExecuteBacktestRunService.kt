@@ -20,9 +20,7 @@ class ExecuteBacktestRunService(
 ) : ExecuteBacktestRunUseCase {
     override fun execute(command: ExecuteBacktestRunCommand): BacktestRunSummary {
         command.validate()
-        if (command.refreshMarketData) {
-            importHistoricalMarketDataUseCase.execute(command.toImportCommand())
-        }
+        importHistoricalMarketDataUseCase.execute(command.toImportCommand())
         val record = runBacktestUseCase.execute(command.toRunBacktestCommand()).toRunRecord()
         backtestRunStorePort.save(record)
         return record.summary

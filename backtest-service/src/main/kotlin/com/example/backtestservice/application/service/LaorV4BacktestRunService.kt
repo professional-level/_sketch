@@ -51,7 +51,6 @@ class LaorV4BacktestRunService(
                 autoRestart = autoRestart,
                 dividendReinvestment = dividendReinvestment,
             ),
-            refreshMarketData = refreshMarketData,
             autoAdjust = autoAdjust,
             marketDataTimeoutSeconds = marketDataTimeoutSeconds,
         )

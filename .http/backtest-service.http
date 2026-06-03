@@ -19,7 +19,7 @@ Content-Type: application/json
   "timeoutSeconds": 30
 }
 
-### Create backtest run summary with market data refresh
+### Create backtest run summary
 POST {{backtestHost}}/backtests/runs
 Content-Type: application/json
 
@@ -32,7 +32,6 @@ Content-Type: application/json
   "strategyType": "BUY_AND_HOLD",
   "commissionRate": 0,
   "slippageRate": 0,
-  "refreshMarketData": true,
   "autoAdjust": false,
   "marketDataTimeoutSeconds": 30
 }
@@ -54,7 +53,6 @@ Content-Type: application/json
   "firstBuyLimitPercentAbovePreviousClose": 12,
   "autoRestart": true,
   "dividendReinvestment": false,
-  "refreshMarketData": true,
   "autoAdjust": false,
   "marketDataTimeoutSeconds": 30
 }

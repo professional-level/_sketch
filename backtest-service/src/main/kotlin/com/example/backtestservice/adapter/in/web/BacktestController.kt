@@ -149,7 +149,6 @@ data class RunBacktestRequest(
     val commissionRate: BigDecimal = BigDecimal.ZERO,
     val slippageRate: BigDecimal = BigDecimal.ZERO,
     val laorV4: LaorV4BacktestRequest? = null,
-    val refreshMarketData: Boolean = false,
     val autoAdjust: Boolean = false,
     val marketDataTimeoutSeconds: Long = 30,
 ) {
@@ -164,7 +163,6 @@ data class RunBacktestRequest(
             commissionRate = commissionRate,
             slippageRate = slippageRate,
             laorV4 = laorV4?.toParameters(),
-            refreshMarketData = refreshMarketData,
             autoAdjust = autoAdjust,
             marketDataTimeoutSeconds = marketDataTimeoutSeconds,
         )
@@ -217,7 +215,6 @@ data class LaorV4BacktestRunRequest(
     val firstBuyLimitPercentAbovePreviousClose: Double,
     val autoRestart: Boolean = true,
     val dividendReinvestment: Boolean = false,
-    val refreshMarketData: Boolean = true,
     val autoAdjust: Boolean = false,
     val marketDataTimeoutSeconds: Long = 30,
 ) {
@@ -232,7 +229,6 @@ data class LaorV4BacktestRunRequest(
             firstBuyLimitPercentAbovePreviousClose = firstBuyLimitPercentAbovePreviousClose,
             autoRestart = autoRestart,
             dividendReinvestment = dividendReinvestment,
-            refreshMarketData = refreshMarketData,
             autoAdjust = autoAdjust,
             marketDataTimeoutSeconds = marketDataTimeoutSeconds,
         )

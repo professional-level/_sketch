@@ -19,7 +19,7 @@ import kotlin.test.assertEquals
 
 class ExecuteBacktestRunServiceTest {
     @Test
-    fun `refreshes market data runs backtest and stores summary record`() {
+    fun `ensures cached market data runs backtest and stores summary record`() {
         val importUseCase = FakeImportHistoricalMarketDataUseCase()
         val runUseCase = FakeRunBacktestUseCase()
         val store = FakeBacktestRunStorePort()
@@ -35,7 +35,6 @@ class ExecuteBacktestRunServiceTest {
                 from = LocalDate.parse("2024-01-02"),
                 to = LocalDate.parse("2024-01-03"),
                 initialCash = "1000".toBigDecimal(),
-                refreshMarketData = true,
             ),
         )
 

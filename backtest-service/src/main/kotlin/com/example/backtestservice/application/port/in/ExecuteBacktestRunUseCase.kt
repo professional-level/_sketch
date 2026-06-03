@@ -21,7 +21,6 @@ data class ExecuteBacktestRunCommand(
     val commissionRate: BigDecimal = BigDecimal.ZERO,
     val slippageRate: BigDecimal = BigDecimal.ZERO,
     val laorV4: LaorV4BacktestParameters? = null,
-    val refreshMarketData: Boolean = false,
     val autoAdjust: Boolean = false,
     val marketDataTimeoutSeconds: Long = 30,
 )

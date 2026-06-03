@@ -20,13 +20,7 @@ class CsvHistoricalMarketDataAdapter(
         val path = Path.of(csvRoot).resolve(query.symbol.toCsvFileName())
         if (!Files.exists(path)) return emptyList()
 
-        val lines = Files.readAllLines(path)
-            .filter { it.isNotBlank() }
-        if (lines.size <= 1) return emptyList()
-
-        val columns = lines.first().split(",").mapIndexed { index, name -> name.normalizedHeader() to index }.toMap()
-        return lines.drop(1)
-            .map { it.toHistoricalCandle(columns, query) }
+        return path.readDailyCandles(query.symbol, query.market)
             .filter { it.date >= query.from && it.date <= query.to }
             .sortedBy { it.date }
     }
@@ -36,9 +30,13 @@ class CsvHistoricalMarketDataAdapter(
         val root = Path.of(csvRoot)
         Files.createDirectories(root)
         val path = root.resolve(command.symbol.toCsvFileName())
+        val existingCandles = path.readDailyCandles(command.symbol, command.market)
+        val mergedCandles = (existingCandles + command.candles)
+            .associateBy { it.date }
+            .values
+            .sortedBy { it.date }
         val rows = sequenceOf("date,open,high,low,close,adj_close,dividend,volume") +
-            command.candles
-                .sortedBy { it.date }
+            mergedCandles
                 .asSequence()
                 .map {
                     listOf(
@@ -55,14 +53,27 @@ class CsvHistoricalMarketDataAdapter(
         Files.writeString(path, rows.joinToString(System.lineSeparator()))
     }
 
+    private fun Path.readDailyCandles(symbol: String, market: String): List<HistoricalCandle> {
+        if (!Files.exists(this)) return emptyList()
+        val lines = Files.readAllLines(this)
+            .filter { it.isNotBlank() }
+        if (lines.size <= 1) return emptyList()
+
+        val columns = lines.first().split(",").mapIndexed { index, name -> name.normalizedHeader() to index }.toMap()
+        return lines.drop(1)
+            .map { it.toHistoricalCandle(columns, symbol, market) }
+            .sortedBy { it.date }
+    }
+
     private fun String.toHistoricalCandle(
         columns: Map<String, Int>,
-        query: HistoricalDailyCandlesQuery,
+        symbol: String,
+        market: String,
     ): HistoricalCandle {
         val values = split(",")
         return HistoricalCandle(
-            symbol = query.symbol.trim().uppercase(),
-            market = query.market.trim().uppercase(),
+            symbol = symbol.trim().uppercase(),
+            market = market.trim().uppercase(),
             date = LocalDate.parse(values.required(columns, "date")),
             open = values.required(columns, "open").toBigDecimal(),
             high = values.required(columns, "high").toBigDecimal(),

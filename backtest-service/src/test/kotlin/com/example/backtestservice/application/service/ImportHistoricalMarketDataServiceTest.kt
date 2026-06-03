@@ -34,6 +34,50 @@ class ImportHistoricalMarketDataServiceTest {
     }
 
     @Test
+    fun `uses cached candles when requested range is already covered`() {
+        val cachedCandles = listOf(candle("2024-01-02"), candle("2024-01-03"))
+        val external = FakeExternalHistoricalMarketDataPort(emptyList())
+        val store = FakeHistoricalMarketDataPort(cachedCandles)
+        val service = ImportHistoricalMarketDataService(external, store)
+
+        val result = service.execute(
+            ImportHistoricalMarketDataCommand(
+                symbol = "TQQQ",
+                from = LocalDate.parse("2024-01-01"),
+                to = LocalDate.parse("2024-01-03"),
+            ),
+        )
+
+        assertEquals(0, result.importedCount)
+        assertEquals(LocalDate.parse("2024-01-02"), result.from)
+        assertEquals(LocalDate.parse("2024-01-03"), result.to)
+        assertEquals(emptyList(), external.queries)
+        assertEquals(emptyList(), store.saved)
+    }
+
+    @Test
+    fun `fetches and saves only missing leading cache range`() {
+        val cachedCandles = listOf(candle("2024-01-10"), candle("2024-01-11"))
+        val fetchedCandle = candle("2024-01-02")
+        val external = FakeExternalHistoricalMarketDataPort(listOf(fetchedCandle))
+        val store = FakeHistoricalMarketDataPort(cachedCandles)
+        val service = ImportHistoricalMarketDataService(external, store)
+
+        val result = service.execute(
+            ImportHistoricalMarketDataCommand(
+                symbol = "TQQQ",
+                from = LocalDate.parse("2024-01-01"),
+                to = LocalDate.parse("2024-01-11"),
+            ),
+        )
+
+        assertEquals(1, result.importedCount)
+        assertEquals(LocalDate.parse("2024-01-01"), external.queries.single().from)
+        assertEquals(LocalDate.parse("2024-01-09"), external.queries.single().to)
+        assertEquals(listOf(fetchedCandle), store.saved.single().candles)
+    }
+
+    @Test
     fun `fails when external source returns no candles`() {
         val service = ImportHistoricalMarketDataService(
             FakeExternalHistoricalMarketDataPort(emptyList()),
@@ -69,20 +113,29 @@ class ImportHistoricalMarketDataServiceTest {
     private class FakeExternalHistoricalMarketDataPort(
         private val candles: List<HistoricalCandle>,
     ) : ExternalHistoricalMarketDataPort {
+        val queries = mutableListOf<ExternalHistoricalDailyCandlesQuery>()
+
         override fun fetchDailyCandles(query: ExternalHistoricalDailyCandlesQuery): List<HistoricalCandle> {
+            queries += query
             return candles
         }
     }
 
-    private class FakeHistoricalMarketDataPort : HistoricalMarketDataPort {
+    private class FakeHistoricalMarketDataPort(
+        initialCandles: List<HistoricalCandle> = emptyList(),
+    ) : HistoricalMarketDataPort {
+        private val candles = initialCandles.toMutableList()
         val saved = mutableListOf<SaveHistoricalDailyCandlesCommand>()
 
         override fun findDailyCandles(query: HistoricalDailyCandlesQuery): List<HistoricalCandle> {
-            return emptyList()
+            return candles
+                .filter { it.date >= query.from && it.date <= query.to }
+                .sortedBy { it.date }
         }
 
         override fun saveDailyCandles(command: SaveHistoricalDailyCandlesCommand) {
             saved += command
+            candles += command.candles
         }
     }
 }
