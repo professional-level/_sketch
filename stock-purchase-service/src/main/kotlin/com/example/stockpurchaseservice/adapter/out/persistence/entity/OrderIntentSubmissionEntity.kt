@@ -85,8 +85,8 @@ internal class OrderIntentSubmissionEntity private constructor(
             quantity = quantity,
             orderTag = orderTag,
             internalOrderId = internalOrderId,
-            externalOrderId = externalOrderId,
-            branchOrderNumber = branchOrderNumber,
+            externalOrderId = externalOrderId.nonBlank(),
+            branchOrderNumber = branchOrderNumber.nonBlank(),
             submittedAt = submittedAt,
             tradingEnvironment = tradingEnvironment?.toDto(),
             status = status.toDto(),
@@ -110,8 +110,8 @@ internal class OrderIntentSubmissionEntity private constructor(
                 quantity = dto.quantity,
                 orderTag = dto.orderTag,
                 internalOrderId = dto.internalOrderId,
-                externalOrderId = dto.externalOrderId,
-                branchOrderNumber = dto.branchOrderNumber,
+                externalOrderId = dto.externalOrderId.nonBlank(),
+                branchOrderNumber = dto.branchOrderNumber.nonBlank(),
                 submittedAt = dto.submittedAt,
                 tradingEnvironment = dto.tradingEnvironment?.let(OrderIntentTradingEnvironment::from),
                 status = OrderIntentSubmissionStatus.from(dto.status),
@@ -120,6 +120,10 @@ internal class OrderIntentSubmissionEntity private constructor(
             )
         }
     }
+}
+
+private fun String?.nonBlank(): String? {
+    return this?.trim()?.takeIf { it.isNotBlank() }
 }
 
 internal enum class OrderIntentSubmissionMarket {
