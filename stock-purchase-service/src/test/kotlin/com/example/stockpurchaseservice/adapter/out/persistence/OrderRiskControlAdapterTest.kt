@@ -264,6 +264,60 @@ class OrderRiskControlAdapterTest {
     }
 
     @Test
+    fun `rejects order when global max order notional is non positive`() = runBlocking {
+        val properties = OrderRiskProperties().apply {
+            maxOrderNotional = 0.0
+        }
+
+        val result = adapter(properties).assess(command())
+
+        assertFalse(result.accepted)
+        assertContains(result.reason ?: "", "invalid max order notional: 0.0")
+    }
+
+    @Test
+    fun `rejects order when account pending buy notional limit is non positive`() = runBlocking {
+        val properties = OrderRiskProperties().apply {
+            maxOrderNotional = null
+            maxAccountPendingBuyNotional = -1.0
+        }
+
+        val result = adapter(properties).assess(command())
+
+        assertFalse(result.accepted)
+        assertContains(result.reason ?: "", "invalid max account pending buy notional: -1.0")
+    }
+
+    @Test
+    fun `rejects order when account exposure notional limit is non positive`() = runBlocking {
+        val properties = OrderRiskProperties().apply {
+            maxOrderNotional = null
+            maxAccountPendingBuyNotional = null
+            maxAccountExposureNotional = 0.0
+        }
+
+        val result = adapter(properties).assess(command())
+
+        assertFalse(result.accepted)
+        assertContains(result.reason ?: "", "invalid max account exposure notional: 0.0")
+    }
+
+    @Test
+    fun `rejects order when max daily order count is non positive`() = runBlocking {
+        val properties = OrderRiskProperties().apply {
+            maxOrderNotional = null
+            maxAccountPendingBuyNotional = null
+            maxAccountExposureNotional = null
+            maxDailyOrderCount = 0
+        }
+
+        val result = adapter(properties).assess(command())
+
+        assertFalse(result.accepted)
+        assertContains(result.reason ?: "", "invalid max daily order count: 0")
+    }
+
+    @Test
     fun `accepts buy when projected pending buy notional equals account limit`() = runBlocking {
         val properties = OrderRiskProperties().apply {
             maxAccountPendingBuyNotional = 1_000.0

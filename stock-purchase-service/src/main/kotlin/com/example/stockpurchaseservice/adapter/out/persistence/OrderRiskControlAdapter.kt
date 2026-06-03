@@ -113,7 +113,8 @@ internal class OrderRiskControlAdapter(
             return "invalid symbol max order notional for ${command.symbol}: $symbolLimit"
         }
         val limit = symbolLimit ?: properties.maxOrderNotional
-        if (limit == null || limit <= 0.0) return null
+        if (limit == null) return null
+        if (limit <= 0.0) return "invalid max order notional: $limit"
         val rawNotional = command.estimatedNotional ?: return null
         val notional = rawNotional
             .toRiskCurrency(command.market.notionalCurrency())
@@ -129,7 +130,7 @@ internal class OrderRiskControlAdapter(
 
     private suspend fun dailyOrderCountReason(command: OrderRiskAssessmentCommand): String? {
         val limit = properties.maxDailyOrderCount ?: return null
-        if (limit <= 0) return null
+        if (limit <= 0) return "invalid max daily order count: $limit"
 
         val windows = properties.dailyOrderCount.marketsForAssessment(command.market)
             .map { market ->
@@ -160,7 +161,8 @@ internal class OrderRiskControlAdapter(
 
     private suspend fun accountPendingBuyExposureReason(command: OrderRiskAssessmentCommand): String? {
         val limit = properties.maxAccountPendingBuyNotional ?: return null
-        if (limit <= 0.0 || command.side != OrderIntentSide.BUY) return null
+        if (limit <= 0.0) return "invalid max account pending buy notional: $limit"
+        if (command.side != OrderIntentSide.BUY) return null
 
         val sourceCurrency = command.market.notionalCurrency()
         val rawOrderNotional = command.estimatedNotional ?: return null
@@ -217,7 +219,8 @@ internal class OrderRiskControlAdapter(
 
     private suspend fun accountExposureReason(command: OrderRiskAssessmentCommand): String? {
         val limit = properties.maxAccountExposureNotional ?: return null
-        if (limit <= 0.0 || command.side != OrderIntentSide.BUY) return null
+        if (limit <= 0.0) return "invalid max account exposure notional: $limit"
+        if (command.side != OrderIntentSide.BUY) return null
 
         val orderNotional = command.estimatedNotional
             ?: return "account exposure cannot be assessed: order notional is missing for ${command.symbol}"
