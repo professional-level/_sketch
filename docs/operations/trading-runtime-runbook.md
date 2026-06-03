@@ -96,7 +96,7 @@ Under production-like profiles, startup validation rejects non-positive token re
 
 ## KIS Broker Smoke Tests
 
-`stock-purchase-service` includes disabled-by-default smoke tests for the broker gateway contract against a running root KIS wrapper. They are not part of CI. The mock tests hard-code broker commands with `isMock=true`, so they should be run only against a wrapper instance that has valid KIS mock credentials configured. The real-account smoke is query-only and uses `isMock=false`; it must never be extended to submit or cancel orders.
+`stock-purchase-service` includes disabled-by-default smoke tests for the broker gateway contract against a running root KIS wrapper. They are not part of CI. The smoke tests are split by market and risk level. Mock tests use `isMock=true` and should be run only against a wrapper instance with valid KIS mock credentials. Real-account query-only tests use `isMock=false` and never place orders. Real-account submit/query/cancel smoke is a separate live-order check gated by explicit market-specific enable flags and `KIS_BROKER_REAL_SUBMIT_CONFIRM`.
 
 Mock query-only smoke:
 
@@ -143,6 +143,7 @@ $env:KIS_BROKER_SMOKE_BASE_URL='http://localhost:8079'
 $env:KIS_BROKER_SMOKE_SYMBOL='TQQQ'
 $env:KIS_BROKER_SMOKE_EXCHANGE='NASD'
 $env:KIS_BROKER_SMOKE_CURRENCY='USD'
+Remove-Item Env:\KIS_BROKER_SMOKE_ENABLED -ErrorAction SilentlyContinue
 Remove-Item Env:\KIS_BROKER_SMOKE_SUBMIT_ENABLED -ErrorAction SilentlyContinue
 .\gradlew.bat --no-daemon :stock-purchase-service:test --tests "com.example.stockpurchaseservice.adapter.out.broker.KisBrokerGatewaySmokeTest" --rerun-tasks
 ```
@@ -160,6 +161,7 @@ $env:KIS_BROKER_SMOKE_BASE_URL='http://localhost:8079'
 $env:KIS_BROKER_SMOKE_DOMESTIC_SYMBOL='005930'
 $env:KIS_BROKER_SMOKE_DOMESTIC_EXCHANGE='KRX'
 $env:KIS_BROKER_SMOKE_DOMESTIC_CURRENCY='KRW'
+Remove-Item Env:\KIS_BROKER_SMOKE_ENABLED -ErrorAction SilentlyContinue
 Remove-Item Env:\KIS_BROKER_SMOKE_SUBMIT_ENABLED -ErrorAction SilentlyContinue
 .\gradlew.bat --no-daemon :stock-purchase-service:test --tests "com.example.stockpurchaseservice.adapter.out.broker.KisBrokerGatewaySmokeTest" --rerun-tasks
 ```
@@ -180,6 +182,8 @@ $env:KIS_BROKER_SMOKE_PRICE='1'
 $env:KIS_BROKER_SMOKE_QUANTITY='1'
 $env:KIS_BROKER_SMOKE_HISTORY_ATTEMPTS='6'
 $env:KIS_BROKER_SMOKE_HISTORY_POLL_SECONDS='5'
+Remove-Item Env:\KIS_BROKER_SMOKE_ENABLED -ErrorAction SilentlyContinue
+Remove-Item Env:\KIS_BROKER_SMOKE_SUBMIT_ENABLED -ErrorAction SilentlyContinue
 .\gradlew.bat --no-daemon :stock-purchase-service:test --tests "com.example.stockpurchaseservice.adapter.out.broker.KisBrokerGatewaySmokeTest" --rerun-tasks
 ```
 
@@ -195,6 +199,8 @@ $env:KIS_BROKER_SMOKE_DOMESTIC_PRICE='1'
 $env:KIS_BROKER_SMOKE_DOMESTIC_QUANTITY='1'
 $env:KIS_BROKER_SMOKE_HISTORY_ATTEMPTS='6'
 $env:KIS_BROKER_SMOKE_HISTORY_POLL_SECONDS='5'
+Remove-Item Env:\KIS_BROKER_SMOKE_ENABLED -ErrorAction SilentlyContinue
+Remove-Item Env:\KIS_BROKER_SMOKE_SUBMIT_ENABLED -ErrorAction SilentlyContinue
 .\gradlew.bat --no-daemon :stock-purchase-service:test --tests "com.example.stockpurchaseservice.adapter.out.broker.KisBrokerGatewaySmokeTest" --rerun-tasks
 ```
 
