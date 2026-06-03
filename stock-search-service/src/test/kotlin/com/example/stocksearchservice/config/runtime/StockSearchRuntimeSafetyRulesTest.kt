@@ -1,5 +1,6 @@
 package com.example.stocksearchservice.config.runtime
 
+import java.time.Duration
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -73,6 +74,55 @@ class StockSearchRuntimeSafetyRulesTest {
     }
 
     @Test
+    fun `blocks incomplete temporal worker and schedule configuration in production profile`() {
+        val violations = StockSearchRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                temporalTarget = "temporal.example.com:7233",
+                temporalNamespace = " ",
+                temporalTaskQueue = "",
+                topVolumeScheduleId = " ",
+                topVolumeScheduleInterval = Duration.ZERO,
+            ),
+        )
+
+        assertEquals(4, violations.size)
+        assertTrue(violations.any { it.contains("Temporal namespace") })
+        assertTrue(violations.any { it.contains("Temporal task queue") })
+        assertTrue(violations.any { it.contains("top-volume Temporal schedule id") })
+        assertTrue(violations.any { it.contains("positive top-volume Temporal schedule interval") })
+    }
+
+    @Test
+    fun `blocks too frequent top volume schedule in production profile`() {
+        val violations = StockSearchRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                temporalTarget = "temporal.example.com:7233",
+                topVolumeScheduleInterval = Duration.ofSeconds(30),
+            ),
+        )
+
+        assertEquals(1, violations.size)
+        assertTrue(violations.single().contains("must be at least PT1M"))
+    }
+
+    @Test
+    fun `allows disabled top volume schedule without schedule id in production profile`() {
+        val violations = StockSearchRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                temporalTarget = "temporal.example.com:7233",
+                topVolumeScheduleEnabled = false,
+                topVolumeScheduleId = "",
+                topVolumeScheduleInterval = Duration.ZERO,
+            ),
+        )
+
+        assertTrue(violations.isEmpty())
+    }
+
+    @Test
     fun `blocks application secret property source in production profile`() {
         val violations = StockSearchRuntimeSafetyRules.validate(
             input(
@@ -106,6 +156,11 @@ class StockSearchRuntimeSafetyRulesTest {
         temporalTarget: String,
         hibernateDdlAuto: String? = "validate",
         temporalEnabled: Boolean = true,
+        temporalNamespace: String = "default",
+        temporalTaskQueue: String = "stock-search-scheduler",
+        topVolumeScheduleEnabled: Boolean = true,
+        topVolumeScheduleId: String = "stock-search-top-volume-stocks",
+        topVolumeScheduleInterval: Duration = Duration.ofMinutes(1),
         applicationSecretPropertySources: List<String> = emptyList(),
         allowLocalTemporalTargetInProduction: Boolean = false,
         allowApplicationSecretPropertySourceInProduction: Boolean = false,
@@ -115,6 +170,11 @@ class StockSearchRuntimeSafetyRulesTest {
         productionProfiles = listOf("prod", "production", "live"),
         temporalEnabled = temporalEnabled,
         temporalTarget = temporalTarget,
+        temporalNamespace = temporalNamespace,
+        temporalTaskQueue = temporalTaskQueue,
+        topVolumeScheduleEnabled = topVolumeScheduleEnabled,
+        topVolumeScheduleId = topVolumeScheduleId,
+        topVolumeScheduleInterval = topVolumeScheduleInterval,
         hibernateDdlAuto = hibernateDdlAuto,
         applicationSecretPropertySources = applicationSecretPropertySources,
         allowLocalTemporalTargetInProduction = allowLocalTemporalTargetInProduction,

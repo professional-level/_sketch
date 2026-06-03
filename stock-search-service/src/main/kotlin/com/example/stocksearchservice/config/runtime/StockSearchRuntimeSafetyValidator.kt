@@ -1,5 +1,6 @@
 package com.example.stocksearchservice.config.runtime
 
+import java.time.Duration
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.ApplicationArguments
 import org.springframework.boot.ApplicationRunner
@@ -15,6 +16,16 @@ class StockSearchRuntimeSafetyValidator(
     private val temporalEnabled: Boolean,
     @Value("\${akra.temporal.target:127.0.0.1:7233}")
     private val temporalTarget: String,
+    @Value("\${akra.temporal.namespace:default}")
+    private val temporalNamespace: String,
+    @Value("\${akra.temporal.task-queue:stock-search-scheduler}")
+    private val temporalTaskQueue: String,
+    @Value("\${akra.temporal.schedules.top-volume.enabled:true}")
+    private val topVolumeScheduleEnabled: Boolean,
+    @Value("\${akra.temporal.schedules.top-volume.schedule-id:stock-search-top-volume-stocks}")
+    private val topVolumeScheduleId: String,
+    @Value("\${akra.temporal.schedules.top-volume.interval:1m}")
+    private val topVolumeScheduleInterval: Duration,
 ) : ApplicationRunner {
 
     override fun run(args: ApplicationArguments) {
@@ -25,6 +36,11 @@ class StockSearchRuntimeSafetyValidator(
                 productionProfiles = properties.productionProfiles,
                 temporalEnabled = temporalEnabled,
                 temporalTarget = temporalTarget,
+                temporalNamespace = temporalNamespace,
+                temporalTaskQueue = temporalTaskQueue,
+                topVolumeScheduleEnabled = topVolumeScheduleEnabled,
+                topVolumeScheduleId = topVolumeScheduleId,
+                topVolumeScheduleInterval = topVolumeScheduleInterval,
                 hibernateDdlAuto = environment.getProperty("spring.jpa.hibernate.ddl-auto"),
                 applicationSecretPropertySources = environment.applicationSecretPropertySourceNames(),
                 allowLocalTemporalTargetInProduction = properties.allowLocalTemporalTargetInProduction,
@@ -62,6 +78,11 @@ object StockSearchRuntimeSafetyRules {
         val productionProfiles: List<String>,
         val temporalEnabled: Boolean,
         val temporalTarget: String,
+        val temporalNamespace: String,
+        val temporalTaskQueue: String,
+        val topVolumeScheduleEnabled: Boolean,
+        val topVolumeScheduleId: String,
+        val topVolumeScheduleInterval: Duration,
         val hibernateDdlAuto: String?,
         val applicationSecretPropertySources: List<String>,
         val allowLocalTemporalTargetInProduction: Boolean,
@@ -78,6 +99,14 @@ object StockSearchRuntimeSafetyRules {
             violations += "prod/live profile must configure a non-blank Temporal target " +
                 "(akra.temporal.target)"
         }
+        if (input.temporalEnabled && input.temporalNamespace.isBlank()) {
+            violations += "prod/live profile must configure a non-blank Temporal namespace " +
+                "(akra.temporal.namespace)"
+        }
+        if (input.temporalEnabled && input.temporalTaskQueue.isBlank()) {
+            violations += "prod/live profile must configure a non-blank Temporal task queue " +
+                "(akra.temporal.task-queue)"
+        }
         if (
             input.temporalEnabled &&
             !input.allowLocalTemporalTargetInProduction &&
@@ -85,6 +114,9 @@ object StockSearchRuntimeSafetyRules {
         ) {
             violations += "prod/live profile cannot use a local Temporal target " +
                 "(akra.temporal.target=${input.temporalTarget})"
+        }
+        if (input.temporalEnabled && input.topVolumeScheduleEnabled) {
+            validateTopVolumeSchedule(input, violations)
         }
 
         if (!isSafeHibernateDdlAuto(input.hibernateDdlAuto)) {
@@ -102,6 +134,21 @@ object StockSearchRuntimeSafetyRules {
         }
 
         return violations
+    }
+
+    private fun validateTopVolumeSchedule(input: Input, violations: MutableList<String>) {
+        if (input.topVolumeScheduleId.isBlank()) {
+            violations += "prod/live profile must configure a non-blank top-volume Temporal schedule id " +
+                "(akra.temporal.schedules.top-volume.schedule-id)"
+        }
+        if (input.topVolumeScheduleInterval.isZero || input.topVolumeScheduleInterval.isNegative) {
+            violations += "prod/live profile must configure a positive top-volume Temporal schedule interval " +
+                "(akra.temporal.schedules.top-volume.interval=${input.topVolumeScheduleInterval})"
+        } else if (input.topVolumeScheduleInterval < MIN_TOP_VOLUME_SCHEDULE_INTERVAL) {
+            violations += "prod/live profile top-volume Temporal schedule interval must be at least " +
+                "$MIN_TOP_VOLUME_SCHEDULE_INTERVAL " +
+                "(akra.temporal.schedules.top-volume.interval=${input.topVolumeScheduleInterval})"
+        }
     }
 
     private fun isSafeHibernateDdlAuto(value: String?): Boolean {
@@ -126,4 +173,6 @@ object StockSearchRuntimeSafetyRules {
             normalized == "::1" ||
             normalized.startsWith("::1:")
     }
+
+    private val MIN_TOP_VOLUME_SCHEDULE_INTERVAL: Duration = Duration.ofMinutes(1)
 }
