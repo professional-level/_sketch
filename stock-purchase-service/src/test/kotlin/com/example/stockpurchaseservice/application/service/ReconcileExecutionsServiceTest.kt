@@ -52,6 +52,7 @@ import java.util.UUID
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class ReconcileExecutionsServiceTest {
@@ -458,6 +459,33 @@ class ReconcileExecutionsServiceTest {
         assertEquals(listOf("BROKER_EXECUTION_DAILY"), reconciliationStatePort.startedSources)
         assertEquals(emptyList(), reconciliationStatePort.completed)
         assertEquals(listOf<String?>("broker unavailable"), reconciliationStatePort.failedReasons)
+        assertEquals("BROKER_EXECUTION_DAILY", alertPort.reconciliationFailed.single().source)
+        assertEquals("broker unavailable", alertPort.reconciliationFailed.single().reason)
+    }
+
+    @Test
+    fun `preserves reconciliation failure when failed cursor update fails`() = runBlocking {
+        val reconciliationStatePort = FakeExecutionReconciliationStatePort(failMarkFailed = true)
+        val alertPort = FakeOperationalAlertPort()
+        val service = service(
+            marketPort = FakeMarketServicePort(
+                failure = IllegalStateException("broker unavailable"),
+            ),
+            executionFillPort = FakeExecutionFillPort(),
+            submissionPort = FakeOrderIntentSubmissionPort(submissions = emptyList()),
+            eventPort = FakeOrderExecutionEventPort(),
+            reconciliationStatePort = reconciliationStatePort,
+            operationalAlertPort = alertPort,
+        )
+
+        val exception = assertFailsWith<IllegalStateException> {
+            service.execute()
+        }
+
+        assertEquals("broker unavailable", exception.message)
+        assertEquals(listOf("BROKER_EXECUTION_DAILY"), reconciliationStatePort.startedSources)
+        assertEquals(emptyList(), reconciliationStatePort.completed)
+        assertEquals(emptyList<String?>(), reconciliationStatePort.failedReasons)
         assertEquals("BROKER_EXECUTION_DAILY", alertPort.reconciliationFailed.single().source)
         assertEquals("broker unavailable", alertPort.reconciliationFailed.single().reason)
     }
@@ -941,6 +969,7 @@ class ReconcileExecutionsServiceTest {
     private class FakeExecutionReconciliationStatePort(
         private val cursor: ExecutionReconciliationCursorDto? = null,
         existingUnmatchedExecutionIds: Set<String> = emptySet(),
+        private val failMarkFailed: Boolean = false,
     ) : ExecutionReconciliationStatePort {
         private val unmatchedExecutionIds: MutableSet<String> = existingUnmatchedExecutionIds.toMutableSet()
         val startedSources: MutableList<String> = mutableListOf()
@@ -966,6 +995,7 @@ class ReconcileExecutionsServiceTest {
         }
 
         override suspend fun markFailed(source: String, failedAt: ZonedDateTime, reason: String?) {
+            if (failMarkFailed) throw IllegalStateException("cursor store unavailable")
             failedReasons += reason
         }
 

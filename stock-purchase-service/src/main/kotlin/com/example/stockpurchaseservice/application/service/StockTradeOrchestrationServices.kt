@@ -89,15 +89,18 @@ class ReconcileExecutionsService(
         val previousCursor = executionReconciliationStatePort.findCursor(RECONCILIATION_SOURCE)
         executionReconciliationStatePort.markStarted(RECONCILIATION_SOURCE, startedAt)
 
-        runCatching {
+        val reconciliationResult = runCatching {
             reconcile(startedAt, previousCursor)
-        }.onFailure { exception ->
+        }
+        reconciliationResult.exceptionOrNull()?.let { exception ->
             val failedAt = ZonedDateTime.now()
-            executionReconciliationStatePort.markFailed(
-                source = RECONCILIATION_SOURCE,
-                failedAt = failedAt,
-                reason = exception.message,
-            )
+            runCatching {
+                executionReconciliationStatePort.markFailed(
+                    source = RECONCILIATION_SOURCE,
+                    failedAt = failedAt,
+                    reason = exception.message,
+                )
+            }
             runCatching {
                 operationalAlertPort.alertReconciliationFailed(
                     ReconciliationFailureAlert(
@@ -107,7 +110,8 @@ class ReconcileExecutionsService(
                     ),
                 )
             }
-        }.getOrThrow()
+        }
+        reconciliationResult.getOrThrow()
     }
 
     private suspend fun reconcile(
