@@ -6,6 +6,7 @@ import com.example.backtestservice.domain.market.HistoricalCandle
 import com.example.common.ExternalApiAdapter
 import com.fasterxml.jackson.annotation.JsonProperty
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.web.reactive.function.client.ExchangeStrategies
 import org.springframework.web.reactive.function.client.WebClient
 import java.math.BigDecimal
 import java.time.Duration
@@ -17,9 +18,20 @@ class YFinanceHistoricalMarketDataAdapter(
     private val baseUrl: String,
     @Value("\${akra.backtest.market-data.yfinance.timeout-seconds:30}")
     private val defaultTimeoutSeconds: Long,
+    @Value("\${akra.backtest.market-data.yfinance.max-in-memory-bytes:16777216}")
+    private val maxInMemoryBytes: Int,
 ) : ExternalHistoricalMarketDataPort {
+    init {
+        require(maxInMemoryBytes > 0) { "maxInMemoryBytes must be positive" }
+    }
+
     private val webClient: WebClient = WebClient.builder()
         .baseUrl(baseUrl)
+        .exchangeStrategies(
+            ExchangeStrategies.builder()
+                .codecs { codecs -> codecs.defaultCodecs().maxInMemorySize(maxInMemoryBytes) }
+                .build(),
+        )
         .build()
 
     override fun fetchDailyCandles(query: ExternalHistoricalDailyCandlesQuery): List<HistoricalCandle> {

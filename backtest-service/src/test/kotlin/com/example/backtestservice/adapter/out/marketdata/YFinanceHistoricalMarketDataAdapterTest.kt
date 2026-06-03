@@ -63,6 +63,7 @@ class YFinanceHistoricalMarketDataAdapterTest {
         val adapter = YFinanceHistoricalMarketDataAdapter(
             baseUrl = server.url("/").toString().trimEnd('/'),
             defaultTimeoutSeconds = 5,
+            maxInMemoryBytes = 1024 * 1024,
         )
 
         val candles = adapter.fetchDailyCandles(
@@ -84,5 +85,61 @@ class YFinanceHistoricalMarketDataAdapterTest {
         val body = request.body.readUtf8()
         assertTrue(body.contains("\"start\":\"2024-01-02\""))
         assertTrue(body.contains("\"end\":\"2024-01-04\""))
+    }
+
+    @Test
+    fun `fetches long historical ranges larger than default webclient buffer`() {
+        val start = LocalDate.parse("2011-01-01")
+        val candleCount = 3_500
+        server.enqueue(
+            MockResponse()
+                .setHeader("Content-Type", "application/json")
+                .setBody(
+                    """
+                    {
+                      "candles": {
+                        "TQQQ": [
+                          ${largeCandlePayload(start, candleCount)}
+                        ]
+                      }
+                    }
+                    """.trimIndent(),
+                ),
+        )
+        val adapter = YFinanceHistoricalMarketDataAdapter(
+            baseUrl = server.url("/").toString().trimEnd('/'),
+            defaultTimeoutSeconds = 5,
+            maxInMemoryBytes = 1024 * 1024,
+        )
+
+        val candles = adapter.fetchDailyCandles(
+            ExternalHistoricalDailyCandlesQuery(
+                symbol = "TQQQ",
+                from = start,
+                to = start.plusDays(candleCount.toLong() - 1),
+            ),
+        )
+
+        assertEquals(candleCount, candles.size)
+        assertEquals(start, candles.first().date)
+        assertEquals(start.plusDays(candleCount.toLong() - 1), candles.last().date)
+    }
+
+    private fun largeCandlePayload(start: LocalDate, count: Int): String {
+        return (0 until count).joinToString(",\n") { index ->
+            val date = start.plusDays(index.toLong())
+            """
+            {
+              "date": "$date",
+              "open": "10.1",
+              "high": "11.2",
+              "low": "9.9",
+              "close": "10.8",
+              "adj_close": "10.7",
+              "dividend": "0",
+              "volume": 12345
+            }
+            """.trimIndent()
+        }
     }
 }
