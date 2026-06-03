@@ -2,7 +2,6 @@
 @symbol = TQQQ
 @from = 2025-01-01
 @to = 2025-12-31
-@runId = 00000000-0000-0000-0000-000000000000
 
 # Prerequisite:
 # docker compose -f docker-compose.backtest.yml up -d --build yfinance-sidecar
@@ -55,6 +54,9 @@ Content-Type: application/json
   "autoAdjust": false,
   "marketDataTimeoutSeconds": 30
 }
+> {%
+    client.global.set("runId", response.body.runId);
+%}
 
 ### Find backtest run summary
 GET {{backtestHost}}/backtests/runs/{{runId}}
