@@ -4,6 +4,8 @@ from pathlib import Path
 import pandas as pd
 import yfinance as yf
 
+NORMALIZED_COLUMNS = ["date", "open", "high", "low", "close", "adj_close", "dividend", "volume"]
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Fetch daily OHLCV candles from yfinance into normalized CSV files.")
@@ -57,7 +59,9 @@ def normalized_daily_frame(frame: pd.DataFrame) -> pd.DataFrame:
     if dividend is None:
         dividend = frame.get("dividends")
     if dividend is None:
-        dividend = 0
+        dividend = pd.Series(0, index=frame.index)
+    else:
+        dividend = dividend.fillna(0)
 
     output = pd.DataFrame(
         {
@@ -72,6 +76,10 @@ def normalized_daily_frame(frame: pd.DataFrame) -> pd.DataFrame:
         }
     )
     return output.dropna(subset=["open", "high", "low", "close"]).sort_values("date")
+
+
+def empty_daily_frame() -> pd.DataFrame:
+    return pd.DataFrame(columns=NORMALIZED_COLUMNS)
 
 
 def download_daily_candles(
@@ -94,7 +102,10 @@ def download_daily_candles(
         timeout=timeout,
     )
     if data.empty:
-        raise ValueError("yfinance returned no rows")
+        return {
+            ticker.strip().upper(): empty_daily_frame()
+            for ticker in tickers
+        }
 
     return {
         ticker.strip().upper(): normalized_daily_frame(ticker_frame(data, ticker))

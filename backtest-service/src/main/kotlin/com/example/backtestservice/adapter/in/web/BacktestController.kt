@@ -45,6 +45,7 @@ class BacktestController(
     @PostMapping("/runs")
     fun createBacktestRun(@RequestBody request: RunBacktestRequest): Mono<BacktestRunSummary> {
         return executeRun(request)
+            .mapRequestErrors()
     }
 
     @GetMapping("/runs/{runId}")
@@ -113,6 +114,7 @@ class BacktestController(
         return blocking {
             importHistoricalMarketDataUseCase.execute(request.toCommand())
         }
+            .mapRequestErrors()
     }
 
     private fun executeRun(request: RunBacktestRequest): Mono<BacktestRunSummary> {
