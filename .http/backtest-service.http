@@ -36,24 +36,6 @@ Content-Type: application/json
   "autoAdjust": false,
   "marketDataTimeoutSeconds": 30
 }
-
-### Run backtest summary with legacy endpoint
-POST {{backtestHost}}/backtests/run
-Content-Type: application/json
-
-{
-  "symbol": "{{symbol}}",
-  "market": "US",
-  "from": "{{from}}",
-  "to": "{{to}}",
-  "initialCash": 10000,
-  "strategyType": "BUY_AND_HOLD",
-  "commissionRate": 0,
-  "slippageRate": 0,
-  "refreshMarketData": true,
-  "autoAdjust": false,
-  "marketDataTimeoutSeconds": 30
-}
 > {%
     client.global.set("runId", response.body.runId);
 %}

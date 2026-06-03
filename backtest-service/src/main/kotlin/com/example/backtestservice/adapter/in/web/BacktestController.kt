@@ -42,11 +42,6 @@ class BacktestController(
     private val findLaorV4BacktestRunUseCase: FindLaorV4BacktestRunUseCase,
     private val importHistoricalMarketDataUseCase: ImportHistoricalMarketDataUseCase,
 ) {
-    @PostMapping("/run")
-    fun runBacktest(@RequestBody request: RunBacktestRequest): Mono<BacktestRunSummary> {
-        return executeRun(request)
-    }
-
     @PostMapping("/runs")
     fun createBacktestRun(@RequestBody request: RunBacktestRequest): Mono<BacktestRunSummary> {
         return executeRun(request)
