@@ -342,6 +342,7 @@ class SubmitOrderIntentService(
             market = market,
             orderTag = orderTag,
             createdAt = createdAt,
+            assessedAt = ZonedDateTime.now(),
             expectedTradingEnvironment = tradingEnvironment,
         )
     }

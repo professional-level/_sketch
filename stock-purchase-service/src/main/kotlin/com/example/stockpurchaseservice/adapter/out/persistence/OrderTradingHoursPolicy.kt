@@ -22,7 +22,7 @@ internal class OrderTradingHoursPolicy(
 
         val zone = window.zoneId.toZoneIdOrNull()
             ?: return "invalid trading-hours zone for ${command.market}: ${window.zoneId}"
-        val localRequestedAt = command.createdAt.withZoneSameInstant(zone)
+        val localRequestedAt = command.assessedAt.withZoneSameInstant(zone)
         val localDate = localRequestedAt.toLocalDate()
         val localTime = localRequestedAt.toLocalTime()
 

@@ -482,8 +482,8 @@ internal class OrderRiskControlAdapter(
     private fun OrderRiskAssessmentCommand.marketDayWindow(
         market: StockOrderMarket = this.market,
     ): Pair<ZonedDateTime, ZonedDateTime> {
-        val zone = market.tradingWindow().zoneId.toZoneIdOrNull() ?: createdAt.zone
-        val start = createdAt.withZoneSameInstant(zone).toLocalDate().atStartOfDay(zone)
+        val zone = market.tradingWindow().zoneId.toZoneIdOrNull() ?: assessedAt.zone
+        val start = assessedAt.withZoneSameInstant(zone).toLocalDate().atStartOfDay(zone)
         return start to start.plusDays(1)
     }
 

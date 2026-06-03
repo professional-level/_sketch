@@ -59,6 +59,41 @@ class OrderRiskControlAdapterTest {
     }
 
     @Test
+    fun `rejects stale overseas LOC order when assessed after cutoff`() = runBlocking {
+        val result = adapter().assess(
+            command(
+                orderType = OrderIntentType.LOC,
+                createdAt = ZonedDateTime.parse("2026-06-01T15:49:00-04:00[America/New_York]"),
+                assessedAt = ZonedDateTime.parse("2026-06-01T15:51:00-04:00[America/New_York]"),
+            ),
+        )
+
+        assertFalse(result.accepted)
+        assertContains(result.reason ?: "", "outside OVERSEAS_US LOC order window")
+        assertContains(result.reason ?: "", "localTime=15:51")
+    }
+
+    @Test
+    fun `counts daily orders using assessed market day`() = runBlocking {
+        val properties = OrderRiskProperties().apply {
+            maxDailyOrderCount = 2
+        }
+        val reader = FakeOrderRiskSubmissionReader(brokerSubmittedCount = 1)
+
+        adapter(properties = properties, reader = reader).assess(
+            command(
+                createdAt = ZonedDateTime.parse("2026-06-01T15:49:00-04:00[America/New_York]"),
+                assessedAt = ZonedDateTime.parse("2026-06-02T09:31:00-04:00[America/New_York]"),
+            ),
+        )
+
+        assertEquals(
+            ZonedDateTime.parse("2026-06-02T00:00:00-04:00[America/New_York]"),
+            reader.countBrokerSubmittedUnknownMarketWindows.single().from,
+        )
+    }
+
+    @Test
     fun `rejects order on configured overseas market holiday`() = runBlocking {
         val properties = OrderRiskProperties().apply {
             tradingHours.overseasUs.holidays = listOf("2026-06-01")
@@ -1026,6 +1061,7 @@ class OrderRiskControlAdapterTest {
         quantity: Long = 1,
         limitPrice: Double? = 100.0,
         createdAt: ZonedDateTime = ZonedDateTime.parse("2026-06-01T10:00:00-04:00[America/New_York]"),
+        assessedAt: ZonedDateTime = createdAt,
         expectedTradingEnvironment: OrderTradingEnvironment? = null,
     ): OrderRiskAssessmentCommand {
         return OrderRiskAssessmentCommand(
@@ -1042,6 +1078,7 @@ class OrderRiskControlAdapterTest {
             market = market,
             orderTag = "FIRST_BUY",
             createdAt = createdAt,
+            assessedAt = assessedAt,
             expectedTradingEnvironment = expectedTradingEnvironment,
         )
     }
