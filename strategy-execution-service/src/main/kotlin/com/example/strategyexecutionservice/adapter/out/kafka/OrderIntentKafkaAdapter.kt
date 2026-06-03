@@ -80,13 +80,33 @@ internal class OrderIntentOutboxPublisher(
             runCatching {
                 messageSender.publish(event)
             }.onSuccess {
-                val markedPublished = outboxEventPort.markPublished(event.id, claimOwner)
-                recordPublishResult(if (markedPublished) PUBLISH_RESULT_PUBLISHED else PUBLISH_RESULT_CLAIM_LOST)
+                recordPublishResult(markPublishedResult(event))
             }.onFailure { exception ->
-                val markedFailed = outboxEventPort.markFailed(event.id, claimOwner, exception.message, nextAttemptAt(event))
-                recordPublishResult(if (markedFailed) PUBLISH_RESULT_FAILED else PUBLISH_RESULT_CLAIM_LOST)
+                recordPublishResult(markFailedResult(event, exception))
             }
         }
+    }
+
+    private suspend fun markPublishedResult(event: OrderIntentOutboxMessage): String {
+        return runCatching {
+            outboxEventPort.markPublished(event.id, claimOwner)
+        }.fold(
+            onSuccess = { markedPublished ->
+                if (markedPublished) PUBLISH_RESULT_PUBLISHED else PUBLISH_RESULT_CLAIM_LOST
+            },
+            onFailure = { PUBLISH_RESULT_STATE_UPDATE_FAILED },
+        )
+    }
+
+    private suspend fun markFailedResult(event: OrderIntentOutboxMessage, exception: Throwable): String {
+        return runCatching {
+            outboxEventPort.markFailed(event.id, claimOwner, exception.message, nextAttemptAt(event))
+        }.fold(
+            onSuccess = { markedFailed ->
+                if (markedFailed) PUBLISH_RESULT_FAILED else PUBLISH_RESULT_CLAIM_LOST
+            },
+            onFailure = { PUBLISH_RESULT_STATE_UPDATE_FAILED },
+        )
     }
 
     private fun nextAttemptAt(event: OrderIntentOutboxMessage): ZonedDateTime {
@@ -116,6 +136,7 @@ internal class OrderIntentOutboxPublisher(
         private const val PUBLISH_RESULT_PUBLISHED = "published"
         private const val PUBLISH_RESULT_FAILED = "failed"
         private const val PUBLISH_RESULT_CLAIM_LOST = "claim_lost"
+        private const val PUBLISH_RESULT_STATE_UPDATE_FAILED = "state_update_failed"
         private const val DEFAULT_RETRY_INITIAL_DELAY_MS = 5_000L
         private const val DEFAULT_RETRY_MAX_DELAY_MS = 300_000L
         private const val DEFAULT_CLAIM_LEASE_MS = 60_000L

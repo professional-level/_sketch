@@ -97,6 +97,45 @@ class OrderIntentOutboxPublisherTest {
     }
 
     @Test
+    fun `continues publishing batch when marking published fails`() = runBlocking {
+        val first = outboxMessage(id = UUID.fromString("00000000-0000-0000-0000-000000000001"))
+        val second = outboxMessage(id = UUID.fromString("00000000-0000-0000-0000-000000000002"))
+        val outboxPort = FakeOrderIntentOutboxPort(
+            events = listOf(first, second),
+            markPublishedFailure = IllegalStateException("database unavailable"),
+        )
+        val sender = FakeOrderIntentOutboxMessageSender()
+        val meterRegistry = SimpleMeterRegistry()
+        val publisher = OrderIntentOutboxPublisher(outboxPort, sender, meterRegistry)
+
+        publisher.publishPendingEvents()
+
+        assertEquals(listOf(first, second), sender.published)
+        assertEquals(2, outboxPort.published.size)
+        assertEquals(2.0, meterRegistry.counter(OUTBOX_PUBLISH_METRIC, "result", "state_update_failed").count())
+        assertEquals(0.0, meterRegistry.counter(OUTBOX_PUBLISH_METRIC, "result", "published").count())
+    }
+
+    @Test
+    fun `continues publishing batch when marking failed fails`() = runBlocking {
+        val first = outboxMessage(id = UUID.fromString("00000000-0000-0000-0000-000000000001"))
+        val second = outboxMessage(id = UUID.fromString("00000000-0000-0000-0000-000000000002"))
+        val outboxPort = FakeOrderIntentOutboxPort(
+            events = listOf(first, second),
+            markFailedFailure = IllegalStateException("database unavailable"),
+        )
+        val sender = FakeOrderIntentOutboxMessageSender(failure = IllegalStateException("kafka down"))
+        val meterRegistry = SimpleMeterRegistry()
+        val publisher = OrderIntentOutboxPublisher(outboxPort, sender, meterRegistry)
+
+        publisher.publishPendingEvents()
+
+        assertEquals(2, outboxPort.failed.size)
+        assertEquals(2.0, meterRegistry.counter(OUTBOX_PUBLISH_METRIC, "result", "state_update_failed").count())
+        assertEquals(0.0, meterRegistry.counter(OUTBOX_PUBLISH_METRIC, "result", "failed").count())
+    }
+
+    @Test
     fun `caps outbox publish retry delay`() = runBlocking {
         val event = outboxMessage(retryCount = 10)
         val outboxPort = FakeOrderIntentOutboxPort(events = listOf(event))
@@ -136,13 +175,14 @@ class OrderIntentOutboxPublisherTest {
     }
 
     private fun outboxMessage(
+        id: UUID = UUID.fromString("00000000-0000-0000-0000-000000000001"),
         retryCount: Int = 0,
         traceId: String? = null,
         spanId: String? = null,
         traceParent: String? = null,
     ): OrderIntentOutboxMessage {
         return OrderIntentOutboxMessage(
-            id = UUID.fromString("00000000-0000-0000-0000-000000000001"),
+            id = id,
             topic = MessageTopic.ORDER_INTENT_CREATED,
             messageKey = "laor-v4:TQQQ",
             payload = byteArrayOf(1, 2, 3),
@@ -161,6 +201,8 @@ class OrderIntentOutboxPublisherTest {
         private val events: List<OrderIntentOutboxMessage>,
         private val markPublishedResult: Boolean = true,
         private val markFailedResult: Boolean = true,
+        private val markPublishedFailure: RuntimeException? = null,
+        private val markFailedFailure: RuntimeException? = null,
     ) : OrderIntentOutboxPort {
         val published: MutableList<PublishedOutboxEvent> = mutableListOf()
         val failed: MutableList<FailedOutboxEvent> = mutableListOf()
@@ -177,6 +219,7 @@ class OrderIntentOutboxPublisherTest {
 
         override suspend fun markPublished(id: UUID, claimOwner: String): Boolean {
             published += PublishedOutboxEvent(id, claimOwner)
+            markPublishedFailure?.let { throw it }
             return markPublishedResult
         }
 
@@ -187,6 +230,7 @@ class OrderIntentOutboxPublisherTest {
             nextAttemptAt: ZonedDateTime,
         ): Boolean {
             failed += FailedOutboxEvent(id, claimOwner, reason, nextAttemptAt)
+            markFailedFailure?.let { throw it }
             return markFailedResult
         }
     }
