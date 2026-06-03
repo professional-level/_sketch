@@ -6,6 +6,7 @@ import java.util.UUID
 
 enum class BacktestStrategyType {
     BUY_AND_HOLD,
+    LAOR_V4,
 }
 
 enum class BacktestTradeSide {
@@ -25,6 +26,9 @@ data class BacktestTrade(
     val price: BigDecimal,
     val notional: BigDecimal,
     val commission: BigDecimal,
+    val orderType: String? = null,
+    val orderTag: String? = null,
+    val cycleNo: Int? = null,
 )
 
 data class BacktestEquityPoint(
@@ -33,6 +37,10 @@ data class BacktestEquityPoint(
     val cash: BigDecimal,
     val positionQuantity: Long,
     val close: BigDecimal,
+    val averagePurchasePrice: BigDecimal? = null,
+    val realizedProfitLoss: BigDecimal? = null,
+    val cycleNo: Int? = null,
+    val strategyMode: String? = null,
 )
 
 data class BacktestResult(

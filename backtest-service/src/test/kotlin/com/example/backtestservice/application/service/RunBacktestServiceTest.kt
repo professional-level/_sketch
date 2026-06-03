@@ -1,9 +1,11 @@
 package com.example.backtestservice.application.service
 
 import com.example.backtestservice.application.port.`in`.RunBacktestCommand
+import com.example.backtestservice.application.port.`in`.LaorV4BacktestParameters
 import com.example.backtestservice.application.port.out.HistoricalDailyCandlesQuery
 import com.example.backtestservice.application.port.out.HistoricalMarketDataPort
 import com.example.backtestservice.application.port.out.SaveHistoricalDailyCandlesCommand
+import com.example.backtestservice.domain.backtest.BacktestStrategyType
 import com.example.backtestservice.domain.backtest.BacktestTradeSide
 import com.example.backtestservice.domain.market.HistoricalCandle
 import java.time.LocalDate
@@ -63,6 +65,37 @@ class RunBacktestServiceTest {
         }
     }
 
+    @Test
+    fun `runs Laor V4 backtest through strategy engine fills`() {
+        val service = RunBacktestService(
+            FakeHistoricalMarketDataPort(
+                listOf(
+                    candle("2024-01-02", open = "10.0", high = "10.0", low = "10.0", close = "10.0"),
+                    candle("2024-01-03", open = "20.0", high = "20.0", low = "20.0", close = "20.0"),
+                ),
+            ),
+        )
+
+        val result = service.execute(
+            RunBacktestCommand(
+                symbol = "TQQQ",
+                from = LocalDate.parse("2024-01-02"),
+                to = LocalDate.parse("2024-01-03"),
+                initialCash = "1000".toBigDecimal(),
+                strategyType = BacktestStrategyType.LAOR_V4,
+                laorV4 = LaorV4BacktestParameters(totalSplitCount = 10),
+            ),
+        )
+
+        assertEquals(BacktestStrategyType.LAOR_V4, result.strategyType)
+        assertEquals("1029.0".toBigDecimal(), result.finalEquity)
+        assertEquals(3, result.trades.size)
+        assertEquals(listOf("FIRST_BUY", "QUARTER_SELL", "TARGET_SELL"), result.trades.map { it.orderTag })
+        assertEquals(listOf(BacktestTradeSide.BUY, BacktestTradeSide.SELL, BacktestTradeSide.SELL), result.trades.map { it.side })
+        assertEquals(0, result.equityCurve.last().positionQuantity)
+        assertEquals("29.0".toBigDecimal(), result.equityCurve.last().realizedProfitLoss)
+    }
+
     private fun candle(
         date: String,
         open: String,
@@ -75,6 +108,27 @@ class RunBacktestServiceTest {
             open = open.toBigDecimal(),
             high = close.toBigDecimal(),
             low = close.toBigDecimal(),
+            close = close.toBigDecimal(),
+            adjustedClose = close.toBigDecimal(),
+            volume = 1000,
+            source = "TEST",
+        )
+    }
+
+    private fun candle(
+        date: String,
+        open: String,
+        high: String,
+        low: String,
+        close: String,
+    ): HistoricalCandle {
+        return HistoricalCandle(
+            symbol = "TQQQ",
+            market = "US",
+            date = LocalDate.parse(date),
+            open = open.toBigDecimal(),
+            high = high.toBigDecimal(),
+            low = low.toBigDecimal(),
             close = close.toBigDecimal(),
             adjustedClose = close.toBigDecimal(),
             volume = 1000,

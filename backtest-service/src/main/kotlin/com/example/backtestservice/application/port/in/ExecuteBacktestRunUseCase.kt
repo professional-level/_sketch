@@ -20,6 +20,7 @@ data class ExecuteBacktestRunCommand(
     val strategyType: BacktestStrategyType = BacktestStrategyType.BUY_AND_HOLD,
     val commissionRate: BigDecimal = BigDecimal.ZERO,
     val slippageRate: BigDecimal = BigDecimal.ZERO,
+    val laorV4: LaorV4BacktestParameters = LaorV4BacktestParameters(),
     val refreshMarketData: Boolean = false,
     val autoAdjust: Boolean = false,
     val marketDataTimeoutSeconds: Long = 30,

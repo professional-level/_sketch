@@ -2,6 +2,7 @@ package com.example.backtestservice.application.port.`in`
 
 import com.example.backtestservice.domain.backtest.BacktestResult
 import com.example.backtestservice.domain.backtest.BacktestStrategyType
+import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategyConfig
 import com.example.common.UseCase
 import java.math.BigDecimal
 import java.time.LocalDate
@@ -20,4 +21,11 @@ data class RunBacktestCommand(
     val strategyType: BacktestStrategyType = BacktestStrategyType.BUY_AND_HOLD,
     val commissionRate: BigDecimal = BigDecimal.ZERO,
     val slippageRate: BigDecimal = BigDecimal.ZERO,
+    val laorV4: LaorV4BacktestParameters = LaorV4BacktestParameters(),
+)
+
+data class LaorV4BacktestParameters(
+    val totalSplitCount: Int = 40,
+    val firstBuyLimitMultiplier: Double = LaorV4StrategyConfig.DEFAULT_FIRST_BUY_LIMIT_MULTIPLIER,
+    val autoRestart: Boolean = true,
 )

@@ -11,6 +11,7 @@ import com.example.backtestservice.application.port.`in`.FindBacktestTradesQuery
 import com.example.backtestservice.application.port.`in`.ImportHistoricalMarketDataCommand
 import com.example.backtestservice.application.port.`in`.ImportHistoricalMarketDataResult
 import com.example.backtestservice.application.port.`in`.ImportHistoricalMarketDataUseCase
+import com.example.backtestservice.application.port.`in`.LaorV4BacktestParameters
 import com.example.backtestservice.domain.backtest.BacktestRunSummary
 import com.example.backtestservice.domain.backtest.BacktestStrategyType
 import com.example.common.WebAdapter
@@ -121,6 +122,7 @@ data class RunBacktestRequest(
     val strategyType: BacktestStrategyType = BacktestStrategyType.BUY_AND_HOLD,
     val commissionRate: BigDecimal = BigDecimal.ZERO,
     val slippageRate: BigDecimal = BigDecimal.ZERO,
+    val laorV4: LaorV4BacktestRequest = LaorV4BacktestRequest(),
     val refreshMarketData: Boolean = false,
     val autoAdjust: Boolean = false,
     val marketDataTimeoutSeconds: Long = 30,
@@ -135,9 +137,24 @@ data class RunBacktestRequest(
             strategyType = strategyType,
             commissionRate = commissionRate,
             slippageRate = slippageRate,
+            laorV4 = laorV4.toParameters(),
             refreshMarketData = refreshMarketData,
             autoAdjust = autoAdjust,
             marketDataTimeoutSeconds = marketDataTimeoutSeconds,
+        )
+    }
+}
+
+data class LaorV4BacktestRequest(
+    val totalSplitCount: Int = 40,
+    val firstBuyLimitMultiplier: Double = 1.12,
+    val autoRestart: Boolean = true,
+) {
+    fun toParameters(): LaorV4BacktestParameters {
+        return LaorV4BacktestParameters(
+            totalSplitCount = totalSplitCount,
+            firstBuyLimitMultiplier = firstBuyLimitMultiplier,
+            autoRestart = autoRestart,
         )
     }
 }

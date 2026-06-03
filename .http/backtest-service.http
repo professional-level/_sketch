@@ -58,6 +58,32 @@ Content-Type: application/json
     client.global.set("runId", response.body.runId);
 %}
 
+### Run Laor V4 backtest summary
+POST {{backtestHost}}/backtests/run
+Content-Type: application/json
+
+{
+  "symbol": "{{symbol}}",
+  "market": "US",
+  "from": "{{from}}",
+  "to": "{{to}}",
+  "initialCash": 10000,
+  "strategyType": "LAOR_V4",
+  "commissionRate": 0,
+  "slippageRate": 0,
+  "laorV4": {
+    "totalSplitCount": 40,
+    "firstBuyLimitMultiplier": 1.12,
+    "autoRestart": true
+  },
+  "refreshMarketData": true,
+  "autoAdjust": false,
+  "marketDataTimeoutSeconds": 30
+}
+> {%
+    client.global.set("runId", response.body.runId);
+%}
+
 ### Find backtest run summary
 GET {{backtestHost}}/backtests/runs/{{runId}}
 

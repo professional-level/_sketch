@@ -8,6 +8,7 @@ import com.example.backtestservice.application.port.`in`.RunBacktestCommand
 import com.example.backtestservice.application.port.`in`.RunBacktestUseCase
 import com.example.backtestservice.application.port.out.BacktestRunStorePort
 import com.example.backtestservice.domain.backtest.BacktestRunSummary
+import com.example.backtestservice.domain.backtest.BacktestStrategyType
 import com.example.common.UseCaseImpl
 import java.math.BigDecimal
 
@@ -40,7 +41,7 @@ class ExecuteBacktestRunService(
         return ImportHistoricalMarketDataCommand(
             symbol = symbol,
             market = market,
-            from = from,
+            from = marketDataImportFrom(),
             to = to,
             autoAdjust = autoAdjust,
             timeoutSeconds = marketDataTimeoutSeconds,
@@ -57,6 +58,14 @@ class ExecuteBacktestRunService(
             strategyType = strategyType,
             commissionRate = commissionRate,
             slippageRate = slippageRate,
+            laorV4 = laorV4,
         )
+    }
+
+    private fun ExecuteBacktestRunCommand.marketDataImportFrom() =
+        if (strategyType == BacktestStrategyType.LAOR_V4) from.minusDays(LAOR_V4_MARKET_DATA_LOOKBACK_DAYS) else from
+
+    companion object {
+        private const val LAOR_V4_MARKET_DATA_LOOKBACK_DAYS = 14L
     }
 }
