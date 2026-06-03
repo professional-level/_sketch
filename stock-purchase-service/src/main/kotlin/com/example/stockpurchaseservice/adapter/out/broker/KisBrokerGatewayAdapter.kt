@@ -1037,7 +1037,12 @@ private fun JsonNode.toBrokerHistoryItem(): BrokerOrderHistoryItem? {
         "cnclDvsnName",
         "CNCL_DVSN_NAME",
     )
-    val statusMessage = joinedText(statusName, revisionCancelName)
+    val executionConditionName = textOrNull(
+        "ccld_cndt_name",
+        "ccldCndtName",
+        "CCLD_CNDT_NAME",
+    )
+    val statusMessage = joinedText(statusName, revisionCancelName, executionConditionName)
     val rejectionReason = joinedRejectionReason(
         textOrNull("rjct_rson", "rjctRson", "RJCT_RSON"),
         textOrNull("rjct_rson_name", "rjctRsonName", "RJCT_RSON_NAME"),

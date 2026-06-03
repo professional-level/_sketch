@@ -2163,6 +2163,39 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `maps overseas execution condition name alias to cancelled status`() {
+        val adapter = overseasHistoryAdapter(
+            """
+            {
+              "rt_cd": "0",
+              "ctx_area_fk200": "",
+              "ctx_area_nk200": "",
+              "output": [
+                {
+                  "odno": "condition-cancelled-order",
+                  "pdno": "TQQQ",
+                  "prdt_name": "ProShares UltraPro QQQ",
+                  "ord_dt": "20260602",
+                  "ord_tmd": "093000",
+                  "ft_ord_qty": "3",
+                  "ft_ccld_qty": "0",
+                  "nccs_qty": "3",
+                  "sll_buy_dvsn_cd": "02",
+                  "prcs_stat_name": "Accepted",
+                  "ccld_cndt_name": "Cancelled"
+                }
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        val status = adapter.findOrderHistory(historyQuery()).single().toStatus()
+
+        assertEquals(BrokerOrderStatus.CANCELLED, status.status)
+        assertEquals("Accepted; Cancelled", status.reason)
+    }
+
+    @Test
     fun `maps overseas partial fill as cumulative execution and partially filled status`() {
         val adapter = overseasHistoryAdapter(
             """
