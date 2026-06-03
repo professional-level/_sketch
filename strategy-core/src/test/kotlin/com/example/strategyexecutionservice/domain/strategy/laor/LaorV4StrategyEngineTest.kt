@@ -26,13 +26,32 @@ class LaorV4StrategyEngineTest {
     }
 
     @Test
+    fun `rejects unsupported Laor symbol and split count combinations`() {
+        assertFailsWith<IllegalArgumentException> {
+            LaorV4StrategyConfig(
+                symbol = LaorV4StrategySymbol.TQQQ,
+                totalSplitCount = 30,
+                firstBuyLimitPercentAbovePreviousClose = 12.0,
+            )
+        }
+        assertFailsWith<IllegalArgumentException> {
+            LaorV4StrategyConfig(
+                symbol = LaorV4StrategySymbol.SOXL,
+                totalSplitCount = 10,
+                firstBuyLimitPercentAbovePreviousClose = 12.0,
+            )
+        }
+    }
+
+    @Test
     fun `calculates star profit percent for supported Laor strategy symbols and split counts`() {
         val cases = listOf(
             CalculationCase(LaorV4StrategySymbol.TQQQ, 20, 0.0, 15.0),
             CalculationCase(LaorV4StrategySymbol.TQQQ, 20, 10.0, 0.0),
-            CalculationCase(LaorV4StrategySymbol.TQQQ, 30, 7.5, 7.5),
+            CalculationCase(LaorV4StrategySymbol.TQQQ, 40, 8.0, 9.0),
             CalculationCase(LaorV4StrategySymbol.SOXL, 20, 10.0, 0.0),
-            CalculationCase(LaorV4StrategySymbol.SOXL, 40, 10.0, 10.0),
+            CalculationCase(LaorV4StrategySymbol.SOXL, 20, 8.6, 2.8),
+            CalculationCase(LaorV4StrategySymbol.SOXL, 40, 8.6, 11.4),
         )
 
         cases.forEach { case ->

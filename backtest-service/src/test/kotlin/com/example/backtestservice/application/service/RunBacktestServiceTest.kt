@@ -84,21 +84,21 @@ class RunBacktestServiceTest {
                 initialCash = "1000".toBigDecimal(),
                 strategyType = BacktestStrategyType.LAOR_V4,
                 laorV4 = LaorV4BacktestParameters(
-                    totalSplitCount = 10,
+                    totalSplitCount = 20,
                     firstBuyLimitPercentAbovePreviousClose = 12.0,
                 ),
             ),
         )
 
         assertEquals(BacktestStrategyType.LAOR_V4, result.strategyType)
-        assertEquals("1033.0".toBigDecimal(), result.finalEquity)
+        assertEquals("1016.5".toBigDecimal(), result.finalEquity)
         assertEquals(3, result.trades.size)
         assertEquals(listOf("FIRST_BUY", "QUARTER_SELL", "TARGET_SELL"), result.trades.map { it.orderTag })
         assertEquals(listOf(BacktestTradeSide.BUY, BacktestTradeSide.SELL, BacktestTradeSide.SELL), result.trades.map { it.side })
         assertEquals(0, result.equityCurve.last().positionQuantity)
-        assertEquals("1033.0".toBigDecimal(), result.equityCurve.last().cash)
-        assertEquals("29.0".toBigDecimal(), result.equityCurve.last().realizedProfitLoss)
-        assertEquals("4.0".toBigDecimal(), result.equityCurve.last().dividendIncome)
+        assertEquals("1016.5".toBigDecimal(), result.equityCurve.last().cash)
+        assertEquals("14.5".toBigDecimal(), result.equityCurve.last().realizedProfitLoss)
+        assertEquals("2.0".toBigDecimal(), result.equityCurve.last().dividendIncome)
     }
 
     private fun candle(

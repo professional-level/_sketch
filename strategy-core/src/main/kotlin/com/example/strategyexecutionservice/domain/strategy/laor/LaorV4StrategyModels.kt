@@ -5,8 +5,9 @@ data class LaorV4StrategyConfig(
     val totalSplitCount: Int,
     val firstBuyLimitPercentAbovePreviousClose: Double,
 ) {
+    val profile: LaorV4StrategyProfile = LaorV4StrategyProfile.from(symbol, totalSplitCount)
+
     init {
-        require(totalSplitCount > 1) { "totalSplitCount must be greater than 1" }
         require(firstBuyLimitPercentAbovePreviousClose in MIN_FIRST_BUY_LIMIT_PERCENT_ABOVE_PREVIOUS_CLOSE..MAX_FIRST_BUY_LIMIT_PERCENT_ABOVE_PREVIOUS_CLOSE) {
             "firstBuyLimitPercentAbovePreviousClose must be between 10 and 15"
         }
@@ -107,6 +108,37 @@ enum class LaorV4StrategySymbol(
 ) {
     TQQQ("TQQQ", 15.0),
     SOXL("SOXL", 20.0),
+}
+
+enum class LaorV4StrategyProfile(
+    val symbol: LaorV4StrategySymbol,
+    val splitCount: Int,
+) {
+    TQQQ_20(LaorV4StrategySymbol.TQQQ, 20),
+    TQQQ_40(LaorV4StrategySymbol.TQQQ, 40),
+    SOXL_20(LaorV4StrategySymbol.SOXL, 20),
+    SOXL_40(LaorV4StrategySymbol.SOXL, 40),
+    ;
+
+    val targetProfitPercent: Double
+        get() = symbol.targetProfitPercent
+
+    val starProfitPercentDeductionPerTurn: Double
+        get() = targetProfitPercent * 2 / splitCount
+
+    companion object {
+        fun from(symbol: LaorV4StrategySymbol, splitCount: Int): LaorV4StrategyProfile {
+            return values().firstOrNull { it.symbol == symbol && it.splitCount == splitCount }
+                ?: throw IllegalArgumentException(
+                    "unsupported Laor V4 strategy profile: symbol=${symbol.ticker}, totalSplitCount=$splitCount " +
+                        "(supported: TQQQ 20/40, SOXL 20/40)",
+                )
+        }
+
+        fun validate(symbol: LaorV4StrategySymbol, splitCount: Int) {
+            from(symbol, splitCount)
+        }
+    }
 }
 
 enum class LaorV4StrategyOrderTag {

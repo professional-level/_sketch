@@ -2,6 +2,7 @@ package com.example.strategyexecutionservice.application.port.`in`
 
 import com.example.common.UseCase
 import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategyConfig
+import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategyProfile
 import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategySymbol
 import java.time.ZonedDateTime
 
@@ -39,7 +40,7 @@ sealed class StartStrategyExecutionCommand {
             require(strategyVersion.isNotBlank()) { "strategyVersion must not be blank" }
             require(market.isNotBlank()) { "market must not be blank" }
             require(budget > 0.0) { "budget must be positive" }
-            require(totalSplitCount > 1) { "totalSplitCount must be greater than 1" }
+            LaorV4StrategyProfile.validate(strategySymbol, totalSplitCount)
             require(
                 firstBuyLimitPercentAbovePreviousClose in
                     LaorV4StrategyConfig.MIN_FIRST_BUY_LIMIT_PERCENT_ABOVE_PREVIOUS_CLOSE..

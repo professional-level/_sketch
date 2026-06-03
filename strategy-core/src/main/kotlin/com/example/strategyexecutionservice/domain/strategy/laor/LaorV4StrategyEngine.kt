@@ -94,7 +94,8 @@ object LaorV4StrategyEngine {
     }
 
     fun normalModeStarProfitPercent(config: LaorV4StrategyConfig, state: LaorV4StrategyState): Double {
-        return config.symbol.targetProfitPercent * (1 - (2 * state.progressRound / config.totalSplitCount))
+        return config.profile.targetProfitPercent -
+            config.profile.starProfitPercentDeductionPerTurn * state.progressRound
     }
 
     fun normalModeStarPrice(config: LaorV4StrategyConfig, state: LaorV4StrategyState): Double {
@@ -108,7 +109,7 @@ object LaorV4StrategyEngine {
         require(state.averagePurchasePrice > 0.0) {
             "averagePurchasePrice must be positive to calculate targetSellPrice"
         }
-        return state.averagePurchasePrice * (1 + config.symbol.targetProfitPercent / 100)
+        return state.averagePurchasePrice * (1 + config.profile.targetProfitPercent / 100)
     }
 
     fun singleBuyBudget(config: LaorV4StrategyConfig, state: LaorV4StrategyState): Double {
@@ -397,7 +398,7 @@ object LaorV4StrategyEngine {
         averagePurchasePrice: Double,
         closePrice: Double,
     ): Boolean {
-        val reverseExitPrice = averagePurchasePrice * (1 - config.symbol.targetProfitPercent / 100)
+        val reverseExitPrice = averagePurchasePrice * (1 - config.profile.targetProfitPercent / 100)
         return closePrice > reverseExitPrice
     }
 
