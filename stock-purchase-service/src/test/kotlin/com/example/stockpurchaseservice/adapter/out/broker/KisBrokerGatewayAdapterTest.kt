@@ -338,6 +338,186 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `overseas submit query cancel flow recovers cancelled status by original broker order id`() {
+        val exchangeFunction = ResponseExchangeFunction(
+            responses = listOf(
+                protobufResponse(
+                    ApiResponse.StockOrder.newBuilder()
+                        .setRtCd("0")
+                        .setOutput(
+                            ApiResponse.Output.newBuilder()
+                                .setODNO("overseas-order-1")
+                                .build(),
+                        )
+                        .build(),
+                ),
+                jsonResponse(
+                    """
+                    {
+                      "rt_cd": "0",
+                      "ctx_area_fk200": "",
+                      "ctx_area_nk200": "",
+                      "output": [
+                        {
+                          "ODNO": "overseas-order-1",
+                          "PDNO": "TQQQ",
+                          "ORD_DT": "20260602",
+                          "ORD_TMD": "093000",
+                          "ORD_QTY": "3",
+                          "ORD_UNPR": "112.5",
+                          "TOT_CCLD_QTY": "0",
+                          "RMN_QTY": "3",
+                          "SLL_BUY_DVSN_NAME": "BUY"
+                        }
+                      ]
+                    }
+                    """.trimIndent(),
+                ),
+                jsonResponse(
+                    """
+                    {
+                      "rt_cd": "0",
+                      "ctx_area_fk200": "",
+                      "ctx_area_nk200": "",
+                      "output": [
+                        {
+                          "ODNO": "overseas-order-1",
+                          "OVRS_PDNO": "TQQQ",
+                          "FT_ORD_QTY": "3",
+                          "NCCS_QTY": "3",
+                          "SLL_BUY_DVSN_CD": "02"
+                        }
+                      ]
+                    }
+                    """.trimIndent(),
+                ),
+                protobufResponse(
+                    ApiResponse.StockOrder.newBuilder()
+                        .setRtCd("0")
+                        .setOutput(
+                            ApiResponse.Output.newBuilder()
+                                .setODNO("overseas-cancel-1")
+                                .build(),
+                        )
+                        .build(),
+                ),
+                jsonResponse(
+                    """
+                    {
+                      "rt_cd": "0",
+                      "ctx_area_fk200": "",
+                      "ctx_area_nk200": "",
+                      "output": [
+                        {
+                          "ODNO": "overseas-order-1",
+                          "PDNO": "TQQQ",
+                          "ORD_DT": "20260602",
+                          "ORD_TMD": "093000",
+                          "ORD_QTY": "3",
+                          "ORD_UNPR": "112.5",
+                          "TOT_CCLD_QTY": "0",
+                          "RMN_QTY": "3",
+                          "SLL_BUY_DVSN_NAME": "BUY"
+                        },
+                        {
+                          "ORD_NO": "overseas-cancel-1",
+                          "ORGN_ODNO": "overseas-order-1",
+                          "PDNO": "TQQQ",
+                          "ORD_DT": "20260602",
+                          "ORD_TMD": "093100",
+                          "ORD_QTY": "3",
+                          "ORD_UNPR": "112.5",
+                          "TOT_CCLD_QTY": "0",
+                          "RMN_QTY": "0",
+                          "CNCL_CFRM_QTY": "3",
+                          "RVSE_CNCL_DVSN_CD": "02",
+                          "SLL_BUY_DVSN_NAME": "BUY",
+                          "PRCS_STAT_NAME": "Processed"
+                        }
+                      ]
+                    }
+                    """.trimIndent(),
+                ),
+            ),
+        )
+        val adapter = KisBrokerGatewayAdapter(
+            WebClient.builder()
+                .exchangeFunction(exchangeFunction)
+                .build(),
+        )
+        val internalOrderId = UUID.randomUUID()
+        val submittedAt = ZonedDateTime.parse("2026-06-02T09:00:00+09:00")
+
+        val submission = adapter.submitOrder(
+            BrokerOrderCommand(
+                internalOrderId = internalOrderId,
+                market = StockOrderMarket.OVERSEAS_US,
+                side = OrderIntentSide.BUY,
+                symbol = "TQQQ",
+                exchange = "NASD",
+                orderType = StockOrderType.LOC,
+                price = 112.5,
+                quantity = 3,
+                isMock = false,
+            ),
+        )
+        val submittedStatus = adapter.findOrderHistory(historyQuery()).findStatusFor(
+            BrokerOrderStatusQuery(
+                orderIntentId = UUID.randomUUID(),
+                internalOrderId = internalOrderId,
+                externalOrderId = submission.externalOrderId,
+                symbol = "TQQQ",
+                side = OrderIntentSide.BUY,
+                orderedQuantity = 3,
+                submittedPrice = 112.5,
+                market = StockOrderMarket.OVERSEAS_US,
+                submittedAt = submittedAt,
+            ),
+        )
+        val cancelSubmission = adapter.cancelOrder(
+            brokerCancelCommand(
+                market = StockOrderMarket.OVERSEAS_US,
+                symbol = "TQQQ",
+                originalOrderId = checkNotNull(submission.externalOrderId),
+                branchOrderNumber = null,
+                price = 112.5,
+                quantity = 3,
+                orderType = StockOrderType.LOC,
+                isMock = false,
+            ),
+        )
+        val cancelledStatus = adapter.findOrderHistory(historyQuery()).findStatusFor(
+            BrokerOrderStatusQuery(
+                orderIntentId = UUID.randomUUID(),
+                internalOrderId = internalOrderId,
+                externalOrderId = submission.externalOrderId,
+                symbol = "TQQQ",
+                side = OrderIntentSide.BUY,
+                orderedQuantity = 3,
+                submittedPrice = 112.5,
+                market = StockOrderMarket.OVERSEAS_US,
+                submittedAt = submittedAt,
+            ),
+        )
+
+        assertEquals("overseas-order-1", submission.externalOrderId)
+        assertEquals(BrokerOrderStatus.SUBMITTED, submittedStatus.status)
+        assertEquals("overseas-order-1", submittedStatus.externalOrderId)
+        assertEquals(3L, submittedStatus.remainingQuantity)
+        assertEquals("overseas-cancel-1", cancelSubmission.externalOrderId)
+        assertEquals(BrokerOrderStatus.CANCELLED, cancelledStatus.status)
+        assertEquals("overseas-order-1", cancelledStatus.externalOrderId)
+        assertEquals(0L, cancelledStatus.remainingQuantity)
+        assertEquals("Processed", cancelledStatus.reason)
+        assertEquals(5, exchangeFunction.requests.size)
+        assertEquals("/open-api/overseas/trading/order", exchangeFunction.requests[0].url().path)
+        assertEquals("/open-api/overseas/trading/inquire-ccnl", exchangeFunction.requests[1].url().path)
+        assertEquals("/open-api/overseas/trading/inquire-nccs", exchangeFunction.requests[2].url().path)
+        assertEquals("/open-api/overseas/trading/order-rvsecncl", exchangeFunction.requests[3].url().path)
+        assertEquals("/open-api/overseas/trading/inquire-ccnl", exchangeFunction.requests[4].url().path)
+    }
+
+    @Test
     fun `overseas cancel matches unfilled order by original broker order id`() {
         val exchangeFunction = ResponseExchangeFunction(
             responses = listOf(
