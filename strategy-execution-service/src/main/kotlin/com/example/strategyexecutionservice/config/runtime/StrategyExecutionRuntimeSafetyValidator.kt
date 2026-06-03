@@ -24,6 +24,20 @@ class StrategyExecutionRuntimeSafetyValidator(
     private val marketDataBaseUrl: String,
     @Value("\${akra.order-intent.default-trading-environment:MOCK}")
     private val defaultOrderIntentTradingEnvironment: String,
+    @Value("\${akra.temporal.schedules.active-executions.enabled:true}")
+    private val activeExecutionsScheduleEnabled: Boolean,
+    @Value("\${akra.temporal.schedules.active-executions.schedule-id:strategy-execution-active-executions-daily}")
+    private val activeExecutionsScheduleId: String,
+    @Value("\${akra.temporal.schedules.active-executions.hour:9}")
+    private val activeExecutionsScheduleHour: Int,
+    @Value("\${akra.temporal.schedules.active-executions.minute:30}")
+    private val activeExecutionsScheduleMinute: Int,
+    @Value("\${akra.temporal.schedules.active-executions.second:0}")
+    private val activeExecutionsScheduleSecond: Int,
+    @Value("\${akra.temporal.schedules.active-executions.time-zone:America/New_York}")
+    private val activeExecutionsScheduleTimeZone: String,
+    @Value("\${akra.temporal.schedules.active-executions.execution-run-id-prefix:ACTIVE_STRATEGIES_DAILY}")
+    private val activeExecutionsScheduleRunIdPrefix: String,
 ) : ApplicationRunner {
 
     override fun run(args: ApplicationArguments) {
@@ -38,6 +52,13 @@ class StrategyExecutionRuntimeSafetyValidator(
                 marketDataBaseUrl = marketDataBaseUrl,
                 hibernateDdlAuto = environment.getProperty("spring.jpa.hibernate.ddl-auto"),
                 defaultOrderIntentTradingEnvironment = defaultOrderIntentTradingEnvironment,
+                activeExecutionsScheduleEnabled = activeExecutionsScheduleEnabled,
+                activeExecutionsScheduleId = activeExecutionsScheduleId,
+                activeExecutionsScheduleHour = activeExecutionsScheduleHour,
+                activeExecutionsScheduleMinute = activeExecutionsScheduleMinute,
+                activeExecutionsScheduleSecond = activeExecutionsScheduleSecond,
+                activeExecutionsScheduleTimeZone = activeExecutionsScheduleTimeZone,
+                activeExecutionsScheduleRunIdPrefix = activeExecutionsScheduleRunIdPrefix,
                 usTradingCalendarEnabled = usCalendar.enabled,
                 defaultUsEquityCalendarEnabled = usCalendar.defaultUsEquityCalendarEnabled,
                 usTradingCalendarZoneId = usCalendar.zoneId,
@@ -89,6 +110,13 @@ object StrategyExecutionRuntimeSafetyRules {
         val marketDataBaseUrl: String,
         val hibernateDdlAuto: String?,
         val defaultOrderIntentTradingEnvironment: String,
+        val activeExecutionsScheduleEnabled: Boolean,
+        val activeExecutionsScheduleId: String,
+        val activeExecutionsScheduleHour: Int,
+        val activeExecutionsScheduleMinute: Int,
+        val activeExecutionsScheduleSecond: Int,
+        val activeExecutionsScheduleTimeZone: String,
+        val activeExecutionsScheduleRunIdPrefix: String,
         val usTradingCalendarEnabled: Boolean,
         val defaultUsEquityCalendarEnabled: Boolean,
         val usTradingCalendarZoneId: String,
@@ -169,8 +197,75 @@ object StrategyExecutionRuntimeSafetyRules {
         if (input.usTradingCalendarEnabled) {
             validateUsTradingCalendar(input, violations)
         }
+        if (input.temporalEnabled && input.activeExecutionsScheduleEnabled) {
+            validateActiveExecutionSchedule(input, violations)
+        }
 
         return violations
+    }
+
+    private fun validateActiveExecutionSchedule(input: Input, violations: MutableList<String>) {
+        if (input.activeExecutionsScheduleId.isBlank()) {
+            violations += "prod/live profile must configure a non-blank active execution Temporal schedule id " +
+                "(akra.temporal.schedules.active-executions.schedule-id)"
+        }
+        if (input.activeExecutionsScheduleRunIdPrefix.isBlank()) {
+            violations += "prod/live profile must configure a non-blank active execution run id prefix " +
+                "(akra.temporal.schedules.active-executions.execution-run-id-prefix)"
+        }
+
+        val scheduleTime = parseScheduleTime(
+            hour = input.activeExecutionsScheduleHour,
+            minute = input.activeExecutionsScheduleMinute,
+            second = input.activeExecutionsScheduleSecond,
+            violations = violations,
+        )
+        val scheduleZone = parseZoneId(input.activeExecutionsScheduleTimeZone)
+        if (scheduleZone == null) {
+            violations += "prod/live profile has invalid active execution schedule time-zone " +
+                "(akra.temporal.schedules.active-executions.time-zone=${input.activeExecutionsScheduleTimeZone})"
+        }
+
+        val calendarZone = parseZoneId(input.usTradingCalendarZoneId)
+        if (scheduleZone != null && calendarZone != null && scheduleZone != calendarZone) {
+            violations += "prod/live profile active execution schedule time-zone must match US trading calendar zone " +
+                "(akra.temporal.schedules.active-executions.time-zone=${input.activeExecutionsScheduleTimeZone}, " +
+                "akra.trading-calendar.us.zone-id=${input.usTradingCalendarZoneId})"
+        }
+
+        val regularOpen = parseLocalTime(input.usTradingCalendarRegularOpen)
+        val regularClose = parseLocalTime(input.usTradingCalendarRegularClose)
+        if (scheduleTime != null && regularOpen != null && scheduleTime.isBefore(regularOpen)) {
+            violations += "prod/live profile active execution schedule time must not be before US regular-open " +
+                "(akra.temporal.schedules.active-executions=${formatScheduleTime(input)}, " +
+                "akra.trading-calendar.us.regular-open=${input.usTradingCalendarRegularOpen})"
+        }
+        if (scheduleTime != null && regularClose != null && !scheduleTime.isBefore(regularClose)) {
+            violations += "prod/live profile active execution schedule time must be before US regular-close " +
+                "(akra.temporal.schedules.active-executions=${formatScheduleTime(input)}, " +
+                "akra.trading-calendar.us.regular-close=${input.usTradingCalendarRegularClose})"
+        }
+    }
+
+    private fun parseScheduleTime(
+        hour: Int,
+        minute: Int,
+        second: Int,
+        violations: MutableList<String>,
+    ): LocalTime? {
+        if (hour !in 0..23) {
+            violations += "prod/live profile has invalid active execution schedule hour " +
+                "(akra.temporal.schedules.active-executions.hour=$hour)"
+        }
+        if (minute !in 0..59) {
+            violations += "prod/live profile has invalid active execution schedule minute " +
+                "(akra.temporal.schedules.active-executions.minute=$minute)"
+        }
+        if (second !in 0..59) {
+            violations += "prod/live profile has invalid active execution schedule second " +
+                "(akra.temporal.schedules.active-executions.second=$second)"
+        }
+        return runCatching { LocalTime.of(hour, minute, second) }.getOrNull()
     }
 
     private fun validateUsTradingCalendar(input: Input, violations: MutableList<String>) {
@@ -290,6 +385,12 @@ object StrategyExecutionRuntimeSafetyRules {
         return value.trim().takeIf { it.isNotEmpty() }?.let {
             runCatching { LocalTime.parse(it) }.getOrNull()
         }
+    }
+
+    private fun formatScheduleTime(input: Input): String {
+        return "${input.activeExecutionsScheduleHour}:" +
+            "${input.activeExecutionsScheduleMinute}:" +
+            input.activeExecutionsScheduleSecond
     }
 
     private fun isSafeHibernateDdlAuto(value: String?): Boolean {

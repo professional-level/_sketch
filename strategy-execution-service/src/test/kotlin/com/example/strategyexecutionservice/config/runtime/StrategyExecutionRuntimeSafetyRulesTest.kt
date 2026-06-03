@@ -179,6 +179,73 @@ class StrategyExecutionRuntimeSafetyRulesTest {
     }
 
     @Test
+    fun `blocks malformed active execution temporal schedule in production profile`() {
+        val violations = StrategyExecutionRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                temporalTarget = "temporal.example.com:7233",
+                marketDataBaseUrl = "https://broker-wrapper.example.com",
+                activeExecutionsScheduleId = " ",
+                activeExecutionsScheduleHour = 24,
+                activeExecutionsScheduleMinute = 60,
+                activeExecutionsScheduleSecond = -1,
+                activeExecutionsScheduleTimeZone = "Mars/Base",
+                activeExecutionsScheduleRunIdPrefix = "",
+            ),
+        )
+
+        assertEquals(6, violations.size)
+        assertTrue(violations.any { it.contains("Temporal schedule id") })
+        assertTrue(violations.any { it.contains("run id prefix") })
+        assertTrue(violations.any { it.contains("schedule hour") })
+        assertTrue(violations.any { it.contains("schedule minute") })
+        assertTrue(violations.any { it.contains("schedule second") })
+        assertTrue(violations.any { it.contains("schedule time-zone") })
+    }
+
+    @Test
+    fun `blocks active execution schedule timezone mismatch in production profile`() {
+        val violations = StrategyExecutionRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                temporalTarget = "temporal.example.com:7233",
+                marketDataBaseUrl = "https://broker-wrapper.example.com",
+                activeExecutionsScheduleTimeZone = "Asia/Seoul",
+            ),
+        )
+
+        assertEquals(1, violations.size)
+        assertTrue(violations.single().contains("must match US trading calendar zone"))
+    }
+
+    @Test
+    fun `blocks active execution schedule outside regular session in production profile`() {
+        val beforeOpen = StrategyExecutionRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                temporalTarget = "temporal.example.com:7233",
+                marketDataBaseUrl = "https://broker-wrapper.example.com",
+                activeExecutionsScheduleHour = 8,
+                activeExecutionsScheduleMinute = 59,
+            ),
+        )
+        val afterClose = StrategyExecutionRuntimeSafetyRules.validate(
+            input(
+                activeProfiles = listOf("prod"),
+                temporalTarget = "temporal.example.com:7233",
+                marketDataBaseUrl = "https://broker-wrapper.example.com",
+                activeExecutionsScheduleHour = 16,
+                activeExecutionsScheduleMinute = 0,
+            ),
+        )
+
+        assertEquals(1, beforeOpen.size)
+        assertTrue(beforeOpen.single().contains("must not be before US regular-open"))
+        assertEquals(1, afterClose.size)
+        assertTrue(afterClose.single().contains("must be before US regular-close"))
+    }
+
+    @Test
     fun `blocks disabled us trading calendar in production profile`() {
         val violations = StrategyExecutionRuntimeSafetyRules.validate(
             input(
@@ -235,8 +302,10 @@ class StrategyExecutionRuntimeSafetyRulesTest {
             ),
         )
 
-        assertEquals(1, violations.size)
-        assertTrue(violations.single().contains("regular-open must be before regular-close"))
+        assertEquals(3, violations.size)
+        assertTrue(violations.any { it.contains("regular-open must be before regular-close") })
+        assertTrue(violations.any { it.contains("must not be before US regular-open") })
+        assertTrue(violations.any { it.contains("must be before US regular-close") })
     }
 
     @Test
@@ -318,6 +387,13 @@ class StrategyExecutionRuntimeSafetyRulesTest {
         marketDataBaseUrl: String,
         hibernateDdlAuto: String? = "validate",
         defaultOrderIntentTradingEnvironment: String = "LIVE",
+        activeExecutionsScheduleEnabled: Boolean = true,
+        activeExecutionsScheduleId: String = "strategy-execution-active-executions-daily",
+        activeExecutionsScheduleHour: Int = 9,
+        activeExecutionsScheduleMinute: Int = 30,
+        activeExecutionsScheduleSecond: Int = 0,
+        activeExecutionsScheduleTimeZone: String = "America/New_York",
+        activeExecutionsScheduleRunIdPrefix: String = "ACTIVE_STRATEGIES_DAILY",
         usTradingCalendarEnabled: Boolean = true,
         defaultUsEquityCalendarEnabled: Boolean = true,
         usTradingCalendarZoneId: String = "America/New_York",
@@ -342,6 +418,13 @@ class StrategyExecutionRuntimeSafetyRulesTest {
         marketDataBaseUrl = marketDataBaseUrl,
         hibernateDdlAuto = hibernateDdlAuto,
         defaultOrderIntentTradingEnvironment = defaultOrderIntentTradingEnvironment,
+        activeExecutionsScheduleEnabled = activeExecutionsScheduleEnabled,
+        activeExecutionsScheduleId = activeExecutionsScheduleId,
+        activeExecutionsScheduleHour = activeExecutionsScheduleHour,
+        activeExecutionsScheduleMinute = activeExecutionsScheduleMinute,
+        activeExecutionsScheduleSecond = activeExecutionsScheduleSecond,
+        activeExecutionsScheduleTimeZone = activeExecutionsScheduleTimeZone,
+        activeExecutionsScheduleRunIdPrefix = activeExecutionsScheduleRunIdPrefix,
         usTradingCalendarEnabled = usTradingCalendarEnabled,
         defaultUsEquityCalendarEnabled = defaultUsEquityCalendarEnabled,
         usTradingCalendarZoneId = usTradingCalendarZoneId,
