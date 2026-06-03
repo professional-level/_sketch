@@ -1342,20 +1342,31 @@ private fun String.withBrokerFailureDetail(detail: String): String {
 }
 
 internal fun parseKisOrderDateTime(date: String, time: String): ZonedDateTime {
-    val parsedDate = date.takeIf { it.length == 8 }?.let {
-        LocalDate.of(
-            it.substring(0, 4).toInt(),
-            it.substring(4, 6).toInt(),
-            it.substring(6, 8).toInt(),
-        )
-    } ?: LocalDate.now(BROKER_ORDER_ZONE)
-    val normalizedTime = time.filter(Char::isDigit).padEnd(6, '0').take(6)
-    val parsedTime = LocalTime.of(
-        normalizedTime.substring(0, 2).toIntOrNull() ?: 0,
-        normalizedTime.substring(2, 4).toIntOrNull() ?: 0,
-        normalizedTime.substring(4, 6).toIntOrNull() ?: 0,
-    )
+    val parsedDate = parseKisOrderDate(date) ?: LocalDate.now(BROKER_ORDER_ZONE)
+    val parsedTime = parseKisOrderTime(time) ?: LocalTime.MIDNIGHT
     return ZonedDateTime.of(parsedDate, parsedTime, BROKER_ORDER_ZONE)
+}
+
+private fun parseKisOrderDate(date: String): LocalDate? {
+    val normalizedDate = date.filter(Char::isDigit).takeIf { it.length == 8 } ?: return null
+    return runCatching {
+        LocalDate.of(
+            normalizedDate.substring(0, 4).toInt(),
+            normalizedDate.substring(4, 6).toInt(),
+            normalizedDate.substring(6, 8).toInt(),
+        )
+    }.getOrNull()
+}
+
+private fun parseKisOrderTime(time: String): LocalTime? {
+    val normalizedTime = time.filter(Char::isDigit).padEnd(6, '0').take(6)
+    return runCatching {
+        LocalTime.of(
+            normalizedTime.substring(0, 2).toInt(),
+            normalizedTime.substring(2, 4).toInt(),
+            normalizedTime.substring(4, 6).toInt(),
+        )
+    }.getOrNull()
 }
 
 internal fun String?.toLongValue(): Long {

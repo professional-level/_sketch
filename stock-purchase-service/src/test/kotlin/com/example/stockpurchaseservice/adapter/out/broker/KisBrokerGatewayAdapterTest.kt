@@ -2026,6 +2026,27 @@ class KisBrokerGatewayAdapterTest {
     }
 
     @Test
+    fun `parses kis order date time with separators`() {
+        val orderedAt = parseKisOrderDateTime("2026-06-02", "09:30:15")
+
+        assertEquals("2026-06-02", orderedAt.toLocalDate().toString())
+        assertEquals(9, orderedAt.hour)
+        assertEquals(30, orderedAt.minute)
+        assertEquals(15, orderedAt.second)
+        assertEquals(BROKER_ORDER_ZONE, orderedAt.zone)
+    }
+
+    @Test
+    fun `falls back to midnight for invalid kis order time`() {
+        val orderedAt = parseKisOrderDateTime("20260602", "999999")
+
+        assertEquals("2026-06-02", orderedAt.toLocalDate().toString())
+        assertEquals(0, orderedAt.hour)
+        assertEquals(0, orderedAt.minute)
+        assertEquals(0, orderedAt.second)
+    }
+
+    @Test
     fun `maps overseas rejection reason name to rejected status`() {
         val adapter = overseasHistoryAdapter(
             """
