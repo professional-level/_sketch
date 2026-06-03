@@ -144,20 +144,22 @@ class SubmitOrderIntentServiceTest {
     }
 
     @Test
-    fun `rejects negative moc order intent price`() {
-        assertFailsWith<IllegalArgumentException> {
-            SubmitOrderIntentCommand(
-                eventId = UUID.randomUUID(),
-                idempotencyKey = "laor-v4-strategy:TQQQ:2026-05-30:MOC_SELL:negative",
-                strategyExecutionId = "laor-v4-strategy:TQQQ",
-                symbol = "TQQQ",
-                side = OrderIntentSide.SELL,
-                orderType = OrderIntentType.MOC,
-                price = -1.0,
-                quantity = 2,
-                orderTag = "MOC_SELL",
-                createdAt = ZonedDateTime.parse("2026-05-30T09:00:00+09:00"),
-            )
+    fun `rejects non positive explicit moc order intent price`() {
+        listOf(0.0, -1.0).forEach { price ->
+            assertFailsWith<IllegalArgumentException> {
+                SubmitOrderIntentCommand(
+                    eventId = UUID.randomUUID(),
+                    idempotencyKey = "laor-v4-strategy:TQQQ:2026-05-30:MOC_SELL:$price",
+                    strategyExecutionId = "laor-v4-strategy:TQQQ",
+                    symbol = "TQQQ",
+                    side = OrderIntentSide.SELL,
+                    orderType = OrderIntentType.MOC,
+                    price = price,
+                    quantity = 2,
+                    orderTag = "MOC_SELL",
+                    createdAt = ZonedDateTime.parse("2026-05-30T09:00:00+09:00"),
+                )
+            }
         }
     }
 

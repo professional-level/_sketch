@@ -63,13 +63,17 @@ fun Event.OrderIntentCreatedEvent.toCommand(): SubmitOrderIntentCommand {
         symbol = event.symbol,
         side = event.side.convert(),
         orderType = event.orderType.convert(),
-        price = event.price.takeIf { it > 0.0 },
+        price = event.price.toOrderIntentPrice(),
         quantity = event.quantity,
         orderTag = event.orderTag,
         createdAt = event.createdAt.toZonedDateTime(),
         tradingEnvironment = event.tradingEnvironment.convert(),
         exchange = event.exchange.ifBlank { DEFAULT_OVERSEAS_ORDER_EXCHANGE },
     )
+}
+
+private fun Double.toOrderIntentPrice(): Double? {
+    return takeIf { it != 0.0 }
 }
 
 private fun Event.OrderIntentSide.convert(): OrderIntentSide {

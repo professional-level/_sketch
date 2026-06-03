@@ -32,7 +32,7 @@ data class SubmitOrderIntentCommand(
         require(quantity <= Int.MAX_VALUE) { "quantity must fit Int" }
         require(orderTag.isNotBlank()) { "orderTag must not be blank" }
         if (orderType == OrderIntentType.MOC) {
-            require(price == null || price >= 0.0) { "$side $orderType price must not be negative" }
+            require(price == null || price > 0.0) { "$side $orderType price must be positive when provided" }
         } else {
             require(price != null && price > 0.0) { "$side $orderType price must be positive" }
         }

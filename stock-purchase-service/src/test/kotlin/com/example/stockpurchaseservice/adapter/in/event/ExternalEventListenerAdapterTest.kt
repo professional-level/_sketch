@@ -19,6 +19,7 @@ import java.time.Instant
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 
 class ExternalEventListenerAdapterTest {
@@ -86,6 +87,32 @@ class ExternalEventListenerAdapterTest {
         assertEquals(3L, command.quantity)
         assertEquals("MOC_SELL", command.orderTag)
         assertEquals(OrderTradingEnvironment.LIVE, command.tradingEnvironment)
+    }
+
+    @Test
+    fun `preserves negative moc price so command validation rejects the event`() = runBlocking {
+        val useCase = CapturingSubmitOrderIntentUseCase()
+        val adapter = ExternalEventListenerAdapter(useCase)
+        val event = Event.OrderIntentCreatedEvent.newBuilder()
+            .setEventId("00000000-0000-0000-0000-000000000103")
+            .setIdempotencyKey("intent-sell-moc-negative")
+            .setStrategyExecutionId("laor-v4:TQQQ")
+            .setStrategyType(Event.StrategyExecutionType.LAOR_V4_STRATEGY)
+            .setSymbol("TQQQ")
+            .setExchange("NASD")
+            .setSide(Event.OrderIntentSide.ORDER_INTENT_SELL)
+            .setOrderType(Event.OrderIntentOrderType.ORDER_INTENT_MOC)
+            .setPrice(-1.0)
+            .setQuantity(3L)
+            .setOrderTag("MOC_SELL")
+            .setCreatedAt(Timestamp.newBuilder().setSeconds(CREATED_AT_EPOCH_SECONDS).build())
+            .setTradingEnvironment(Event.OrderTradingEnvironment.ORDER_TRADING_ENVIRONMENT_LIVE)
+            .build()
+
+        assertFailsWith<IllegalArgumentException> {
+            adapter.orderIntents(ConsumerRecord(ORDER_INTENT_CREATED, 0, 0L, "laor-v4:TQQQ", event.toByteArray()))
+        }
+        assertEquals(emptyList(), useCase.commands)
     }
 
     private fun orderIntentRecord(): ConsumerRecord<String, ByteArray> {
