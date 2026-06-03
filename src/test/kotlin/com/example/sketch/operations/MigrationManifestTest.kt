@@ -48,4 +48,28 @@ class MigrationManifestTest {
             "Migration Job must not rely on lexicographic glob order.",
         )
     }
+
+    @Test
+    fun `kubernetes migration job records applied migrations`() {
+        val runtimeManifest = Files.readString(
+            Path.of("docs", "operations", "kubernetes", "trading-runtime.yaml"),
+        )
+
+        assertTrue(
+            runtimeManifest.contains("CREATE TABLE IF NOT EXISTS schema_migration"),
+            "Migration Job must create a migration ledger table.",
+        )
+        assertTrue(
+            runtimeManifest.contains("SELECT COUNT(*) FROM schema_migration"),
+            "Migration Job must check whether each manifest entry was already applied.",
+        )
+        assertTrue(
+            runtimeManifest.contains("skipping already applied migration"),
+            "Migration Job must skip already applied manifest entries on redeploy.",
+        )
+        assertTrue(
+            runtimeManifest.contains("INSERT INTO schema_migration"),
+            "Migration Job must record successfully applied migrations.",
+        )
+    }
 }

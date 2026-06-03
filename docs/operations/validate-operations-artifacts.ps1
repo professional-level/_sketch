@@ -220,7 +220,11 @@ foreach ($expected in @(
     "temporal-frontend.trading-infra.svc.cluster.local",
     "MIGRATION_MANIFEST.md",
     "grep -E '^[0-9]{8}_.+\.sql$'",
-    "migration listed in manifest is missing"
+    "migration listed in manifest is missing",
+    "CREATE TABLE IF NOT EXISTS schema_migration",
+    "SELECT COUNT(*) FROM schema_migration",
+    "skipping already applied migration",
+    "INSERT INTO schema_migration"
 )) {
     Assert-Contains "trading-runtime.yaml" $runtime $expected
 }

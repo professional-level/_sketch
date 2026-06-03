@@ -202,14 +202,32 @@ spec:
                 exit 1
               fi
 
+              mysql_exec() {
+                mysql --protocol=TCP -h "${DB_HOST}" -P "${DB_PORT}" -u "${DB_USER}" -p"${DB_PASSWORD}" "${DB_NAME}" "$@"
+              }
+
+              mysql_exec <<'SQL'
+              CREATE TABLE IF NOT EXISTS schema_migration (
+                  fileName VARCHAR(255) NOT NULL,
+                  appliedAt DATETIME(6) NOT NULL,
+                  PRIMARY KEY (fileName)
+              );
+              SQL
+
               printf '%s\n' "${migration_files}" | while IFS= read -r file_name; do
                 file="/migrations/${file_name}"
                 if [ ! -f "${file}" ]; then
                   echo "migration listed in manifest is missing: ${file_name}" >&2
                   exit 1
                 fi
+                applied_count="$(mysql_exec --batch --skip-column-names -e "SELECT COUNT(*) FROM schema_migration WHERE fileName = '${file_name}';" | tr -d '[:space:]')"
+                if [ "${applied_count}" = "1" ]; then
+                  echo "skipping already applied migration ${file_name}"
+                  continue
+                fi
                 echo "applying ${file_name}"
-                mysql --protocol=TCP -h "${DB_HOST}" -P "${DB_PORT}" -u "${DB_USER}" -p"${DB_PASSWORD}" "${DB_NAME}" < "${file}"
+                mysql_exec < "${file}"
+                mysql_exec -e "INSERT INTO schema_migration (fileName, appliedAt) VALUES ('${file_name}', UTC_TIMESTAMP(6));"
               done
           volumeMounts:
             - name: sql-migrations
