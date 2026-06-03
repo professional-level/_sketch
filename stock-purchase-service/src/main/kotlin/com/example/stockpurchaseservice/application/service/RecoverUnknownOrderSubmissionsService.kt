@@ -91,7 +91,8 @@ class RecoverUnknownOrderSubmissionsService(
             }
             BrokerOrderStatus.PARTIALLY_FILLED -> {
                 val pending = submission.copy(
-                    externalOrderId = status.externalOrderId ?: submission.externalOrderId,
+                    externalOrderId = submission.resolveExternalOrderId(status),
+                    branchOrderNumber = submission.branchOrderNumber.nonBlank(),
                     statusReason = status.reason ?: submission.statusReason,
                     lastStatusCheckedAt = status.checkedAt,
                 )
@@ -101,7 +102,8 @@ class RecoverUnknownOrderSubmissionsService(
             BrokerOrderStatus.SUBMITTED,
             BrokerOrderStatus.UNKNOWN -> {
                 val pending = submission.copy(
-                    externalOrderId = status.externalOrderId ?: submission.externalOrderId,
+                    externalOrderId = submission.resolveExternalOrderId(status),
+                    branchOrderNumber = submission.branchOrderNumber.nonBlank(),
                     statusReason = status.reason ?: submission.statusReason,
                     lastStatusCheckedAt = status.checkedAt,
                 )
@@ -134,6 +136,8 @@ class RecoverUnknownOrderSubmissionsService(
     ) {
         val checkedAt = ZonedDateTime.now(clock)
         val unresolved = submission.copy(
+            externalOrderId = submission.externalOrderId.nonBlank(),
+            branchOrderNumber = submission.branchOrderNumber.nonBlank(),
             statusReason = "broker status lookup failed: ${exception.message ?: exception::class.java.simpleName}",
             lastStatusCheckedAt = checkedAt,
         )
@@ -159,9 +163,10 @@ class RecoverUnknownOrderSubmissionsService(
         submission: OrderIntentSubmissionDto,
         status: BrokerOrderStatusDto,
     ): OrderIntentSubmissionDto? {
-        val externalOrderId = status.externalOrderId ?: submission.externalOrderId ?: return null
+        val externalOrderId = submission.resolveExternalOrderId(status) ?: return null
         val recovered = submission.copy(
             externalOrderId = externalOrderId,
+            branchOrderNumber = submission.branchOrderNumber.nonBlank(),
             statusReason = null,
             lastStatusCheckedAt = status.checkedAt,
         )
@@ -175,9 +180,10 @@ class RecoverUnknownOrderSubmissionsService(
         submission: OrderIntentSubmissionDto,
         status: BrokerOrderStatusDto,
     ): OrderIntentSubmissionDto? {
-        val externalOrderId = status.externalOrderId ?: submission.externalOrderId ?: return null
+        val externalOrderId = submission.resolveExternalOrderId(status) ?: return null
         val recovered = submission.copy(
             externalOrderId = externalOrderId,
+            branchOrderNumber = submission.branchOrderNumber.nonBlank(),
             statusReason = status.reason,
             lastStatusCheckedAt = status.checkedAt,
         )
@@ -190,7 +196,7 @@ class RecoverUnknownOrderSubmissionsService(
         status: BrokerOrderStatusDto,
     ) {
         val fillPort = executionFillPort ?: return
-        val externalOrderId = status.externalOrderId ?: submission.externalOrderId ?: return
+        val externalOrderId = submission.resolveExternalOrderId(status) ?: return
         val cumulativeFilledQuantity = status.cumulativeFilledQuantity?.takeIf { it > 0 } ?: return
         val alreadySavedQuantity = fillPort.sumQuantityByExternalOrderId(externalOrderId)
         val deltaFilledQuantity = cumulativeFilledQuantity - alreadySavedQuantity
@@ -289,13 +295,15 @@ class RecoverUnknownOrderSubmissionsService(
         status: BrokerOrderStatusDto,
     ) {
         val recovered = submission.copy(
+            externalOrderId = submission.resolveExternalOrderId(status),
+            branchOrderNumber = submission.branchOrderNumber.nonBlank(),
             statusReason = status.reason,
             lastStatusCheckedAt = status.checkedAt,
         )
         orderIntentSubmissionPort.saveRejected(recovered)
         syncRecoveredLegacySellOrder(
             submission = recovered,
-            externalOrderId = status.externalOrderId ?: submission.externalOrderId,
+            externalOrderId = recovered.externalOrderId,
             targetState = OrderStateDto.SUBMIT_FAILED,
         )
         orderExecutionEventPort.publishRejected(recovered.toRejectedMessage(status))
@@ -305,9 +313,10 @@ class RecoverUnknownOrderSubmissionsService(
         submission: OrderIntentSubmissionDto,
         status: BrokerOrderStatusDto,
     ) {
-        val externalOrderId = status.externalOrderId ?: submission.externalOrderId ?: return
+        val externalOrderId = submission.resolveExternalOrderId(status) ?: return
         val recovered = submission.copy(
             externalOrderId = externalOrderId,
+            branchOrderNumber = submission.branchOrderNumber.nonBlank(),
             statusReason = status.reason,
             lastStatusCheckedAt = status.checkedAt,
         )
@@ -337,8 +346,8 @@ class RecoverUnknownOrderSubmissionsService(
         return BrokerOrderStatusQuery(
             orderIntentId = orderIntentId,
             internalOrderId = internalOrderId,
-            externalOrderId = externalOrderId,
-            branchOrderNumber = branchOrderNumber,
+            externalOrderId = externalOrderId.nonBlank(),
+            branchOrderNumber = branchOrderNumber.nonBlank(),
             symbol = symbol,
             exchange = exchange,
             side = side,
@@ -366,7 +375,7 @@ class RecoverUnknownOrderSubmissionsService(
             eventId = deterministicEventId("${orderIntentId}:REJECTED"),
             strategyExecutionId = strategyExecutionId,
             orderIntentId = orderIntentId.toString(),
-            brokerOrderId = status.externalOrderId ?: externalOrderId,
+            brokerOrderId = status.externalOrderId.nonBlank() ?: externalOrderId.nonBlank(),
             reason = status.reason ?: "broker order rejected",
             rejectedAt = status.checkedAt,
         )
@@ -398,7 +407,7 @@ class RecoverUnknownOrderSubmissionsService(
             side = side,
             orderType = orderType,
             orderTag = orderTag,
-            externalOrderId = status.externalOrderId ?: externalOrderId,
+            externalOrderId = resolveExternalOrderId(status),
             reason = status.reason,
             submittedAt = submittedAt,
             checkedAt = status.checkedAt,
@@ -415,6 +424,14 @@ class RecoverUnknownOrderSubmissionsService(
         val fallback = "$externalOrderId:$cumulativeFilledQuantity:$executionType"
         val marketPrefix = "${(market ?: symbol.toStockOrderMarket()).name}:"
         return if (fallback.startsWith(marketPrefix)) fallback else "$marketPrefix$fallback"
+    }
+
+    private fun OrderIntentSubmissionDto.resolveExternalOrderId(status: BrokerOrderStatusDto): String? {
+        return status.externalOrderId.nonBlank() ?: externalOrderId.nonBlank()
+    }
+
+    private fun String?.nonBlank(): String? {
+        return this?.trim()?.takeIf { it.isNotBlank() }
     }
 
     private fun deterministicEventId(seed: String): UUID {

@@ -73,6 +73,34 @@ class RecoverUnknownOrderSubmissionsServiceTest {
     }
 
     @Test
+    fun `recovers unknown submission with blank stored broker ids`() = runBlocking {
+        val submissionPort = FakeOrderIntentSubmissionPort(
+            listOf(submission(externalOrderId = " ", branchOrderNumber = " ")),
+        )
+        val eventPort = FakeOrderExecutionEventPort()
+        val marketService = FakeMarketServicePort(
+            status = BrokerOrderStatusDto(
+                status = BrokerOrderStatus.SUBMITTED,
+                externalOrderId = "broker-1",
+                checkedAt = CHECKED_AT,
+            ),
+        )
+        val service = RecoverUnknownOrderSubmissionsService(
+            marketService = marketService,
+            orderIntentSubmissionPort = submissionPort,
+            orderExecutionEventPort = eventPort,
+            operationalAlertPort = FakeOperationalAlertPort(),
+        )
+
+        service.execute()
+
+        assertEquals(null, marketService.queries.single().externalOrderId)
+        assertEquals(null, marketService.queries.single().branchOrderNumber)
+        assertEquals("broker-1", submissionPort.submitted.single().externalOrderId)
+        assertEquals("broker-1", eventPort.submitted.single().brokerOrderId)
+    }
+
+    @Test
     fun `recovers legacy sell unknown submission to stock order mapping`() = runBlocking {
         val submissionPort = FakeOrderIntentSubmissionPort(
             listOf(
