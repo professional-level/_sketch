@@ -82,6 +82,9 @@ message OrderSubmitted {
   string broker_order_id = 4;
   google.protobuf.Timestamp submitted_at = 5;
   EventMeta meta = 6;
+  OrderIntentSide side = 7;
+  string order_tag = 8;
+  int64 quantity = 9;
 }
 
 message OrderRejected {

@@ -14,6 +14,8 @@ interface StrategyExecutionTemporalActivities {
     ): RunActiveStrategyExecutionsWorkflowResult
 }
 
+const val LAOR_ORDER_MILESTONE_SIGNAL_NAME = "OnLaorOrderMilestone"
+
 data class RunActiveStrategyExecutionsWorkflowInput(
     val executionRunId: String = "",
     val requestedAt: String = "",
@@ -65,6 +67,21 @@ data class LaorV4StrategyWorkflowState(
 data class StrategyMarketWorkflowSnapshot(
     val previousClose: Double = 0.0,
     val recentClosePrices: List<Double> = emptyList(),
+)
+
+data class LaorOrderMilestoneWorkflowSignal(
+    val eventId: String = "",
+    val milestoneType: String = "",
+    val strategyExecutionId: String = "",
+    val orderIntentId: String = "",
+    val brokerOrderId: String? = null,
+    val orderTag: String? = null,
+    val side: String? = null,
+    val filledQuantity: Long = 0,
+    val averageFilledPrice: Double? = null,
+    val occurredAt: String = "",
+    val sourceEventIds: List<String> = emptyList(),
+    val idempotencyKey: String = "",
 )
 
 data class RunLaorV4StrategyWorkflowResult(

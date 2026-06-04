@@ -3,6 +3,7 @@ package com.example.streamprocessingservice.laor.application
 import org.apache.flink.api.common.functions.OpenContext
 import org.apache.flink.api.common.state.MapState
 import org.apache.flink.api.common.state.MapStateDescriptor
+import org.apache.flink.api.common.state.StateTtlConfig
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction
 import org.apache.flink.util.Collector
 import java.time.Duration
@@ -12,8 +13,14 @@ import java.time.ZonedDateTime
 
 class OrderLifecycleProcessFunction(
     fillTimeoutMillis: Long,
+    processedEventTtlMillis: Long,
 ) : KeyedProcessFunction<String, OrderExecutionEvent, LifecycleEventEnvelope>() {
     private val processor = OrderLifecycleProcessor(Duration.ofMillis(fillTimeoutMillis))
+    private val processedEventTtlConfig = StateTtlConfig
+        .newBuilder(Duration.ofMillis(processedEventTtlMillis))
+        .setUpdateType(StateTtlConfig.UpdateType.OnCreateAndWrite)
+        .setStateVisibility(StateTtlConfig.StateVisibility.NeverReturnExpired)
+        .build()
 
     private lateinit var orderStates: MapState<String, OrderLifecycleState>
     private lateinit var processedEvents: MapState<String, Boolean>
@@ -27,13 +34,14 @@ class OrderLifecycleProcessFunction(
                 OrderLifecycleState::class.java,
             ),
         )
-        processedEvents = runtimeContext.getMapState(
-            MapStateDescriptor(
-                "laor-order-processed-event-ids",
-                String::class.java,
-                Boolean::class.javaObjectType,
-            ),
-        )
+        val processedEventsDescriptor = MapStateDescriptor(
+            "laor-order-processed-event-ids",
+            String::class.java,
+            Boolean::class.javaObjectType,
+        ).apply {
+            enableTimeToLive(processedEventTtlConfig)
+        }
+        processedEvents = runtimeContext.getMapState(processedEventsDescriptor)
         timeoutTimers = runtimeContext.getMapState(
             MapStateDescriptor(
                 "laor-order-timeout-timers",

@@ -1,0 +1,19 @@
+spring:
+  kafka:
+    bootstrap-servers:
+      - 127.0.0.1:19092
+      - 127.0.0.1:19093
+      - 127.0.0.1:19094
+    consumer:
+      group-id: strategy-execution
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
+      properties:
+        isolation.level: read_committed
+    listener:
+      ack-mode: record
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer

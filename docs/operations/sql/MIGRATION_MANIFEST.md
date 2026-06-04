@@ -16,6 +16,7 @@ Apply these MySQL migrations explicitly before running production-like profiles 
 20260602_create_strategy_execution_state_tables.mysql.sql
 20260602_create_final_price_bating_v1_strategy_execution.mysql.sql
 20260602_add_final_price_bating_v1_sell_lifecycle_columns.mysql.sql
+20260604_create_strategy_execution_milestone_event.mysql.sql
 ```
 
 ## 3. Stock Search Service Base State

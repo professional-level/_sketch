@@ -101,6 +101,7 @@ class OrderLifecycleProcessor(
                         event = event,
                         reason = "partial fill arrived before submitted event",
                     )
+                    return ProcessingResult(state = initialState.updateLastEvent(event), outputs = outputs)
                 }
                 val state = initialState.addFill(event, terminal = false)
                 state.overfillAnomaly(event)?.let { outputs += it }
@@ -116,6 +117,7 @@ class OrderLifecycleProcessor(
                         event = event,
                         reason = "fill arrived before submitted event",
                     )
+                    return ProcessingResult(state = initialState.updateLastEvent(event), outputs = outputs)
                 }
                 val state = initialState.addFill(event, terminal = true)
                 state.overfillAnomaly(event)?.let { outputs += it }

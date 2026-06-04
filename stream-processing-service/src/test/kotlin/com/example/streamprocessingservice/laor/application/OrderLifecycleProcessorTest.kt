@@ -39,9 +39,11 @@ class OrderLifecycleProcessorTest {
         val afterIntent = processor.process(intent, null)
         val afterFill = processor.process(fill, afterIntent.state)
 
-        assertEquals(2, afterFill.outputs.size)
-        assertEquals(AnomalyType.FILL_BEFORE_SUBMIT, afterFill.outputs.first().anomaly?.anomalyType)
-        assertEquals(MilestoneType.EXIT_SELL_FILLED, afterFill.outputs.last().milestone?.milestoneType)
+        assertEquals(1, afterFill.outputs.size)
+        assertEquals(AnomalyType.FILL_BEFORE_SUBMIT, afterFill.outputs.single().anomaly?.anomalyType)
+        assertEquals(null, afterFill.outputs.single().milestone)
+        assertEquals(0, afterFill.state.filledQuantity)
+        assertEquals(null, afterFill.state.terminalStatus)
     }
 
     @Test

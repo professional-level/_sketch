@@ -1,6 +1,7 @@
 package com.example.strategyexecutionservice.application.port.`in`
 
 import com.example.common.UseCase
+import com.example.strategyexecutionservice.domain.strategy.execution.OrderSide
 import java.time.ZonedDateTime
 
 @UseCase
@@ -20,6 +21,9 @@ sealed class RecordOrderExecutionEventCommand {
         override val strategyExecutionId: String,
         override val orderIntentId: String,
         override val brokerOrderId: String,
+        val side: OrderSide? = null,
+        val orderTag: String? = null,
+        val quantity: Long? = null,
         val submittedAt: ZonedDateTime,
     ) : RecordOrderExecutionEventCommand() {
         override val occurredAt: ZonedDateTime = submittedAt
@@ -29,6 +33,8 @@ sealed class RecordOrderExecutionEventCommand {
             require(strategyExecutionId.isNotBlank()) { "strategyExecutionId must not be blank" }
             require(orderIntentId.isNotBlank()) { "orderIntentId must not be blank" }
             require(brokerOrderId.isNotBlank()) { "brokerOrderId must not be blank" }
+            orderTag?.let { require(it.isNotBlank()) { "orderTag must not be blank" } }
+            quantity?.let { require(it > 0) { "quantity must be positive" } }
         }
     }
 

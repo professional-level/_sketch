@@ -7,11 +7,14 @@ import com.example.strategyexecutionservice.application.port.`in`.ApplyOrderFill
 import com.example.strategyexecutionservice.application.port.`in`.OrderFillKind
 import com.example.strategyexecutionservice.application.port.`in`.RecordOrderExecutionEventCommand
 import com.example.strategyexecutionservice.application.port.`in`.RecordOrderExecutionEventUseCase
+import com.example.strategyexecutionservice.application.port.`in`.SignalLaorOrderMilestoneCommand
+import com.example.strategyexecutionservice.application.port.`in`.SignalLaorOrderMilestoneUseCase
 import com.example.strategyexecutionservice.application.port.`in`.StartStrategyExecutionCommand
 import com.example.strategyexecutionservice.application.port.`in`.StartStrategyExecutionUseCase
 import com.example.strategyexecutionservice.domain.strategy.execution.OrderSide
 import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategySymbol
 import common.ConsumerGroupId.STRATEGY_EXECUTION_SERVICE
+import common.Topic.LAOR_ORDER_MILESTONE_DETECTED
 import common.Topic.ORDER_FILLED
 import common.Topic.ORDER_PARTIALLY_FILLED
 import common.Topic.ORDER_CANCELLED
@@ -29,6 +32,7 @@ internal class StrategyExecutionEventListenerAdapter(
     private val startStrategyExecutionUseCase: StartStrategyExecutionUseCase,
     private val applyOrderFillUseCase: ApplyOrderFillUseCase,
     private val recordOrderExecutionEventUseCase: RecordOrderExecutionEventUseCase,
+    private val signalLaorOrderMilestoneUseCase: SignalLaorOrderMilestoneUseCase,
 ) {
     @KafkaListener(topics = [STRATEGY_EXECUTION_START_REQUESTED], groupId = STRATEGY_EXECUTION_SERVICE)
     suspend fun strategyExecutionStartRequests(record: ConsumerRecord<String, ByteArray>) {
@@ -75,6 +79,14 @@ internal class StrategyExecutionEventListenerAdapter(
         record.withTraceContext {
             val event = Event.OrderCancelled.parseFrom(record.value())
             recordOrderExecutionEventUseCase.execute(event.toCommand())
+        }
+    }
+
+    @KafkaListener(topics = [LAOR_ORDER_MILESTONE_DETECTED], groupId = STRATEGY_EXECUTION_SERVICE)
+    suspend fun laorOrderMilestones(record: ConsumerRecord<String, ByteArray>) {
+        record.withTraceContext {
+            val event = Event.LaorOrderMilestoneDetected.parseFrom(record.value())
+            signalLaorOrderMilestoneUseCase.execute(event.toCommand())
         }
     }
 }
@@ -184,6 +196,9 @@ private fun Event.OrderSubmitted.toCommand(): RecordOrderExecutionEventCommand.S
         strategyExecutionId = strategyExecutionId,
         orderIntentId = orderIntentId,
         brokerOrderId = brokerOrderId,
+        side = side.toDomainOrNull(),
+        orderTag = orderTag.ifBlank { null },
+        quantity = quantity.takeIf { it > 0 },
         submittedAt = submittedAt.toZonedDateTime(),
     )
 }
@@ -216,6 +231,50 @@ private fun Event.OrderIntentSide.toDomain(): OrderSide {
         Event.OrderIntentSide.ORDER_INTENT_SELL -> OrderSide.SELL
         Event.OrderIntentSide.ORDER_INTENT_SIDE_UNDEFINED,
         Event.OrderIntentSide.UNRECOGNIZED -> throw IllegalArgumentException("unsupported order side: $this")
+    }
+}
+
+private fun Event.OrderIntentSide.toDomainOrNull(): OrderSide? {
+    return when (this) {
+        Event.OrderIntentSide.ORDER_INTENT_BUY -> OrderSide.BUY
+        Event.OrderIntentSide.ORDER_INTENT_SELL -> OrderSide.SELL
+        Event.OrderIntentSide.ORDER_INTENT_SIDE_UNDEFINED,
+        Event.OrderIntentSide.UNRECOGNIZED -> null
+    }
+}
+
+private fun Event.LaorOrderMilestoneDetected.toCommand(): SignalLaorOrderMilestoneCommand {
+    return SignalLaorOrderMilestoneCommand(
+        eventId = eventId,
+        milestoneType = milestoneType.toSignalName(),
+        strategyExecutionId = strategyExecutionId,
+        orderIntentId = orderIntentId,
+        brokerOrderId = brokerOrderId.ifBlank { null },
+        orderTag = orderTag.ifBlank { null },
+        side = side.toDomainOrNull(),
+        filledQuantity = filledQuantity,
+        averageFilledPrice = averageFilledPrice.takeIf { it > 0.0 },
+        occurredAt = occurredAt.toZonedDateTime(),
+        sourceEventIds = sourceEventIdsList,
+        idempotencyKey = idempotencyKey.ifBlank { eventId },
+    )
+}
+
+private fun Event.LaorOrderMilestoneType.toSignalName(): String {
+    return when (this) {
+        Event.LaorOrderMilestoneType.ENTRY_BUY_SUBMITTED,
+        Event.LaorOrderMilestoneType.ENTRY_BUY_PARTIALLY_FILLED,
+        Event.LaorOrderMilestoneType.ENTRY_BUY_FILLED,
+        Event.LaorOrderMilestoneType.EXIT_SELL_SUBMITTED,
+        Event.LaorOrderMilestoneType.EXIT_SELL_PARTIALLY_FILLED,
+        Event.LaorOrderMilestoneType.EXIT_SELL_FILLED,
+        Event.LaorOrderMilestoneType.ORDER_REJECTED,
+        Event.LaorOrderMilestoneType.ORDER_CANCELLED,
+        Event.LaorOrderMilestoneType.ORDER_FILL_TIMEOUT_DETECTED -> name
+        Event.LaorOrderMilestoneType.LAOR_ORDER_MILESTONE_TYPE_UNDEFINED,
+        Event.LaorOrderMilestoneType.UNRECOGNIZED -> {
+            throw IllegalArgumentException("unsupported laor order milestone type: $this")
+        }
     }
 }
 

@@ -266,6 +266,9 @@ class SubmitOrderIntentService(
             strategyExecutionId = strategyExecutionId,
             orderIntentId = eventId.toString(),
             brokerOrderId = checkNotNull(submission.externalOrderId),
+            side = side,
+            orderTag = orderTag,
+            quantity = quantity,
             submittedAt = submission.submittedAt,
         )
     }

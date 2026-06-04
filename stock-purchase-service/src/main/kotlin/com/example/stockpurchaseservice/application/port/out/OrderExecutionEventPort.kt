@@ -17,6 +17,9 @@ data class OrderSubmittedMessage(
     val strategyExecutionId: String,
     val orderIntentId: String,
     val brokerOrderId: String,
+    val side: OrderIntentSide,
+    val orderTag: String,
+    val quantity: Long,
     val submittedAt: ZonedDateTime,
 )
 

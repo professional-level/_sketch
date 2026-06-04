@@ -39,6 +39,9 @@ private fun RecordOrderExecutionEventCommand.toRecord(): StrategyExecutionOrderE
             orderIntentId = orderIntentId,
             brokerOrderId = brokerOrderId,
             type = StrategyExecutionOrderEventType.SUBMITTED,
+            side = side,
+            quantity = quantity,
+            orderTag = orderTag,
             occurredAt = submittedAt,
         )
 

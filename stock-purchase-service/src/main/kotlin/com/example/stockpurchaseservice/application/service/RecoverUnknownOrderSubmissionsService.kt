@@ -364,6 +364,9 @@ class RecoverUnknownOrderSubmissionsService(
             strategyExecutionId = strategyExecutionId,
             orderIntentId = orderIntentId.toString(),
             brokerOrderId = checkNotNull(externalOrderId),
+            side = side,
+            orderTag = orderTag,
+            quantity = quantity,
             submittedAt = lastStatusCheckedAt ?: ZonedDateTime.now(),
         )
     }

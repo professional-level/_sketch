@@ -49,6 +49,9 @@ class OrderSubmittedEventDeserializer : OrderExecutionEventDeserializer() {
             strategyExecutionId = event.strategyExecutionId,
             orderIntentId = event.orderIntentId,
             brokerOrderId = event.brokerOrderId.ifBlank { null },
+            side = event.side.toDomainSide(),
+            orderTag = event.orderTag.ifBlank { null },
+            expectedQuantity = event.quantity.takeIf { it > 0 },
             occurredAt = event.submittedAt.toZonedDateTime(),
         )
     }

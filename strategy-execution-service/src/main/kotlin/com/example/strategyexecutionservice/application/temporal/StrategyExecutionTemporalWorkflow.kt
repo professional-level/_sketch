@@ -2,6 +2,7 @@ package com.example.strategyexecutionservice.application.temporal
 
 import io.temporal.activity.ActivityOptions
 import io.temporal.common.RetryOptions
+import io.temporal.workflow.SignalMethod
 import io.temporal.workflow.Workflow
 import io.temporal.workflow.WorkflowInterface
 import io.temporal.workflow.WorkflowMethod
@@ -21,9 +22,13 @@ interface StrategyExecutionTemporalWorkflow {
 
     @WorkflowMethod(name = RUN_LAOR_V4_STRATEGY_WORKFLOW_TYPE)
     fun runLaorV4Strategy(input: RunLaorV4StrategyWorkflowInput): RunLaorV4StrategyWorkflowResult
+
+    @SignalMethod(name = LAOR_ORDER_MILESTONE_SIGNAL_NAME)
+    fun onLaorOrderMilestone(signal: LaorOrderMilestoneWorkflowSignal)
 }
 
 class StrategyExecutionTemporalWorkflowImpl : StrategyExecutionTemporalWorkflow {
+    private val orderMilestoneSignals: MutableList<LaorOrderMilestoneWorkflowSignal> = mutableListOf()
     private val activities: StrategyExecutionTemporalActivities = Workflow.newActivityStub(
         StrategyExecutionTemporalActivities::class.java,
         ActivityOptions.newBuilder()
@@ -62,6 +67,10 @@ class StrategyExecutionTemporalWorkflowImpl : StrategyExecutionTemporalWorkflow 
                 ),
             ),
         )
+    }
+
+    override fun onLaorOrderMilestone(signal: LaorOrderMilestoneWorkflowSignal) {
+        orderMilestoneSignals += signal
     }
 }
 

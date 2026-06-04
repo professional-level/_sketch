@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: stream-processing-flink-state
+  namespace: trading
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: flink.apache.org/v1beta1
+kind: FlinkDeployment
+metadata:
+  name: stream-processing-service-laor-order-lifecycle
+  namespace: trading
+spec:
+  image: refinedstone/akra-stream-processing-service:REPLACE_ME
+  flinkVersion: v1_19
+  serviceAccount: flink
+  flinkConfiguration:
+    taskmanager.numberOfTaskSlots: "2"
+    execution.checkpointing.interval: "10s"
+    state.checkpoints.dir: file:///flink-data/checkpoints
+    state.savepoints.dir: file:///flink-data/savepoints
+    high-availability: org.apache.flink.kubernetes.highavailability.KubernetesHaServicesFactory
+    high-availability.storageDir: file:///flink-data/ha
+  podTemplate:
+    spec:
+      containers:
+        - name: flink-main-container
+          env:
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: kafka-0.kafka.trading-infra.svc.cluster.local:9092,kafka-1.kafka.trading-infra.svc.cluster.local:9092,kafka-2.kafka.trading-infra.svc.cluster.local:9092
+            - name: LAOR_FLINK_GROUP_ID
+              value: stream-processing-service-laor-order-lifecycle
+            - name: LAOR_FLINK_CHECKPOINT_INTERVAL_MS
+              value: "10000"
+            - name: LAOR_FLINK_CHECKPOINT_STORAGE_PATH
+              value: file:///flink-data/checkpoints
+            - name: LAOR_FLINK_ALLOWED_LATENESS_SECONDS
+              value: "30"
+            - name: LAOR_FILL_TIMEOUT_MS
+              value: "1800000"
+            - name: LAOR_FLINK_PROCESSED_EVENT_TTL_MS
+              value: "604800000"
+          volumeMounts:
+            - mountPath: /flink-data
+              name: flink-state
+      volumes:
+        - name: flink-state
+          persistentVolumeClaim:
+            claimName: stream-processing-flink-state
+  jobManager:
+    resource:
+      memory: "2048m"
+      cpu: 1
+  taskManager:
+    resource:
+      memory: "2048m"
+      cpu: 1
+  job:
+    jarURI: local:///opt/flink/usrlib/stream-processing-service.jar
+    entryClass: com.example.streamprocessingservice.laor.OrderLifecycleJobKt
+    parallelism: 2
+    upgradeMode: savepoint
+    state: running
