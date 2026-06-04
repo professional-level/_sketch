@@ -10,10 +10,10 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
 
-class LaorOrderLifecycleProcessFunction(
+class OrderLifecycleProcessFunction(
     fillTimeoutMillis: Long,
-) : KeyedProcessFunction<String, LaorOrderExecutionEvent, LaorMilestoneEnvelope>() {
-    private val processor = LaorOrderLifecycleProcessor(Duration.ofMillis(fillTimeoutMillis))
+) : KeyedProcessFunction<String, OrderExecutionEvent, LifecycleEventEnvelope>() {
+    private val processor = OrderLifecycleProcessor(Duration.ofMillis(fillTimeoutMillis))
 
     private lateinit var orderStates: MapState<String, OrderLifecycleState>
     private lateinit var processedEvents: MapState<String, Boolean>
@@ -44,9 +44,9 @@ class LaorOrderLifecycleProcessFunction(
     }
 
     override fun processElement(
-        value: LaorOrderExecutionEvent,
+        value: OrderExecutionEvent,
         ctx: Context,
-        out: Collector<LaorMilestoneEnvelope>,
+        out: Collector<LifecycleEventEnvelope>,
     ) {
         if (processedEvents.contains(value.eventId)) return
 
@@ -64,7 +64,7 @@ class LaorOrderLifecycleProcessFunction(
     override fun onTimer(
         timestamp: Long,
         ctx: OnTimerContext,
-        out: Collector<LaorMilestoneEnvelope>,
+        out: Collector<LifecycleEventEnvelope>,
     ) {
         val expiredOrderIntentIds = timeoutTimers.entries()
             .filter { it.value == timestamp }

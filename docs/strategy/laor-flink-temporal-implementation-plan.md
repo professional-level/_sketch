@@ -142,13 +142,13 @@ strategy-execution-service
 stream-processing-service
   src/main/kotlin/com/example/streamprocessingservice/laor
     application/
-      LaorOrderLifecycleJob.kt
-      LaorOrderLifecycleState.kt
-      LaorMilestoneMapper.kt
+      OrderLifecycleJob.kt
+      OrderLifecycleState.kt
+      OrderLifecycleProcessor.kt
     adapter/in/kafka/
       OrderExecutionEventDeserializer.kt
     adapter/out/kafka/
-      LaorMilestoneEventSerializer.kt
+      OrderLifecycleEventSerializer.kt
 ```
 
 운영 배포 단위:
@@ -194,7 +194,7 @@ Keying rule:
 Flink job은 `strategyExecutionId`로 keyBy 후, 주문별 state를 보관한다.
 
 ```text
-ValueState<LaorExecutionLifecycleState>
+ValueState<OrderLifecycleState>
 MapState<orderIntentId, OrderLifecycleState>
 MapState<eventId, ProcessedEventMarker>
 ```

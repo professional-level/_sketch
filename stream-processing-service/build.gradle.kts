@@ -33,7 +33,7 @@ dependencies {
 }
 
 application {
-    mainClass.set("com.example.streamprocessingservice.laor.LaorOrderLifecycleJobKt")
+    mainClass.set("com.example.streamprocessingservice.laor.OrderLifecycleJobKt")
 }
 
 kotlin {

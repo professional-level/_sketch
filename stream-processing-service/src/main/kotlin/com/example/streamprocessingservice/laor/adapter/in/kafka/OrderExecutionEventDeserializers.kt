@@ -1,8 +1,8 @@
 package com.example.streamprocessingservice.laor.adapter.`in`.kafka
 
 import Event
-import com.example.streamprocessingservice.laor.application.LaorOrderExecutionEvent
-import com.example.streamprocessingservice.laor.application.LaorOrderSide
+import com.example.streamprocessingservice.laor.application.OrderExecutionEvent
+import com.example.streamprocessingservice.laor.application.OrderSide
 import com.example.streamprocessingservice.laor.application.OrderExecutionEventType
 import com.example.streamprocessingservice.laor.application.StrategyExecutionKind
 import common.proto.ProtoUtils.toZonedDateTime
@@ -11,18 +11,18 @@ import org.apache.flink.api.common.typeinfo.TypeInformation
 import java.nio.charset.StandardCharsets
 import java.util.UUID
 
-abstract class LaorOrderEventDeserializer : DeserializationSchema<LaorOrderExecutionEvent> {
-    override fun isEndOfStream(nextElement: LaorOrderExecutionEvent): Boolean = false
+abstract class OrderExecutionEventDeserializer : DeserializationSchema<OrderExecutionEvent> {
+    override fun isEndOfStream(nextElement: OrderExecutionEvent): Boolean = false
 
-    override fun getProducedType(): TypeInformation<LaorOrderExecutionEvent> {
-        return TypeInformation.of(LaorOrderExecutionEvent::class.java)
+    override fun getProducedType(): TypeInformation<OrderExecutionEvent> {
+        return TypeInformation.of(OrderExecutionEvent::class.java)
     }
 }
 
-class OrderIntentCreatedEventDeserializer : LaorOrderEventDeserializer() {
-    override fun deserialize(message: ByteArray): LaorOrderExecutionEvent {
+class OrderIntentCreatedEventDeserializer : OrderExecutionEventDeserializer() {
+    override fun deserialize(message: ByteArray): OrderExecutionEvent {
         val event = Event.OrderIntentCreatedEvent.parseFrom(message)
-        return LaorOrderExecutionEvent(
+        return OrderExecutionEvent(
             eventId = event.eventId.ifBlank {
                 deterministicFallbackId(event.strategyExecutionId, event.orderTag, event.createdAt.seconds, event.createdAt.nanos)
             },
@@ -40,10 +40,10 @@ class OrderIntentCreatedEventDeserializer : LaorOrderEventDeserializer() {
     }
 }
 
-class OrderSubmittedEventDeserializer : LaorOrderEventDeserializer() {
-    override fun deserialize(message: ByteArray): LaorOrderExecutionEvent {
+class OrderSubmittedEventDeserializer : OrderExecutionEventDeserializer() {
+    override fun deserialize(message: ByteArray): OrderExecutionEvent {
         val event = Event.OrderSubmitted.parseFrom(message)
-        return LaorOrderExecutionEvent(
+        return OrderExecutionEvent(
             eventId = event.eventId,
             type = OrderExecutionEventType.SUBMITTED,
             strategyExecutionId = event.strategyExecutionId,
@@ -54,10 +54,10 @@ class OrderSubmittedEventDeserializer : LaorOrderEventDeserializer() {
     }
 }
 
-class OrderPartiallyFilledEventDeserializer : LaorOrderEventDeserializer() {
-    override fun deserialize(message: ByteArray): LaorOrderExecutionEvent {
+class OrderPartiallyFilledEventDeserializer : OrderExecutionEventDeserializer() {
+    override fun deserialize(message: ByteArray): OrderExecutionEvent {
         val event = Event.OrderPartiallyFilled.parseFrom(message)
-        return LaorOrderExecutionEvent(
+        return OrderExecutionEvent(
             eventId = event.eventId,
             type = OrderExecutionEventType.PARTIALLY_FILLED,
             strategyExecutionId = event.strategyExecutionId,
@@ -72,10 +72,10 @@ class OrderPartiallyFilledEventDeserializer : LaorOrderEventDeserializer() {
     }
 }
 
-class OrderFilledEventDeserializer : LaorOrderEventDeserializer() {
-    override fun deserialize(message: ByteArray): LaorOrderExecutionEvent {
+class OrderFilledEventDeserializer : OrderExecutionEventDeserializer() {
+    override fun deserialize(message: ByteArray): OrderExecutionEvent {
         val event = Event.OrderFilled.parseFrom(message)
-        return LaorOrderExecutionEvent(
+        return OrderExecutionEvent(
             eventId = event.eventId,
             type = OrderExecutionEventType.FILLED,
             strategyExecutionId = event.strategyExecutionId,
@@ -90,10 +90,10 @@ class OrderFilledEventDeserializer : LaorOrderEventDeserializer() {
     }
 }
 
-class OrderRejectedEventDeserializer : LaorOrderEventDeserializer() {
-    override fun deserialize(message: ByteArray): LaorOrderExecutionEvent {
+class OrderRejectedEventDeserializer : OrderExecutionEventDeserializer() {
+    override fun deserialize(message: ByteArray): OrderExecutionEvent {
         val event = Event.OrderRejected.parseFrom(message)
-        return LaorOrderExecutionEvent(
+        return OrderExecutionEvent(
             eventId = event.eventId,
             type = OrderExecutionEventType.REJECTED,
             strategyExecutionId = event.strategyExecutionId,
@@ -105,10 +105,10 @@ class OrderRejectedEventDeserializer : LaorOrderEventDeserializer() {
     }
 }
 
-class OrderCancelledEventDeserializer : LaorOrderEventDeserializer() {
-    override fun deserialize(message: ByteArray): LaorOrderExecutionEvent {
+class OrderCancelledEventDeserializer : OrderExecutionEventDeserializer() {
+    override fun deserialize(message: ByteArray): OrderExecutionEvent {
         val event = Event.OrderCancelled.parseFrom(message)
-        return LaorOrderExecutionEvent(
+        return OrderExecutionEvent(
             eventId = event.eventId,
             type = OrderExecutionEventType.CANCELLED,
             strategyExecutionId = event.strategyExecutionId,
@@ -120,12 +120,12 @@ class OrderCancelledEventDeserializer : LaorOrderEventDeserializer() {
     }
 }
 
-private fun Event.OrderIntentSide.toDomainSide(): LaorOrderSide {
+private fun Event.OrderIntentSide.toDomainSide(): OrderSide {
     return when (this) {
-        Event.OrderIntentSide.ORDER_INTENT_BUY -> LaorOrderSide.BUY
-        Event.OrderIntentSide.ORDER_INTENT_SELL -> LaorOrderSide.SELL
+        Event.OrderIntentSide.ORDER_INTENT_BUY -> OrderSide.BUY
+        Event.OrderIntentSide.ORDER_INTENT_SELL -> OrderSide.SELL
         Event.OrderIntentSide.ORDER_INTENT_SIDE_UNDEFINED,
-        Event.OrderIntentSide.UNRECOGNIZED -> LaorOrderSide.UNKNOWN
+        Event.OrderIntentSide.UNRECOGNIZED -> OrderSide.UNKNOWN
     }
 }
 

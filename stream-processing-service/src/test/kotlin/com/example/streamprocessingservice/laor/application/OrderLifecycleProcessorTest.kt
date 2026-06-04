@@ -6,13 +6,13 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import java.time.ZonedDateTime
 
-class LaorOrderLifecycleProcessorTest {
-    private val processor = LaorOrderLifecycleProcessor()
+class OrderLifecycleProcessorTest {
+    private val processor = OrderLifecycleProcessor()
     private val baseTime = ZonedDateTime.parse("2026-06-04T09:30:00-04:00")
 
     @Test
     fun `emits buy submitted partial and filled milestones`() {
-        val intent = orderIntent(side = LaorOrderSide.BUY, quantity = 10)
+        val intent = orderIntent(side = OrderSide.BUY, quantity = 10)
         val submitted = submitted()
         val partial = partialFill(quantity = 4, price = 100.0)
         val filled = filled(quantity = 6, price = 110.0)
@@ -23,9 +23,9 @@ class LaorOrderLifecycleProcessorTest {
         val afterFilled = processor.process(filled, afterPartial.state)
 
         assertEquals(emptyList(), afterIntent.outputs)
-        assertEquals(LaorMilestoneType.ENTRY_BUY_SUBMITTED, afterSubmitted.outputs.single().milestone?.milestoneType)
-        assertEquals(LaorMilestoneType.ENTRY_BUY_PARTIALLY_FILLED, afterPartial.outputs.single().milestone?.milestoneType)
-        assertEquals(LaorMilestoneType.ENTRY_BUY_FILLED, afterFilled.outputs.single().milestone?.milestoneType)
+        assertEquals(MilestoneType.ENTRY_BUY_SUBMITTED, afterSubmitted.outputs.single().milestone?.milestoneType)
+        assertEquals(MilestoneType.ENTRY_BUY_PARTIALLY_FILLED, afterPartial.outputs.single().milestone?.milestoneType)
+        assertEquals(MilestoneType.ENTRY_BUY_FILLED, afterFilled.outputs.single().milestone?.milestoneType)
         assertEquals(10, afterFilled.state.filledQuantity)
         assertEquals(106.0, afterFilled.state.averageFilledPrice)
         assertEquals(OrderTerminalStatus.FILLED, afterFilled.state.terminalStatus)
@@ -33,15 +33,15 @@ class LaorOrderLifecycleProcessorTest {
 
     @Test
     fun `emits anomaly when fill arrives before submitted event`() {
-        val intent = orderIntent(side = LaorOrderSide.SELL, quantity = 3, orderTag = "TARGET_SELL")
-        val fill = filled(quantity = 3, price = 120.0, side = LaorOrderSide.SELL, orderTag = "TARGET_SELL")
+        val intent = orderIntent(side = OrderSide.SELL, quantity = 3, orderTag = "TARGET_SELL")
+        val fill = filled(quantity = 3, price = 120.0, side = OrderSide.SELL, orderTag = "TARGET_SELL")
 
         val afterIntent = processor.process(intent, null)
         val afterFill = processor.process(fill, afterIntent.state)
 
         assertEquals(2, afterFill.outputs.size)
-        assertEquals(LaorAnomalyType.FILL_BEFORE_SUBMIT, afterFill.outputs.first().anomaly?.anomalyType)
-        assertEquals(LaorMilestoneType.EXIT_SELL_FILLED, afterFill.outputs.last().milestone?.milestoneType)
+        assertEquals(AnomalyType.FILL_BEFORE_SUBMIT, afterFill.outputs.first().anomaly?.anomalyType)
+        assertEquals(MilestoneType.EXIT_SELL_FILLED, afterFill.outputs.last().milestone?.milestoneType)
     }
 
     @Test
@@ -54,7 +54,7 @@ class LaorOrderLifecycleProcessorTest {
         val lateResult = processor.process(lateFill, afterFilled.state)
 
         assertEquals(
-            listOf(LaorAnomalyType.DUPLICATE_TERMINAL_EVENT, LaorAnomalyType.LATE_EVENT_AFTER_TERMINAL),
+            listOf(AnomalyType.DUPLICATE_TERMINAL_EVENT, AnomalyType.LATE_EVENT_AFTER_TERMINAL),
             lateResult.outputs.mapNotNull { it.anomaly?.anomalyType },
         )
         assertEquals(OrderTerminalStatus.FILLED, lateResult.state.terminalStatus)
@@ -63,12 +63,12 @@ class LaorOrderLifecycleProcessorTest {
     @Test
     fun `defers submitted milestone until late order intent metadata supplies side`() {
         val submittedBeforeIntent = processor.process(submitted(), null)
-        val lateIntent = orderIntent(side = LaorOrderSide.SELL, orderTag = "TARGET_SELL")
+        val lateIntent = orderIntent(side = OrderSide.SELL, orderTag = "TARGET_SELL")
         val afterIntent = processor.process(lateIntent, submittedBeforeIntent.state)
 
         assertEquals(1, submittedBeforeIntent.outputs.size)
-        assertEquals(LaorAnomalyType.UNKNOWN_ORDER_INTENT, submittedBeforeIntent.outputs.single().anomaly?.anomalyType)
-        assertEquals(LaorMilestoneType.EXIT_SELL_SUBMITTED, afterIntent.outputs.single().milestone?.milestoneType)
+        assertEquals(AnomalyType.UNKNOWN_ORDER_INTENT, submittedBeforeIntent.outputs.single().anomaly?.anomalyType)
+        assertEquals(MilestoneType.EXIT_SELL_SUBMITTED, afterIntent.outputs.single().milestone?.milestoneType)
         assertEquals(listOf("submitted-1", "intent-1"), afterIntent.outputs.single().milestone?.sourceEventIds)
     }
 
@@ -90,7 +90,7 @@ class LaorOrderLifecycleProcessorTest {
         val firstSubmitted = processor.process(submitted(), afterIntent.state)
         val repeatedSubmitted = processor.process(submitted(eventId = "submitted-2"), firstSubmitted.state)
 
-        assertEquals(LaorMilestoneType.ENTRY_BUY_SUBMITTED, firstSubmitted.outputs.single().milestone?.milestoneType)
+        assertEquals(MilestoneType.ENTRY_BUY_SUBMITTED, firstSubmitted.outputs.single().milestone?.milestoneType)
         assertEquals(emptyList(), repeatedSubmitted.outputs)
     }
 
@@ -102,7 +102,7 @@ class LaorOrderLifecycleProcessorTest {
         val timeout = processor.timeout(afterSubmitted.state, baseTime.plusMinutes(31))
 
         assertNotNull(timeout)
-        assertEquals(LaorMilestoneType.ORDER_FILL_TIMEOUT_DETECTED, timeout.milestone?.milestoneType)
+        assertEquals(MilestoneType.ORDER_FILL_TIMEOUT_DETECTED, timeout.milestone?.milestoneType)
     }
 
     @Test
@@ -112,16 +112,16 @@ class LaorOrderLifecycleProcessorTest {
         val afterPartial = processor.process(partialFill(quantity = 4, price = 100.0), afterSubmitted.state)
         val afterFilled = processor.process(filled(quantity = 3, price = 100.0), afterPartial.state)
 
-        assertTrue(afterFilled.outputs.any { it.anomaly?.anomalyType == LaorAnomalyType.FILLED_QUANTITY_EXCEEDS_EXPECTED })
+        assertTrue(afterFilled.outputs.any { it.anomaly?.anomalyType == AnomalyType.FILLED_QUANTITY_EXCEEDS_EXPECTED })
     }
 
     private fun orderIntent(
-        side: LaorOrderSide = LaorOrderSide.BUY,
+        side: OrderSide = OrderSide.BUY,
         quantity: Long = 10,
         orderTag: String = "FIRST_BUY",
         strategyKind: StrategyExecutionKind = StrategyExecutionKind.LAOR_V4,
-    ): LaorOrderExecutionEvent {
-        return LaorOrderExecutionEvent(
+    ): OrderExecutionEvent {
+        return OrderExecutionEvent(
             eventId = "intent-1",
             type = OrderExecutionEventType.INTENT_CREATED,
             strategyExecutionId = "laor-v4:TQQQ",
@@ -134,8 +134,8 @@ class LaorOrderLifecycleProcessorTest {
         )
     }
 
-    private fun submitted(eventId: String = "submitted-1"): LaorOrderExecutionEvent {
-        return LaorOrderExecutionEvent(
+    private fun submitted(eventId: String = "submitted-1"): OrderExecutionEvent {
+        return OrderExecutionEvent(
             eventId = eventId,
             type = OrderExecutionEventType.SUBMITTED,
             strategyExecutionId = "laor-v4:TQQQ",
@@ -149,10 +149,10 @@ class LaorOrderLifecycleProcessorTest {
         eventId: String = "partial-1",
         quantity: Long,
         price: Double,
-        side: LaorOrderSide = LaorOrderSide.BUY,
+        side: OrderSide = OrderSide.BUY,
         orderTag: String = "FIRST_BUY",
-    ): LaorOrderExecutionEvent {
-        return LaorOrderExecutionEvent(
+    ): OrderExecutionEvent {
+        return OrderExecutionEvent(
             eventId = eventId,
             type = OrderExecutionEventType.PARTIALLY_FILLED,
             strategyExecutionId = "laor-v4:TQQQ",
@@ -170,10 +170,10 @@ class LaorOrderLifecycleProcessorTest {
         eventId: String = "filled-1",
         quantity: Long,
         price: Double,
-        side: LaorOrderSide = LaorOrderSide.BUY,
+        side: OrderSide = OrderSide.BUY,
         orderTag: String = "FIRST_BUY",
-    ): LaorOrderExecutionEvent {
-        return LaorOrderExecutionEvent(
+    ): OrderExecutionEvent {
+        return OrderExecutionEvent(
             eventId = eventId,
             type = OrderExecutionEventType.FILLED,
             strategyExecutionId = "laor-v4:TQQQ",

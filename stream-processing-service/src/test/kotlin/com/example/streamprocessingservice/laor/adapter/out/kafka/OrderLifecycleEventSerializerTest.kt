@@ -1,28 +1,28 @@
 package com.example.streamprocessingservice.laor.adapter.out.kafka
 
 import Event
-import com.example.streamprocessingservice.laor.application.LaorAnomalyEvent
-import com.example.streamprocessingservice.laor.application.LaorAnomalyType
-import com.example.streamprocessingservice.laor.application.LaorMilestoneEvent
-import com.example.streamprocessingservice.laor.application.LaorMilestoneEnvelope
-import com.example.streamprocessingservice.laor.application.LaorMilestoneType
-import com.example.streamprocessingservice.laor.application.LaorOrderSide
+import com.example.streamprocessingservice.laor.application.AnomalyEvent
+import com.example.streamprocessingservice.laor.application.AnomalyType
+import com.example.streamprocessingservice.laor.application.MilestoneEvent
+import com.example.streamprocessingservice.laor.application.LifecycleEventEnvelope
+import com.example.streamprocessingservice.laor.application.MilestoneType
+import com.example.streamprocessingservice.laor.application.OrderSide
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import java.time.ZonedDateTime
 
-class LaorMilestoneEventSerializerTest {
+class OrderLifecycleEventSerializerTest {
     @Test
     fun `serializes milestone envelope to protobuf`() {
-        val serializer = LaorMilestoneEventSerializer()
-        val event = LaorMilestoneEvent(
+        val serializer = OrderLifecycleEventSerializer()
+        val event = MilestoneEvent(
             eventId = "milestone-1",
-            milestoneType = LaorMilestoneType.ENTRY_BUY_FILLED,
+            milestoneType = MilestoneType.ENTRY_BUY_FILLED,
             strategyExecutionId = "laor-v4:TQQQ",
             orderIntentId = "intent-1",
             brokerOrderId = "broker-1",
             orderTag = "FIRST_BUY",
-            side = LaorOrderSide.BUY,
+            side = OrderSide.BUY,
             filledQuantity = 10,
             averageFilledPrice = 100.5,
             occurredAt = ZonedDateTime.parse("2026-06-04T09:30:00-04:00"),
@@ -31,7 +31,7 @@ class LaorMilestoneEventSerializerTest {
         )
 
         val proto = Event.LaorOrderMilestoneDetected.parseFrom(
-            serializer.serialize(LaorMilestoneEnvelope(milestone = event)),
+            serializer.serialize(LifecycleEventEnvelope(milestone = event)),
         )
 
         assertEquals("milestone-1", proto.eventId)
@@ -45,15 +45,15 @@ class LaorMilestoneEventSerializerTest {
 
     @Test
     fun `serializes anomaly envelope to protobuf`() {
-        val serializer = LaorMilestoneEventSerializer()
-        val event = LaorAnomalyEvent(
+        val serializer = OrderLifecycleEventSerializer()
+        val event = AnomalyEvent(
             eventId = "anomaly-1",
-            anomalyType = LaorAnomalyType.FILL_BEFORE_SUBMIT,
+            anomalyType = AnomalyType.FILL_BEFORE_SUBMIT,
             strategyExecutionId = "laor-v4:TQQQ",
             orderIntentId = "intent-1",
             brokerOrderId = "broker-1",
             orderTag = "FIRST_BUY",
-            side = LaorOrderSide.BUY,
+            side = OrderSide.BUY,
             reason = "fill arrived before submitted event",
             occurredAt = ZonedDateTime.parse("2026-06-04T09:30:00-04:00"),
             sourceEventIds = listOf("fill-1"),
@@ -61,7 +61,7 @@ class LaorMilestoneEventSerializerTest {
         )
 
         val proto = Event.LaorOrderAnomalyDetected.parseFrom(
-            serializer.serialize(LaorMilestoneEnvelope(anomaly = event)),
+            serializer.serialize(LifecycleEventEnvelope(anomaly = event)),
         )
 
         assertEquals("anomaly-1", proto.eventId)

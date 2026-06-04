@@ -14,7 +14,7 @@ enum class OrderExecutionEventType {
     CANCELLED,
 }
 
-enum class LaorOrderSide {
+enum class OrderSide {
     BUY,
     SELL,
     UNKNOWN,
@@ -33,7 +33,7 @@ enum class StrategyExecutionKind {
     UNKNOWN,
 }
 
-enum class LaorMilestoneType {
+enum class MilestoneType {
     ENTRY_BUY_SUBMITTED,
     ENTRY_BUY_PARTIALLY_FILLED,
     ENTRY_BUY_FILLED,
@@ -45,7 +45,7 @@ enum class LaorMilestoneType {
     ORDER_FILL_TIMEOUT_DETECTED,
 }
 
-enum class LaorAnomalyType {
+enum class AnomalyType {
     FILL_BEFORE_SUBMIT,
     DUPLICATE_TERMINAL_EVENT,
     FILLED_QUANTITY_EXCEEDS_EXPECTED,
@@ -54,14 +54,14 @@ enum class LaorAnomalyType {
     LATE_EVENT_AFTER_TERMINAL,
 }
 
-data class LaorOrderExecutionEvent(
+data class OrderExecutionEvent(
     val eventId: String,
     val type: OrderExecutionEventType,
     val strategyExecutionId: String,
     val orderIntentId: String,
     val brokerOrderId: String? = null,
     val strategyKind: StrategyExecutionKind = StrategyExecutionKind.UNKNOWN,
-    val side: LaorOrderSide = LaorOrderSide.UNKNOWN,
+    val side: OrderSide = OrderSide.UNKNOWN,
     val orderTag: String? = null,
     val expectedQuantity: Long? = null,
     val filledPrice: Double? = null,
@@ -85,7 +85,7 @@ data class OrderLifecycleState(
     val strategyExecutionId: String = "",
     val orderTag: String? = null,
     val strategyKind: StrategyExecutionKind = StrategyExecutionKind.UNKNOWN,
-    val side: LaorOrderSide = LaorOrderSide.UNKNOWN,
+    val side: OrderSide = OrderSide.UNKNOWN,
     val expectedQuantity: Long? = null,
     val submitted: Boolean = false,
     val submittedAt: ZonedDateTime? = null,
@@ -101,14 +101,14 @@ data class OrderLifecycleState(
     fun hasTerminalStatus(): Boolean = terminalStatus != null
 }
 
-data class LaorMilestoneEvent(
+data class MilestoneEvent(
     val eventId: String,
-    val milestoneType: LaorMilestoneType,
+    val milestoneType: MilestoneType,
     val strategyExecutionId: String,
     val orderIntentId: String,
     val brokerOrderId: String?,
     val orderTag: String?,
-    val side: LaorOrderSide,
+    val side: OrderSide,
     val filledQuantity: Long,
     val averageFilledPrice: Double?,
     val occurredAt: ZonedDateTime,
@@ -116,23 +116,23 @@ data class LaorMilestoneEvent(
     val idempotencyKey: String,
 ) : Serializable
 
-data class LaorAnomalyEvent(
+data class AnomalyEvent(
     val eventId: String,
-    val anomalyType: LaorAnomalyType,
+    val anomalyType: AnomalyType,
     val strategyExecutionId: String,
     val orderIntentId: String,
     val brokerOrderId: String?,
     val orderTag: String?,
-    val side: LaorOrderSide,
+    val side: OrderSide,
     val reason: String,
     val occurredAt: ZonedDateTime,
     val sourceEventIds: List<String>,
     val idempotencyKey: String,
 ) : Serializable
 
-data class LaorMilestoneEnvelope(
-    val milestone: LaorMilestoneEvent? = null,
-    val anomaly: LaorAnomalyEvent? = null,
+data class LifecycleEventEnvelope(
+    val milestone: MilestoneEvent? = null,
+    val anomaly: AnomalyEvent? = null,
 ) : Serializable {
     init {
         require((milestone == null) xor (anomaly == null)) {
@@ -147,9 +147,9 @@ data class LaorMilestoneEnvelope(
         get() = anomaly != null
 }
 
-data class LaorProcessingResult(
+data class ProcessingResult(
     val state: OrderLifecycleState,
-    val outputs: List<LaorMilestoneEnvelope> = emptyList(),
+    val outputs: List<LifecycleEventEnvelope> = emptyList(),
     val timeoutAtEpochMillis: Long? = null,
 ) : Serializable
 

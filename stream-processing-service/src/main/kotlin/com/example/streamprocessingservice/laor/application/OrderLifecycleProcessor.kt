@@ -3,27 +3,27 @@ package com.example.streamprocessingservice.laor.application
 import java.time.Duration
 import java.time.ZonedDateTime
 
-class LaorOrderLifecycleProcessor(
+class OrderLifecycleProcessor(
     private val fillTimeout: Duration = Duration.ofMinutes(DEFAULT_FILL_TIMEOUT_MINUTES),
 ) {
     fun process(
-        event: LaorOrderExecutionEvent,
+        event: OrderExecutionEvent,
         current: OrderLifecycleState?,
-    ): LaorProcessingResult {
+    ): ProcessingResult {
         val initialState = current ?: event.initialState()
-        val outputs = mutableListOf<LaorMilestoneEnvelope>()
+        val outputs = mutableListOf<LifecycleEventEnvelope>()
 
         if (event.type == OrderExecutionEventType.INTENT_CREATED && event.strategyKind == StrategyExecutionKind.OTHER) {
-            return LaorProcessingResult(state = initialState.mergeIntent(event), outputs = emptyList())
+            return ProcessingResult(state = initialState.mergeIntent(event), outputs = emptyList())
         }
 
         if (initialState.strategyKind == StrategyExecutionKind.OTHER) {
-            return LaorProcessingResult(state = initialState.updateLastEvent(event), outputs = emptyList())
+            return ProcessingResult(state = initialState.updateLastEvent(event), outputs = emptyList())
         }
 
         if (current == null && event.type != OrderExecutionEventType.INTENT_CREATED) {
             outputs += anomaly(
-                type = LaorAnomalyType.UNKNOWN_ORDER_INTENT,
+                type = AnomalyType.UNKNOWN_ORDER_INTENT,
                 state = initialState,
                 event = event,
                 reason = "order execution event arrived before order intent metadata",
@@ -33,19 +33,19 @@ class LaorOrderLifecycleProcessor(
         if (initialState.hasTerminalStatus() && event.type != OrderExecutionEventType.INTENT_CREATED) {
             if (event.type.isTerminalEvent()) {
                 outputs += anomaly(
-                    type = LaorAnomalyType.DUPLICATE_TERMINAL_EVENT,
+                    type = AnomalyType.DUPLICATE_TERMINAL_EVENT,
                     state = initialState,
                     event = event,
                     reason = "terminal event arrived after terminal status ${initialState.terminalStatus}",
                 )
             }
             outputs += anomaly(
-                type = LaorAnomalyType.LATE_EVENT_AFTER_TERMINAL,
+                type = AnomalyType.LATE_EVENT_AFTER_TERMINAL,
                 state = initialState,
                 event = event,
                 reason = "event arrived after terminal status ${initialState.terminalStatus}",
             )
-            return LaorProcessingResult(state = initialState.updateLastEvent(event), outputs = outputs)
+            return ProcessingResult(state = initialState.updateLastEvent(event), outputs = outputs)
         }
 
         val brokerConflict = initialState.brokerOrderId != null &&
@@ -53,7 +53,7 @@ class LaorOrderLifecycleProcessor(
             initialState.brokerOrderId != event.brokerOrderId
         if (brokerConflict) {
             outputs += anomaly(
-                type = LaorAnomalyType.CONFLICTING_BROKER_ORDER_ID,
+                type = AnomalyType.CONFLICTING_BROKER_ORDER_ID,
                 state = initialState,
                 event = event,
                 reason = "broker order id changed from ${initialState.brokerOrderId} to ${event.brokerOrderId}",
@@ -66,12 +66,12 @@ class LaorOrderLifecycleProcessor(
                 if (state.shouldEmitDeferredSubmittedMilestone()) {
                     val sourceEventIds = listOfNotNull(state.submittedEventId, event.eventId)
                     outputs += submittedMilestone(state, sourceEventIds, event.occurredAt)
-                    LaorProcessingResult(
+                    ProcessingResult(
                         state = state.copy(submittedMilestoneEmitted = true),
                         outputs = outputs,
                     )
                 } else {
-                    LaorProcessingResult(
+                    ProcessingResult(
                         state = state,
                         outputs = outputs,
                     )
@@ -80,11 +80,11 @@ class LaorOrderLifecycleProcessor(
 
             OrderExecutionEventType.SUBMITTED -> {
                 val state = initialState.markSubmitted(event)
-                val shouldEmitMilestone = !initialState.submittedMilestoneEmitted && state.side != LaorOrderSide.UNKNOWN
+                val shouldEmitMilestone = !initialState.submittedMilestoneEmitted && state.side != OrderSide.UNKNOWN
                 if (shouldEmitMilestone) {
                     outputs += submittedMilestone(state, listOf(event.eventId), event.occurredAt)
                 }
-                LaorProcessingResult(
+                ProcessingResult(
                     state = state.copy(
                         submittedMilestoneEmitted = initialState.submittedMilestoneEmitted || shouldEmitMilestone,
                     ),
@@ -96,7 +96,7 @@ class LaorOrderLifecycleProcessor(
             OrderExecutionEventType.PARTIALLY_FILLED -> {
                 if (!initialState.submitted) {
                     outputs += anomaly(
-                        type = LaorAnomalyType.FILL_BEFORE_SUBMIT,
+                        type = AnomalyType.FILL_BEFORE_SUBMIT,
                         state = initialState,
                         event = event,
                         reason = "partial fill arrived before submitted event",
@@ -105,13 +105,13 @@ class LaorOrderLifecycleProcessor(
                 val state = initialState.addFill(event, terminal = false)
                 state.overfillAnomaly(event)?.let { outputs += it }
                 outputs += fillMilestone(state, event, partial = true)
-                LaorProcessingResult(state = state, outputs = outputs)
+                ProcessingResult(state = state, outputs = outputs)
             }
 
             OrderExecutionEventType.FILLED -> {
                 if (!initialState.submitted) {
                     outputs += anomaly(
-                        type = LaorAnomalyType.FILL_BEFORE_SUBMIT,
+                        type = AnomalyType.FILL_BEFORE_SUBMIT,
                         state = initialState,
                         event = event,
                         reason = "fill arrived before submitted event",
@@ -120,24 +120,24 @@ class LaorOrderLifecycleProcessor(
                 val state = initialState.addFill(event, terminal = true)
                 state.overfillAnomaly(event)?.let { outputs += it }
                 outputs += fillMilestone(state, event, partial = false)
-                LaorProcessingResult(state = state, outputs = outputs)
+                ProcessingResult(state = state, outputs = outputs)
             }
 
             OrderExecutionEventType.REJECTED -> {
                 val state = initialState.markTerminal(event, OrderTerminalStatus.REJECTED)
-                outputs += terminalMilestone(state, event, LaorMilestoneType.ORDER_REJECTED)
-                LaorProcessingResult(state = state, outputs = outputs)
+                outputs += terminalMilestone(state, event, MilestoneType.ORDER_REJECTED)
+                ProcessingResult(state = state, outputs = outputs)
             }
 
             OrderExecutionEventType.CANCELLED -> {
                 val state = initialState.markTerminal(event, OrderTerminalStatus.CANCELLED)
-                outputs += terminalMilestone(state, event, LaorMilestoneType.ORDER_CANCELLED)
-                LaorProcessingResult(state = state, outputs = outputs)
+                outputs += terminalMilestone(state, event, MilestoneType.ORDER_CANCELLED)
+                ProcessingResult(state = state, outputs = outputs)
             }
         }
     }
 
-    fun timeout(state: OrderLifecycleState, timeoutAt: ZonedDateTime): LaorMilestoneEnvelope? {
+    fun timeout(state: OrderLifecycleState, timeoutAt: ZonedDateTime): LifecycleEventEnvelope? {
         if (!state.submitted || state.hasTerminalStatus()) return null
 
         val timedOut = state.copy(
@@ -146,14 +146,14 @@ class LaorOrderLifecycleProcessor(
             lastEventAt = timeoutAt,
         )
         return milestone(
-            type = LaorMilestoneType.ORDER_FILL_TIMEOUT_DETECTED,
+            type = MilestoneType.ORDER_FILL_TIMEOUT_DETECTED,
             state = timedOut,
             sourceEventIds = listOf("timeout:${state.orderIntentId}:${timeoutAt.toInstant().toEpochMilli()}"),
             occurredAt = timeoutAt,
         )
     }
 
-    private fun LaorOrderExecutionEvent.initialState(): OrderLifecycleState {
+    private fun OrderExecutionEvent.initialState(): OrderLifecycleState {
         return OrderLifecycleState(
             orderIntentId = orderIntentId,
             strategyExecutionId = strategyExecutionId,
@@ -166,17 +166,17 @@ class LaorOrderLifecycleProcessor(
         )
     }
 
-    private fun OrderLifecycleState.mergeIntent(event: LaorOrderExecutionEvent): OrderLifecycleState {
+    private fun OrderLifecycleState.mergeIntent(event: OrderExecutionEvent): OrderLifecycleState {
         return copy(
             orderTag = event.orderTag ?: orderTag,
             strategyKind = event.strategyKind.takeIf { it != StrategyExecutionKind.UNKNOWN } ?: strategyKind,
-            side = event.side.takeIf { it != LaorOrderSide.UNKNOWN } ?: side,
+            side = event.side.takeIf { it != OrderSide.UNKNOWN } ?: side,
             expectedQuantity = event.expectedQuantity ?: expectedQuantity,
             lastEventAt = event.occurredAt,
         )
     }
 
-    private fun OrderLifecycleState.markSubmitted(event: LaorOrderExecutionEvent): OrderLifecycleState {
+    private fun OrderLifecycleState.markSubmitted(event: OrderExecutionEvent): OrderLifecycleState {
         return copy(
             submitted = true,
             submittedAt = submittedAt ?: event.occurredAt,
@@ -187,7 +187,7 @@ class LaorOrderLifecycleProcessor(
     }
 
     private fun OrderLifecycleState.addFill(
-        event: LaorOrderExecutionEvent,
+        event: OrderExecutionEvent,
         terminal: Boolean,
     ): OrderLifecycleState {
         val fillQuantity = checkNotNull(event.filledQuantity) { "filledQuantity is required for fill event" }
@@ -206,7 +206,7 @@ class LaorOrderLifecycleProcessor(
     }
 
     private fun OrderLifecycleState.markTerminal(
-        event: LaorOrderExecutionEvent,
+        event: OrderExecutionEvent,
         status: OrderTerminalStatus,
     ): OrderLifecycleState {
         return copy(
@@ -217,7 +217,7 @@ class LaorOrderLifecycleProcessor(
         ).mergeIntent(event)
     }
 
-    private fun OrderLifecycleState.updateLastEvent(event: LaorOrderExecutionEvent): OrderLifecycleState {
+    private fun OrderLifecycleState.updateLastEvent(event: OrderExecutionEvent): OrderLifecycleState {
         return copy(lastEventAt = event.occurredAt)
     }
 
@@ -225,36 +225,36 @@ class LaorOrderLifecycleProcessor(
         state: OrderLifecycleState,
         sourceEventIds: List<String>,
         occurredAt: ZonedDateTime,
-    ): LaorMilestoneEnvelope {
+    ): LifecycleEventEnvelope {
         return milestone(state.submittedMilestoneType(), state, sourceEventIds, occurredAt)
     }
 
     private fun fillMilestone(
         state: OrderLifecycleState,
-        event: LaorOrderExecutionEvent,
+        event: OrderExecutionEvent,
         partial: Boolean,
-    ): LaorMilestoneEnvelope {
+    ): LifecycleEventEnvelope {
         val type = if (partial) state.partialFillMilestoneType() else state.fullFillMilestoneType()
         return milestone(type, state, listOf(event.eventId), event.occurredAt)
     }
 
     private fun terminalMilestone(
         state: OrderLifecycleState,
-        event: LaorOrderExecutionEvent,
-        type: LaorMilestoneType,
-    ): LaorMilestoneEnvelope {
+        event: OrderExecutionEvent,
+        type: MilestoneType,
+    ): LifecycleEventEnvelope {
         return milestone(type, state, listOf(event.eventId), event.occurredAt)
     }
 
     private fun milestone(
-        type: LaorMilestoneType,
+        type: MilestoneType,
         state: OrderLifecycleState,
         sourceEventIds: List<String>,
         occurredAt: ZonedDateTime,
-    ): LaorMilestoneEnvelope {
+    ): LifecycleEventEnvelope {
         val seed = "laor-milestone:${state.strategyExecutionId}:${state.orderIntentId}:$type:${sourceEventIds.joinToString(",")}"
-        return LaorMilestoneEnvelope(
-            milestone = LaorMilestoneEvent(
+        return LifecycleEventEnvelope(
+            milestone = MilestoneEvent(
                 eventId = deterministicId(seed),
                 milestoneType = type,
                 strategyExecutionId = state.strategyExecutionId,
@@ -272,21 +272,21 @@ class LaorOrderLifecycleProcessor(
     }
 
     private fun anomaly(
-        type: LaorAnomalyType,
+        type: AnomalyType,
         state: OrderLifecycleState,
-        event: LaorOrderExecutionEvent,
+        event: OrderExecutionEvent,
         reason: String,
-    ): LaorMilestoneEnvelope {
+    ): LifecycleEventEnvelope {
         val seed = "laor-anomaly:${event.strategyExecutionId}:${event.orderIntentId}:$type:${event.eventId}"
-        return LaorMilestoneEnvelope(
-            anomaly = LaorAnomalyEvent(
+        return LifecycleEventEnvelope(
+            anomaly = AnomalyEvent(
                 eventId = deterministicId(seed),
                 anomalyType = type,
                 strategyExecutionId = event.strategyExecutionId,
                 orderIntentId = event.orderIntentId,
                 brokerOrderId = event.brokerOrderId ?: state.brokerOrderId,
                 orderTag = event.orderTag ?: state.orderTag,
-                side = event.side.takeIf { it != LaorOrderSide.UNKNOWN } ?: state.side,
+                side = event.side.takeIf { it != OrderSide.UNKNOWN } ?: state.side,
                 reason = reason,
                 occurredAt = event.occurredAt,
                 sourceEventIds = listOf(event.eventId),
@@ -295,38 +295,38 @@ class LaorOrderLifecycleProcessor(
         )
     }
 
-    private fun OrderLifecycleState.overfillAnomaly(event: LaorOrderExecutionEvent): LaorMilestoneEnvelope? {
+    private fun OrderLifecycleState.overfillAnomaly(event: OrderExecutionEvent): LifecycleEventEnvelope? {
         val expected = expectedQuantity ?: return null
         if (filledQuantity <= expected) return null
         return anomaly(
-            type = LaorAnomalyType.FILLED_QUANTITY_EXCEEDS_EXPECTED,
+            type = AnomalyType.FILLED_QUANTITY_EXCEEDS_EXPECTED,
             state = this,
             event = event,
             reason = "filled quantity $filledQuantity exceeds expected quantity $expected",
         )
     }
 
-    private fun OrderLifecycleState.submittedMilestoneType(): LaorMilestoneType {
+    private fun OrderLifecycleState.submittedMilestoneType(): MilestoneType {
         return when (side) {
-            LaorOrderSide.BUY -> LaorMilestoneType.ENTRY_BUY_SUBMITTED
-            LaorOrderSide.SELL -> LaorMilestoneType.EXIT_SELL_SUBMITTED
-            LaorOrderSide.UNKNOWN -> error("cannot emit submitted milestone without order side")
+            OrderSide.BUY -> MilestoneType.ENTRY_BUY_SUBMITTED
+            OrderSide.SELL -> MilestoneType.EXIT_SELL_SUBMITTED
+            OrderSide.UNKNOWN -> error("cannot emit submitted milestone without order side")
         }
     }
 
-    private fun OrderLifecycleState.partialFillMilestoneType(): LaorMilestoneType {
+    private fun OrderLifecycleState.partialFillMilestoneType(): MilestoneType {
         return when (side) {
-            LaorOrderSide.BUY -> LaorMilestoneType.ENTRY_BUY_PARTIALLY_FILLED
-            LaorOrderSide.SELL -> LaorMilestoneType.EXIT_SELL_PARTIALLY_FILLED
-            LaorOrderSide.UNKNOWN -> LaorMilestoneType.ENTRY_BUY_PARTIALLY_FILLED
+            OrderSide.BUY -> MilestoneType.ENTRY_BUY_PARTIALLY_FILLED
+            OrderSide.SELL -> MilestoneType.EXIT_SELL_PARTIALLY_FILLED
+            OrderSide.UNKNOWN -> MilestoneType.ENTRY_BUY_PARTIALLY_FILLED
         }
     }
 
-    private fun OrderLifecycleState.fullFillMilestoneType(): LaorMilestoneType {
+    private fun OrderLifecycleState.fullFillMilestoneType(): MilestoneType {
         return when (side) {
-            LaorOrderSide.BUY -> LaorMilestoneType.ENTRY_BUY_FILLED
-            LaorOrderSide.SELL -> LaorMilestoneType.EXIT_SELL_FILLED
-            LaorOrderSide.UNKNOWN -> LaorMilestoneType.ENTRY_BUY_FILLED
+            OrderSide.BUY -> MilestoneType.ENTRY_BUY_FILLED
+            OrderSide.SELL -> MilestoneType.EXIT_SELL_FILLED
+            OrderSide.UNKNOWN -> MilestoneType.ENTRY_BUY_FILLED
         }
     }
 
@@ -353,5 +353,5 @@ private fun OrderExecutionEventType.isTerminalEvent(): Boolean {
 }
 
 private fun OrderLifecycleState.shouldEmitDeferredSubmittedMilestone(): Boolean {
-    return submitted && !submittedMilestoneEmitted && side != LaorOrderSide.UNKNOWN
+    return submitted && !submittedMilestoneEmitted && side != OrderSide.UNKNOWN
 }

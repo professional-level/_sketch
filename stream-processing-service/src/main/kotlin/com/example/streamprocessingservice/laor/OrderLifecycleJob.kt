@@ -6,10 +6,10 @@ import com.example.streamprocessingservice.laor.adapter.`in`.kafka.OrderIntentCr
 import com.example.streamprocessingservice.laor.adapter.`in`.kafka.OrderPartiallyFilledEventDeserializer
 import com.example.streamprocessingservice.laor.adapter.`in`.kafka.OrderRejectedEventDeserializer
 import com.example.streamprocessingservice.laor.adapter.`in`.kafka.OrderSubmittedEventDeserializer
-import com.example.streamprocessingservice.laor.adapter.out.kafka.LaorMilestoneKafkaRecordSerializer
-import com.example.streamprocessingservice.laor.application.LaorOrderExecutionEvent
-import com.example.streamprocessingservice.laor.application.LaorOrderLifecycleProcessor
-import com.example.streamprocessingservice.laor.application.LaorOrderLifecycleProcessFunction
+import com.example.streamprocessingservice.laor.adapter.out.kafka.OrderLifecycleKafkaRecordSerializer
+import com.example.streamprocessingservice.laor.application.OrderExecutionEvent
+import com.example.streamprocessingservice.laor.application.OrderLifecycleProcessor
+import com.example.streamprocessingservice.laor.application.OrderLifecycleProcessFunction
 import common.MessageTopic
 import org.apache.flink.api.common.eventtime.WatermarkStrategy
 import org.apache.flink.api.connector.source.Source
@@ -22,7 +22,7 @@ import org.apache.kafka.clients.consumer.OffsetResetStrategy
 import java.time.Duration
 
 fun main() {
-    val config = LaorOrderLifecycleJobConfig.fromEnvironment()
+    val config = OrderLifecycleJobConfig.fromEnvironment()
     val env = StreamExecutionEnvironment.getExecutionEnvironment()
     env.enableCheckpointing(config.checkpointIntervalMs)
 
@@ -59,19 +59,19 @@ fun main() {
     )
 
     val watermarkStrategy = WatermarkStrategy
-        .forBoundedOutOfOrderness<LaorOrderExecutionEvent>(Duration.ofSeconds(config.allowedLatenessSeconds))
+        .forBoundedOutOfOrderness<OrderExecutionEvent>(Duration.ofSeconds(config.allowedLatenessSeconds))
         .withTimestampAssigner { event, _ -> event.occurredAt.toInstant().toEpochMilli() }
 
     events
         .assignTimestampsAndWatermarks(watermarkStrategy)
         .keyBy { event -> event.strategyExecutionId }
-        .process(LaorOrderLifecycleProcessFunction(config.fillTimeoutMs))
+        .process(OrderLifecycleProcessFunction(config.fillTimeoutMs))
         .sinkTo(config.kafkaSink())
 
     env.execute("laor-order-lifecycle-milestone-detector")
 }
 
-data class LaorOrderLifecycleJobConfig(
+data class OrderLifecycleJobConfig(
     val bootstrapServers: String,
     val groupId: String,
     val checkpointIntervalMs: Long,
@@ -80,9 +80,9 @@ data class LaorOrderLifecycleJobConfig(
 ) {
     fun kafkaSource(
         topic: MessageTopic,
-        deserializer: org.apache.flink.api.common.serialization.DeserializationSchema<LaorOrderExecutionEvent>,
-    ): Source<LaorOrderExecutionEvent, *, *> {
-        return KafkaSource.builder<LaorOrderExecutionEvent>()
+        deserializer: org.apache.flink.api.common.serialization.DeserializationSchema<OrderExecutionEvent>,
+    ): Source<OrderExecutionEvent, *, *> {
+        return KafkaSource.builder<OrderExecutionEvent>()
             .setBootstrapServers(bootstrapServers)
             .setTopics(topic.topicName)
             .setGroupId(groupId)
@@ -91,23 +91,23 @@ data class LaorOrderLifecycleJobConfig(
             .build()
     }
 
-    fun kafkaSink(): KafkaSink<com.example.streamprocessingservice.laor.application.LaorMilestoneEnvelope> {
-        return KafkaSink.builder<com.example.streamprocessingservice.laor.application.LaorMilestoneEnvelope>()
+    fun kafkaSink(): KafkaSink<com.example.streamprocessingservice.laor.application.LifecycleEventEnvelope> {
+        return KafkaSink.builder<com.example.streamprocessingservice.laor.application.LifecycleEventEnvelope>()
             .setBootstrapServers(bootstrapServers)
-            .setRecordSerializer(LaorMilestoneKafkaRecordSerializer())
+            .setRecordSerializer(OrderLifecycleKafkaRecordSerializer())
             .setDeliveryGuarantee(DeliveryGuarantee.AT_LEAST_ONCE)
             .build()
     }
 
     companion object {
-        fun fromEnvironment(env: Map<String, String> = System.getenv()): LaorOrderLifecycleJobConfig {
-            return LaorOrderLifecycleJobConfig(
+        fun fromEnvironment(env: Map<String, String> = System.getenv()): OrderLifecycleJobConfig {
+            return OrderLifecycleJobConfig(
                 bootstrapServers = env["KAFKA_BOOTSTRAP_SERVERS"] ?: "127.0.0.1:19092",
                 groupId = env["LAOR_FLINK_GROUP_ID"] ?: "stream-processing-service-laor-order-lifecycle",
                 checkpointIntervalMs = env["LAOR_FLINK_CHECKPOINT_INTERVAL_MS"]?.toLongOrNull() ?: 10_000L,
                 allowedLatenessSeconds = env["LAOR_FLINK_ALLOWED_LATENESS_SECONDS"]?.toLongOrNull() ?: 30L,
                 fillTimeoutMs = env["LAOR_FILL_TIMEOUT_MS"]?.toLongOrNull()
-                    ?: Duration.ofMinutes(LaorOrderLifecycleProcessor.DEFAULT_FILL_TIMEOUT_MINUTES).toMillis(),
+                    ?: Duration.ofMinutes(OrderLifecycleProcessor.DEFAULT_FILL_TIMEOUT_MINUTES).toMillis(),
             )
         }
     }
