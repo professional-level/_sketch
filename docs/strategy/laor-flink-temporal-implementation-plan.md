@@ -113,7 +113,7 @@ stock-purchase-service
   -> OrderRejected
   -> OrderCancelled
 
-flink-job
+stream-processing-service
   -> LaorOrderSubmitted
   -> LaorEntryBuyPartiallyFilled
   -> LaorEntryBuyFilled
@@ -133,14 +133,14 @@ strategy-execution-service
 ## Proposed Module Layout
 
 Flink는 각 Spring Boot service 내부에 embed하지 않고 별도 모듈과 별도 배포 단위로 둔다.
-모듈은 특정 전략명이 아니라 Flink 실행 계층을 드러내는 `flink-job`으로 두고, LAOR 처리는 그 내부의 `laor` job/package로 격리한다.
+모듈은 특정 전략명이나 Flink 기술명이 아니라 stream processing 책임을 드러내는 `stream-processing-service`로 두고, LAOR 처리는 그 내부의 `laor` job/package로 격리한다.
 
 ```text
 strategy-execution-service
   src/main/kotlin/...
 
-flink-job
-  src/main/kotlin/com/example/flinkjob/laor
+stream-processing-service
+  src/main/kotlin/com/example/streamprocessingservice/laor
     application/
       LaorOrderLifecycleJob.kt
       LaorOrderLifecycleState.kt
@@ -156,7 +156,7 @@ flink-job
 ```text
 strategy-execution-service Deployment
 stock-purchase-service Deployment
-flink-job FlinkDeployment
+stream-processing-service FlinkDeployment
 ```
 
 ## Kafka Topic Plan
@@ -339,7 +339,7 @@ Flink가 이 문제를 대신 해결하지 않는다.
 
 작업:
 
-- `flink-job` 모듈 추가
+- `stream-processing-service` 모듈 추가
 - Kafka source/sink 설정
 - protobuf deserialize/serialize 추가
 - 단순 pass-through 또는 submitted milestone emit 구현
