@@ -13,6 +13,8 @@ object Topic {
     const val ORDER_PARTIALLY_FILLED = "order-partially-filled"
     const val ORDER_REJECTED = "order-rejected"
     const val ORDER_CANCELLED = "order-cancelled"
+    const val LAOR_ORDER_MILESTONE_DETECTED = "laor-order-milestone-detected"
+    const val LAOR_ORDER_ANOMALY_DETECTED = "laor-order-anomaly-detected"
     const val INVALID_EVENT = "invalid-event"
     const val PURCHASE_SUCCESS = "purchase-success"
 }
@@ -28,6 +30,8 @@ enum class MessageTopic(val topicName: String) {
     ORDER_PARTIALLY_FILLED(Topic.ORDER_PARTIALLY_FILLED),
     ORDER_REJECTED(Topic.ORDER_REJECTED),
     ORDER_CANCELLED(Topic.ORDER_CANCELLED),
+    LAOR_ORDER_MILESTONE_DETECTED(Topic.LAOR_ORDER_MILESTONE_DETECTED),
+    LAOR_ORDER_ANOMALY_DETECTED(Topic.LAOR_ORDER_ANOMALY_DETECTED),
     INVALID_EVENT(Topic.INVALID_EVENT),
     PURCHASE_SUCCESS(Topic.PURCHASE_SUCCESS),
     ;

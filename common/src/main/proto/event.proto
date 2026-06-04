@@ -130,6 +130,37 @@ message OrderPartiallyFilled {
   EventMeta meta = 10;
 }
 
+message LaorOrderMilestoneDetected {
+  string event_id = 1;
+  LaorOrderMilestoneType milestone_type = 2;
+  string strategy_execution_id = 3;
+  string order_intent_id = 4;
+  string broker_order_id = 5;
+  string order_tag = 6;
+  OrderIntentSide side = 7;
+  int64 filled_quantity = 8;
+  double average_filled_price = 9;
+  google.protobuf.Timestamp occurred_at = 10;
+  EventMeta meta = 11;
+  repeated string source_event_ids = 12;
+  string idempotency_key = 13;
+}
+
+message LaorOrderAnomalyDetected {
+  string event_id = 1;
+  LaorOrderAnomalyType anomaly_type = 2;
+  string strategy_execution_id = 3;
+  string order_intent_id = 4;
+  string broker_order_id = 5;
+  string order_tag = 6;
+  OrderIntentSide side = 7;
+  string reason = 8;
+  google.protobuf.Timestamp occurred_at = 9;
+  EventMeta meta = 10;
+  repeated string source_event_ids = 11;
+  string idempotency_key = 12;
+}
+
 enum StrategyType{
   UNDEFINED = 0;
   FINAL_PRICE_BATING_V1 = 1;
@@ -158,4 +189,27 @@ enum OrderTradingEnvironment{
   ORDER_TRADING_ENVIRONMENT_UNDEFINED = 0;
   ORDER_TRADING_ENVIRONMENT_MOCK = 1;
   ORDER_TRADING_ENVIRONMENT_LIVE = 2;
+}
+
+enum LaorOrderMilestoneType{
+  LAOR_ORDER_MILESTONE_TYPE_UNDEFINED = 0;
+  ENTRY_BUY_SUBMITTED = 1;
+  ENTRY_BUY_PARTIALLY_FILLED = 2;
+  ENTRY_BUY_FILLED = 3;
+  EXIT_SELL_SUBMITTED = 4;
+  EXIT_SELL_PARTIALLY_FILLED = 5;
+  EXIT_SELL_FILLED = 6;
+  ORDER_REJECTED = 7;
+  ORDER_CANCELLED = 8;
+  ORDER_FILL_TIMEOUT_DETECTED = 9;
+}
+
+enum LaorOrderAnomalyType{
+  LAOR_ORDER_ANOMALY_TYPE_UNDEFINED = 0;
+  FILL_BEFORE_SUBMIT = 1;
+  DUPLICATE_TERMINAL_EVENT = 2;
+  FILLED_QUANTITY_EXCEEDS_EXPECTED = 3;
+  CONFLICTING_BROKER_ORDER_ID = 4;
+  UNKNOWN_ORDER_INTENT = 5;
+  LATE_EVENT_AFTER_TERMINAL = 6;
 }
