@@ -1,7 +1,8 @@
 # yfinance Market Data Sidecar
 
-This Docker image exposes a small HTTP sidecar that downloads daily Yahoo Finance candles through `yfinance`.
-`backtest-service` calls this sidecar when a backtest request asks to refresh market data.
+This Docker image exposes a small HTTP sidecar that downloads daily Yahoo Finance candles through `yfinance`
+and resolves market trading days through `pandas_market_calendars`.
+`backtest-service` calls this sidecar before a backtest to fill missing daily candle data for valid trading days.
 
 Prerequisite:
 
@@ -36,12 +37,12 @@ Invoke-RestMethod `
     "symbol": "TQQQ",
     "from": "2024-01-01",
     "to": "2024-01-10",
-    "initialCash": 10000,
-    "refreshMarketData": true
+    "initialCash": 10000
   }'
 ```
 
-The API fetches yfinance data from the sidecar, writes normalized CSV data under `data/yfinance`, stores the run under `data/backtest-runs`, and returns a summary with `runId`.
+The API resolves the requested market's trading days, fetches missing yfinance data from the sidecar,
+writes normalized CSV data under `data/yfinance`, stores the run under `data/backtest-runs`, and returns a summary with `runId`.
 
 Use the returned `runId` to fetch details without returning large ten-year payloads from the run request:
 
@@ -64,6 +65,20 @@ Invoke-RestMethod `
     "end": "2024-01-11",
     "autoAdjust": false,
     "timeout": 10
+  }'
+```
+
+Direct market-calendar request shape:
+
+```powershell
+Invoke-RestMethod `
+  -Method Post `
+  -Uri http://localhost:8095/market-calendar/valid-days `
+  -ContentType 'application/json' `
+  -Body '{
+    "market": "US",
+    "start": "2024-01-01",
+    "end": "2024-01-10"
   }'
 ```
 

@@ -7,6 +7,8 @@ import com.example.backtestservice.application.port.out.ExternalHistoricalDailyC
 import com.example.backtestservice.application.port.out.ExternalHistoricalMarketDataPort
 import com.example.backtestservice.application.port.out.HistoricalDailyCandlesQuery
 import com.example.backtestservice.application.port.out.HistoricalMarketDataPort
+import com.example.backtestservice.application.port.out.MarketCalendarPort
+import com.example.backtestservice.application.port.out.MarketTradingDaysQuery
 import com.example.backtestservice.application.port.out.SaveHistoricalDailyCandlesCommand
 import com.example.backtestservice.domain.market.HistoricalCandle
 import com.example.common.UseCaseImpl
@@ -16,12 +18,20 @@ import java.time.LocalDate
 class ImportHistoricalMarketDataService(
     private val externalHistoricalMarketDataPort: ExternalHistoricalMarketDataPort,
     private val historicalMarketDataPort: HistoricalMarketDataPort,
+    private val marketCalendarPort: MarketCalendarPort,
 ) : ImportHistoricalMarketDataUseCase {
     override fun execute(command: ImportHistoricalMarketDataCommand): ImportHistoricalMarketDataResult {
         command.validate()
+        val tradingDays = marketCalendarPort.findTradingDays(command.toTradingDaysQuery()).dates
+            .filter { it >= command.from && it <= command.to }
+            .distinct()
+            .sorted()
+        require(tradingDays.isNotEmpty()) {
+            "trading days not found: market=${command.market}, from=${command.from}, to=${command.to}"
+        }
         val cachedCandles = historicalMarketDataPort.findDailyCandles(command.toCachedQuery())
             .sortedBy { it.date }
-        val fetchedCandles = command.missingRanges(cachedCandles)
+        val fetchedCandles = command.missingRanges(cachedCandles, tradingDays)
             .flatMap { range ->
                 externalHistoricalMarketDataPort.fetchDailyCandles(command.toExternalQuery(range))
             }
@@ -41,8 +51,10 @@ class ImportHistoricalMarketDataService(
             .distinctBy { it.date }
             .filter { it.date >= command.from && it.date <= command.to }
             .sortedBy { it.date }
-        require(availableCandles.isNotEmpty()) {
-            "external historical candles not found: symbol=${command.symbol}, from=${command.from}, to=${command.to}"
+        val missingTradingDays = tradingDays - availableCandles.map { it.date }.toSet()
+        require(missingTradingDays.isEmpty()) {
+            "historical candles missing for trading days: symbol=${command.symbol}, " +
+                "from=${command.from}, to=${command.to}, missing=${missingTradingDays.toPreview()}"
         }
         return ImportHistoricalMarketDataResult(
             symbol = command.symbol.trim().uppercase(),
@@ -68,6 +80,14 @@ class ImportHistoricalMarketDataService(
         )
     }
 
+    private fun ImportHistoricalMarketDataCommand.toTradingDaysQuery(): MarketTradingDaysQuery {
+        return MarketTradingDaysQuery(
+            market = market,
+            from = from,
+            to = to,
+        )
+    }
+
     private fun ImportHistoricalMarketDataCommand.toExternalQuery(range: DateRange): ExternalHistoricalDailyCandlesQuery {
         return ExternalHistoricalDailyCandlesQuery(
             symbol = symbol,
@@ -81,24 +101,40 @@ class ImportHistoricalMarketDataService(
 
     private fun ImportHistoricalMarketDataCommand.missingRanges(
         cachedCandles: List<HistoricalCandle>,
+        tradingDays: List<LocalDate>,
     ): List<DateRange> {
-        if (cachedCandles.isEmpty()) return listOf(DateRange(from, to))
-
+        val cachedDates = cachedCandles.map { it.date }.toSet()
         val ranges = mutableListOf<DateRange>()
-        val firstCachedDate = cachedCandles.first().date
-        val lastCachedDate = cachedCandles.last().date
-        if (firstCachedDate > from.plusDays(CACHE_EDGE_TOLERANCE_DAYS)) {
-            ranges += DateRange(from, firstCachedDate.minusDays(1))
-        }
-        cachedCandles.zipWithNext().forEach { (left, right) ->
-            if (right.date > left.date.plusDays(CACHE_GAP_TOLERANCE_DAYS)) {
-                ranges += DateRange(left.date.plusDays(1), right.date.minusDays(1))
+        var rangeStart: LocalDate? = null
+        var previousMissing: LocalDate? = null
+        tradingDays.forEach { date ->
+            if (date in cachedDates) {
+                if (rangeStart != null && previousMissing != null) {
+                    ranges += DateRange(checkNotNull(rangeStart), checkNotNull(previousMissing))
+                    rangeStart = null
+                    previousMissing = null
+                }
+            } else {
+                if (rangeStart == null) {
+                    rangeStart = date
+                }
+                previousMissing = date
             }
         }
-        if (lastCachedDate < to.minusDays(CACHE_EDGE_TOLERANCE_DAYS)) {
-            ranges += DateRange(lastCachedDate.plusDays(1), to)
+        if (rangeStart != null && previousMissing != null) {
+            ranges += DateRange(checkNotNull(rangeStart), checkNotNull(previousMissing))
         }
-        return ranges.filterNot { it.from.isAfter(it.to) }
+        return ranges
+    }
+
+    private fun List<LocalDate>.toPreview(): String {
+        val sortedDates = sorted()
+        val suffix = if (sortedDates.size > MAX_MISSING_DATES_IN_ERROR) {
+            ", ... total=${sortedDates.size}"
+        } else {
+            ""
+        }
+        return sortedDates.take(MAX_MISSING_DATES_IN_ERROR).joinToString(prefix = "[", postfix = "$suffix]")
     }
 
     private data class DateRange(
@@ -107,7 +143,6 @@ class ImportHistoricalMarketDataService(
     )
 
     companion object {
-        private const val CACHE_EDGE_TOLERANCE_DAYS = 7L
-        private const val CACHE_GAP_TOLERANCE_DAYS = 7L
+        private const val MAX_MISSING_DATES_IN_ERROR = 10
     }
 }

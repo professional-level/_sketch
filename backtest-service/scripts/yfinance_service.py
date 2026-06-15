@@ -1,9 +1,19 @@
 from datetime import date
+from typing import Optional
 
+import pandas_market_calendars as mcal
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
 from fetch_yfinance_daily import download_daily_candles
+
+MARKET_CALENDARS = {
+    "US": "NYSE",
+    "NYSE": "NYSE",
+    "NASDAQ": "NYSE",
+    "XNYS": "NYSE",
+    "XNAS": "NYSE",
+}
 
 
 class DailyCandlesRequest(BaseModel):
@@ -29,6 +39,21 @@ class DailyCandleResponse(BaseModel):
 
 class DailyCandlesResponse(BaseModel):
     candles: dict[str, list[DailyCandleResponse]]
+
+
+class ValidTradingDaysRequest(BaseModel):
+    market: str = "US"
+    start: date
+    end: date
+    calendar: Optional[str] = None
+
+
+class ValidTradingDaysResponse(BaseModel):
+    market: str
+    calendar: str
+    start: date
+    end: date
+    valid_days: list[date]
 
 
 app = FastAPI(title="AKRA yfinance market data sidecar")
@@ -74,4 +99,32 @@ def daily_candles(request: DailyCandlesRequest) -> DailyCandlesResponse:
             ]
             for ticker, frame in frames.items()
         }
+    )
+
+
+@app.post("/market-calendar/valid-days")
+def valid_trading_days(request: ValidTradingDaysRequest) -> ValidTradingDaysResponse:
+    if request.start > request.end:
+        raise HTTPException(status_code=400, detail="start must be on or before end")
+
+    market = request.market.strip().upper()
+    calendar_name = request.calendar or MARKET_CALENDARS.get(market)
+    if calendar_name is None:
+        raise HTTPException(status_code=400, detail=f"unsupported market calendar: {request.market}")
+
+    try:
+        calendar = mcal.get_calendar(calendar_name)
+        valid_days = calendar.valid_days(
+            start_date=request.start.isoformat(),
+            end_date=request.end.isoformat(),
+        )
+    except Exception as exception:
+        raise HTTPException(status_code=502, detail=str(exception)) from exception
+
+    return ValidTradingDaysResponse(
+        market=market,
+        calendar=calendar_name,
+        start=request.start,
+        end=request.end,
+        valid_days=[value.date() for value in valid_days],
     )
