@@ -64,8 +64,8 @@ object LaorV4StrategyEngine {
                 startingHoldingQuantity = working.holdingQuantity,
                 sellFills = sellFills.filter { it.advancesProgressRound },
             )
-            sellFills.forEach { fill -> applySell(working, fill) }
-            buyFills.forEach { fill -> applyNormalBuy(working, fill) }
+            sellFills.forEach { fill -> applySell(config, working, fill) }
+            buyFills.forEach { fill -> applyNormalBuy(config, working, fill) }
         }
 
         if (working.holdingQuantity == 0L) {
@@ -141,6 +141,7 @@ object LaorV4StrategyEngine {
                     price = firstBuyLimitPrice,
                     budget = state.availableCash / config.totalSplitCount,
                     tag = LaorV4StrategyOrderTag.FIRST_BUY,
+                    costPolicy = config.costPolicy,
                 ),
             )
         }
@@ -155,12 +156,14 @@ object LaorV4StrategyEngine {
                     price = starBuyPrice,
                     budget = singleBuyBudget / 2,
                     tag = LaorV4StrategyOrderTag.STAR_HALF_BUY,
+                    costPolicy = config.costPolicy,
                 ),
                 buyOrder(
                     type = LaorV4StrategyOrderType.LOC,
                     price = state.averagePurchasePrice,
                     budget = singleBuyBudget / 2,
                     tag = LaorV4StrategyOrderTag.AVG_HALF_BUY,
+                    costPolicy = config.costPolicy,
                 ),
             )
         } else {
@@ -170,6 +173,7 @@ object LaorV4StrategyEngine {
                     price = starBuyPrice,
                     budget = singleBuyBudget,
                     tag = LaorV4StrategyOrderTag.STAR_FULL_BUY,
+                    costPolicy = config.costPolicy,
                 ),
             )
         }
@@ -231,6 +235,7 @@ object LaorV4StrategyEngine {
                 price = reverseBuyPrice,
                 budget = state.availableCash * REVERSE_BUY_AVAILABLE_CASH_RATIO,
                 tag = LaorV4StrategyOrderTag.REVERSE_BUY,
+                costPolicy = config.costPolicy,
             ),
         )
     }
@@ -240,8 +245,9 @@ object LaorV4StrategyEngine {
         price: Double,
         budget: Double,
         tag: LaorV4StrategyOrderTag,
+        costPolicy: LaorV4StrategyCostPolicy,
     ): LaorV4StrategyOrder? {
-        val quantity = quantityForBudget(budget, price)
+        val quantity = quantityForBudget(budget, price, costPolicy)
         return if (quantity > 0) {
             LaorV4StrategyOrder(
                 side = LaorV4StrategySide.BUY,
@@ -274,9 +280,13 @@ object LaorV4StrategyEngine {
         }
     }
 
-    private fun quantityForBudget(budget: Double, price: Double): Long {
+    private fun quantityForBudget(
+        budget: Double,
+        price: Double,
+        costPolicy: LaorV4StrategyCostPolicy,
+    ): Long {
         require(price > 0.0) { "price must be positive" }
-        return floor((budget + EPSILON) / price).toLong()
+        return floor((budget + EPSILON) / costPolicy.buyCashRequiredPerShare(price)).toLong()
     }
 
     private fun reverseSellQuantity(config: LaorV4StrategyConfig, holdingQuantity: Long): Long {
@@ -317,11 +327,15 @@ object LaorV4StrategyEngine {
                 state.progressRound = cleanZero(state.progressRound * config.reverseSellFactor)
             }
         }
-        applySell(state, fill)
+        applySell(config, state, fill)
     }
 
-    private fun applyNormalBuy(state: WorkingState, fill: LaorV4StrategyFill) {
-        applyBuy(state, fill)
+    private fun applyNormalBuy(
+        config: LaorV4StrategyConfig,
+        state: WorkingState,
+        fill: LaorV4StrategyFill,
+    ) {
+        applyBuy(config, state, fill)
         if (fill.advancesProgressRound) {
             state.progressRound = cleanZero(state.progressRound + normalBuyProgressRoundIncrement(fill.tag))
         }
@@ -338,17 +352,23 @@ object LaorV4StrategyEngine {
                     (config.totalSplitCount - state.progressRound) * REVERSE_BUY_AVAILABLE_CASH_RATIO,
             )
         }
-        applyBuy(state, fill)
+        applyBuy(config, state, fill)
     }
 
-    private fun applySell(state: WorkingState, fill: LaorV4StrategyFill) {
+    private fun applySell(
+        config: LaorV4StrategyConfig,
+        state: WorkingState,
+        fill: LaorV4StrategyFill,
+    ) {
         require(fill.quantity <= state.holdingQuantity) {
             "sell quantity ${fill.quantity} exceeds holdingQuantity ${state.holdingQuantity}"
         }
 
-        state.availableCash = cleanZero(state.availableCash + fill.price * fill.quantity)
+        val proceeds = config.costPolicy.sellCashProceeds(fill.price, fill.quantity)
+        val positionCost = state.averagePurchasePrice * fill.quantity
+        state.availableCash = cleanZero(state.availableCash + proceeds)
         state.realizedProfitLoss = cleanZero(
-            state.realizedProfitLoss + (fill.price - state.averagePurchasePrice) * fill.quantity,
+            state.realizedProfitLoss + proceeds - positionCost,
         )
         state.holdingQuantity -= fill.quantity
 
@@ -360,8 +380,12 @@ object LaorV4StrategyEngine {
         }
     }
 
-    private fun applyBuy(state: WorkingState, fill: LaorV4StrategyFill) {
-        val cost = fill.price * fill.quantity
+    private fun applyBuy(
+        config: LaorV4StrategyConfig,
+        state: WorkingState,
+        fill: LaorV4StrategyFill,
+    ) {
+        val cost = config.costPolicy.buyCashRequired(fill.price, fill.quantity)
         require(cost <= state.availableCash + EPSILON) {
             "buy cost $cost exceeds availableCash ${state.availableCash}"
         }

@@ -3,6 +3,8 @@ package com.example.backtestservice.adapter.`in`.web
 import com.example.backtestservice.application.port.`in`.BacktestEquityCurveGranularity
 import com.example.backtestservice.application.port.`in`.BacktestEquityCurveResult
 import com.example.backtestservice.application.port.`in`.BacktestTradesPage
+import com.example.backtestservice.application.port.`in`.CalculateLaorV4DashboardCommand
+import com.example.backtestservice.application.port.`in`.CalculateLaorV4DashboardUseCase
 import com.example.backtestservice.application.port.`in`.ExecuteBacktestRunCommand
 import com.example.backtestservice.application.port.`in`.ExecuteBacktestRunUseCase
 import com.example.backtestservice.application.port.`in`.FindBacktestEquityCurveQuery
@@ -12,6 +14,7 @@ import com.example.backtestservice.application.port.`in`.FindLaorV4BacktestRunUs
 import com.example.backtestservice.application.port.`in`.ImportHistoricalMarketDataCommand
 import com.example.backtestservice.application.port.`in`.ImportHistoricalMarketDataResult
 import com.example.backtestservice.application.port.`in`.ImportHistoricalMarketDataUseCase
+import com.example.backtestservice.application.port.`in`.LaorV4DashboardResponse
 import com.example.backtestservice.application.port.`in`.LaorV4BacktestParameters
 import com.example.backtestservice.application.port.`in`.LaorV4BacktestRunResponse
 import com.example.backtestservice.application.port.`in`.RunLaorV4BacktestCommand
@@ -41,6 +44,7 @@ class BacktestController(
     private val runLaorV4BacktestUseCase: RunLaorV4BacktestUseCase,
     private val findLaorV4BacktestRunUseCase: FindLaorV4BacktestRunUseCase,
     private val importHistoricalMarketDataUseCase: ImportHistoricalMarketDataUseCase,
+    private val calculateLaorV4DashboardUseCase: CalculateLaorV4DashboardUseCase,
 ) {
     @PostMapping("/runs")
     fun createBacktestRun(@RequestBody request: RunBacktestRequest): Mono<BacktestRunSummary> {
@@ -107,6 +111,14 @@ class BacktestController(
         }
             .mapRequestErrors()
             .mapNotFound()
+    }
+
+    @PostMapping("/laor-v4/dashboard")
+    fun calculateLaorV4Dashboard(@RequestBody request: LaorV4DashboardRequest): Mono<LaorV4DashboardResponse> {
+        return blocking {
+            calculateLaorV4DashboardUseCase.calculate(request.toCommand())
+        }
+            .mapRequestErrors()
     }
 
     @PostMapping("/market-data/import")
@@ -215,6 +227,8 @@ data class LaorV4BacktestRunRequest(
     val firstBuyLimitPercentAbovePreviousClose: Double,
     val autoRestart: Boolean = true,
     val dividendReinvestment: Boolean = false,
+    val commissionRate: BigDecimal = BigDecimal.ZERO,
+    val slippageRate: BigDecimal = BigDecimal.ZERO,
     val autoAdjust: Boolean = false,
     val marketDataTimeoutSeconds: Long = 30,
 ) {
@@ -229,7 +243,43 @@ data class LaorV4BacktestRunRequest(
             firstBuyLimitPercentAbovePreviousClose = firstBuyLimitPercentAbovePreviousClose,
             autoRestart = autoRestart,
             dividendReinvestment = dividendReinvestment,
+            commissionRate = commissionRate,
+            slippageRate = slippageRate,
             autoAdjust = autoAdjust,
+            marketDataTimeoutSeconds = marketDataTimeoutSeconds,
+        )
+    }
+}
+
+data class LaorV4DashboardRequest(
+    val symbol: String,
+    val market: String = "US",
+    val startDate: LocalDate,
+    val asOfDate: LocalDate? = null,
+    val initialCash: BigDecimal,
+    val totalSplitCount: Int,
+    val firstBuyLimitPercentAbovePreviousClose: Double,
+    val autoRestart: Boolean = true,
+    val dividendReinvestment: Boolean = false,
+    val autoAdjust: Boolean = false,
+    val commissionRate: BigDecimal = BigDecimal("0.0005"),
+    val slippageRate: BigDecimal = BigDecimal.ZERO,
+    val marketDataTimeoutSeconds: Long = 30,
+) {
+    fun toCommand(): CalculateLaorV4DashboardCommand {
+        return CalculateLaorV4DashboardCommand(
+            symbol = symbol,
+            market = market,
+            startDate = startDate,
+            asOfDate = asOfDate,
+            initialCash = initialCash,
+            totalSplitCount = totalSplitCount,
+            firstBuyLimitPercentAbovePreviousClose = firstBuyLimitPercentAbovePreviousClose,
+            autoRestart = autoRestart,
+            dividendReinvestment = dividendReinvestment,
+            autoAdjust = autoAdjust,
+            commissionRate = commissionRate,
+            slippageRate = slippageRate,
             marketDataTimeoutSeconds = marketDataTimeoutSeconds,
         )
     }

@@ -29,13 +29,6 @@ class LaorV4StrategyEngineTest {
     fun `rejects unsupported Laor symbol and split count combinations`() {
         assertFailsWith<IllegalArgumentException> {
             LaorV4StrategyConfig(
-                symbol = LaorV4StrategySymbol.TQQQ,
-                totalSplitCount = 30,
-                firstBuyLimitPercentAbovePreviousClose = 12.0,
-            )
-        }
-        assertFailsWith<IllegalArgumentException> {
-            LaorV4StrategyConfig(
                 symbol = LaorV4StrategySymbol.SOXL,
                 totalSplitCount = 10,
                 firstBuyLimitPercentAbovePreviousClose = 12.0,
@@ -48,9 +41,11 @@ class LaorV4StrategyEngineTest {
         val cases = listOf(
             CalculationCase(LaorV4StrategySymbol.TQQQ, 20, 0.0, 15.0),
             CalculationCase(LaorV4StrategySymbol.TQQQ, 20, 10.0, 0.0),
+            CalculationCase(LaorV4StrategySymbol.TQQQ, 30, 7.5, 7.5),
             CalculationCase(LaorV4StrategySymbol.TQQQ, 40, 8.0, 9.0),
             CalculationCase(LaorV4StrategySymbol.SOXL, 20, 10.0, 0.0),
             CalculationCase(LaorV4StrategySymbol.SOXL, 20, 8.6, 2.8),
+            CalculationCase(LaorV4StrategySymbol.SOXL, 30, 7.5, 10.0),
             CalculationCase(LaorV4StrategySymbol.SOXL, 40, 8.6, 11.4),
         )
 
@@ -106,6 +101,29 @@ class LaorV4StrategyEngineTest {
         )
 
         assertEquals(emptyList(), skipped)
+    }
+
+    @Test
+    fun `buy order quantity includes commission without moving the limit price for slippage`() {
+        val config = config(
+            symbol = LaorV4StrategySymbol.TQQQ,
+            totalSplitCount = 20,
+            costPolicy = LaorV4StrategyCostPolicy(
+                commissionRate = 0.01,
+                slippageRate = 0.01,
+            ),
+        )
+        val state = LaorV4StrategyState(availableCash = 4_480.0)
+
+        val orders = LaorV4StrategyEngine.generateOrders(
+            config = config,
+            state = state,
+            market = LaorV4StrategyMarket(previousClose = 100.0),
+        )
+
+        assertEquals(1, orders.size)
+        assertOrder(orders[0], LaorV4StrategySide.BUY, LaorV4StrategyOrderType.LOC, 112.0, 1, LaorV4StrategyOrderTag.FIRST_BUY)
+        assertDouble(112.0, config.costPolicy.executionPrice(LaorV4StrategySide.BUY, orders[0].price ?: error("price is null")))
     }
 
     @Test
@@ -285,6 +303,46 @@ class LaorV4StrategyEngineTest {
         assertEquals(2, next.reverseModeElapsedDays)
     }
 
+    @Test
+    fun `apply fills keeps slippage out of prices and deducts round-trip slippage on sell`() {
+        val config = config(
+            symbol = LaorV4StrategySymbol.TQQQ,
+            totalSplitCount = 20,
+            costPolicy = LaorV4StrategyCostPolicy(
+                commissionRate = 0.01,
+                slippageRate = 0.01,
+            ),
+        )
+        val state = LaorV4StrategyState(availableCash = 1_000.0)
+
+        val afterBuy = LaorV4StrategyEngine.applyFills(
+            config = config,
+            state = state,
+            fills = listOf(
+                LaorV4StrategyFill(LaorV4StrategySide.BUY, 100.0, 5, LaorV4StrategyOrderTag.FIRST_BUY),
+            ),
+            closePrice = 100.0,
+        )
+
+        assertDouble(495.0, afterBuy.availableCash)
+        assertEquals(5, afterBuy.holdingQuantity)
+        assertDouble(101.0, afterBuy.averagePurchasePrice)
+
+        val afterSell = LaorV4StrategyEngine.applyFills(
+            config = config,
+            state = afterBuy,
+            fills = listOf(
+                LaorV4StrategyFill(LaorV4StrategySide.SELL, 110.0, 2, LaorV4StrategyOrderTag.QUARTER_SELL),
+            ),
+            closePrice = 110.0,
+        )
+
+        assertDouble(708.4, afterSell.availableCash)
+        assertEquals(3, afterSell.holdingQuantity)
+        assertDouble(101.0, afterSell.averagePurchasePrice)
+        assertDouble(11.4, afterSell.realizedProfitLoss)
+    }
+
     private fun assertOrder(
         order: LaorV4StrategyOrder,
         side: LaorV4StrategySide,
@@ -304,11 +362,16 @@ class LaorV4StrategyEngineTest {
         assertEquals(expected, actual, 0.000001)
     }
 
-    private fun config(symbol: LaorV4StrategySymbol, totalSplitCount: Int): LaorV4StrategyConfig {
+    private fun config(
+        symbol: LaorV4StrategySymbol,
+        totalSplitCount: Int,
+        costPolicy: LaorV4StrategyCostPolicy = LaorV4StrategyCostPolicy(),
+    ): LaorV4StrategyConfig {
         return LaorV4StrategyConfig(
             symbol = symbol,
             totalSplitCount = totalSplitCount,
             firstBuyLimitPercentAbovePreviousClose = 12.0,
+            costPolicy = costPolicy,
         )
     }
 

@@ -4,6 +4,7 @@ data class LaorV4StrategyConfig(
     val symbol: LaorV4StrategySymbol,
     val totalSplitCount: Int,
     val firstBuyLimitPercentAbovePreviousClose: Double,
+    val costPolicy: LaorV4StrategyCostPolicy = LaorV4StrategyCostPolicy(),
 ) {
     val profile: LaorV4StrategyProfile = LaorV4StrategyProfile.from(symbol, totalSplitCount)
 
@@ -22,6 +23,74 @@ data class LaorV4StrategyConfig(
     companion object {
         const val MIN_FIRST_BUY_LIMIT_PERCENT_ABOVE_PREVIOUS_CLOSE: Double = 10.0
         const val MAX_FIRST_BUY_LIMIT_PERCENT_ABOVE_PREVIOUS_CLOSE: Double = 15.0
+    }
+}
+
+data class LaorV4StrategyCostPolicy(
+    val commissionRate: Double = 0.0,
+    val slippageRate: Double = 0.0,
+) {
+    init {
+        require(commissionRate >= 0.0) { "commissionRate must be zero or positive" }
+        require(slippageRate >= 0.0) { "slippageRate must be zero or positive" }
+        require(slippageRate < 1.0) { "slippageRate must be less than 1" }
+    }
+
+    fun buyExecutionPrice(referencePrice: Double): Double {
+        require(referencePrice > 0.0) { "referencePrice must be positive" }
+        return referencePrice
+    }
+
+    fun sellExecutionPrice(referencePrice: Double): Double {
+        require(referencePrice > 0.0) { "referencePrice must be positive" }
+        return referencePrice
+    }
+
+    fun executionPrice(side: LaorV4StrategySide, referencePrice: Double): Double {
+        return when (side) {
+            LaorV4StrategySide.BUY -> buyExecutionPrice(referencePrice)
+            LaorV4StrategySide.SELL -> sellExecutionPrice(referencePrice)
+        }
+    }
+
+    fun commission(notional: Double): Double {
+        require(notional >= 0.0) { "notional must not be negative" }
+        return notional * commissionRate
+    }
+
+    fun tradeCost(side: LaorV4StrategySide, referencePrice: Double, quantity: Long): Double {
+        require(referencePrice > 0.0) { "referencePrice must be positive" }
+        require(quantity > 0) { "quantity must be positive" }
+        val notional = referencePrice * quantity
+        return commission(notional) + slippageCost(side, notional)
+    }
+
+    fun buyCashRequired(referencePrice: Double, quantity: Long): Double {
+        require(quantity > 0) { "quantity must be positive" }
+        val notional = buyExecutionPrice(referencePrice) * quantity
+        return notional + tradeCost(LaorV4StrategySide.BUY, referencePrice, quantity)
+    }
+
+    fun sellCashProceeds(referencePrice: Double, quantity: Long): Double {
+        require(quantity > 0) { "quantity must be positive" }
+        val notional = sellExecutionPrice(referencePrice) * quantity
+        return notional - tradeCost(LaorV4StrategySide.SELL, referencePrice, quantity)
+    }
+
+    fun buyCashRequiredPerShare(referencePrice: Double): Double {
+        require(referencePrice > 0.0) { "referencePrice must be positive" }
+        return referencePrice * (1 + commissionRate)
+    }
+
+    private fun slippageCost(side: LaorV4StrategySide, notional: Double): Double {
+        return when (side) {
+            LaorV4StrategySide.BUY -> 0.0
+            LaorV4StrategySide.SELL -> notional * slippageRate * ROUND_TRIP_SLIPPAGE_MULTIPLIER
+        }
+    }
+
+    companion object {
+        private const val ROUND_TRIP_SLIPPAGE_MULTIPLIER = 2.0
     }
 }
 
@@ -115,8 +184,10 @@ enum class LaorV4StrategyProfile(
     val splitCount: Int,
 ) {
     TQQQ_20(LaorV4StrategySymbol.TQQQ, 20),
+    TQQQ_30(LaorV4StrategySymbol.TQQQ, 30),
     TQQQ_40(LaorV4StrategySymbol.TQQQ, 40),
     SOXL_20(LaorV4StrategySymbol.SOXL, 20),
+    SOXL_30(LaorV4StrategySymbol.SOXL, 30),
     SOXL_40(LaorV4StrategySymbol.SOXL, 40),
     ;
 
@@ -131,7 +202,7 @@ enum class LaorV4StrategyProfile(
             return values().firstOrNull { it.symbol == symbol && it.splitCount == splitCount }
                 ?: throw IllegalArgumentException(
                     "unsupported Laor V4 strategy profile: symbol=${symbol.ticker}, totalSplitCount=$splitCount " +
-                        "(supported: TQQQ 20/40, SOXL 20/40)",
+                        "(supported: TQQQ 20/30/40, SOXL 20/30/40)",
                 )
         }
 

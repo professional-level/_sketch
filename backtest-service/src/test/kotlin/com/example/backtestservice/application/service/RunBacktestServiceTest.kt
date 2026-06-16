@@ -8,6 +8,13 @@ import com.example.backtestservice.application.port.out.SaveHistoricalDailyCandl
 import com.example.backtestservice.domain.backtest.BacktestStrategyType
 import com.example.backtestservice.domain.backtest.BacktestTradeSide
 import com.example.backtestservice.domain.market.HistoricalCandle
+import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategyConfig
+import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategyCostPolicy
+import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategyOrder
+import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategyOrderTag
+import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategyOrderType
+import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategySide
+import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategySymbol
 import java.time.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -99,6 +106,40 @@ class RunBacktestServiceTest {
         assertEquals("1016.5".toBigDecimal(), result.equityCurve.last().cash)
         assertEquals("14.5".toBigDecimal(), result.equityCurve.last().realizedProfitLoss)
         assertEquals("2.0".toBigDecimal(), result.equityCurve.last().dividendIncome)
+    }
+
+    @Test
+    fun `Laor V4 slippage does not move LOC fill price beyond limit and is deducted on sell`() {
+        val config = LaorV4StrategyConfig(
+            symbol = LaorV4StrategySymbol.TQQQ,
+            totalSplitCount = 20,
+            firstBuyLimitPercentAbovePreviousClose = 12.0,
+            costPolicy = LaorV4StrategyCostPolicy(slippageRate = 0.01),
+        )
+        val candle = candle("2024-01-02", open = "100.0", high = "100.0", low = "100.0", close = "100.0")
+        val buyTrade = checkNotNull(
+            LaorV4StrategyOrder(
+                side = LaorV4StrategySide.BUY,
+                type = LaorV4StrategyOrderType.LOC,
+                price = 100.0,
+                quantity = 1,
+                tag = LaorV4StrategyOrderTag.FIRST_BUY,
+            ).toFilledOrder(candle),
+        ).toBacktestTrade(config, candle.date, cycleNo = 1)
+        val sellTrade = checkNotNull(
+            LaorV4StrategyOrder(
+                side = LaorV4StrategySide.SELL,
+                type = LaorV4StrategyOrderType.LOC,
+                price = 100.0,
+                quantity = 2,
+                tag = LaorV4StrategyOrderTag.QUARTER_SELL,
+            ).toFilledOrder(candle),
+        ).toBacktestTrade(config, candle.date, cycleNo = 1)
+
+        assertEquals("100.0".toBigDecimal(), buyTrade.price)
+        assertEquals("0.0".toBigDecimal(), buyTrade.commission)
+        assertEquals("100.0".toBigDecimal(), sellTrade.price)
+        assertEquals("4.0".toBigDecimal(), sellTrade.commission)
     }
 
     private fun candle(

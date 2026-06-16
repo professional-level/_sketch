@@ -26,6 +26,8 @@ data class RunLaorV4BacktestCommand(
     val firstBuyLimitPercentAbovePreviousClose: Double,
     val autoRestart: Boolean = true,
     val dividendReinvestment: Boolean = false,
+    val commissionRate: BigDecimal = BigDecimal.ZERO,
+    val slippageRate: BigDecimal = BigDecimal.ZERO,
     val autoAdjust: Boolean = false,
     val marketDataTimeoutSeconds: Long = 30,
 )
