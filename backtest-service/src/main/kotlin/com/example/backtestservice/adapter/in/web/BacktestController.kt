@@ -5,16 +5,23 @@ import com.example.backtestservice.application.port.`in`.BacktestEquityCurveResu
 import com.example.backtestservice.application.port.`in`.BacktestTradesPage
 import com.example.backtestservice.application.port.`in`.CalculateLaorV4DashboardCommand
 import com.example.backtestservice.application.port.`in`.CalculateLaorV4DashboardUseCase
+import com.example.backtestservice.application.port.`in`.CalculateLaorV4PortfolioDashboardQuery
+import com.example.backtestservice.application.port.`in`.CalculateLaorV4PortfolioDashboardUseCase
+import com.example.backtestservice.application.port.`in`.CreateLaorV4PortfolioCommand
+import com.example.backtestservice.application.port.`in`.CreateLaorV4PortfolioUseCase
 import com.example.backtestservice.application.port.`in`.ExecuteBacktestRunCommand
 import com.example.backtestservice.application.port.`in`.ExecuteBacktestRunUseCase
 import com.example.backtestservice.application.port.`in`.FindBacktestEquityCurveQuery
 import com.example.backtestservice.application.port.`in`.FindBacktestRunUseCase
 import com.example.backtestservice.application.port.`in`.FindBacktestTradesQuery
 import com.example.backtestservice.application.port.`in`.FindLaorV4BacktestRunUseCase
+import com.example.backtestservice.application.port.`in`.FindLaorV4PortfolioUseCase
 import com.example.backtestservice.application.port.`in`.ImportHistoricalMarketDataCommand
 import com.example.backtestservice.application.port.`in`.ImportHistoricalMarketDataResult
 import com.example.backtestservice.application.port.`in`.ImportHistoricalMarketDataUseCase
 import com.example.backtestservice.application.port.`in`.LaorV4DashboardResponse
+import com.example.backtestservice.application.port.`in`.LaorV4PortfolioDashboardResponse
+import com.example.backtestservice.application.port.`in`.LaorV4PortfolioResponse
 import com.example.backtestservice.application.port.`in`.LaorV4BacktestParameters
 import com.example.backtestservice.application.port.`in`.LaorV4BacktestRunResponse
 import com.example.backtestservice.application.port.`in`.RunLaorV4BacktestCommand
@@ -45,6 +52,9 @@ class BacktestController(
     private val findLaorV4BacktestRunUseCase: FindLaorV4BacktestRunUseCase,
     private val importHistoricalMarketDataUseCase: ImportHistoricalMarketDataUseCase,
     private val calculateLaorV4DashboardUseCase: CalculateLaorV4DashboardUseCase,
+    private val createLaorV4PortfolioUseCase: CreateLaorV4PortfolioUseCase,
+    private val findLaorV4PortfolioUseCase: FindLaorV4PortfolioUseCase,
+    private val calculateLaorV4PortfolioDashboardUseCase: CalculateLaorV4PortfolioDashboardUseCase,
 ) {
     @PostMapping("/runs")
     fun createBacktestRun(@RequestBody request: RunBacktestRequest): Mono<BacktestRunSummary> {
@@ -119,6 +129,48 @@ class BacktestController(
             calculateLaorV4DashboardUseCase.calculate(request.toCommand())
         }
             .mapRequestErrors()
+    }
+
+    @PostMapping("/laor-v4/portfolios")
+    fun createLaorV4Portfolio(@RequestBody request: CreateLaorV4PortfolioRequest): Mono<LaorV4PortfolioResponse> {
+        return blocking {
+            createLaorV4PortfolioUseCase.create(request.toCommand())
+        }
+            .mapRequestErrors()
+    }
+
+    @GetMapping("/laor-v4/portfolios")
+    fun findLaorV4Portfolios(): Mono<List<LaorV4PortfolioResponse>> {
+        return blocking {
+            findLaorV4PortfolioUseCase.findAll()
+        }
+    }
+
+    @GetMapping("/laor-v4/portfolios/{portfolioId}")
+    fun findLaorV4Portfolio(@PathVariable portfolioId: UUID): Mono<LaorV4PortfolioResponse> {
+        return blocking {
+            findLaorV4PortfolioUseCase.find(portfolioId)
+        }
+            .mapNotFound()
+    }
+
+    @GetMapping("/laor-v4/portfolios/{portfolioId}/dashboard")
+    fun calculateLaorV4PortfolioDashboard(
+        @PathVariable portfolioId: UUID,
+        @RequestParam(required = false) asOfDate: LocalDate?,
+        @RequestParam(defaultValue = "30") marketDataTimeoutSeconds: Long,
+    ): Mono<LaorV4PortfolioDashboardResponse> {
+        return blocking {
+            calculateLaorV4PortfolioDashboardUseCase.calculate(
+                CalculateLaorV4PortfolioDashboardQuery(
+                    portfolioId = portfolioId,
+                    asOfDate = asOfDate,
+                    marketDataTimeoutSeconds = marketDataTimeoutSeconds,
+                ),
+            )
+        }
+            .mapRequestErrors()
+            .mapNotFound()
     }
 
     @PostMapping("/market-data/import")
@@ -281,6 +333,38 @@ data class LaorV4DashboardRequest(
             commissionRate = commissionRate,
             slippageRate = slippageRate,
             marketDataTimeoutSeconds = marketDataTimeoutSeconds,
+        )
+    }
+}
+
+data class CreateLaorV4PortfolioRequest(
+    val name: String? = null,
+    val symbol: String,
+    val market: String = "US",
+    val startDate: LocalDate,
+    val initialCash: BigDecimal,
+    val totalSplitCount: Int,
+    val firstBuyLimitPercentAbovePreviousClose: Double,
+    val autoRestart: Boolean = true,
+    val dividendReinvestment: Boolean = false,
+    val autoAdjust: Boolean = false,
+    val commissionRate: BigDecimal = BigDecimal("0.0005"),
+    val slippageRate: BigDecimal = BigDecimal.ZERO,
+) {
+    fun toCommand(): CreateLaorV4PortfolioCommand {
+        return CreateLaorV4PortfolioCommand(
+            name = name,
+            symbol = symbol,
+            market = market,
+            startDate = startDate,
+            initialCash = initialCash,
+            totalSplitCount = totalSplitCount,
+            firstBuyLimitPercentAbovePreviousClose = firstBuyLimitPercentAbovePreviousClose,
+            autoRestart = autoRestart,
+            dividendReinvestment = dividendReinvestment,
+            autoAdjust = autoAdjust,
+            commissionRate = commissionRate,
+            slippageRate = slippageRate,
         )
     }
 }

@@ -71,3 +71,6 @@ out/
 hs_err_pid*
 replay_pid*
 amend-commit.sh
+
+node_modules/
+laor-dashboard-web/dist/
