@@ -66,14 +66,17 @@ class LaorV4DashboardService(
             .distinctBy { it.date }
             .sortedBy { it.date }
 
-        val simulationCandles = allCandles
+        val candlesFromStartReference = allCandles
             .filter { it.date >= command.startDate && it.date <= upperAsOfDate }
             .sortedBy { it.date }
-        require(simulationCandles.isNotEmpty()) {
+        require(candlesFromStartReference.isNotEmpty()) {
             "historical candles not found: symbol=${symbol.ticker}, from=${command.startDate}, to=$upperAsOfDate"
         }
+        require(candlesFromStartReference.first().date == command.startDate) {
+            "start reference candle not found: symbol=${symbol.ticker}, date=${command.startDate}"
+        }
 
-        val resolvedCandle = simulationCandles.last()
+        val resolvedCandle = candlesFromStartReference.last()
         val resolvedAsOfDate = resolvedCandle.date
         val candlesThroughResolvedAsOf = allCandles.filter { it.date <= resolvedAsOfDate }
         validateHistoricalCoverage(
@@ -87,7 +90,9 @@ class LaorV4DashboardService(
             config = config,
             command = command,
             allCandles = candlesThroughResolvedAsOf,
-            simulationCandles = simulationCandles.filter { it.date <= resolvedAsOfDate },
+            simulationCandles = candlesFromStartReference.filter {
+                it.date > command.startDate && it.date <= resolvedAsOfDate
+            },
         )
         val orderSessionDate = nextTradingDay(market, resolvedAsOfDate)
         val nextMarket = candlesThroughResolvedAsOf.toLaorNextSessionMarket(resolvedCandle)

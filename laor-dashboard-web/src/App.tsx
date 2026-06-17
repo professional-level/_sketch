@@ -185,7 +185,7 @@ export default function App() {
                 >
                   <strong>{portfolio.name || `${portfolio.symbol} ${portfolio.totalSplitCount}`}</strong>
                   <span>
-                    {portfolio.symbol} · {portfolio.totalSplitCount}분할 · {portfolio.startDate}
+                    {portfolio.symbol} · {portfolio.totalSplitCount}분할 · 기준일 {portfolio.startDate}
                   </span>
                   {portfolio.latestSnapshot ? (
                     <small>{formatSignedCurrency(portfolio.latestSnapshot.totalProfitLoss)}</small>
@@ -298,7 +298,7 @@ function PortfolioForm({
         </label>
       </div>
       <label>
-        시작일
+        첫 주문 기준일
         <input type="date" value={form.startDate} onChange={(event) => onChange({ ...form, startDate: event.target.value })} />
       </label>
       <div className="field-grid two">
@@ -442,7 +442,7 @@ function DashboardView({
         </div>
         <div className="order-context">
           <Readout label="주문일" value={dashboard.nextOrderContext.orderSessionDate} />
-          <Readout label="전일 종가" value={formatCurrency(dashboard.nextOrderContext.previousClose)} />
+          <Readout label="기준 종가" value={formatCurrency(dashboard.nextOrderContext.previousClose)} />
           <Readout label="별 매도가" value={formatCurrency(dashboard.nextOrderContext.starPrice)} />
           <Readout label="1회 매수금" value={formatCurrency(dashboard.nextOrderContext.oneBuyBudget)} />
         </div>

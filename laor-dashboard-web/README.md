@@ -22,6 +22,7 @@ VITE_BACKTEST_API_BASE_URL=http://localhost:8081 npm run dev
 
 - Create and select saved LAOR V4 portfolio settings.
 - Recalculate dashboard state by `asOfDate`.
+- `startDate` is the first order reference date, so replay starts from the next trading day.
 - Show current position, valuation, next orders, data coverage, and API gaps.
 
 ## Notes From `raor-calculate`

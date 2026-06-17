@@ -20,7 +20,7 @@ import kotlin.test.assertTrue
 
 class LaorV4DashboardServiceTest {
     @Test
-    fun `replays through resolved as-of date and returns current summary with next orders`() {
+    fun `treats start date as first order reference date and replays from next trading day`() {
         val startDate = LocalDate.parse("2024-01-02")
         val asOfDate = LocalDate.parse("2024-01-03")
         val import = FakeImportHistoricalMarketDataUseCase()
@@ -59,10 +59,10 @@ class LaorV4DashboardServiceTest {
         assertEquals(30, response.parameters.totalSplitCount)
         assertDecimal("0.0005", response.parameters.commissionRate)
         assertEquals(1, response.current.cycleNo)
-        assertDecimal("1.5", response.current.progressRound)
-        assertEquals(3, response.current.holdingQuantity)
-        assertDecimal("10.17175", response.current.averagePurchasePrice)
-        assertDecimal("969.48475", response.current.cash)
+        assertDecimal("1.0", response.current.progressRound)
+        assertEquals(2, response.current.holdingQuantity)
+        assertDecimal("10.50525", response.current.averagePurchasePrice)
+        assertDecimal("978.9895", response.current.cash)
         assertEquals(LocalDate.parse("2024-01-04"), response.nextOrderContext.orderSessionDate)
         assertEquals(listOf("STAR_HALF_BUY", "AVG_HALF_BUY", "TARGET_SELL"), response.nextOrders.map { it.orderTag })
         assertEquals(startDate, response.dataCoverage.from)
@@ -70,6 +70,45 @@ class LaorV4DashboardServiceTest {
         assertEquals(2, response.dataCoverage.candleCount)
         assertEquals(startDate.minusDays(14), import.commands.single().from)
         assertEquals(asOfDate, import.commands.single().to)
+    }
+
+    @Test
+    fun `returns initial state and first order when as-of date is start reference date`() {
+        val startDate = LocalDate.parse("2024-01-02")
+        val import = FakeImportHistoricalMarketDataUseCase()
+        val service = LaorV4DashboardService(
+            importHistoricalMarketDataUseCase = import,
+            historicalMarketDataPort = FakeHistoricalMarketDataPort(
+                listOf(candle("2024-01-02", close = "10.0")),
+            ),
+            marketCalendarPort = FakeMarketCalendarPort(
+                listOf(
+                    LocalDate.parse("2024-01-02"),
+                    LocalDate.parse("2024-01-03"),
+                ),
+            ),
+        )
+
+        val response = service.calculate(
+            CalculateLaorV4DashboardCommand(
+                symbol = "TQQQ",
+                startDate = startDate,
+                asOfDate = startDate,
+                initialCash = "1000".toBigDecimal(),
+                totalSplitCount = 30,
+                firstBuyLimitPercentAbovePreviousClose = 12.0,
+            ),
+        )
+
+        assertEquals(startDate, response.resolvedAsOfDate)
+        assertDecimal("0.0", response.current.progressRound)
+        assertEquals(0, response.current.holdingQuantity)
+        assertDecimal("1000", response.current.cash)
+        assertEquals(LocalDate.parse("2024-01-03"), response.nextOrderContext.orderSessionDate)
+        assertEquals(listOf("FIRST_BUY"), response.nextOrders.map { it.orderTag })
+        assertDecimal("10.0", response.nextOrderContext.previousClose)
+        assertEquals(startDate.minusDays(14), import.commands.single().from)
+        assertEquals(startDate, import.commands.single().to)
     }
 
     @Test
