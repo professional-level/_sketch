@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  Activity,
   AlertTriangle,
+  ArrowLeft,
+  ArrowRight,
   BarChart3,
   CalendarDays,
   Check,
   CircleDollarSign,
   Clock3,
   Database,
+  Layers3,
   ListOrdered,
   Loader2,
   Plus,
@@ -16,12 +20,18 @@ import {
 } from 'lucide-react'
 import {
   createPortfolio,
+  fetchPortfolioDailyFlow,
   fetchPortfolioDashboard,
   fetchPortfolios,
+  fetchPortfolioTrades,
+  type BacktestTrade,
   type CreatePortfolioRequest,
   type Dashboard,
+  type DailyFlowItem,
   type NextOrder,
   type Portfolio,
+  type PortfolioDailyFlowPage,
+  type PortfolioTradesPage,
   type SplitCount,
   type StrategySymbol,
 } from './api'
@@ -35,6 +45,9 @@ import {
 } from './format'
 
 type LoadState = 'idle' | 'loading' | 'error'
+type DetailTab = 'overview' | 'trades' | 'flow'
+
+const detailPageSize = 12
 
 interface FormState {
   name: string
@@ -75,8 +88,14 @@ export default function App() {
   const [dashboard, setDashboard] = useState<Dashboard | null>(null)
   const [form, setForm] = useState<FormState>(defaultForm)
   const [asOfDate, setAsOfDate] = useState(todayIsoDate())
+  const [activeTab, setActiveTab] = useState<DetailTab>('overview')
+  const [tradesPage, setTradesPage] = useState<PortfolioTradesPage | null>(null)
+  const [dailyFlowPage, setDailyFlowPage] = useState<PortfolioDailyFlowPage | null>(null)
+  const [tradePageIndex, setTradePageIndex] = useState(0)
+  const [flowPageIndex, setFlowPageIndex] = useState(0)
   const [portfolioLoadState, setPortfolioLoadState] = useState<LoadState>('idle')
   const [dashboardLoadState, setDashboardLoadState] = useState<LoadState>('idle')
+  const [detailLoadState, setDetailLoadState] = useState<LoadState>('idle')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
 
@@ -118,6 +137,44 @@ export default function App() {
     }
   }, [asOfDate, selectedPortfolioId])
 
+  const refreshTrades = useCallback(async () => {
+    if (!selectedPortfolioId) return
+    setDetailLoadState('loading')
+    setMessage('')
+    try {
+      const response = await fetchPortfolioTrades(selectedPortfolioId, {
+        asOfDate: asOfDate || undefined,
+        page: tradePageIndex,
+        size: detailPageSize,
+        sort: 'DESC',
+      })
+      setTradesPage(response)
+      setDetailLoadState('idle')
+    } catch (error) {
+      setDetailLoadState('error')
+      setMessage(error instanceof Error ? error.message : '체결 목록을 불러오지 못했습니다.')
+    }
+  }, [asOfDate, selectedPortfolioId, tradePageIndex])
+
+  const refreshDailyFlow = useCallback(async () => {
+    if (!selectedPortfolioId) return
+    setDetailLoadState('loading')
+    setMessage('')
+    try {
+      const response = await fetchPortfolioDailyFlow(selectedPortfolioId, {
+        asOfDate: asOfDate || undefined,
+        page: flowPageIndex,
+        size: detailPageSize,
+        sort: 'ASC',
+      })
+      setDailyFlowPage(response)
+      setDetailLoadState('idle')
+    } catch (error) {
+      setDetailLoadState('error')
+      setMessage(error instanceof Error ? error.message : '일별 흐름을 불러오지 못했습니다.')
+    }
+  }, [asOfDate, flowPageIndex, selectedPortfolioId])
+
   useEffect(() => {
     void refreshPortfolios()
   }, [refreshPortfolios])
@@ -129,6 +186,25 @@ export default function App() {
       setDashboard(null)
     }
   }, [refreshDashboard, selectedPortfolioId])
+
+  useEffect(() => {
+    setTradePageIndex(0)
+    setFlowPageIndex(0)
+    setTradesPage(null)
+    setDailyFlowPage(null)
+  }, [asOfDate, selectedPortfolioId])
+
+  useEffect(() => {
+    if (activeTab === 'trades' && selectedPortfolioId) {
+      void refreshTrades()
+    }
+  }, [activeTab, refreshTrades, selectedPortfolioId])
+
+  useEffect(() => {
+    if (activeTab === 'flow' && selectedPortfolioId) {
+      void refreshDailyFlow()
+    }
+  }, [activeTab, refreshDailyFlow, selectedPortfolioId])
 
   async function handleCreatePortfolio(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -234,7 +310,22 @@ export default function App() {
           </div>
         ) : null}
 
-        <DashboardView dashboard={dashboard} selectedPortfolio={selectedPortfolio} loading={dashboardLoadState === 'loading'} />
+        <DashboardView
+          activeTab={activeTab}
+          dashboard={dashboard}
+          dailyFlowPage={dailyFlowPage}
+          detailLoading={detailLoadState === 'loading'}
+          flowPageIndex={flowPageIndex}
+          loading={dashboardLoadState === 'loading'}
+          onFlowPageChange={setFlowPageIndex}
+          onRefreshDailyFlow={() => void refreshDailyFlow()}
+          onRefreshTrades={() => void refreshTrades()}
+          onTabChange={setActiveTab}
+          onTradePageChange={setTradePageIndex}
+          selectedPortfolio={selectedPortfolio}
+          tradePageIndex={tradePageIndex}
+          tradesPage={tradesPage}
+        />
       </section>
     </main>
   )
@@ -374,12 +465,34 @@ function PortfolioForm({
 }
 
 function DashboardView({
+  activeTab,
   dashboard,
+  dailyFlowPage,
+  detailLoading,
+  flowPageIndex,
+  onFlowPageChange,
+  onRefreshDailyFlow,
+  onRefreshTrades,
+  onTabChange,
+  onTradePageChange,
   selectedPortfolio,
+  tradePageIndex,
+  tradesPage,
   loading,
 }: {
+  activeTab: DetailTab
   dashboard: Dashboard | null
+  dailyFlowPage: PortfolioDailyFlowPage | null
+  detailLoading: boolean
+  flowPageIndex: number
+  onFlowPageChange: (page: number) => void
+  onRefreshDailyFlow: () => void
+  onRefreshTrades: () => void
+  onTabChange: (tab: DetailTab) => void
+  onTradePageChange: (page: number) => void
   selectedPortfolio?: Portfolio
+  tradePageIndex: number
+  tradesPage: PortfolioTradesPage | null
   loading: boolean
 }) {
   if (!selectedPortfolio) {
@@ -451,21 +564,286 @@ function DashboardView({
 
       <section className="panel dashboard-panel wide-panel">
         <div className="panel-title-row">
-          <h2>API 윤곽</h2>
-          <Database size={17} aria-hidden="true" />
+          <h2>상세</h2>
+          <div className="panel-actions">
+            {activeTab === 'trades' ? (
+              <button className="icon-button subtle" type="button" onClick={onRefreshTrades} title="체결 목록 새로고침">
+                {detailLoading ? <Loader2 className="spin" size={16} aria-hidden="true" /> : <RefreshCw size={16} aria-hidden="true" />}
+              </button>
+            ) : null}
+            {activeTab === 'flow' ? (
+              <button className="icon-button subtle" type="button" onClick={onRefreshDailyFlow} title="일별 흐름 새로고침">
+                {detailLoading ? <Loader2 className="spin" size={16} aria-hidden="true" /> : <RefreshCw size={16} aria-hidden="true" />}
+              </button>
+            ) : null}
+            <Layers3 size={17} aria-hidden="true" />
+          </div>
         </div>
-        <div className="api-grid">
-          <ApiNeed status="ready" title="설정 저장" endpoint="POST /backtests/laor-v4/portfolios" />
-          <ApiNeed status="ready" title="현재 상태 계산" endpoint="GET /backtests/laor-v4/portfolios/{id}/dashboard" />
-          <ApiNeed status="missing" title="가상 체결 목록" endpoint="GET /backtests/laor-v4/portfolios/{id}/trades" />
-          <ApiNeed status="missing" title="일별 상태 흐름" endpoint="GET /backtests/laor-v4/portfolios/{id}/daily-flow" />
-        </div>
-        <div className="coverage-row">
-          <span>데이터 {dashboard.dataCoverage.from} ~ {dashboard.dataCoverage.to}</span>
-          <span>{formatNumber(dashboard.dataCoverage.candleCount, 0)} candles</span>
-          <span>계산 {formatDateTime(selectedPortfolio.latestSnapshot?.calculatedAt)}</span>
-        </div>
+        <DetailTabs activeTab={activeTab} onChange={onTabChange} />
+        {activeTab === 'overview' ? (
+          <OverviewDetails dashboard={dashboard} selectedPortfolio={selectedPortfolio} />
+        ) : null}
+        {activeTab === 'trades' ? (
+          <TradesPanel
+            loading={detailLoading}
+            onPageChange={onTradePageChange}
+            page={tradesPage}
+            pageIndex={tradePageIndex}
+          />
+        ) : null}
+        {activeTab === 'flow' ? (
+          <DailyFlowPanel
+            loading={detailLoading}
+            onPageChange={onFlowPageChange}
+            page={dailyFlowPage}
+            pageIndex={flowPageIndex}
+          />
+        ) : null}
       </section>
+    </div>
+  )
+}
+
+function DetailTabs({
+  activeTab,
+  onChange,
+}: {
+  activeTab: DetailTab
+  onChange: (tab: DetailTab) => void
+}) {
+  return (
+    <div className="detail-tabs" role="tablist" aria-label="상세 보기">
+      <button className={activeTab === 'overview' ? 'active' : ''} type="button" onClick={() => onChange('overview')}>
+        <Activity size={15} aria-hidden="true" />
+        개요
+      </button>
+      <button className={activeTab === 'trades' ? 'active' : ''} type="button" onClick={() => onChange('trades')}>
+        <ListOrdered size={15} aria-hidden="true" />
+        체결
+      </button>
+      <button className={activeTab === 'flow' ? 'active' : ''} type="button" onClick={() => onChange('flow')}>
+        <Layers3 size={15} aria-hidden="true" />
+        일별 흐름
+      </button>
+    </div>
+  )
+}
+
+function OverviewDetails({
+  dashboard,
+  selectedPortfolio,
+}: {
+  dashboard: Dashboard
+  selectedPortfolio: Portfolio
+}) {
+  return (
+    <>
+      <div className="detail-grid">
+        <Readout label="첫 주문 기준일" value={dashboard.startDate} />
+        <Readout label="계산 기준일" value={dashboard.resolvedAsOfDate} />
+        <Readout label="데이터 시작" value={dashboard.dataCoverage.from} />
+        <Readout label="데이터 끝" value={dashboard.dataCoverage.to} />
+        <Readout label="캔들" value={formatNumber(dashboard.dataCoverage.candleCount, 0)} />
+        <Readout label="완료 Cycle" value={formatNumber(dashboard.cycleSummary.completedCycleCount, 0)} />
+        <Readout label="현재 Cycle 시작" value={dashboard.cycleSummary.currentCycleStartedAt ?? '-'} />
+        <Readout label="계산 시각" value={formatDateTime(selectedPortfolio.latestSnapshot?.calculatedAt)} />
+      </div>
+      <div className="coverage-row">
+        <span>{dashboard.parameters.totalSplitCount}분할</span>
+        <span>첫 매수 상한 {formatNumber(dashboard.parameters.firstBuyLimitPercentAbovePreviousClose, 2)}%</span>
+        <span>수수료 {formatPercent(dashboard.parameters.commissionRate * 100)}</span>
+        <span>슬리피지 {formatPercent(dashboard.parameters.slippageRate * 100)}</span>
+        <span>{dashboard.parameters.autoRestart ? '자동 재시작' : '단일 Cycle'}</span>
+      </div>
+    </>
+  )
+}
+
+function TradesPanel({
+  loading,
+  onPageChange,
+  page,
+  pageIndex,
+}: {
+  loading: boolean
+  onPageChange: (page: number) => void
+  page: PortfolioTradesPage | null
+  pageIndex: number
+}) {
+  if (loading && !page) {
+    return <DetailLoading label="체결 목록 계산 중" />
+  }
+
+  if (!page || page.total === 0) {
+    return <div className="empty-row">체결 없음</div>
+  }
+
+  return (
+    <>
+      <div className="table-wrap detail-table">
+        <table>
+          <thead>
+            <tr>
+              <th>일자</th>
+              <th>Cycle</th>
+              <th>Side</th>
+              <th>Tag</th>
+              <th>Price</th>
+              <th>Qty</th>
+              <th>Notional</th>
+              <th>Cost</th>
+            </tr>
+          </thead>
+          <tbody>
+            {page.items.map((trade) => (
+              <TradeRow key={`${trade.date}-${trade.side}-${trade.orderTag}-${trade.quantity}`} trade={trade} />
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <Pagination page={page.page} size={page.size} total={page.total} requestedPage={pageIndex} onChange={onPageChange} />
+    </>
+  )
+}
+
+function TradeRow({ trade }: { trade: BacktestTrade }) {
+  return (
+    <tr>
+      <td>{trade.date}</td>
+      <td>{trade.cycleNo ?? '-'}</td>
+      <td><span className={`side-pill ${trade.side.toLowerCase()}`}>{trade.side}</span></td>
+      <td>{trade.orderTag ?? '-'}</td>
+      <td>{formatCurrency(trade.price)}</td>
+      <td>{formatNumber(trade.quantity, 0)}</td>
+      <td>{formatCurrency(trade.notional)}</td>
+      <td>{formatCurrency(trade.commission)}</td>
+    </tr>
+  )
+}
+
+function DailyFlowPanel({
+  loading,
+  onPageChange,
+  page,
+  pageIndex,
+}: {
+  loading: boolean
+  onPageChange: (page: number) => void
+  page: PortfolioDailyFlowPage | null
+  pageIndex: number
+}) {
+  if (loading && !page) {
+    return <DetailLoading label="일별 흐름 계산 중" />
+  }
+
+  if (!page || page.total === 0) {
+    return <div className="empty-row">흐름 없음</div>
+  }
+
+  return (
+    <>
+      <div className="table-wrap flow-table">
+        <table>
+          <thead>
+            <tr>
+              <th>일자</th>
+              <th>종가</th>
+              <th>T</th>
+              <th>보유</th>
+              <th>현금</th>
+              <th>체결</th>
+              <th>상태</th>
+            </tr>
+          </thead>
+          <tbody>
+            {page.items.map((item) => (
+              <DailyFlowRow item={item} key={item.date} />
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <Pagination page={page.page} size={page.size} total={page.total} requestedPage={pageIndex} onChange={onPageChange} />
+    </>
+  )
+}
+
+function DailyFlowRow({ item }: { item: DailyFlowItem }) {
+  return (
+    <tr>
+      <td>
+        <div className="cell-stack">
+          <strong>{item.date}</strong>
+          <span>{item.referenceDate} 기준</span>
+        </div>
+      </td>
+      <td>
+        <div className="cell-stack">
+          <strong>{formatCurrency(item.close)}</strong>
+          <span>전일 {formatCurrency(item.previousClose)}</span>
+        </div>
+      </td>
+      <td>{formatNumber(item.before.progressRound, 4)} → {formatNumber(item.after.progressRound, 4)}</td>
+      <td>{formatNumber(item.before.holdingQuantity, 0)} → {formatNumber(item.after.holdingQuantity, 0)}</td>
+      <td>{formatCurrency(item.after.cash)}</td>
+      <td>
+        {item.filledOrders.length === 0 ? (
+          <span className="muted-text">-</span>
+        ) : (
+          <div className="fill-list">
+            {item.filledOrders.map((trade) => (
+              <span key={`${trade.side}-${trade.orderTag}-${trade.quantity}`}>
+                {trade.side} {trade.quantity} · {trade.orderTag}
+              </span>
+            ))}
+          </div>
+        )}
+      </td>
+      <td>
+        <div className="status-list">
+          <span>{item.after.mode}</span>
+          {item.cycleClosed ? <span className="status-pill">Cycle 종료</span> : null}
+          {item.tradingCompleted ? <span className="status-pill">완료</span> : null}
+        </div>
+      </td>
+    </tr>
+  )
+}
+
+function DetailLoading({ label }: { label: string }) {
+  return (
+    <div className="empty-row">
+      <Loader2 className="spin" size={16} aria-hidden="true" />
+      {label}
+    </div>
+  )
+}
+
+function Pagination({
+  onChange,
+  page,
+  requestedPage,
+  size,
+  total,
+}: {
+  onChange: (page: number) => void
+  page: number
+  requestedPage: number
+  size: number
+  total: number
+}) {
+  const totalPages = Math.max(1, Math.ceil(total / size))
+  const currentPage = Math.min(page, totalPages - 1)
+  return (
+    <div className="pagination-row">
+      <button type="button" disabled={requestedPage <= 0} onClick={() => onChange(Math.max(0, requestedPage - 1))}>
+        <ArrowLeft size={15} aria-hidden="true" />
+        이전
+      </button>
+      <span>{currentPage + 1} / {totalPages}</span>
+      <button type="button" disabled={requestedPage >= totalPages - 1} onClick={() => onChange(requestedPage + 1)}>
+        다음
+        <ArrowRight size={15} aria-hidden="true" />
+      </button>
     </div>
   )
 }
@@ -529,24 +907,6 @@ function NextOrdersTable({ orders }: { orders: NextOrder[] }) {
           ))}
         </tbody>
       </table>
-    </div>
-  )
-}
-
-function ApiNeed({
-  status,
-  title,
-  endpoint,
-}: {
-  status: 'ready' | 'missing'
-  title: string
-  endpoint: string
-}) {
-  return (
-    <div className={`api-need ${status}`}>
-      <span>{status === 'ready' ? '연동됨' : '필요'}</span>
-      <strong>{title}</strong>
-      <code>{endpoint}</code>
     </div>
   )
 }
