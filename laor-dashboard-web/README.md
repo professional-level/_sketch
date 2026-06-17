@@ -9,7 +9,9 @@ npm install
 npm run dev
 ```
 
-The Vite dev server proxies `/backtests/**` to `http://localhost:8080` by default.
+Open `http://127.0.0.1:5184/`.
+
+The Vite dev server proxies `/backtests/**` to `http://localhost:8084` by default.
 Override with:
 
 ```bash
