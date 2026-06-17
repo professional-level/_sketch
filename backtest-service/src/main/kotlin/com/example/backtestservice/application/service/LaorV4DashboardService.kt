@@ -2,20 +2,35 @@ package com.example.backtestservice.application.service
 
 import com.example.backtestservice.application.port.`in`.CalculateLaorV4DashboardCommand
 import com.example.backtestservice.application.port.`in`.CalculateLaorV4DashboardUseCase
+import com.example.backtestservice.application.port.`in`.FindLaorV4DashboardDailyFlowQuery
+import com.example.backtestservice.application.port.`in`.FindLaorV4DashboardDetailsUseCase
+import com.example.backtestservice.application.port.`in`.FindLaorV4DashboardIndexQuery
+import com.example.backtestservice.application.port.`in`.FindLaorV4DashboardTradesQuery
 import com.example.backtestservice.application.port.`in`.ImportHistoricalMarketDataCommand
 import com.example.backtestservice.application.port.`in`.ImportHistoricalMarketDataUseCase
+import com.example.backtestservice.application.port.`in`.LaorV4DashboardChartPoint
+import com.example.backtestservice.application.port.`in`.LaorV4DashboardChartSeries
 import com.example.backtestservice.application.port.`in`.LaorV4DashboardCurrentState
 import com.example.backtestservice.application.port.`in`.LaorV4DashboardCycleSummary
+import com.example.backtestservice.application.port.`in`.LaorV4DashboardDailyFlowItem
+import com.example.backtestservice.application.port.`in`.LaorV4DashboardDailyFlowPage
+import com.example.backtestservice.application.port.`in`.LaorV4DashboardDailyState
 import com.example.backtestservice.application.port.`in`.LaorV4DashboardDataCoverage
+import com.example.backtestservice.application.port.`in`.LaorV4DashboardDetailSort
+import com.example.backtestservice.application.port.`in`.LaorV4DashboardIndexBase
+import com.example.backtestservice.application.port.`in`.LaorV4DashboardIndexPoint
+import com.example.backtestservice.application.port.`in`.LaorV4DashboardIndexResponse
 import com.example.backtestservice.application.port.`in`.LaorV4DashboardNextOrder
 import com.example.backtestservice.application.port.`in`.LaorV4DashboardNextOrderContext
 import com.example.backtestservice.application.port.`in`.LaorV4DashboardParameters
 import com.example.backtestservice.application.port.`in`.LaorV4DashboardResponse
+import com.example.backtestservice.application.port.`in`.LaorV4DashboardTradesPage
 import com.example.backtestservice.application.port.`in`.LaorV4DashboardValuation
 import com.example.backtestservice.application.port.out.HistoricalDailyCandlesQuery
 import com.example.backtestservice.application.port.out.HistoricalMarketDataPort
 import com.example.backtestservice.application.port.out.MarketCalendarPort
 import com.example.backtestservice.application.port.out.MarketTradingDaysQuery
+import com.example.backtestservice.domain.backtest.BacktestTrade
 import com.example.backtestservice.domain.market.HistoricalCandle
 import com.example.common.UseCaseImpl
 import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategyConfig
@@ -35,8 +50,68 @@ class LaorV4DashboardService(
     private val importHistoricalMarketDataUseCase: ImportHistoricalMarketDataUseCase,
     private val historicalMarketDataPort: HistoricalMarketDataPort,
     private val marketCalendarPort: MarketCalendarPort,
-) : CalculateLaorV4DashboardUseCase {
+) : CalculateLaorV4DashboardUseCase,
+    FindLaorV4DashboardDetailsUseCase {
     override fun calculate(command: CalculateLaorV4DashboardCommand): LaorV4DashboardResponse {
+        return calculateInternal(command).response
+    }
+
+    override fun findTrades(query: FindLaorV4DashboardTradesQuery): LaorV4DashboardTradesPage {
+        query.validatePage()
+        val calculation = calculateInternal(query.command)
+        val trades = calculation.replay.trades.sortedBy(query.sort) { it.date }
+        return LaorV4DashboardTradesPage(
+            symbol = calculation.response.symbol,
+            market = calculation.response.market,
+            startDate = calculation.response.startDate,
+            requestedAsOfDate = calculation.response.requestedAsOfDate,
+            resolvedAsOfDate = calculation.response.resolvedAsOfDate,
+            page = query.page,
+            size = query.size,
+            total = trades.size,
+            items = trades.page(query.page, query.size),
+        )
+    }
+
+    override fun findDailyFlow(query: FindLaorV4DashboardDailyFlowQuery): LaorV4DashboardDailyFlowPage {
+        query.validatePage()
+        val calculation = calculateInternal(query.command)
+        val flows = calculation.replay.dailyFlows.sortedBy(query.sort) { it.date }
+        return LaorV4DashboardDailyFlowPage(
+            symbol = calculation.response.symbol,
+            market = calculation.response.market,
+            startDate = calculation.response.startDate,
+            requestedAsOfDate = calculation.response.requestedAsOfDate,
+            resolvedAsOfDate = calculation.response.resolvedAsOfDate,
+            page = query.page,
+            size = query.size,
+            total = flows.size,
+            items = flows.page(query.page, query.size),
+        )
+    }
+
+    override fun findIndex(query: FindLaorV4DashboardIndexQuery): LaorV4DashboardIndexResponse {
+        val calculation = calculateInternal(query.command)
+        val points = calculation.toIndexPoints()
+        return LaorV4DashboardIndexResponse(
+            symbol = calculation.response.symbol,
+            market = calculation.response.market,
+            startDate = calculation.response.startDate,
+            requestedAsOfDate = calculation.response.requestedAsOfDate,
+            resolvedAsOfDate = calculation.response.resolvedAsOfDate,
+            base = LaorV4DashboardIndexBase(
+                baseDate = calculation.response.startDate,
+                baseValue = LAOR_INDEX_BASE_VALUE,
+                initialCash = calculation.initialCash,
+                benchmarkSymbol = calculation.response.symbol,
+                benchmarkClose = calculation.baseCandle.close,
+            ),
+            series = points.toChartSeries(calculation.response.symbol),
+            points = points,
+        )
+    }
+
+    private fun calculateInternal(command: CalculateLaorV4DashboardCommand): DashboardCalculation {
         command.validate()
 
         val symbol = LaorV4StrategySymbol.valueOf(command.symbol.trim().uppercase())
@@ -115,7 +190,7 @@ class LaorV4DashboardService(
             reportCash = reportCash,
         )
 
-        return LaorV4DashboardResponse(
+        val response = LaorV4DashboardResponse(
             symbol = symbol.ticker,
             market = market,
             startDate = command.startDate,
@@ -161,6 +236,13 @@ class LaorV4DashboardService(
                 candleCount = candlesThroughResolvedAsOf.size,
             ),
         )
+        return DashboardCalculation(
+            response = response,
+            replay = replay,
+            config = config,
+            baseCandle = candlesFromStartReference.first(),
+            initialCash = command.initialCash,
+        )
     }
 
     private fun CalculateLaorV4DashboardCommand.validate() {
@@ -172,6 +254,19 @@ class LaorV4DashboardService(
         require(marketDataTimeoutSeconds > 0) { "marketDataTimeoutSeconds must be positive" }
         val upperAsOfDate = asOfDate ?: LocalDate.now()
         require(!startDate.isAfter(upperAsOfDate)) { "startDate must be on or before asOfDate" }
+    }
+
+    private fun FindLaorV4DashboardTradesQuery.validatePage() {
+        validatePage(page, size)
+    }
+
+    private fun FindLaorV4DashboardDailyFlowQuery.validatePage() {
+        validatePage(page, size)
+    }
+
+    private fun validatePage(page: Int, size: Int) {
+        require(page >= 0) { "page must be zero or positive" }
+        require(size in 1..1000) { "size must be between 1 and 1000" }
     }
 
     private fun importMarketData(
@@ -245,6 +340,8 @@ class LaorV4DashboardService(
         var dividendIncome = 0.0
         var currentCycleStartedAt: LocalDate? = simulationCandles.firstOrNull()?.date
         var startNextCycleOnNextCandle = false
+        val trades = mutableListOf<BacktestTrade>()
+        val dailyFlows = mutableListOf<LaorV4DashboardDailyFlowItem>()
 
         simulationCandles.forEach { candle ->
             if (startNextCycleOnNextCandle) {
@@ -252,20 +349,31 @@ class LaorV4DashboardService(
                 startNextCycleOnNextCandle = false
             }
 
+            val cycleNoBefore = cycleNo
+            val stateBefore = state.toDailyState(cycleNoBefore, dividendIncome, command.dividendReinvestment)
             val dividendEligibleQuantity = state.holdingQuantity
             val plannedState = state.forOrderGeneration(config)
-            val filledOrders = if (tradingCompleted) {
+            val market = allCandles.toLaorMarket(candle)
+            val generatedOrders = if (tradingCompleted) {
                 emptyList()
             } else {
                 LaorV4StrategyEngine.generateOrders(
                     config = config,
                     state = plannedState,
-                    market = allCandles.toLaorMarket(candle),
+                    market = market,
                 )
-                    .mapNotNull { order -> order.toFilledOrder(candle) }
-                    .sortedBy { filledOrder -> if (filledOrder.fill.side == LaorV4StrategySide.SELL) 0 else 1 }
             }
+            val filledOrders = generatedOrders
+                .mapNotNull { order -> order.toFilledOrder(candle) }
+                .sortedBy { filledOrder -> if (filledOrder.fill.side == LaorV4StrategySide.SELL) 0 else 1 }
             val fills = filledOrders.map { it.fill }
+            val dailyTrades = filledOrders.map { filledOrder ->
+                filledOrder.toBacktestTrade(
+                    config = config,
+                    date = candle.date,
+                    cycleNo = cycleNoBefore,
+                )
+            }
             var nextState = if (fills.isEmpty()) {
                 plannedState
             } else {
@@ -289,6 +397,7 @@ class LaorV4DashboardService(
 
             val cycleClosed = state.holdingQuantity > 0 && nextState.holdingQuantity == 0L
             state = nextState
+            trades += dailyTrades
             if (cycleClosed) {
                 completedCycleCount += 1
                 if (command.autoRestart) {
@@ -300,6 +409,21 @@ class LaorV4DashboardService(
                     currentCycleStartedAt = null
                 }
             }
+            val referenceDate = allCandles.lastOrNull { it.date < candle.date }?.date ?: candle.date
+            dailyFlows += LaorV4DashboardDailyFlowItem(
+                date = candle.date,
+                referenceDate = referenceDate,
+                cycleNo = cycleNoBefore,
+                previousClose = market.previousClose.toBigDecimalValue(),
+                close = candle.close,
+                orders = generatedOrders.map { it.toDashboardNextOrder() },
+                filledOrders = dailyTrades,
+                before = stateBefore,
+                after = state.toDailyState(cycleNo, dividendIncome, command.dividendReinvestment),
+                dailyDividendIncome = dailyDividendIncome.toBigDecimalValue(),
+                cycleClosed = cycleClosed,
+                tradingCompleted = tradingCompleted,
+            )
         }
 
         return DashboardReplayResult(
@@ -309,6 +433,8 @@ class LaorV4DashboardService(
             currentCycleStartedAt = currentCycleStartedAt,
             tradingCompleted = tradingCompleted,
             dividendIncome = dividendIncome,
+            trades = trades,
+            dailyFlows = dailyFlows,
         )
     }
 
@@ -360,6 +486,116 @@ class LaorV4DashboardService(
             totalReturnPercent = totalProfitLoss.percentOf(initialCash),
             positionUnrealizedProfitLoss = positionUnrealizedProfitLoss,
             positionReturnPercent = positionUnrealizedProfitLoss.percentOf(positionCost),
+        )
+    }
+
+    private fun DashboardCalculation.toIndexPoints(): List<LaorV4DashboardIndexPoint> {
+        val basePoint = LaorV4DashboardIndexPoint(
+            date = response.startDate,
+            laorIndex = LAOR_INDEX_BASE_VALUE,
+            benchmarkIndex = LAOR_INDEX_BASE_VALUE,
+            netEquity = initialCash,
+            cash = initialCash,
+            holdingQuantity = 0,
+            averagePurchasePrice = BigDecimal.ZERO,
+            realizedProfitLoss = BigDecimal.ZERO,
+            dividendIncome = BigDecimal.ZERO,
+            progressRound = BigDecimal.ZERO,
+            cycleNo = 1,
+            mode = LaorV4StrategyMode.NORMAL.name,
+            close = baseCandle.close,
+            benchmarkClose = baseCandle.close,
+            basePoint = true,
+        )
+        val replayPoints = replay.dailyFlows.map { flow ->
+            val netEquity = flow.after.toNetEquity(config, flow.close)
+            LaorV4DashboardIndexPoint(
+                date = flow.date,
+                laorIndex = netEquity.indexFrom(initialCash),
+                benchmarkIndex = flow.close.indexFrom(baseCandle.close),
+                netEquity = netEquity,
+                cash = flow.after.cash,
+                holdingQuantity = flow.after.holdingQuantity,
+                averagePurchasePrice = flow.after.averagePurchasePrice,
+                realizedProfitLoss = flow.after.realizedProfitLoss,
+                dividendIncome = flow.after.dividendIncome,
+                progressRound = flow.after.progressRound,
+                cycleNo = flow.after.cycleNo,
+                mode = flow.after.mode,
+                close = flow.close,
+                benchmarkClose = flow.close,
+                basePoint = false,
+            )
+        }
+        return (listOf(basePoint) + replayPoints)
+            .distinctBy { it.date }
+            .sortedBy { it.date }
+    }
+
+    private fun LaorV4DashboardDailyState.toNetEquity(
+        config: LaorV4StrategyConfig,
+        close: BigDecimal,
+    ): BigDecimal {
+        val netPositionMarketValue = if (holdingQuantity == 0L) {
+            BigDecimal.ZERO
+        } else {
+            config.costPolicy.sellCashProceeds(close.toDouble(), holdingQuantity).toBigDecimalValue()
+        }
+        return cash + netPositionMarketValue
+    }
+
+    private fun BigDecimal.indexFrom(base: BigDecimal): BigDecimal {
+        return if (base.compareTo(BigDecimal.ZERO) == 0) {
+            BigDecimal.ZERO
+        } else {
+            divide(base, MathContext.DECIMAL64) * LAOR_INDEX_BASE_VALUE
+        }
+    }
+
+    private fun List<LaorV4DashboardIndexPoint>.toChartSeries(symbol: String): List<LaorV4DashboardChartSeries> {
+        return listOf(
+            LaorV4DashboardChartSeries(
+                key = "laorIndex",
+                label = "LAOR $symbol",
+                chartType = LIGHTWEIGHT_CHART_LINE_SERIES,
+                color = LAOR_INDEX_COLOR,
+                data = map { point ->
+                    LaorV4DashboardChartPoint(
+                        time = point.date,
+                        value = point.laorIndex,
+                    )
+                },
+            ),
+            LaorV4DashboardChartSeries(
+                key = "benchmarkIndex",
+                label = "$symbol Buy & Hold",
+                chartType = LIGHTWEIGHT_CHART_LINE_SERIES,
+                color = BENCHMARK_INDEX_COLOR,
+                data = map { point ->
+                    LaorV4DashboardChartPoint(
+                        time = point.date,
+                        value = point.benchmarkIndex,
+                    )
+                },
+            ),
+        )
+    }
+
+    private fun LaorV4StrategyState.toDailyState(
+        cycleNo: Int,
+        dividendIncome: Double,
+        dividendReinvestment: Boolean,
+    ): LaorV4DashboardDailyState {
+        val nonReinvestedDividendIncome = if (dividendReinvestment) 0.0 else dividendIncome
+        return LaorV4DashboardDailyState(
+            cycleNo = cycleNo,
+            mode = mode.name,
+            progressRound = progressRound.toBigDecimalValue(),
+            cash = (availableCash + nonReinvestedDividendIncome).toBigDecimalValue(),
+            holdingQuantity = holdingQuantity,
+            averagePurchasePrice = averagePurchasePrice.toBigDecimalValue(),
+            realizedProfitLoss = realizedProfitLoss.toBigDecimalValue(),
+            dividendIncome = dividendIncome.toBigDecimalValue(),
         )
     }
 
@@ -433,6 +669,30 @@ class LaorV4DashboardService(
         return take(MAX_MISSING_DATES_IN_ERROR).joinToString(prefix = "[", postfix = "$suffix]")
     }
 
+    private inline fun <T, R : Comparable<R>> List<T>.sortedBy(
+        sort: LaorV4DashboardDetailSort,
+        crossinline selector: (T) -> R,
+    ): List<T> {
+        val sorted = sortedBy(selector)
+        return when (sort) {
+            LaorV4DashboardDetailSort.ASC -> sorted
+            LaorV4DashboardDetailSort.DESC -> sorted.asReversed()
+        }
+    }
+
+    private fun <T> List<T>.page(page: Int, size: Int): List<T> {
+        val offset = page * size
+        return drop(offset).take(size)
+    }
+
+    private data class DashboardCalculation(
+        val response: LaorV4DashboardResponse,
+        val replay: DashboardReplayResult,
+        val config: LaorV4StrategyConfig,
+        val baseCandle: HistoricalCandle,
+        val initialCash: BigDecimal,
+    )
+
     private data class DashboardReplayResult(
         val state: LaorV4StrategyState,
         val cycleNo: Int,
@@ -440,6 +700,8 @@ class LaorV4DashboardService(
         val currentCycleStartedAt: LocalDate?,
         val tradingCompleted: Boolean,
         val dividendIncome: Double,
+        val trades: List<BacktestTrade>,
+        val dailyFlows: List<LaorV4DashboardDailyFlowItem>,
     )
 
     private operator fun BigDecimal.plus(other: BigDecimal): BigDecimal = add(other)
@@ -451,6 +713,10 @@ class LaorV4DashboardService(
         private const val REVERSE_BUY_AVAILABLE_CASH_RATIO = 0.25
         private const val STAR_BUY_PRICE_OFFSET = 0.01
         private const val MAX_MISSING_DATES_IN_ERROR = 10
+        private const val LIGHTWEIGHT_CHART_LINE_SERIES = "LineSeries"
+        private const val LAOR_INDEX_COLOR = "#0f766e"
+        private const val BENCHMARK_INDEX_COLOR = "#64748b"
         private val PERCENT_MULTIPLIER = BigDecimal("100")
+        private val LAOR_INDEX_BASE_VALUE = BigDecimal("100")
     }
 }

@@ -14,14 +14,22 @@ import com.example.backtestservice.application.port.`in`.ExecuteBacktestRunUseCa
 import com.example.backtestservice.application.port.`in`.FindBacktestEquityCurveQuery
 import com.example.backtestservice.application.port.`in`.FindBacktestRunUseCase
 import com.example.backtestservice.application.port.`in`.FindBacktestTradesQuery
+import com.example.backtestservice.application.port.`in`.FindLaorV4PortfolioDailyFlowQuery
+import com.example.backtestservice.application.port.`in`.FindLaorV4PortfolioDetailsUseCase
+import com.example.backtestservice.application.port.`in`.FindLaorV4PortfolioIndexQuery
+import com.example.backtestservice.application.port.`in`.FindLaorV4PortfolioTradesQuery
 import com.example.backtestservice.application.port.`in`.FindLaorV4BacktestRunUseCase
 import com.example.backtestservice.application.port.`in`.FindLaorV4PortfolioUseCase
 import com.example.backtestservice.application.port.`in`.ImportHistoricalMarketDataCommand
 import com.example.backtestservice.application.port.`in`.ImportHistoricalMarketDataResult
 import com.example.backtestservice.application.port.`in`.ImportHistoricalMarketDataUseCase
+import com.example.backtestservice.application.port.`in`.LaorV4DashboardDetailSort
 import com.example.backtestservice.application.port.`in`.LaorV4DashboardResponse
+import com.example.backtestservice.application.port.`in`.LaorV4PortfolioDailyFlowPage
 import com.example.backtestservice.application.port.`in`.LaorV4PortfolioDashboardResponse
+import com.example.backtestservice.application.port.`in`.LaorV4PortfolioIndexResponse
 import com.example.backtestservice.application.port.`in`.LaorV4PortfolioResponse
+import com.example.backtestservice.application.port.`in`.LaorV4PortfolioTradesPage
 import com.example.backtestservice.application.port.`in`.LaorV4BacktestParameters
 import com.example.backtestservice.application.port.`in`.LaorV4BacktestRunResponse
 import com.example.backtestservice.application.port.`in`.RunLaorV4BacktestCommand
@@ -55,6 +63,7 @@ class BacktestController(
     private val createLaorV4PortfolioUseCase: CreateLaorV4PortfolioUseCase,
     private val findLaorV4PortfolioUseCase: FindLaorV4PortfolioUseCase,
     private val calculateLaorV4PortfolioDashboardUseCase: CalculateLaorV4PortfolioDashboardUseCase,
+    private val findLaorV4PortfolioDetailsUseCase: FindLaorV4PortfolioDetailsUseCase,
 ) {
     @PostMapping("/runs")
     fun createBacktestRun(@RequestBody request: RunBacktestRequest): Mono<BacktestRunSummary> {
@@ -163,6 +172,75 @@ class BacktestController(
         return blocking {
             calculateLaorV4PortfolioDashboardUseCase.calculate(
                 CalculateLaorV4PortfolioDashboardQuery(
+                    portfolioId = portfolioId,
+                    asOfDate = asOfDate,
+                    marketDataTimeoutSeconds = marketDataTimeoutSeconds,
+                ),
+            )
+        }
+            .mapRequestErrors()
+            .mapNotFound()
+    }
+
+    @GetMapping("/laor-v4/portfolios/{portfolioId}/trades")
+    fun findLaorV4PortfolioTrades(
+        @PathVariable portfolioId: UUID,
+        @RequestParam(required = false) asOfDate: LocalDate?,
+        @RequestParam(defaultValue = "0") page: Int,
+        @RequestParam(defaultValue = "100") size: Int,
+        @RequestParam(defaultValue = "ASC") sort: LaorV4DashboardDetailSort,
+        @RequestParam(defaultValue = "30") marketDataTimeoutSeconds: Long,
+    ): Mono<LaorV4PortfolioTradesPage> {
+        return blocking {
+            findLaorV4PortfolioDetailsUseCase.findTrades(
+                FindLaorV4PortfolioTradesQuery(
+                    portfolioId = portfolioId,
+                    asOfDate = asOfDate,
+                    page = page,
+                    size = size,
+                    sort = sort,
+                    marketDataTimeoutSeconds = marketDataTimeoutSeconds,
+                ),
+            )
+        }
+            .mapRequestErrors()
+            .mapNotFound()
+    }
+
+    @GetMapping("/laor-v4/portfolios/{portfolioId}/daily-flow")
+    fun findLaorV4PortfolioDailyFlow(
+        @PathVariable portfolioId: UUID,
+        @RequestParam(required = false) asOfDate: LocalDate?,
+        @RequestParam(defaultValue = "0") page: Int,
+        @RequestParam(defaultValue = "100") size: Int,
+        @RequestParam(defaultValue = "ASC") sort: LaorV4DashboardDetailSort,
+        @RequestParam(defaultValue = "30") marketDataTimeoutSeconds: Long,
+    ): Mono<LaorV4PortfolioDailyFlowPage> {
+        return blocking {
+            findLaorV4PortfolioDetailsUseCase.findDailyFlow(
+                FindLaorV4PortfolioDailyFlowQuery(
+                    portfolioId = portfolioId,
+                    asOfDate = asOfDate,
+                    page = page,
+                    size = size,
+                    sort = sort,
+                    marketDataTimeoutSeconds = marketDataTimeoutSeconds,
+                ),
+            )
+        }
+            .mapRequestErrors()
+            .mapNotFound()
+    }
+
+    @GetMapping("/laor-v4/portfolios/{portfolioId}/index")
+    fun findLaorV4PortfolioIndex(
+        @PathVariable portfolioId: UUID,
+        @RequestParam(required = false) asOfDate: LocalDate?,
+        @RequestParam(defaultValue = "30") marketDataTimeoutSeconds: Long,
+    ): Mono<LaorV4PortfolioIndexResponse> {
+        return blocking {
+            findLaorV4PortfolioDetailsUseCase.findIndex(
+                FindLaorV4PortfolioIndexQuery(
                     portfolioId = portfolioId,
                     asOfDate = asOfDate,
                     marketDataTimeoutSeconds = marketDataTimeoutSeconds,

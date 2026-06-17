@@ -6,11 +6,22 @@ import com.example.backtestservice.application.port.`in`.CalculateLaorV4Portfoli
 import com.example.backtestservice.application.port.`in`.CalculateLaorV4PortfolioDashboardUseCase
 import com.example.backtestservice.application.port.`in`.CreateLaorV4PortfolioCommand
 import com.example.backtestservice.application.port.`in`.CreateLaorV4PortfolioUseCase
+import com.example.backtestservice.application.port.`in`.FindLaorV4DashboardDailyFlowQuery
+import com.example.backtestservice.application.port.`in`.FindLaorV4DashboardDetailsUseCase
+import com.example.backtestservice.application.port.`in`.FindLaorV4DashboardIndexQuery
+import com.example.backtestservice.application.port.`in`.FindLaorV4DashboardTradesQuery
+import com.example.backtestservice.application.port.`in`.FindLaorV4PortfolioDailyFlowQuery
+import com.example.backtestservice.application.port.`in`.FindLaorV4PortfolioDetailsUseCase
+import com.example.backtestservice.application.port.`in`.FindLaorV4PortfolioIndexQuery
+import com.example.backtestservice.application.port.`in`.FindLaorV4PortfolioTradesQuery
 import com.example.backtestservice.application.port.`in`.FindLaorV4PortfolioUseCase
 import com.example.backtestservice.application.port.`in`.LaorV4DashboardResponse
+import com.example.backtestservice.application.port.`in`.LaorV4PortfolioDailyFlowPage
 import com.example.backtestservice.application.port.`in`.LaorV4PortfolioDashboardResponse
+import com.example.backtestservice.application.port.`in`.LaorV4PortfolioIndexResponse
 import com.example.backtestservice.application.port.`in`.LaorV4PortfolioResponse
 import com.example.backtestservice.application.port.`in`.LaorV4PortfolioSnapshotResponse
+import com.example.backtestservice.application.port.`in`.LaorV4PortfolioTradesPage
 import com.example.backtestservice.application.port.out.LaorV4PortfolioStorePort
 import com.example.backtestservice.domain.backtest.LaorV4PortfolioRecord
 import com.example.backtestservice.domain.backtest.LaorV4PortfolioSnapshot
@@ -20,15 +31,18 @@ import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategyC
 import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategySymbol
 import java.math.BigDecimal
 import java.time.Instant
+import java.time.LocalDate
 import java.util.UUID
 
 @UseCaseImpl
 class LaorV4PortfolioService(
     private val laorV4PortfolioStorePort: LaorV4PortfolioStorePort,
     private val calculateLaorV4DashboardUseCase: CalculateLaorV4DashboardUseCase,
+    private val findLaorV4DashboardDetailsUseCase: FindLaorV4DashboardDetailsUseCase,
 ) : CreateLaorV4PortfolioUseCase,
     FindLaorV4PortfolioUseCase,
-    CalculateLaorV4PortfolioDashboardUseCase {
+    CalculateLaorV4PortfolioDashboardUseCase,
+    FindLaorV4PortfolioDetailsUseCase {
     override fun create(command: CreateLaorV4PortfolioCommand): LaorV4PortfolioResponse {
         command.validate()
         val now = Instant.now()
@@ -78,6 +92,86 @@ class LaorV4PortfolioService(
         )
     }
 
+    override fun findTrades(query: FindLaorV4PortfolioTradesQuery): LaorV4PortfolioTradesPage {
+        query.validate()
+        val record = findRecord(query.portfolioId)
+        val page = findLaorV4DashboardDetailsUseCase.findTrades(
+            FindLaorV4DashboardTradesQuery(
+                command = record.toDashboardCommand(
+                    asOfDate = query.asOfDate,
+                    marketDataTimeoutSeconds = query.marketDataTimeoutSeconds,
+                ),
+                page = query.page,
+                size = query.size,
+                sort = query.sort,
+            ),
+        )
+        return LaorV4PortfolioTradesPage(
+            portfolioId = record.portfolioId,
+            symbol = page.symbol,
+            market = page.market,
+            startDate = page.startDate,
+            requestedAsOfDate = page.requestedAsOfDate,
+            resolvedAsOfDate = page.resolvedAsOfDate,
+            page = page.page,
+            size = page.size,
+            total = page.total,
+            items = page.items,
+        )
+    }
+
+    override fun findDailyFlow(query: FindLaorV4PortfolioDailyFlowQuery): LaorV4PortfolioDailyFlowPage {
+        query.validate()
+        val record = findRecord(query.portfolioId)
+        val page = findLaorV4DashboardDetailsUseCase.findDailyFlow(
+            FindLaorV4DashboardDailyFlowQuery(
+                command = record.toDashboardCommand(
+                    asOfDate = query.asOfDate,
+                    marketDataTimeoutSeconds = query.marketDataTimeoutSeconds,
+                ),
+                page = query.page,
+                size = query.size,
+                sort = query.sort,
+            ),
+        )
+        return LaorV4PortfolioDailyFlowPage(
+            portfolioId = record.portfolioId,
+            symbol = page.symbol,
+            market = page.market,
+            startDate = page.startDate,
+            requestedAsOfDate = page.requestedAsOfDate,
+            resolvedAsOfDate = page.resolvedAsOfDate,
+            page = page.page,
+            size = page.size,
+            total = page.total,
+            items = page.items,
+        )
+    }
+
+    override fun findIndex(query: FindLaorV4PortfolioIndexQuery): LaorV4PortfolioIndexResponse {
+        query.validate()
+        val record = findRecord(query.portfolioId)
+        val index = findLaorV4DashboardDetailsUseCase.findIndex(
+            FindLaorV4DashboardIndexQuery(
+                command = record.toDashboardCommand(
+                    asOfDate = query.asOfDate,
+                    marketDataTimeoutSeconds = query.marketDataTimeoutSeconds,
+                ),
+            ),
+        )
+        return LaorV4PortfolioIndexResponse(
+            portfolioId = record.portfolioId,
+            symbol = index.symbol,
+            market = index.market,
+            startDate = index.startDate,
+            requestedAsOfDate = index.requestedAsOfDate,
+            resolvedAsOfDate = index.resolvedAsOfDate,
+            base = index.base,
+            series = index.series,
+            points = index.points,
+        )
+    }
+
     private fun findRecord(portfolioId: UUID): LaorV4PortfolioRecord {
         return laorV4PortfolioStorePort.findById(portfolioId)
             ?: throw NoSuchElementException("LAOR_V4 portfolio not found: $portfolioId")
@@ -105,11 +199,33 @@ class LaorV4PortfolioService(
     }
 
     private fun LaorV4PortfolioRecord.toDashboardCommand(query: CalculateLaorV4PortfolioDashboardQuery): CalculateLaorV4DashboardCommand {
+        return toDashboardCommand(
+            asOfDate = query.asOfDate,
+            marketDataTimeoutSeconds = query.marketDataTimeoutSeconds,
+        )
+    }
+
+    private fun FindLaorV4PortfolioTradesQuery.validate() {
+        require(marketDataTimeoutSeconds > 0) { "marketDataTimeoutSeconds must be positive" }
+    }
+
+    private fun FindLaorV4PortfolioDailyFlowQuery.validate() {
+        require(marketDataTimeoutSeconds > 0) { "marketDataTimeoutSeconds must be positive" }
+    }
+
+    private fun FindLaorV4PortfolioIndexQuery.validate() {
+        require(marketDataTimeoutSeconds > 0) { "marketDataTimeoutSeconds must be positive" }
+    }
+
+    private fun LaorV4PortfolioRecord.toDashboardCommand(
+        asOfDate: LocalDate?,
+        marketDataTimeoutSeconds: Long,
+    ): CalculateLaorV4DashboardCommand {
         return CalculateLaorV4DashboardCommand(
             symbol = symbol,
             market = market,
             startDate = startDate,
-            asOfDate = query.asOfDate,
+            asOfDate = asOfDate,
             initialCash = initialCash,
             totalSplitCount = totalSplitCount,
             firstBuyLimitPercentAbovePreviousClose = firstBuyLimitPercentAbovePreviousClose,
@@ -118,7 +234,7 @@ class LaorV4PortfolioService(
             autoAdjust = autoAdjust,
             commissionRate = commissionRate,
             slippageRate = slippageRate,
-            marketDataTimeoutSeconds = query.marketDataTimeoutSeconds,
+            marketDataTimeoutSeconds = marketDataTimeoutSeconds,
         )
     }
 

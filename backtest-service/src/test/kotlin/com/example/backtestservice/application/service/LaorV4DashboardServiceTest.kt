@@ -1,9 +1,13 @@
 package com.example.backtestservice.application.service
 
 import com.example.backtestservice.application.port.`in`.CalculateLaorV4DashboardCommand
+import com.example.backtestservice.application.port.`in`.FindLaorV4DashboardDailyFlowQuery
+import com.example.backtestservice.application.port.`in`.FindLaorV4DashboardIndexQuery
+import com.example.backtestservice.application.port.`in`.FindLaorV4DashboardTradesQuery
 import com.example.backtestservice.application.port.`in`.ImportHistoricalMarketDataCommand
 import com.example.backtestservice.application.port.`in`.ImportHistoricalMarketDataResult
 import com.example.backtestservice.application.port.`in`.ImportHistoricalMarketDataUseCase
+import com.example.backtestservice.application.port.`in`.LaorV4DashboardDetailSort
 import com.example.backtestservice.application.port.out.HistoricalDailyCandlesQuery
 import com.example.backtestservice.application.port.out.HistoricalMarketDataPort
 import com.example.backtestservice.application.port.out.MarketCalendarPort
@@ -109,6 +113,187 @@ class LaorV4DashboardServiceTest {
         assertDecimal("10.0", response.nextOrderContext.previousClose)
         assertEquals(startDate.minusDays(14), import.commands.single().from)
         assertEquals(startDate, import.commands.single().to)
+    }
+
+    @Test
+    fun `returns paged trades and daily flow from dashboard replay`() {
+        val startDate = LocalDate.parse("2024-01-02")
+        val asOfDate = LocalDate.parse("2024-01-04")
+        val service = LaorV4DashboardService(
+            importHistoricalMarketDataUseCase = FakeImportHistoricalMarketDataUseCase(),
+            historicalMarketDataPort = FakeHistoricalMarketDataPort(
+                listOf(
+                    candle("2024-01-02", close = "10.0"),
+                    candle("2024-01-03", close = "10.5"),
+                    candle("2024-01-04", close = "10.7"),
+                ),
+            ),
+            marketCalendarPort = FakeMarketCalendarPort(
+                listOf(
+                    LocalDate.parse("2024-01-02"),
+                    LocalDate.parse("2024-01-03"),
+                    LocalDate.parse("2024-01-04"),
+                    LocalDate.parse("2024-01-05"),
+                ),
+            ),
+        )
+        val command = CalculateLaorV4DashboardCommand(
+            symbol = "TQQQ",
+            startDate = startDate,
+            asOfDate = asOfDate,
+            initialCash = "1000".toBigDecimal(),
+            totalSplitCount = 30,
+            firstBuyLimitPercentAbovePreviousClose = 12.0,
+        )
+
+        val trades = service.findTrades(
+            FindLaorV4DashboardTradesQuery(
+                command = command,
+                page = 0,
+                size = 10,
+            ),
+        )
+        val secondDailyFlowPage = service.findDailyFlow(
+            FindLaorV4DashboardDailyFlowQuery(
+                command = command,
+                page = 1,
+                size = 1,
+                sort = LaorV4DashboardDetailSort.ASC,
+            ),
+        )
+
+        assertEquals(asOfDate, trades.resolvedAsOfDate)
+        assertEquals(2, trades.total)
+        assertEquals("FIRST_BUY", trades.items.first().orderTag)
+        assertEquals(LocalDate.parse("2024-01-03"), trades.items.first().date)
+        assertEquals(2, secondDailyFlowPage.total)
+        val flow = secondDailyFlowPage.items.single()
+        assertEquals(LocalDate.parse("2024-01-04"), flow.date)
+        assertEquals(LocalDate.parse("2024-01-03"), flow.referenceDate)
+        assertDecimal("10.5", flow.previousClose)
+        assertTrue(flow.orders.isNotEmpty())
+        assertEquals(2, flow.before.holdingQuantity)
+    }
+
+    @Test
+    fun `returns lightweight chart compatible LAOR index series`() {
+        val startDate = LocalDate.parse("2024-01-02")
+        val asOfDate = LocalDate.parse("2024-01-03")
+        val service = LaorV4DashboardService(
+            importHistoricalMarketDataUseCase = FakeImportHistoricalMarketDataUseCase(),
+            historicalMarketDataPort = FakeHistoricalMarketDataPort(
+                listOf(
+                    candle("2024-01-02", close = "10.0"),
+                    candle("2024-01-03", close = "10.5"),
+                ),
+            ),
+            marketCalendarPort = FakeMarketCalendarPort(
+                listOf(
+                    LocalDate.parse("2024-01-02"),
+                    LocalDate.parse("2024-01-03"),
+                    LocalDate.parse("2024-01-04"),
+                ),
+            ),
+        )
+
+        val response = service.findIndex(
+            FindLaorV4DashboardIndexQuery(
+                command = CalculateLaorV4DashboardCommand(
+                    symbol = "TQQQ",
+                    startDate = startDate,
+                    asOfDate = asOfDate,
+                    initialCash = "1000".toBigDecimal(),
+                    totalSplitCount = 30,
+                    firstBuyLimitPercentAbovePreviousClose = 12.0,
+                ),
+            ),
+        )
+
+        assertEquals(startDate, response.base.baseDate)
+        assertDecimal("100", response.base.baseValue)
+        assertEquals("TQQQ", response.base.benchmarkSymbol)
+        assertEquals(listOf("laorIndex", "benchmarkIndex"), response.series.map { it.key })
+        assertEquals("LineSeries", response.series.first().chartType)
+        assertEquals(startDate, response.series.first().data.first().time)
+        assertDecimal("100", response.series.first().data.first().value)
+        assertEquals(2, response.points.size)
+        assertEquals(true, response.points.first().basePoint)
+        assertEquals(asOfDate, response.points.last().date)
+        assertDecimal("105.00", response.points.last().benchmarkIndex)
+    }
+
+    @Test
+    fun `returns LAOR index for all supported symbols and split counts`() {
+        val startDate = LocalDate.parse("2024-01-02")
+        val asOfDate = LocalDate.parse("2024-01-03")
+        val cases = listOf("TQQQ", "SOXL").flatMap { symbol ->
+            listOf(20, 30, 40).map { splitCount -> symbol to splitCount }
+        }
+
+        cases.forEach { (symbol, splitCount) ->
+            val service = LaorV4DashboardService(
+                importHistoricalMarketDataUseCase = FakeImportHistoricalMarketDataUseCase(),
+                historicalMarketDataPort = FakeHistoricalMarketDataPort(
+                    listOf(
+                        candle(startDate, close = "10.0"),
+                        candle(asOfDate, close = "10.5"),
+                    ),
+                ),
+                marketCalendarPort = FakeMarketCalendarPort(
+                    listOf(
+                        startDate,
+                        asOfDate,
+                        asOfDate.plusDays(1),
+                    ),
+                ),
+            )
+
+            val response = service.findIndex(
+                FindLaorV4DashboardIndexQuery(
+                    command = CalculateLaorV4DashboardCommand(
+                        symbol = symbol,
+                        startDate = startDate,
+                        asOfDate = asOfDate,
+                        initialCash = "1000".toBigDecimal(),
+                        totalSplitCount = splitCount,
+                        firstBuyLimitPercentAbovePreviousClose = 12.0,
+                    ),
+                ),
+            )
+
+            assertEquals(symbol, response.symbol)
+            assertEquals(symbol, response.base.benchmarkSymbol)
+            assertEquals(listOf("LAOR $symbol", "$symbol Buy & Hold"), response.series.map { it.label })
+            assertEquals(2, response.points.size)
+            assertDecimal("100", response.points.first().laorIndex)
+            assertDecimal("105.00", response.points.last().benchmarkIndex)
+        }
+    }
+
+    @Test
+    fun `rejects invalid detail pagination`() {
+        val service = LaorV4DashboardService(
+            importHistoricalMarketDataUseCase = FakeImportHistoricalMarketDataUseCase(),
+            historicalMarketDataPort = FakeHistoricalMarketDataPort(emptyList()),
+            marketCalendarPort = FakeMarketCalendarPort(emptyList()),
+        )
+
+        assertFailsWith<IllegalArgumentException> {
+            service.findTrades(
+                FindLaorV4DashboardTradesQuery(
+                    command = CalculateLaorV4DashboardCommand(
+                        symbol = "TQQQ",
+                        startDate = LocalDate.parse("2024-01-02"),
+                        asOfDate = LocalDate.parse("2024-01-03"),
+                        initialCash = "1000".toBigDecimal(),
+                        totalSplitCount = 20,
+                        firstBuyLimitPercentAbovePreviousClose = 12.0,
+                    ),
+                    page = 0,
+                    size = 1001,
+                ),
+            )
+        }
     }
 
     @Test

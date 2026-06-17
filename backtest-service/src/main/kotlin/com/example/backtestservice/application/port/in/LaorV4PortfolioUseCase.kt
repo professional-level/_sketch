@@ -1,5 +1,6 @@
 package com.example.backtestservice.application.port.`in`
 
+import com.example.backtestservice.domain.backtest.BacktestTrade
 import com.example.common.UseCase
 import java.math.BigDecimal
 import java.time.Instant
@@ -20,6 +21,13 @@ interface FindLaorV4PortfolioUseCase {
 @UseCase
 interface CalculateLaorV4PortfolioDashboardUseCase {
     fun calculate(query: CalculateLaorV4PortfolioDashboardQuery): LaorV4PortfolioDashboardResponse
+}
+
+@UseCase
+interface FindLaorV4PortfolioDetailsUseCase {
+    fun findTrades(query: FindLaorV4PortfolioTradesQuery): LaorV4PortfolioTradesPage
+    fun findDailyFlow(query: FindLaorV4PortfolioDailyFlowQuery): LaorV4PortfolioDailyFlowPage
+    fun findIndex(query: FindLaorV4PortfolioIndexQuery): LaorV4PortfolioIndexResponse
 }
 
 data class CreateLaorV4PortfolioCommand(
@@ -43,9 +51,71 @@ data class CalculateLaorV4PortfolioDashboardQuery(
     val marketDataTimeoutSeconds: Long = 30,
 )
 
+data class FindLaorV4PortfolioTradesQuery(
+    val portfolioId: UUID,
+    val asOfDate: LocalDate? = null,
+    val page: Int = 0,
+    val size: Int = 100,
+    val sort: LaorV4DashboardDetailSort = LaorV4DashboardDetailSort.ASC,
+    val marketDataTimeoutSeconds: Long = 30,
+)
+
+data class FindLaorV4PortfolioDailyFlowQuery(
+    val portfolioId: UUID,
+    val asOfDate: LocalDate? = null,
+    val page: Int = 0,
+    val size: Int = 100,
+    val sort: LaorV4DashboardDetailSort = LaorV4DashboardDetailSort.ASC,
+    val marketDataTimeoutSeconds: Long = 30,
+)
+
+data class FindLaorV4PortfolioIndexQuery(
+    val portfolioId: UUID,
+    val asOfDate: LocalDate? = null,
+    val marketDataTimeoutSeconds: Long = 30,
+)
+
 data class LaorV4PortfolioDashboardResponse(
     val portfolio: LaorV4PortfolioResponse,
     val dashboard: LaorV4DashboardResponse,
+)
+
+data class LaorV4PortfolioTradesPage(
+    val portfolioId: UUID,
+    val symbol: String,
+    val market: String,
+    val startDate: LocalDate,
+    val requestedAsOfDate: LocalDate?,
+    val resolvedAsOfDate: LocalDate,
+    val page: Int,
+    val size: Int,
+    val total: Int,
+    val items: List<BacktestTrade>,
+)
+
+data class LaorV4PortfolioDailyFlowPage(
+    val portfolioId: UUID,
+    val symbol: String,
+    val market: String,
+    val startDate: LocalDate,
+    val requestedAsOfDate: LocalDate?,
+    val resolvedAsOfDate: LocalDate,
+    val page: Int,
+    val size: Int,
+    val total: Int,
+    val items: List<LaorV4DashboardDailyFlowItem>,
+)
+
+data class LaorV4PortfolioIndexResponse(
+    val portfolioId: UUID,
+    val symbol: String,
+    val market: String,
+    val startDate: LocalDate,
+    val requestedAsOfDate: LocalDate?,
+    val resolvedAsOfDate: LocalDate,
+    val base: LaorV4DashboardIndexBase,
+    val series: List<LaorV4DashboardChartSeries>,
+    val points: List<LaorV4DashboardIndexPoint>,
 )
 
 data class LaorV4PortfolioResponse(

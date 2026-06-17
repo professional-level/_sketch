@@ -1,5 +1,6 @@
 package com.example.backtestservice.application.port.`in`
 
+import com.example.backtestservice.domain.backtest.BacktestTrade
 import com.example.common.UseCase
 import java.math.BigDecimal
 import java.time.LocalDate
@@ -7,6 +8,13 @@ import java.time.LocalDate
 @UseCase
 interface CalculateLaorV4DashboardUseCase {
     fun calculate(command: CalculateLaorV4DashboardCommand): LaorV4DashboardResponse
+}
+
+@UseCase
+interface FindLaorV4DashboardDetailsUseCase {
+    fun findTrades(query: FindLaorV4DashboardTradesQuery): LaorV4DashboardTradesPage
+    fun findDailyFlow(query: FindLaorV4DashboardDailyFlowQuery): LaorV4DashboardDailyFlowPage
+    fun findIndex(query: FindLaorV4DashboardIndexQuery): LaorV4DashboardIndexResponse
 }
 
 data class CalculateLaorV4DashboardCommand(
@@ -24,6 +32,29 @@ data class CalculateLaorV4DashboardCommand(
     val slippageRate: BigDecimal = BigDecimal.ZERO,
     val marketDataTimeoutSeconds: Long = 30,
 )
+
+data class FindLaorV4DashboardTradesQuery(
+    val command: CalculateLaorV4DashboardCommand,
+    val page: Int = 0,
+    val size: Int = 100,
+    val sort: LaorV4DashboardDetailSort = LaorV4DashboardDetailSort.ASC,
+)
+
+data class FindLaorV4DashboardDailyFlowQuery(
+    val command: CalculateLaorV4DashboardCommand,
+    val page: Int = 0,
+    val size: Int = 100,
+    val sort: LaorV4DashboardDetailSort = LaorV4DashboardDetailSort.ASC,
+)
+
+data class FindLaorV4DashboardIndexQuery(
+    val command: CalculateLaorV4DashboardCommand,
+)
+
+enum class LaorV4DashboardDetailSort {
+    ASC,
+    DESC,
+}
 
 data class LaorV4DashboardResponse(
     val symbol: String,
@@ -102,4 +133,104 @@ data class LaorV4DashboardDataCoverage(
     val from: LocalDate,
     val to: LocalDate,
     val candleCount: Int,
+)
+
+data class LaorV4DashboardTradesPage(
+    val symbol: String,
+    val market: String,
+    val startDate: LocalDate,
+    val requestedAsOfDate: LocalDate?,
+    val resolvedAsOfDate: LocalDate,
+    val page: Int,
+    val size: Int,
+    val total: Int,
+    val items: List<BacktestTrade>,
+)
+
+data class LaorV4DashboardDailyFlowPage(
+    val symbol: String,
+    val market: String,
+    val startDate: LocalDate,
+    val requestedAsOfDate: LocalDate?,
+    val resolvedAsOfDate: LocalDate,
+    val page: Int,
+    val size: Int,
+    val total: Int,
+    val items: List<LaorV4DashboardDailyFlowItem>,
+)
+
+data class LaorV4DashboardDailyFlowItem(
+    val date: LocalDate,
+    val referenceDate: LocalDate,
+    val cycleNo: Int,
+    val previousClose: BigDecimal,
+    val close: BigDecimal,
+    val orders: List<LaorV4DashboardNextOrder>,
+    val filledOrders: List<BacktestTrade>,
+    val before: LaorV4DashboardDailyState,
+    val after: LaorV4DashboardDailyState,
+    val dailyDividendIncome: BigDecimal,
+    val cycleClosed: Boolean,
+    val tradingCompleted: Boolean,
+)
+
+data class LaorV4DashboardDailyState(
+    val cycleNo: Int,
+    val mode: String,
+    val progressRound: BigDecimal,
+    val cash: BigDecimal,
+    val holdingQuantity: Long,
+    val averagePurchasePrice: BigDecimal,
+    val realizedProfitLoss: BigDecimal,
+    val dividendIncome: BigDecimal,
+)
+
+data class LaorV4DashboardIndexResponse(
+    val symbol: String,
+    val market: String,
+    val startDate: LocalDate,
+    val requestedAsOfDate: LocalDate?,
+    val resolvedAsOfDate: LocalDate,
+    val base: LaorV4DashboardIndexBase,
+    val series: List<LaorV4DashboardChartSeries>,
+    val points: List<LaorV4DashboardIndexPoint>,
+)
+
+data class LaorV4DashboardIndexBase(
+    val baseDate: LocalDate,
+    val baseValue: BigDecimal,
+    val initialCash: BigDecimal,
+    val benchmarkSymbol: String,
+    val benchmarkClose: BigDecimal,
+)
+
+data class LaorV4DashboardChartSeries(
+    val key: String,
+    val label: String,
+    val chartType: String,
+    val color: String,
+    val data: List<LaorV4DashboardChartPoint>,
+)
+
+data class LaorV4DashboardChartPoint(
+    val time: LocalDate,
+    val value: BigDecimal,
+)
+
+data class LaorV4DashboardIndexPoint(
+    val date: LocalDate,
+    val laorIndex: BigDecimal,
+    val benchmarkIndex: BigDecimal,
+    val netEquity: BigDecimal,
+    val cash: BigDecimal,
+    val holdingQuantity: Long,
+    val averagePurchasePrice: BigDecimal,
+    val realizedProfitLoss: BigDecimal,
+    val dividendIncome: BigDecimal,
+    val progressRound: BigDecimal,
+    val cycleNo: Int,
+    val mode: String,
+    val close: BigDecimal,
+    val benchmarkClose: BigDecimal,
+    val basePoint: Boolean,
 )

@@ -107,6 +107,36 @@ class ImportHistoricalMarketDataServiceTest {
     }
 
     @Test
+    fun `continues with cached candles when external source is unavailable`() {
+        val cachedCandles = listOf(candle("2024-01-02"))
+        val external = FakeExternalHistoricalMarketDataPort(
+            candles = emptyList(),
+            exception = RuntimeException("sidecar unavailable"),
+        )
+        val store = FakeHistoricalMarketDataPort(cachedCandles)
+        val calendar = FakeMarketCalendarPort(
+            listOf(
+                LocalDate.parse("2024-01-02"),
+                LocalDate.parse("2024-01-03"),
+            ),
+        )
+        val service = ImportHistoricalMarketDataService(external, store, calendar)
+
+        val exception = assertFailsWith<IllegalArgumentException> {
+            service.execute(
+                ImportHistoricalMarketDataCommand(
+                    symbol = "TQQQ",
+                    from = LocalDate.parse("2024-01-02"),
+                    to = LocalDate.parse("2024-01-03"),
+                ),
+            )
+        }
+
+        assertEquals(1, external.queries.size)
+        assertEquals(true, exception.message.orEmpty().contains("historical candles missing for trading days"))
+    }
+
+    @Test
     fun `fails when external source returns no candles for expected trading days`() {
         val tradingDay = LocalDate.parse("2024-01-02")
         val service = ImportHistoricalMarketDataService(
@@ -164,11 +194,13 @@ class ImportHistoricalMarketDataServiceTest {
 
     private class FakeExternalHistoricalMarketDataPort(
         private val candles: List<HistoricalCandle>,
+        private val exception: RuntimeException? = null,
     ) : ExternalHistoricalMarketDataPort {
         val queries = mutableListOf<ExternalHistoricalDailyCandlesQuery>()
 
         override fun fetchDailyCandles(query: ExternalHistoricalDailyCandlesQuery): List<HistoricalCandle> {
             queries += query
+            exception?.let { throw it }
             return candles
         }
     }

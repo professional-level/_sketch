@@ -12,6 +12,7 @@ import com.example.backtestservice.application.port.out.MarketTradingDaysQuery
 import com.example.backtestservice.application.port.out.SaveHistoricalDailyCandlesCommand
 import com.example.backtestservice.domain.market.HistoricalCandle
 import com.example.common.UseCaseImpl
+import org.slf4j.LoggerFactory
 import java.time.LocalDate
 
 @UseCaseImpl
@@ -31,10 +32,7 @@ class ImportHistoricalMarketDataService(
         }
         val cachedCandles = historicalMarketDataPort.findDailyCandles(command.toCachedQuery())
             .sortedBy { it.date }
-        val fetchedCandles = command.missingRanges(cachedCandles, tradingDays)
-            .flatMap { range ->
-                externalHistoricalMarketDataPort.fetchDailyCandles(command.toExternalQuery(range))
-            }
+        val fetchedCandles = fetchMissingCandles(command, cachedCandles, tradingDays)
             .distinctBy { it.date }
             .sortedBy { it.date }
         if (fetchedCandles.isNotEmpty()) {
@@ -63,6 +61,30 @@ class ImportHistoricalMarketDataService(
             from = availableCandles.first().date,
             to = availableCandles.last().date,
         )
+    }
+
+    private fun fetchMissingCandles(
+        command: ImportHistoricalMarketDataCommand,
+        cachedCandles: List<HistoricalCandle>,
+        tradingDays: List<LocalDate>,
+    ): List<HistoricalCandle> {
+        return command.missingRanges(cachedCandles, tradingDays)
+            .flatMap { range ->
+                runCatching {
+                    externalHistoricalMarketDataPort.fetchDailyCandles(command.toExternalQuery(range))
+                }.getOrElse { exception ->
+                    logger.warn(
+                        "external historical market data fetch failed; continuing with cached candles: " +
+                            "symbol={}, market={}, from={}, to={}",
+                        command.symbol,
+                        command.market,
+                        range.from,
+                        range.to,
+                        exception,
+                    )
+                    emptyList()
+                }
+            }
     }
 
     private fun ImportHistoricalMarketDataCommand.validate() {
@@ -144,5 +166,6 @@ class ImportHistoricalMarketDataService(
 
     companion object {
         private const val MAX_MISSING_DATES_IN_ERROR = 10
+        private val logger = LoggerFactory.getLogger(ImportHistoricalMarketDataService::class.java)
     }
 }
