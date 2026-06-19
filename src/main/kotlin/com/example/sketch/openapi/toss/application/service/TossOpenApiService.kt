@@ -14,31 +14,27 @@ class TossOpenApiService(
     private val tossOpenApiPort: TossOpenApiPort,
 ) : TossOpenApiUseCase {
 
-    override suspend fun issueToken(): TossAccessTokenResult {
-        return tossOpenApiPort.issueToken()
+    override suspend fun issueToken(forceRefresh: Boolean): TossAccessTokenResult {
+        return tossOpenApiPort.issueToken(forceRefresh)
     }
 
     override suspend fun getAccount(query: TossAccountQuery): TossOpenApiResult {
-        return tossOpenApiPort.getAccount(accessToken = accessToken(), query = query)
+        return tossOpenApiPort.getAccount(query)
     }
 
     override suspend fun getStockSnapshot(query: TossQuery): TossOpenApiResult {
-        return tossOpenApiPort.getStockSnapshot(accessToken = accessToken(), query = query)
+        return tossOpenApiPort.getStockSnapshot(query)
     }
 
     override suspend fun getStockBalance(query: TossAccountQuery): TossOpenApiResult {
-        return tossOpenApiPort.getStockBalance(accessToken = accessToken(), query = query)
+        return tossOpenApiPort.getStockBalance(query)
     }
 
     override suspend fun submitOrder(command: TossOrderCommand): TossOpenApiResult {
-        return tossOpenApiPort.submitOrder(accessToken = accessToken(), command = command)
+        return tossOpenApiPort.submitOrder(command)
     }
 
     override suspend fun simulateOrder(command: TossOrderCommand): TossOpenApiResult {
-        return tossOpenApiPort.simulateOrder(accessToken = accessToken(), command = command)
-    }
-
-    private suspend fun accessToken(): String {
-        return tossOpenApiPort.issueToken().accessToken
+        return tossOpenApiPort.simulateOrder(command)
     }
 }

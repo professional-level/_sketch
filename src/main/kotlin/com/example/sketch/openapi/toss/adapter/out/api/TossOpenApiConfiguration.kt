@@ -15,4 +15,9 @@ class TossOpenApiConfiguration {
             .baseUrl(properties.baseUrl)
             .build()
     }
+
+    @Bean
+    fun tossAccessTokenCache(properties: TossOpenApiProperties): TossAccessTokenCache {
+        return TossAccessTokenCache(properties)
+    }
 }

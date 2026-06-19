@@ -1,12 +1,13 @@
 package com.example.sketch.openapi.toss.adapter.`in`.web
 
 import com.example.common.WebAdapter
-import com.example.sketch.openapi.toss.adapter.out.api.TossOpenApiConfigurationException
 import com.example.sketch.openapi.toss.application.port.`in`.TossAccountQuery
 import com.example.sketch.openapi.toss.application.port.`in`.TossOpenApiResult
 import com.example.sketch.openapi.toss.application.port.`in`.TossOpenApiUseCase
 import com.example.sketch.openapi.toss.application.port.`in`.TossOrderCommand
 import com.example.sketch.openapi.toss.application.port.`in`.TossQuery
+import com.example.sketch.openapi.toss.domain.TossOpenApiConfigurationException
+import com.example.sketch.openapi.toss.domain.TossOpenApiTokenException
 import com.example.sketch.openapi.toss.domain.TossOrderSide
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -24,8 +25,8 @@ class TossOpenApiController(
 ) {
 
     @PostMapping("/token")
-    suspend fun issueToken(): ResponseEntity<Any?> {
-        return ResponseEntity.ok(useCase.issueToken())
+    suspend fun issueToken(@RequestParam(defaultValue = "false") refresh: Boolean): ResponseEntity<Any?> {
+        return ResponseEntity.ok(useCase.issueToken(forceRefresh = refresh))
     }
 
     @GetMapping("/account")
@@ -55,9 +56,19 @@ class TossOpenApiController(
 
     @ExceptionHandler(TossOpenApiConfigurationException::class)
     fun handleConfigurationException(exception: TossOpenApiConfigurationException): ResponseEntity<Map<String, String?>> {
-        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).body(
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(
             mapOf(
                 "error" to "TOSS_OPEN_API_NOT_CONFIGURED",
+                "message" to exception.message,
+            ),
+        )
+    }
+
+    @ExceptionHandler(TossOpenApiTokenException::class)
+    fun handleTokenException(exception: TossOpenApiTokenException): ResponseEntity<Map<String, String?>> {
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(
+            mapOf(
+                "error" to "TOSS_OPEN_API_TOKEN_FAILED",
                 "message" to exception.message,
             ),
         )

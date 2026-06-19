@@ -3,6 +3,8 @@ package com.example.sketch.openapi.toss.adapter.out.api
 import com.example.sketch.openapi.toss.application.port.`in`.TossAccountQuery
 import com.example.sketch.openapi.toss.application.port.`in`.TossOrderCommand
 import com.example.sketch.openapi.toss.application.port.`in`.TossQuery
+import com.example.sketch.openapi.toss.domain.TossOpenApiConfigurationException
+import com.example.sketch.openapi.toss.domain.TossOpenApiTokenException
 import com.example.sketch.openapi.toss.domain.TossOrderSide
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
@@ -29,19 +31,10 @@ class TossOpenApiAdapterTest {
 
     @Test
     fun `issues oauth client credentials token`() = runTest {
-        val exchangeFunction = RecordingExchangeFunction(
-            body = """
-            {
-              "access_token": "toss-access-token",
-              "token_type": "Bearer",
-              "expires_in": 3600,
-              "scope": "trade"
-            }
-            """.trimIndent(),
-        )
+        val exchangeFunction = RecordingExchangeFunction(tokenResponse())
         val adapter = adapter(exchangeFunction)
 
-        val token = adapter.issueToken()
+        val token = adapter.issueToken(forceRefresh = false)
 
         assertEquals("toss-access-token", token.accessToken)
         assertEquals("Bearer", token.tokenType)
@@ -58,13 +51,15 @@ class TossOpenApiAdapterTest {
     }
 
     @Test
-    fun `sends bearer token account header and query for stock balance`() = runTest {
-        val exchangeFunction = RecordingExchangeFunction()
+    fun `sends cached bearer token account header and query for stock balance`() = runTest {
+        val exchangeFunction = RecordingExchangeFunction(
+            tokenResponse(),
+            apiResponse(),
+        )
         val adapter = adapter(exchangeFunction)
 
         val response = adapter.getStockBalance(
-            accessToken = "access-token",
-            query = TossAccountQuery(
+            TossAccountQuery(
                 parameters = mapOf(
                     "symbol" to "TQQQ",
                     "market" to "US",
@@ -73,9 +68,9 @@ class TossOpenApiAdapterTest {
         )
 
         assertEquals(200, response.statusCode)
-        with(exchangeFunction.requests.single()) {
+        with(exchangeFunction.requests[1]) {
             assertEquals("/stocks/balance", url().path)
-            assertEquals("Bearer access-token", headers().getFirst("Authorization"))
+            assertEquals("Bearer toss-access-token", headers().getFirst("Authorization"))
             assertEquals("toss-account-1", headers().getFirst("X-Tossinvest-Account"))
             assertEquals("TQQQ", url().queryValue("symbol"))
             assertEquals("US", url().queryValue("market"))
@@ -84,12 +79,14 @@ class TossOpenApiAdapterTest {
 
     @Test
     fun `selects sell simulation path and forwards raw order payload`() = runTest {
-        val exchangeFunction = RecordingExchangeFunction()
+        val exchangeFunction = RecordingExchangeFunction(
+            tokenResponse(),
+            apiResponse(),
+        )
         val adapter = adapter(exchangeFunction)
 
         adapter.simulateOrder(
-            accessToken = "access-token",
-            command = TossOrderCommand(
+            TossOrderCommand(
                 side = TossOrderSide.SELL,
                 accountNumber = "request-account",
                 payload = mapOf(
@@ -100,9 +97,9 @@ class TossOpenApiAdapterTest {
             ),
         )
 
-        with(exchangeFunction.requests.single()) {
+        with(exchangeFunction.requests[1]) {
             assertEquals("/orders/sell/simulations", url().path)
-            assertEquals("Bearer access-token", headers().getFirst("Authorization"))
+            assertEquals("Bearer toss-access-token", headers().getFirst("Authorization"))
             assertEquals("request-account", headers().getFirst("X-Tossinvest-Account"))
             with(bodyAsJson()) {
                 assertEquals("TQQQ", path("symbol").asText())
@@ -113,6 +110,42 @@ class TossOpenApiAdapterTest {
     }
 
     @Test
+    fun `reuses cached token for subsequent calls`() = runTest {
+        val exchangeFunction = RecordingExchangeFunction(
+            tokenResponse(),
+            apiResponse(),
+            apiResponse(),
+        )
+        val adapter = adapter(exchangeFunction)
+
+        adapter.getStockSnapshot(TossQuery(parameters = mapOf("symbol" to "TQQQ")))
+        adapter.getStockSnapshot(TossQuery(parameters = mapOf("symbol" to "SOXL")))
+
+        assertEquals(3, exchangeFunction.requests.size)
+        assertEquals("/oauth2/token", exchangeFunction.requests[0].url().path)
+        assertEquals("/stocks/snapshot", exchangeFunction.requests[1].url().path)
+        assertEquals("/stocks/snapshot", exchangeFunction.requests[2].url().path)
+    }
+
+    @Test
+    fun `invalidates cached token and retries once after unauthorized response`() = runTest {
+        val exchangeFunction = RecordingExchangeFunction(
+            tokenResponse(accessToken = "expired-token"),
+            apiResponse(status = HttpStatus.UNAUTHORIZED, body = """{"error":"expired"}"""),
+            tokenResponse(accessToken = "fresh-token"),
+            apiResponse(),
+        )
+        val adapter = adapter(exchangeFunction)
+
+        val response = adapter.getStockSnapshot(TossQuery(parameters = mapOf("symbol" to "TQQQ")))
+
+        assertEquals(200, response.statusCode)
+        assertEquals(4, exchangeFunction.requests.size)
+        assertEquals("Bearer expired-token", exchangeFunction.requests[1].headers().getFirst("Authorization"))
+        assertEquals("Bearer fresh-token", exchangeFunction.requests[3].headers().getFirst("Authorization"))
+    }
+
+    @Test
     fun `fails fast when operation path is not configured`() = runTest {
         val properties = properties().apply {
             paths.stockSnapshot = ""
@@ -120,10 +153,39 @@ class TossOpenApiAdapterTest {
         val adapter = adapter(RecordingExchangeFunction(), properties)
 
         val exception = assertFailsWith<TossOpenApiConfigurationException> {
-            adapter.getStockSnapshot("access-token", TossQuery(parameters = mapOf("symbol" to "TQQQ")))
+            adapter.getStockSnapshot(TossQuery(parameters = mapOf("symbol" to "TQQQ")))
         }
 
         assertTrue(exception.message.orEmpty().contains("akra.openapi.toss.paths.stock-snapshot"))
+    }
+
+    @Test
+    fun `fails token request when credentials are not configured`() = runTest {
+        val properties = properties().apply {
+            clientSecret = ""
+        }
+        val adapter = adapter(RecordingExchangeFunction(), properties)
+
+        val exception = assertFailsWith<TossOpenApiConfigurationException> {
+            adapter.issueToken(forceRefresh = true)
+        }
+
+        assertTrue(exception.message.orEmpty().contains("akra.openapi.toss.client-secret"))
+    }
+
+    @Test
+    fun `fails token request when response has no access token`() = runTest {
+        val adapter = adapter(
+            RecordingExchangeFunction(
+                apiResponse(body = """{"token_type":"Bearer","expires_in":3600}"""),
+            ),
+        )
+
+        val exception = assertFailsWith<TossOpenApiTokenException> {
+            adapter.issueToken(forceRefresh = true)
+        }
+
+        assertTrue(exception.message.orEmpty().contains("access_token"))
     }
 
     private fun adapter(
@@ -136,6 +198,7 @@ class TossOpenApiAdapterTest {
                 .exchangeFunction(exchangeFunction)
                 .build(),
             properties = properties,
+            tokenCache = TossAccessTokenCache(properties),
             objectMapper = OBJECT_MAPPER,
         )
     }
@@ -156,25 +219,58 @@ class TossOpenApiAdapterTest {
         }
     }
 
-    private class RecordingExchangeFunction(
-        private val status: HttpStatus = HttpStatus.OK,
-        private val body: String = """
+    private data class RecordedResponse(
+        val status: HttpStatus = HttpStatus.OK,
+        val body: String = """
         {
           "ok": true
         }
         """.trimIndent(),
+    )
+
+    private class RecordingExchangeFunction(
+        vararg responses: RecordedResponse,
     ) : ExchangeFunction {
         val requests = mutableListOf<ClientRequest>()
+        private val responses = ArrayDeque(responses.toList())
 
         override fun exchange(request: ClientRequest): Mono<ClientResponse> {
             requests += request
+            val response = if (responses.isEmpty()) RecordedResponse() else responses.removeFirst()
             return Mono.just(
-                ClientResponse.create(status)
+                ClientResponse.create(response.status)
                     .header("Content-Type", MediaType.APPLICATION_JSON_VALUE)
-                    .body(body)
+                    .body(response.body)
                     .build(),
             )
         }
+    }
+
+    private fun tokenResponse(
+        accessToken: String = "toss-access-token",
+        expiresIn: Long = 3600,
+    ): RecordedResponse {
+        return apiResponse(
+            body = """
+            {
+              "access_token": "$accessToken",
+              "token_type": "Bearer",
+              "expires_in": $expiresIn,
+              "scope": "trade"
+            }
+            """.trimIndent(),
+        )
+    }
+
+    private fun apiResponse(
+        status: HttpStatus = HttpStatus.OK,
+        body: String = """
+        {
+          "ok": true
+        }
+        """.trimIndent(),
+    ): RecordedResponse {
+        return RecordedResponse(status = status, body = body)
     }
 
     private fun java.net.URI.queryValue(name: String): String? {

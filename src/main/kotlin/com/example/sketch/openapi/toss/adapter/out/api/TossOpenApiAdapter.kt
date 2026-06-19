@@ -7,11 +7,14 @@ import com.example.sketch.openapi.toss.application.port.`in`.TossOpenApiResult
 import com.example.sketch.openapi.toss.application.port.`in`.TossOrderCommand
 import com.example.sketch.openapi.toss.application.port.`in`.TossQuery
 import com.example.sketch.openapi.toss.application.port.out.TossOpenApiPort
+import com.example.sketch.openapi.toss.domain.TossOpenApiConfigurationException
+import com.example.sketch.openapi.toss.domain.TossOpenApiTokenException
 import com.example.sketch.openapi.toss.domain.TossOrderSide
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import kotlinx.coroutines.reactor.awaitSingle
 import org.springframework.beans.factory.annotation.Qualifier
+import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.web.reactive.function.BodyInserters
 import org.springframework.web.reactive.function.client.ClientResponse
@@ -21,10 +24,17 @@ import org.springframework.web.reactive.function.client.WebClient
 class TossOpenApiAdapter(
     @Qualifier("tossOpenApiWebClient") private val webClient: WebClient,
     private val properties: TossOpenApiProperties,
+    private val tokenCache: TossAccessTokenCache,
     private val objectMapper: ObjectMapper,
 ) : TossOpenApiPort {
 
-    override suspend fun issueToken(): TossAccessTokenResult {
+    override suspend fun issueToken(forceRefresh: Boolean): TossAccessTokenResult {
+        return tokenCache.getOrRefresh(forceRefresh) {
+            requestToken()
+        }
+    }
+
+    private suspend fun requestToken(): TossAccessTokenResult {
         requireConfigured(properties.clientId, "akra.openapi.toss.client-id")
         requireConfigured(properties.clientSecret, "akra.openapi.toss.client-secret")
 
@@ -39,10 +49,13 @@ class TossOpenApiAdapter(
             .exchangeToMono { response -> response.toOpenApiResult() }
             .awaitSingle()
 
+        if (result.statusCode !in 200..299) {
+            throw TossOpenApiTokenException("Toss token request failed: statusCode=${result.statusCode}")
+        }
         val body = result.body as? Map<*, *>
-            ?: throw TossOpenApiConfigurationException("Toss token response body is not a JSON object")
+            ?: throw TossOpenApiTokenException("Toss token response body is not a JSON object")
         val accessToken = body.stringValue("access_token")
-            ?: throw TossOpenApiConfigurationException("Toss token response has no access_token")
+            ?: throw TossOpenApiTokenException("Toss token response has no access_token")
 
         return TossAccessTokenResult(
             accessToken = accessToken,
@@ -53,49 +66,78 @@ class TossOpenApiAdapter(
         )
     }
 
-    override suspend fun getAccount(accessToken: String, query: TossAccountQuery): TossOpenApiResult {
-        return authorizedGet(
-            path = requiredPath(properties.paths.account, "akra.openapi.toss.paths.account"),
-            accessToken = accessToken,
-            accountNumber = resolveAccountNumber(query.accountNumber),
-            parameters = query.parameters,
-        )
+    override suspend fun getAccount(query: TossAccountQuery): TossOpenApiResult {
+        val path = requiredPath(properties.paths.account, "akra.openapi.toss.paths.account")
+        val accountNumber = resolveAccountNumber(query.accountNumber)
+        return authenticated { accessToken ->
+            authorizedGet(
+                path = path,
+                accessToken = accessToken,
+                accountNumber = accountNumber,
+                parameters = query.parameters,
+            )
+        }
     }
 
-    override suspend fun getStockSnapshot(accessToken: String, query: TossQuery): TossOpenApiResult {
-        return authorizedGet(
-            path = requiredPath(properties.paths.stockSnapshot, "akra.openapi.toss.paths.stock-snapshot"),
-            accessToken = accessToken,
-            accountNumber = null,
-            parameters = query.parameters,
-        )
+    override suspend fun getStockSnapshot(query: TossQuery): TossOpenApiResult {
+        val path = requiredPath(properties.paths.stockSnapshot, "akra.openapi.toss.paths.stock-snapshot")
+        return authenticated { accessToken ->
+            authorizedGet(
+                path = path,
+                accessToken = accessToken,
+                accountNumber = null,
+                parameters = query.parameters,
+            )
+        }
     }
 
-    override suspend fun getStockBalance(accessToken: String, query: TossAccountQuery): TossOpenApiResult {
-        return authorizedGet(
-            path = requiredPath(properties.paths.stockBalance, "akra.openapi.toss.paths.stock-balance"),
-            accessToken = accessToken,
-            accountNumber = requiredAccountNumber(query.accountNumber, "stock balance"),
-            parameters = query.parameters,
-        )
+    override suspend fun getStockBalance(query: TossAccountQuery): TossOpenApiResult {
+        val path = requiredPath(properties.paths.stockBalance, "akra.openapi.toss.paths.stock-balance")
+        val accountNumber = requiredAccountNumber(query.accountNumber, "stock balance")
+        return authenticated { accessToken ->
+            authorizedGet(
+                path = path,
+                accessToken = accessToken,
+                accountNumber = accountNumber,
+                parameters = query.parameters,
+            )
+        }
     }
 
-    override suspend fun submitOrder(accessToken: String, command: TossOrderCommand): TossOpenApiResult {
-        return authorizedPost(
-            path = orderPath(command.side, simulation = false),
-            accessToken = accessToken,
-            accountNumber = requiredAccountNumber(command.accountNumber, "order"),
-            payload = command.payload,
-        )
+    override suspend fun submitOrder(command: TossOrderCommand): TossOpenApiResult {
+        val path = orderPath(command.side, simulation = false)
+        val accountNumber = requiredAccountNumber(command.accountNumber, "order")
+        return authenticated { accessToken ->
+            authorizedPost(
+                path = path,
+                accessToken = accessToken,
+                accountNumber = accountNumber,
+                payload = command.payload,
+            )
+        }
     }
 
-    override suspend fun simulateOrder(accessToken: String, command: TossOrderCommand): TossOpenApiResult {
-        return authorizedPost(
-            path = orderPath(command.side, simulation = true),
-            accessToken = accessToken,
-            accountNumber = requiredAccountNumber(command.accountNumber, "order simulation"),
-            payload = command.payload,
-        )
+    override suspend fun simulateOrder(command: TossOrderCommand): TossOpenApiResult {
+        val path = orderPath(command.side, simulation = true)
+        val accountNumber = requiredAccountNumber(command.accountNumber, "order simulation")
+        return authenticated { accessToken ->
+            authorizedPost(
+                path = path,
+                accessToken = accessToken,
+                accountNumber = accountNumber,
+                payload = command.payload,
+            )
+        }
+    }
+
+    private suspend fun authenticated(block: suspend (String) -> TossOpenApiResult): TossOpenApiResult {
+        val first = block(issueToken(forceRefresh = false).accessToken)
+        if (first.statusCode != HttpStatus.UNAUTHORIZED.value()) {
+            return first
+        }
+
+        tokenCache.invalidate()
+        return block(issueToken(forceRefresh = true).accessToken)
     }
 
     private suspend fun authorizedGet(

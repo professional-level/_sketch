@@ -3,7 +3,7 @@ package com.example.sketch.openapi.toss.application.port.`in`
 import com.example.sketch.openapi.toss.domain.TossOrderSide
 
 interface TossOpenApiUseCase {
-    suspend fun issueToken(): TossAccessTokenResult
+    suspend fun issueToken(forceRefresh: Boolean = false): TossAccessTokenResult
     suspend fun getAccount(query: TossAccountQuery): TossOpenApiResult
     suspend fun getStockSnapshot(query: TossQuery): TossOpenApiResult
     suspend fun getStockBalance(query: TossAccountQuery): TossOpenApiResult
@@ -15,6 +15,7 @@ data class TossAccessTokenResult(
     val accessToken: String,
     val tokenType: String,
     val expiresIn: Long?,
+    val expiresAt: java.time.Instant? = null,
     val scope: String?,
     val rawBody: Any?,
 )

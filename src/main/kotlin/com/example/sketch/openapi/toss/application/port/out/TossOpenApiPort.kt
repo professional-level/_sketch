@@ -7,10 +7,10 @@ import com.example.sketch.openapi.toss.application.port.`in`.TossOrderCommand
 import com.example.sketch.openapi.toss.application.port.`in`.TossQuery
 
 interface TossOpenApiPort {
-    suspend fun issueToken(): TossAccessTokenResult
-    suspend fun getAccount(accessToken: String, query: TossAccountQuery): TossOpenApiResult
-    suspend fun getStockSnapshot(accessToken: String, query: TossQuery): TossOpenApiResult
-    suspend fun getStockBalance(accessToken: String, query: TossAccountQuery): TossOpenApiResult
-    suspend fun submitOrder(accessToken: String, command: TossOrderCommand): TossOpenApiResult
-    suspend fun simulateOrder(accessToken: String, command: TossOrderCommand): TossOpenApiResult
+    suspend fun issueToken(forceRefresh: Boolean = false): TossAccessTokenResult
+    suspend fun getAccount(query: TossAccountQuery): TossOpenApiResult
+    suspend fun getStockSnapshot(query: TossQuery): TossOpenApiResult
+    suspend fun getStockBalance(query: TossAccountQuery): TossOpenApiResult
+    suspend fun submitOrder(command: TossOrderCommand): TossOpenApiResult
+    suspend fun simulateOrder(command: TossOrderCommand): TossOpenApiResult
 }
