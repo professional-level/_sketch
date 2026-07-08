@@ -19,11 +19,11 @@ class TossOpenApiProperties {
 
     class Paths {
         var token: String = "/oauth2/token"
-        var account: String = ""
-        var stockSnapshot: String = ""
-        var stockBalance: String = ""
-        var buyOrder: String = ""
-        var sellOrder: String = ""
+        var account: String = "/api/v1/accounts"
+        var stockSnapshot: String = "/api/v1/stocks"
+        var stockBalance: String = "/api/v1/holdings"
+        var buyOrder: String = "/api/v1/orders"
+        var sellOrder: String = "/api/v1/orders"
         var buyOrderSimulation: String = ""
         var sellOrderSimulation: String = ""
     }
