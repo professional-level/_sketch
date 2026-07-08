@@ -23,6 +23,7 @@ internal class StrategyExecutionOperationsMetricsAdapter(
     private val log = LoggerFactory.getLogger(javaClass)
     private val orderIntentOutboxStatusGauges = ConcurrentHashMap<String, AtomicLong>()
     private val orderEventTypeGauges = ConcurrentHashMap<String, AtomicLong>()
+    private val laorOrderAnomalyTypeGauges = ConcurrentHashMap<String, AtomicLong>()
     private val laorV4StatusGauges = ConcurrentHashMap<String, AtomicLong>()
     private val finalPriceBatingV1StatusGauges = ConcurrentHashMap<String, AtomicLong>()
     private val strategyExecutionStartRequestGauge = registerGauge(
@@ -51,6 +52,7 @@ internal class StrategyExecutionOperationsMetricsAdapter(
     internal fun recordSnapshot(snapshot: StrategyExecutionOperationsStatusSnapshot) {
         resetGauges(orderIntentOutboxStatusGauges)
         resetGauges(orderEventTypeGauges)
+        resetGauges(laorOrderAnomalyTypeGauges)
         resetGauges(laorV4StatusGauges)
         resetGauges(finalPriceBatingV1StatusGauges)
 
@@ -69,6 +71,14 @@ internal class StrategyExecutionOperationsMetricsAdapter(
                 count = count,
                 name = STRATEGY_EXECUTION_ORDER_EVENT_TYPE_GAUGE,
                 description = "Strategy execution order events by type",
+            )
+        }
+        snapshot.laorOrderAnomalyTypeCounts.forEach { count ->
+            recordStatusCount(
+                gauges = laorOrderAnomalyTypeGauges,
+                count = count,
+                name = LAOR_ORDER_ANOMALY_TYPE_GAUGE,
+                description = "LAOR order anomalies by type",
             )
         }
         snapshot.laorV4StatusCounts.forEach { count ->
@@ -136,6 +146,8 @@ internal class StrategyExecutionOperationsMetricsAdapter(
             "strategy.execution.start.requests"
         internal const val STRATEGY_EXECUTION_ORDER_EVENT_TYPE_GAUGE =
             "strategy.execution.order.events"
+        internal const val LAOR_ORDER_ANOMALY_TYPE_GAUGE =
+            "strategy.execution.laor.order.anomalies"
         internal const val LAOR_V4_STATUS_GAUGE = "strategy.execution.laor.v4.executions"
         internal const val FINAL_PRICE_BATING_V1_STATUS_GAUGE =
             "strategy.execution.final.price.bating.v1.executions"

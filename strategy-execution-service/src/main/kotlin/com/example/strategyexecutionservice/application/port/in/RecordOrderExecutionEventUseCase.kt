@@ -15,6 +15,7 @@ sealed class RecordOrderExecutionEventCommand {
     abstract val orderIntentId: String
     abstract val brokerOrderId: String?
     abstract val occurredAt: ZonedDateTime
+    abstract val idempotencyKey: String
 
     data class Submitted(
         override val eventId: String,
@@ -25,11 +26,13 @@ sealed class RecordOrderExecutionEventCommand {
         val orderTag: String? = null,
         val quantity: Long? = null,
         val submittedAt: ZonedDateTime,
+        override val idempotencyKey: String = eventId,
     ) : RecordOrderExecutionEventCommand() {
         override val occurredAt: ZonedDateTime = submittedAt
 
         init {
             require(eventId.isNotBlank()) { "eventId must not be blank" }
+            require(idempotencyKey.isNotBlank()) { "idempotencyKey must not be blank" }
             require(strategyExecutionId.isNotBlank()) { "strategyExecutionId must not be blank" }
             require(orderIntentId.isNotBlank()) { "orderIntentId must not be blank" }
             require(brokerOrderId.isNotBlank()) { "brokerOrderId must not be blank" }
@@ -45,11 +48,13 @@ sealed class RecordOrderExecutionEventCommand {
         override val brokerOrderId: String?,
         val reason: String,
         val rejectedAt: ZonedDateTime,
+        override val idempotencyKey: String = eventId,
     ) : RecordOrderExecutionEventCommand() {
         override val occurredAt: ZonedDateTime = rejectedAt
 
         init {
             require(eventId.isNotBlank()) { "eventId must not be blank" }
+            require(idempotencyKey.isNotBlank()) { "idempotencyKey must not be blank" }
             require(strategyExecutionId.isNotBlank()) { "strategyExecutionId must not be blank" }
             require(orderIntentId.isNotBlank()) { "orderIntentId must not be blank" }
             brokerOrderId?.let { require(it.isNotBlank()) { "brokerOrderId must not be blank" } }
@@ -64,11 +69,13 @@ sealed class RecordOrderExecutionEventCommand {
         override val brokerOrderId: String,
         val reason: String,
         val cancelledAt: ZonedDateTime,
+        override val idempotencyKey: String = eventId,
     ) : RecordOrderExecutionEventCommand() {
         override val occurredAt: ZonedDateTime = cancelledAt
 
         init {
             require(eventId.isNotBlank()) { "eventId must not be blank" }
+            require(idempotencyKey.isNotBlank()) { "idempotencyKey must not be blank" }
             require(strategyExecutionId.isNotBlank()) { "strategyExecutionId must not be blank" }
             require(orderIntentId.isNotBlank()) { "orderIntentId must not be blank" }
             require(brokerOrderId.isNotBlank()) { "brokerOrderId must not be blank" }

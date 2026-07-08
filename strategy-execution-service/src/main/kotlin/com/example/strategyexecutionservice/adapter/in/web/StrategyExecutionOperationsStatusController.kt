@@ -29,6 +29,7 @@ internal data class StrategyExecutionOperationsStatusResponse(
     val strategyExecutionOrderEventTypeCounts: List<StrategyExecutionStatusCount>,
     val laorV4StatusCounts: List<StrategyExecutionStatusCount>,
     val finalPriceBatingV1StatusCounts: List<StrategyExecutionStatusCount>,
+    val laorOrderAnomalyTypeCounts: List<StrategyExecutionStatusCount>,
     val activeLaorV4Strategies: List<LaorV4StrategyExecutionResponse>,
     val activeFinalPriceBatingV1Strategies: List<FinalPriceBatingV1StrategyExecutionResponse>,
 )
@@ -41,6 +42,7 @@ private fun StrategyExecutionOperationsStatusResult.toResponse(): StrategyExecut
         strategyExecutionOrderEventTypeCounts = snapshot.strategyExecutionOrderEventTypeCounts,
         laorV4StatusCounts = snapshot.laorV4StatusCounts,
         finalPriceBatingV1StatusCounts = snapshot.finalPriceBatingV1StatusCounts,
+        laorOrderAnomalyTypeCounts = snapshot.laorOrderAnomalyTypeCounts,
         activeLaorV4Strategies = activeLaorV4Strategies.map { it.toResponse() },
         activeFinalPriceBatingV1Strategies = activeFinalPriceBatingV1Strategies.map { it.toResponse() },
     )

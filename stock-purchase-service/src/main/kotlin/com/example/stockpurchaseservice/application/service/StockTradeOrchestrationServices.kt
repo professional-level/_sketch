@@ -221,6 +221,7 @@ class ReconcileExecutionsService(
                     filledQuantity = execution.quantity.toLong(),
                     orderTag = plan.submission.orderTag,
                     filledAt = execution.createdAt,
+                    idempotencyKey = "${plan.submission.idempotencyKey}:FILLED:${execution.externalExecutionId.value}",
                 ),
             )
         } else {
@@ -235,6 +236,7 @@ class ReconcileExecutionsService(
                     filledQuantity = execution.quantity.toLong(),
                     orderTag = plan.submission.orderTag,
                     filledAt = execution.createdAt,
+                    idempotencyKey = "${plan.submission.idempotencyKey}:PARTIALLY_FILLED:${execution.externalExecutionId.value}",
                 ),
             )
         }
@@ -359,8 +361,8 @@ private suspend fun submitLegacySellOrder(
         OrderIntentSubmissionStatus.REJECTED -> order.changeOrderState(OrderState.SUBMIT_FAILED)
     }
     if (result.status == OrderIntentSubmissionStatus.SUBMISSION_UNKNOWN) {
-        externalOrderId?.let { externalOrderId ->
-            stockOrderRepository.save(order, ExternalOrderId(externalOrderId))
+        externalOrderId?.let { resolvedExternalOrderId ->
+            stockOrderRepository.save(order, ExternalOrderId(resolvedExternalOrderId))
             return
         }
     }

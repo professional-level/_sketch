@@ -13,7 +13,7 @@ internal class StrategyExecutionOrderEventAdapter(
 ) : StrategyExecutionOrderEventPort {
 
     override suspend fun tryRecord(event: StrategyExecutionOrderEventRecord): Boolean {
-        if (orderEventRepository.existsByEventId(event.eventId)) return false
+        if (orderEventRepository.existsByEventIdOrIdempotencyKey(event.eventId, event.idempotencyKey)) return false
 
         return runCatching {
             orderEventRepository.save(StrategyExecutionOrderEventEntity.from(event)).awaitSuspending()

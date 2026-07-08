@@ -39,6 +39,10 @@ message OrderIntentCreatedEvent{
   EventMeta meta = 12;
   OrderTradingEnvironment trading_environment = 13;
   string exchange = 14;
+  string execution_run_id = 15;
+  int32 order_index = 16;
+  string market = 17;
+  string strategy_version = 18;
 }
 
 message StrategyExecutionStartRequested {
@@ -85,6 +89,7 @@ message OrderSubmitted {
   OrderIntentSide side = 7;
   string order_tag = 8;
   int64 quantity = 9;
+  string idempotency_key = 10;
 }
 
 message OrderRejected {
@@ -95,6 +100,7 @@ message OrderRejected {
   string reason = 5;
   google.protobuf.Timestamp rejected_at = 6;
   EventMeta meta = 7;
+  string idempotency_key = 8;
 }
 
 message OrderCancelled {
@@ -105,6 +111,7 @@ message OrderCancelled {
   string reason = 5;
   google.protobuf.Timestamp cancelled_at = 6;
   EventMeta meta = 7;
+  string idempotency_key = 8;
 }
 
 message OrderFilled {
@@ -118,6 +125,7 @@ message OrderFilled {
   string order_tag = 8;
   google.protobuf.Timestamp filled_at = 9;
   EventMeta meta = 10;
+  string idempotency_key = 11;
 }
 
 message OrderPartiallyFilled {
@@ -131,6 +139,7 @@ message OrderPartiallyFilled {
   string order_tag = 8;
   google.protobuf.Timestamp filled_at = 9;
   EventMeta meta = 10;
+  string idempotency_key = 11;
 }
 
 message LaorOrderMilestoneDetected {

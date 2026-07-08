@@ -65,7 +65,7 @@ class RunActiveStrategyExecutionsServiceTest {
         assertEquals(1, result.activeStrategyCount)
         assertEquals(1, result.executedStrategyCount)
         assertEquals(3, result.createdOrderIntentCount)
-        assertEquals("TQQQ" to 5, marketDataPort.requests.single())
+        assertEquals(Triple("TQQQ", requestedAt.toLocalDate(), 5), marketDataPort.requests.single())
 
         val command = runStrategyExecutionUseCase.commands.single() as RunStrategyExecutionCommand.LaorV4
         assertEquals("laor-v4-strategy:TQQQ", command.executionId)
@@ -284,13 +284,14 @@ class RunActiveStrategyExecutionsServiceTest {
     }
 
     private class FakeMarketDataPort : MarketDataPort {
-        val requests: MutableList<Pair<String, Int>> = mutableListOf()
+        val requests: MutableList<Triple<String, LocalDate, Int>> = mutableListOf()
 
         override suspend fun getMarketSnapshot(
             symbol: String,
+            asOfDate: LocalDate,
             recentCloseCount: Int,
         ): StrategyMarketDataSnapshot {
-            requests += symbol to recentCloseCount
+            requests += Triple(symbol, asOfDate, recentCloseCount)
             return StrategyMarketDataSnapshot(
                 previousClose = 100.0,
                 recentClosePrices = listOf(99.0, 98.0, 97.0, 96.0, 95.0),

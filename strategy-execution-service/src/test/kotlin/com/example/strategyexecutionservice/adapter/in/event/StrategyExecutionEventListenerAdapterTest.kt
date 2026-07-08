@@ -6,6 +6,10 @@ import com.example.strategyexecutionservice.application.port.`in`.ApplyOrderFill
 import com.example.strategyexecutionservice.application.port.`in`.ApplyOrderFillStatus
 import com.example.strategyexecutionservice.application.port.`in`.ApplyOrderFillUseCase
 import com.example.strategyexecutionservice.application.port.`in`.OrderFillKind
+import com.example.strategyexecutionservice.application.port.`in`.RecordLaorOrderAnomalyCommand
+import com.example.strategyexecutionservice.application.port.`in`.RecordLaorOrderAnomalyResult
+import com.example.strategyexecutionservice.application.port.`in`.RecordLaorOrderAnomalyStatus
+import com.example.strategyexecutionservice.application.port.`in`.RecordLaorOrderAnomalyUseCase
 import com.example.strategyexecutionservice.application.port.`in`.RecordOrderExecutionEventCommand
 import com.example.strategyexecutionservice.application.port.`in`.RecordOrderExecutionEventResult
 import com.example.strategyexecutionservice.application.port.`in`.RecordOrderExecutionEventUseCase
@@ -18,6 +22,7 @@ import com.example.strategyexecutionservice.application.port.`in`.StartStrategyE
 import com.example.strategyexecutionservice.application.port.`in`.StartStrategyExecutionUseCase
 import com.example.strategyexecutionservice.domain.strategy.execution.OrderSide
 import com.google.protobuf.Timestamp
+import common.Topic.LAOR_ORDER_ANOMALY_DETECTED
 import common.Topic.LAOR_ORDER_MILESTONE_DETECTED
 import common.Topic.ORDER_FILLED
 import common.observability.TraceContext
@@ -40,6 +45,7 @@ class StrategyExecutionEventListenerAdapterTest {
             applyOrderFillUseCase = fillUseCase,
             recordOrderExecutionEventUseCase = NoopRecordOrderExecutionEventUseCase(),
             signalLaorOrderMilestoneUseCase = NoopSignalLaorOrderMilestoneUseCase(),
+            recordLaorOrderAnomalyUseCase = NoopRecordLaorOrderAnomalyUseCase(),
         )
         val record = orderFilledRecord()
             .withHeader(TraceContext.TRACEPARENT_KEY, TRACE_PARENT)
@@ -67,6 +73,7 @@ class StrategyExecutionEventListenerAdapterTest {
             assertEquals(100.5, filledPrice)
             assertEquals(2L, filledQuantity)
             assertEquals("FIRST_BUY", orderTag)
+            assertEquals("fill-key-1", idempotencyKey)
             assertEquals(Instant.ofEpochSecond(FILLED_AT_EPOCH_SECONDS), filledAt.toInstant())
         }
     }
@@ -79,6 +86,7 @@ class StrategyExecutionEventListenerAdapterTest {
             applyOrderFillUseCase = NoopApplyOrderFillUseCase(),
             recordOrderExecutionEventUseCase = NoopRecordOrderExecutionEventUseCase(),
             signalLaorOrderMilestoneUseCase = signalUseCase,
+            recordLaorOrderAnomalyUseCase = NoopRecordLaorOrderAnomalyUseCase(),
         )
         val record = laorMilestoneRecord()
 
@@ -100,6 +108,34 @@ class StrategyExecutionEventListenerAdapterTest {
         }
     }
 
+    @Test
+    fun `maps laor anomaly event to record command`() = runBlocking {
+        val anomalyUseCase = CapturingRecordLaorOrderAnomalyUseCase()
+        val adapter = StrategyExecutionEventListenerAdapter(
+            startStrategyExecutionUseCase = NoopStartStrategyExecutionUseCase(),
+            applyOrderFillUseCase = NoopApplyOrderFillUseCase(),
+            recordOrderExecutionEventUseCase = NoopRecordOrderExecutionEventUseCase(),
+            signalLaorOrderMilestoneUseCase = NoopSignalLaorOrderMilestoneUseCase(),
+            recordLaorOrderAnomalyUseCase = anomalyUseCase,
+        )
+
+        adapter.laorOrderAnomalies(laorAnomalyRecord())
+
+        with(anomalyUseCase.commands.single()) {
+            assertEquals("anomaly-1", eventId)
+            assertEquals("FILL_BEFORE_SUBMIT", anomalyType)
+            assertEquals("laor-v4:TQQQ", strategyExecutionId)
+            assertEquals("intent-1", orderIntentId)
+            assertEquals("broker-1", brokerOrderId)
+            assertEquals("FIRST_BUY", orderTag)
+            assertEquals(OrderSide.BUY, side)
+            assertEquals("fill arrived before submitted event", reason)
+            assertEquals(listOf("fill-1"), sourceEventIds)
+            assertEquals("laor-v4:TQQQ:intent-1:FILL_BEFORE_SUBMIT:fill-1", idempotencyKey)
+            assertEquals(Instant.ofEpochSecond(FILLED_AT_EPOCH_SECONDS), occurredAt.toInstant())
+        }
+    }
+
     private fun orderFilledRecord(): ConsumerRecord<String, ByteArray> {
         val event = Event.OrderFilled.newBuilder()
             .setEventId("fill-1")
@@ -111,6 +147,7 @@ class StrategyExecutionEventListenerAdapterTest {
             .setFilledQuantity(2L)
             .setOrderTag("FIRST_BUY")
             .setFilledAt(Timestamp.newBuilder().setSeconds(FILLED_AT_EPOCH_SECONDS).build())
+            .setIdempotencyKey("fill-key-1")
             .build()
         return ConsumerRecord(ORDER_FILLED, 0, 0L, "laor-v4:TQQQ", event.toByteArray())
     }
@@ -132,6 +169,23 @@ class StrategyExecutionEventListenerAdapterTest {
             .setIdempotencyKey("laor-v4:TQQQ:intent-1:ENTRY_BUY_FILLED:fill-1")
             .build()
         return ConsumerRecord(LAOR_ORDER_MILESTONE_DETECTED, 0, 0L, "laor-v4:TQQQ", event.toByteArray())
+    }
+
+    private fun laorAnomalyRecord(): ConsumerRecord<String, ByteArray> {
+        val event = Event.LaorOrderAnomalyDetected.newBuilder()
+            .setEventId("anomaly-1")
+            .setAnomalyType(Event.LaorOrderAnomalyType.FILL_BEFORE_SUBMIT)
+            .setStrategyExecutionId("laor-v4:TQQQ")
+            .setOrderIntentId("intent-1")
+            .setBrokerOrderId("broker-1")
+            .setOrderTag("FIRST_BUY")
+            .setSide(Event.OrderIntentSide.ORDER_INTENT_BUY)
+            .setReason("fill arrived before submitted event")
+            .setOccurredAt(Timestamp.newBuilder().setSeconds(FILLED_AT_EPOCH_SECONDS).build())
+            .addSourceEventIds("fill-1")
+            .setIdempotencyKey("laor-v4:TQQQ:intent-1:FILL_BEFORE_SUBMIT:fill-1")
+            .build()
+        return ConsumerRecord(LAOR_ORDER_ANOMALY_DETECTED, 0, 0L, "laor-v4:TQQQ", event.toByteArray())
     }
 
     private fun ConsumerRecord<String, ByteArray>.withHeader(
@@ -168,6 +222,15 @@ class StrategyExecutionEventListenerAdapterTest {
         }
     }
 
+    private class CapturingRecordLaorOrderAnomalyUseCase : RecordLaorOrderAnomalyUseCase {
+        val commands: MutableList<RecordLaorOrderAnomalyCommand> = mutableListOf()
+
+        override suspend fun execute(command: RecordLaorOrderAnomalyCommand): RecordLaorOrderAnomalyResult {
+            commands += command
+            return RecordLaorOrderAnomalyResult(command.strategyExecutionId, RecordLaorOrderAnomalyStatus.RECORDED)
+        }
+    }
+
     private class NoopApplyOrderFillUseCase : ApplyOrderFillUseCase {
         override suspend fun execute(command: ApplyOrderFillCommand): ApplyOrderFillResult {
             error("not used")
@@ -188,6 +251,12 @@ class StrategyExecutionEventListenerAdapterTest {
 
     private class NoopSignalLaorOrderMilestoneUseCase : SignalLaorOrderMilestoneUseCase {
         override suspend fun execute(command: SignalLaorOrderMilestoneCommand): SignalLaorOrderMilestoneResult {
+            error("not used")
+        }
+    }
+
+    private class NoopRecordLaorOrderAnomalyUseCase : RecordLaorOrderAnomalyUseCase {
+        override suspend fun execute(command: RecordLaorOrderAnomalyCommand): RecordLaorOrderAnomalyResult {
             error("not used")
         }
     }

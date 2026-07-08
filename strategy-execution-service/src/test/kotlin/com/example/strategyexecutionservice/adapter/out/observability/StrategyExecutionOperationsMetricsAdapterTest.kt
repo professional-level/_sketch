@@ -58,6 +58,14 @@ class StrategyExecutionOperationsMetricsAdapterTest {
                 "COMPLETED",
             ),
         )
+        assertEquals(
+            6.0,
+            meterRegistry.gaugeValue(
+                StrategyExecutionOperationsMetricsAdapter.LAOR_ORDER_ANOMALY_TYPE_GAUGE,
+                "status",
+                "FILL_BEFORE_SUBMIT",
+            ),
+        )
     }
 
     @Test
@@ -73,6 +81,7 @@ class StrategyExecutionOperationsMetricsAdapterTest {
             strategyExecutionOrderEventTypeCounts = listOf(StrategyExecutionStatusCount("SUBMITTED", 1)),
             laorV4StatusCounts = listOf(StrategyExecutionStatusCount("COMPLETED", 1)),
             finalPriceBatingV1StatusCounts = listOf(StrategyExecutionStatusCount("ACTIVE", 1)),
+            laorOrderAnomalyTypeCounts = listOf(StrategyExecutionStatusCount("UNKNOWN_ORDER_INTENT", 1)),
         )
         adapter.refresh()
 
@@ -112,6 +121,22 @@ class StrategyExecutionOperationsMetricsAdapterTest {
                 StrategyExecutionOperationsMetricsAdapter.FINAL_PRICE_BATING_V1_STATUS_GAUGE,
                 "status",
                 "COMPLETED",
+            ),
+        )
+        assertEquals(
+            0.0,
+            meterRegistry.gaugeValue(
+                StrategyExecutionOperationsMetricsAdapter.LAOR_ORDER_ANOMALY_TYPE_GAUGE,
+                "status",
+                "FILL_BEFORE_SUBMIT",
+            ),
+        )
+        assertEquals(
+            1.0,
+            meterRegistry.gaugeValue(
+                StrategyExecutionOperationsMetricsAdapter.LAOR_ORDER_ANOMALY_TYPE_GAUGE,
+                "status",
+                "UNKNOWN_ORDER_INTENT",
             ),
         )
     }
@@ -164,6 +189,9 @@ class StrategyExecutionOperationsMetricsAdapterTest {
             StrategyExecutionStatusCount("ACTIVE", 1),
             StrategyExecutionStatusCount("COMPLETED", 3),
         ),
+        laorOrderAnomalyTypeCounts: List<StrategyExecutionStatusCount> = listOf(
+            StrategyExecutionStatusCount("FILL_BEFORE_SUBMIT", 6),
+        ),
     ): StrategyExecutionOperationsStatusSnapshot {
         return StrategyExecutionOperationsStatusSnapshot(
             orderIntentOutboxStatusCounts = orderIntentOutboxStatusCounts,
@@ -171,6 +199,7 @@ class StrategyExecutionOperationsMetricsAdapterTest {
             strategyExecutionOrderEventTypeCounts = strategyExecutionOrderEventTypeCounts,
             laorV4StatusCounts = laorV4StatusCounts,
             finalPriceBatingV1StatusCounts = finalPriceBatingV1StatusCounts,
+            laorOrderAnomalyTypeCounts = laorOrderAnomalyTypeCounts,
         )
     }
 

@@ -21,6 +21,10 @@ class OrderIntentKafkaSerializerTest {
 
         assertEquals(Event.OrderTradingEnvironment.ORDER_TRADING_ENVIRONMENT_LIVE, event.tradingEnvironment)
         assertEquals("NYSE", event.exchange)
+        assertEquals("laor-v4-live:TQQQ:run-2026-06-02", event.executionRunId)
+        assertEquals(0, event.orderIndex)
+        assertEquals("US", event.market)
+        assertEquals("v4", event.strategyVersion)
     }
 
     private fun message(): OrderIntentMessage {
@@ -38,6 +42,10 @@ class OrderIntentKafkaSerializerTest {
             createdAt = ZonedDateTime.parse("2026-06-02T09:00:00+09:00"),
             tradingEnvironment = OrderTradingEnvironment.LIVE,
             exchange = "NYSE",
+            executionRunId = "laor-v4-live:TQQQ:run-2026-06-02",
+            orderIndex = 0,
+            market = "US",
+            strategyVersion = "v4",
         )
     }
 }

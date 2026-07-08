@@ -56,7 +56,11 @@ class ApplyOrderFillService(
             ),
             state = current.state,
         )
-        val market = marketDataPort.getMarketSnapshot(current.symbol.ticker, recentCloseCount = 5)
+        val market = marketDataPort.getMarketSnapshot(
+            symbol = current.symbol.ticker,
+            asOfDate = command.filledAt.toLocalDate(),
+            recentCloseCount = 5,
+        )
         val next = strategy.applyFills(
             fills = listOf(
                 StrategyExecutionFill(
@@ -200,6 +204,10 @@ class ApplyOrderFillService(
                     idempotencyKey = idempotencyKey,
                     createdAt = createdAt,
                     tradingEnvironment = tradingEnvironmentResolver.resolve(current.executionId),
+                    executionRunId = "${current.executionId}:SELL_AFTER_ENTRY",
+                    orderIndex = 0,
+                    market = current.market,
+                    strategyVersion = "v1",
                 ),
             ),
         )
@@ -227,10 +235,11 @@ private const val FINAL_PRICE_BATING_TAKE_PROFIT_MARGIN = 0.03
 private const val FINAL_PRICE_BATING_SELL_ORDER_TAG = "FINAL_PRICE_BATING_V1_SELL"
 
 private fun ApplyOrderFillCommand.toRecord(): StrategyExecutionOrderEventRecord {
-    return StrategyExecutionOrderEventRecord(
-        eventId = eventId,
-        strategyExecutionId = strategyExecutionId,
-        orderIntentId = orderIntentId,
+        return StrategyExecutionOrderEventRecord(
+            eventId = eventId,
+            idempotencyKey = idempotencyKey,
+            strategyExecutionId = strategyExecutionId,
+            orderIntentId = orderIntentId,
         brokerOrderId = brokerOrderId,
         type = fillKind.toEventType(),
         side = side,

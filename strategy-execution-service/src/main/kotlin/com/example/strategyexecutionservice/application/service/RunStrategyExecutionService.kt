@@ -53,6 +53,8 @@ class RunStrategyExecutionService(
                     orderIndex = index,
                     createdAt = createdAt,
                     tradingEnvironment = tradingEnvironmentResolver.resolve(command.executionId),
+                    market = command.marketCode(),
+                    strategyVersion = "v1",
                 )
             },
         )
@@ -99,6 +101,12 @@ class RunStrategyExecutionService(
             is RunStrategyExecutionCommand.LaorV4 -> market
         }
 
+    private fun RunStrategyExecutionCommand.marketCode(): String {
+        return when (this) {
+            is RunStrategyExecutionCommand.LaorV4 -> "US"
+        }
+    }
+
     private fun LaorV4State.toDomain(): LaorV4StrategyState {
         return LaorV4StrategyState(
             mode = mode,
@@ -136,6 +144,8 @@ class RunStrategyExecutionService(
         orderIndex: Int,
         createdAt: ZonedDateTime,
         tradingEnvironment: OrderTradingEnvironment,
+        market: String,
+        strategyVersion: String,
     ): OrderIntentMessage {
         val idempotencyKey = "${executionId.value}:$executionRunId:$tag:$orderIndex"
         return OrderIntentMessage(
@@ -151,6 +161,10 @@ class RunStrategyExecutionService(
             idempotencyKey = idempotencyKey,
             createdAt = createdAt,
             tradingEnvironment = tradingEnvironment,
+            executionRunId = executionRunId,
+            orderIndex = orderIndex,
+            market = market,
+            strategyVersion = strategyVersion,
         )
     }
 }

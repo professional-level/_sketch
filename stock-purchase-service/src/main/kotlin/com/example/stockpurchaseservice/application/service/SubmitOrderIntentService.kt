@@ -270,6 +270,7 @@ class SubmitOrderIntentService(
             orderTag = orderTag,
             quantity = quantity,
             submittedAt = submission.submittedAt,
+            idempotencyKey = "$idempotencyKey:SUBMITTED",
         )
     }
 
@@ -286,6 +287,7 @@ class SubmitOrderIntentService(
             brokerOrderId = null,
             reason = reason,
             rejectedAt = rejectedAt,
+            idempotencyKey = "$idempotencyKey:REJECTED",
         )
     }
 

@@ -30,6 +30,10 @@ internal class OrderIntentKafkaSerializer {
             .setCreatedAt(createdAt.toProtobufTimestamp())
             .setTradingEnvironment(tradingEnvironment.toProto())
             .setExchange(exchange)
+            .setExecutionRunId(executionRunId)
+            .setOrderIndex(orderIndex)
+            .setMarket(market)
+            .setStrategyVersion(strategyVersion)
             .setMeta(
                 Event.EventMeta.newBuilder()
                     .setOccurredAt(createdAt.toProtobufTimestamp())

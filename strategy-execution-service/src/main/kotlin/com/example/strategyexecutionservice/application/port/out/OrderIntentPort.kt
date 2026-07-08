@@ -24,6 +24,10 @@ data class OrderIntentMessage(
     val createdAt: ZonedDateTime,
     val tradingEnvironment: OrderTradingEnvironment = OrderTradingEnvironment.MOCK,
     val exchange: String = DEFAULT_OVERSEAS_ORDER_EXCHANGE,
+    val executionRunId: String = "",
+    val orderIndex: Int = 0,
+    val market: String = "",
+    val strategyVersion: String = "v1",
 )
 
 enum class OrderTradingEnvironment {

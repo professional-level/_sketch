@@ -11,6 +11,7 @@ import org.springframework.web.reactive.function.client.WebClient
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
 import java.time.Duration
+import java.time.LocalDate
 
 @ExternalApiAdapter
 internal class KisOpenApiMarketDataAdapter(
@@ -19,6 +20,7 @@ internal class KisOpenApiMarketDataAdapter(
 
     override suspend fun getMarketSnapshot(
         symbol: String,
+        asOfDate: LocalDate,
         recentCloseCount: Int,
     ): StrategyMarketDataSnapshot {
         val response = kisOpenApiClient.get()

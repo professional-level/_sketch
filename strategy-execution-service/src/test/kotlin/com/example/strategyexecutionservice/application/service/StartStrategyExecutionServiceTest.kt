@@ -193,6 +193,7 @@ class StartStrategyExecutionServiceTest {
     private class FakeMarketDataPort : MarketDataPort {
         override suspend fun getMarketSnapshot(
             symbol: String,
+            asOfDate: java.time.LocalDate,
             recentCloseCount: Int,
         ): StrategyMarketDataSnapshot {
             return StrategyMarketDataSnapshot(

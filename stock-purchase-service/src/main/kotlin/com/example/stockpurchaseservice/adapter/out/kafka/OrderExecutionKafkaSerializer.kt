@@ -33,6 +33,7 @@ internal class OrderExecutionKafkaSerializer {
             .setOrderTag(orderTag)
             .setQuantity(quantity)
             .setSubmittedAt(submittedAt.toProtobufTimestamp())
+            .setIdempotencyKey(idempotencyKey)
             .setMeta(meta(submittedAt))
             .build()
     }
@@ -45,6 +46,7 @@ internal class OrderExecutionKafkaSerializer {
             .setBrokerOrderId(brokerOrderId.orEmpty())
             .setReason(reason)
             .setRejectedAt(rejectedAt.toProtobufTimestamp())
+            .setIdempotencyKey(idempotencyKey)
             .setMeta(meta(rejectedAt))
             .build()
     }
@@ -57,6 +59,7 @@ internal class OrderExecutionKafkaSerializer {
             .setBrokerOrderId(brokerOrderId)
             .setReason(reason)
             .setCancelledAt(cancelledAt.toProtobufTimestamp())
+            .setIdempotencyKey(idempotencyKey)
             .setMeta(meta(cancelledAt))
             .build()
     }
@@ -72,6 +75,7 @@ internal class OrderExecutionKafkaSerializer {
             .setFilledQuantity(filledQuantity)
             .setOrderTag(orderTag)
             .setFilledAt(filledAt.toProtobufTimestamp())
+            .setIdempotencyKey(idempotencyKey)
             .setMeta(meta(filledAt))
             .build()
     }
@@ -87,6 +91,7 @@ internal class OrderExecutionKafkaSerializer {
             .setFilledQuantity(filledQuantity)
             .setOrderTag(orderTag)
             .setFilledAt(filledAt.toProtobufTimestamp())
+            .setIdempotencyKey(idempotencyKey)
             .setMeta(meta(filledAt))
             .build()
     }

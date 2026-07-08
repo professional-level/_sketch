@@ -84,6 +84,7 @@ dependencies {
     implementation("com.google.protobuf:protobuf-java:3.25.2")
     // kafka
     implementation("org.springframework.kafka:spring-kafka")
+    implementation("org.springframework.boot:spring-boot-starter-data-redis")
     // aop 추가
     implementation("org.springframework.boot:spring-boot-starter-aop")
 }

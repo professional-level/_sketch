@@ -5,6 +5,8 @@ import com.example.common.ExternalApiAdapter
 import com.example.strategyexecutionservice.application.port.`in`.ApplyOrderFillCommand
 import com.example.strategyexecutionservice.application.port.`in`.ApplyOrderFillUseCase
 import com.example.strategyexecutionservice.application.port.`in`.OrderFillKind
+import com.example.strategyexecutionservice.application.port.`in`.RecordLaorOrderAnomalyCommand
+import com.example.strategyexecutionservice.application.port.`in`.RecordLaorOrderAnomalyUseCase
 import com.example.strategyexecutionservice.application.port.`in`.RecordOrderExecutionEventCommand
 import com.example.strategyexecutionservice.application.port.`in`.RecordOrderExecutionEventUseCase
 import com.example.strategyexecutionservice.application.port.`in`.SignalLaorOrderMilestoneCommand
@@ -14,6 +16,7 @@ import com.example.strategyexecutionservice.application.port.`in`.StartStrategyE
 import com.example.strategyexecutionservice.domain.strategy.execution.OrderSide
 import com.example.strategyexecutionservice.domain.strategy.laor.LaorV4StrategySymbol
 import common.ConsumerGroupId.STRATEGY_EXECUTION_SERVICE
+import common.Topic.LAOR_ORDER_ANOMALY_DETECTED
 import common.Topic.LAOR_ORDER_MILESTONE_DETECTED
 import common.Topic.ORDER_FILLED
 import common.Topic.ORDER_PARTIALLY_FILLED
@@ -33,6 +36,7 @@ internal class StrategyExecutionEventListenerAdapter(
     private val applyOrderFillUseCase: ApplyOrderFillUseCase,
     private val recordOrderExecutionEventUseCase: RecordOrderExecutionEventUseCase,
     private val signalLaorOrderMilestoneUseCase: SignalLaorOrderMilestoneUseCase,
+    private val recordLaorOrderAnomalyUseCase: RecordLaorOrderAnomalyUseCase,
 ) {
     @KafkaListener(topics = [STRATEGY_EXECUTION_START_REQUESTED], groupId = STRATEGY_EXECUTION_SERVICE)
     suspend fun strategyExecutionStartRequests(record: ConsumerRecord<String, ByteArray>) {
@@ -87,6 +91,14 @@ internal class StrategyExecutionEventListenerAdapter(
         record.withTraceContext {
             val event = Event.LaorOrderMilestoneDetected.parseFrom(record.value())
             signalLaorOrderMilestoneUseCase.execute(event.toCommand())
+        }
+    }
+
+    @KafkaListener(topics = [LAOR_ORDER_ANOMALY_DETECTED], groupId = STRATEGY_EXECUTION_SERVICE)
+    suspend fun laorOrderAnomalies(record: ConsumerRecord<String, ByteArray>) {
+        record.withTraceContext {
+            val event = Event.LaorOrderAnomalyDetected.parseFrom(record.value())
+            recordLaorOrderAnomalyUseCase.execute(event.toCommand())
         }
     }
 }
@@ -172,6 +184,7 @@ private fun Event.OrderFilled.toCommand(): ApplyOrderFillCommand {
         filledQuantity = filledQuantity,
         orderTag = orderTag,
         filledAt = filledAt.toZonedDateTime(),
+        idempotencyKey = idempotencyKey.ifBlank { eventId },
     )
 }
 
@@ -187,6 +200,7 @@ private fun Event.OrderPartiallyFilled.toCommand(): ApplyOrderFillCommand {
         filledQuantity = filledQuantity,
         orderTag = orderTag,
         filledAt = filledAt.toZonedDateTime(),
+        idempotencyKey = idempotencyKey.ifBlank { eventId },
     )
 }
 
@@ -200,6 +214,7 @@ private fun Event.OrderSubmitted.toCommand(): RecordOrderExecutionEventCommand.S
         orderTag = orderTag.ifBlank { null },
         quantity = quantity.takeIf { it > 0 },
         submittedAt = submittedAt.toZonedDateTime(),
+        idempotencyKey = idempotencyKey.ifBlank { eventId },
     )
 }
 
@@ -211,6 +226,7 @@ private fun Event.OrderRejected.toCommand(): RecordOrderExecutionEventCommand.Re
         brokerOrderId = brokerOrderId.ifBlank { null },
         reason = reason,
         rejectedAt = rejectedAt.toZonedDateTime(),
+        idempotencyKey = idempotencyKey.ifBlank { eventId },
     )
 }
 
@@ -222,6 +238,7 @@ private fun Event.OrderCancelled.toCommand(): RecordOrderExecutionEventCommand.C
         brokerOrderId = brokerOrderId,
         reason = reason,
         cancelledAt = cancelledAt.toZonedDateTime(),
+        idempotencyKey = idempotencyKey.ifBlank { eventId },
     )
 }
 
@@ -260,6 +277,22 @@ private fun Event.LaorOrderMilestoneDetected.toCommand(): SignalLaorOrderMilesto
     )
 }
 
+private fun Event.LaorOrderAnomalyDetected.toCommand(): RecordLaorOrderAnomalyCommand {
+    return RecordLaorOrderAnomalyCommand(
+        eventId = eventId,
+        anomalyType = anomalyType.toRecordName(),
+        strategyExecutionId = strategyExecutionId,
+        orderIntentId = orderIntentId,
+        brokerOrderId = brokerOrderId.ifBlank { null },
+        orderTag = orderTag.ifBlank { null },
+        side = side.toDomainOrNull(),
+        reason = reason,
+        occurredAt = occurredAt.toZonedDateTime(),
+        sourceEventIds = sourceEventIdsList,
+        idempotencyKey = idempotencyKey.ifBlank { eventId },
+    )
+}
+
 private fun Event.LaorOrderMilestoneType.toSignalName(): String {
     return when (this) {
         Event.LaorOrderMilestoneType.ENTRY_BUY_SUBMITTED,
@@ -274,6 +307,21 @@ private fun Event.LaorOrderMilestoneType.toSignalName(): String {
         Event.LaorOrderMilestoneType.LAOR_ORDER_MILESTONE_TYPE_UNDEFINED,
         Event.LaorOrderMilestoneType.UNRECOGNIZED -> {
             throw IllegalArgumentException("unsupported laor order milestone type: $this")
+        }
+    }
+}
+
+private fun Event.LaorOrderAnomalyType.toRecordName(): String {
+    return when (this) {
+        Event.LaorOrderAnomalyType.FILL_BEFORE_SUBMIT,
+        Event.LaorOrderAnomalyType.DUPLICATE_TERMINAL_EVENT,
+        Event.LaorOrderAnomalyType.FILLED_QUANTITY_EXCEEDS_EXPECTED,
+        Event.LaorOrderAnomalyType.CONFLICTING_BROKER_ORDER_ID,
+        Event.LaorOrderAnomalyType.UNKNOWN_ORDER_INTENT,
+        Event.LaorOrderAnomalyType.LATE_EVENT_AFTER_TERMINAL -> name
+        Event.LaorOrderAnomalyType.LAOR_ORDER_ANOMALY_TYPE_UNDEFINED,
+        Event.LaorOrderAnomalyType.UNRECOGNIZED -> {
+            throw IllegalArgumentException("unsupported laor order anomaly type: $this")
         }
     }
 }

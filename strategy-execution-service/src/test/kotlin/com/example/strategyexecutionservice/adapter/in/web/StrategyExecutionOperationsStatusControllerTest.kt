@@ -39,6 +39,7 @@ class StrategyExecutionOperationsStatusControllerTest {
         )
         assertEquals(result.snapshot.laorV4StatusCounts, response.laorV4StatusCounts)
         assertEquals(result.snapshot.finalPriceBatingV1StatusCounts, response.finalPriceBatingV1StatusCounts)
+        assertEquals(result.snapshot.laorOrderAnomalyTypeCounts, response.laorOrderAnomalyTypeCounts)
         with(response.activeLaorV4Strategies.single()) {
             assertEquals("laor-v4:TQQQ", executionId)
             assertEquals("TQQQ", symbol)
@@ -76,6 +77,9 @@ class StrategyExecutionOperationsStatusControllerTest {
             finalPriceBatingV1StatusCounts = listOf(
                 StrategyExecutionStatusCount("ACTIVE", 2),
                 StrategyExecutionStatusCount("COMPLETED", 5),
+            ),
+            laorOrderAnomalyTypeCounts = listOf(
+                StrategyExecutionStatusCount("FILL_BEFORE_SUBMIT", 1),
             ),
         )
     }

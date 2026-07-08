@@ -40,7 +40,11 @@ class KisOpenApiMarketDataAdapterTest {
             .build()
         val adapter = KisOpenApiMarketDataAdapter(webClient)
 
-        val result = adapter.getMarketSnapshot("tqqq", recentCloseCount = 5)
+        val result = adapter.getMarketSnapshot(
+            symbol = "tqqq",
+            asOfDate = java.time.LocalDate.parse("2026-06-02"),
+            recentCloseCount = 5,
+        )
 
         assertEquals("/open-api/overseas/quotations/dailyprice/TQQQ?exchange=NAS&count=5", requestedPath)
         assertEquals(100.0, result.previousClose)

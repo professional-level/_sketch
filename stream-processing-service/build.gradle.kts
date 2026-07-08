@@ -30,6 +30,7 @@ dependencies {
     implementation("org.apache.flink:flink-connector-kafka:$flinkKafkaConnectorVersion")
 
     testImplementation(kotlin("test"))
+    testImplementation(project(":architecture-test-support"))
 }
 
 application {

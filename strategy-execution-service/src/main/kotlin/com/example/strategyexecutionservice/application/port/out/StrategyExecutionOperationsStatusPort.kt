@@ -10,6 +10,7 @@ data class StrategyExecutionOperationsStatusSnapshot(
     val strategyExecutionOrderEventTypeCounts: List<StrategyExecutionStatusCount>,
     val laorV4StatusCounts: List<StrategyExecutionStatusCount>,
     val finalPriceBatingV1StatusCounts: List<StrategyExecutionStatusCount>,
+    val laorOrderAnomalyTypeCounts: List<StrategyExecutionStatusCount> = emptyList(),
 )
 
 data class StrategyExecutionStatusCount(

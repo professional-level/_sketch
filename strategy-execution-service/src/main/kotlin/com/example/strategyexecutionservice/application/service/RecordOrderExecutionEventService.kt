@@ -35,6 +35,7 @@ private fun RecordOrderExecutionEventCommand.toRecord(): StrategyExecutionOrderE
     return when (this) {
         is RecordOrderExecutionEventCommand.Submitted -> StrategyExecutionOrderEventRecord(
             eventId = eventId,
+            idempotencyKey = idempotencyKey,
             strategyExecutionId = strategyExecutionId,
             orderIntentId = orderIntentId,
             brokerOrderId = brokerOrderId,
@@ -47,6 +48,7 @@ private fun RecordOrderExecutionEventCommand.toRecord(): StrategyExecutionOrderE
 
         is RecordOrderExecutionEventCommand.Rejected -> StrategyExecutionOrderEventRecord(
             eventId = eventId,
+            idempotencyKey = idempotencyKey,
             strategyExecutionId = strategyExecutionId,
             orderIntentId = orderIntentId,
             brokerOrderId = brokerOrderId,
@@ -57,6 +59,7 @@ private fun RecordOrderExecutionEventCommand.toRecord(): StrategyExecutionOrderE
 
         is RecordOrderExecutionEventCommand.Cancelled -> StrategyExecutionOrderEventRecord(
             eventId = eventId,
+            idempotencyKey = idempotencyKey,
             strategyExecutionId = strategyExecutionId,
             orderIntentId = orderIntentId,
             brokerOrderId = brokerOrderId,

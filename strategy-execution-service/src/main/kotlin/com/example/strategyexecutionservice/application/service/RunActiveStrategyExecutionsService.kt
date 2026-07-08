@@ -57,6 +57,7 @@ class RunActiveStrategyExecutionsService(
             }
             val market = marketDataPort.getMarketSnapshot(
                 symbol = strategy.symbol.ticker,
+                asOfDate = orderRequestedAt.toLocalDate(),
                 recentCloseCount = RECENT_CLOSE_COUNT,
             )
             val result = runStrategyExecutionUseCase.execute(

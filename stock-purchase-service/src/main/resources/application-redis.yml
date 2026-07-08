@@ -1,0 +1,20 @@
+spring:
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      timeout: 500ms
+
+akra:
+  redis:
+    key-prefix: akra:stock-purchase
+    processed-event:
+      enabled: true
+      lease-ttl: 5m
+      completed-ttl: 7d
+    broker-rate-limit:
+      enabled: true
+      capacity: 5
+      refill-per-second: 5
+      bucket-ttl: 10s
+      fail-open: false

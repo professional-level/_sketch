@@ -20,9 +20,11 @@ data class ApplyOrderFillCommand(
     val filledQuantity: Long,
     val orderTag: String,
     val filledAt: ZonedDateTime,
+    val idempotencyKey: String = eventId,
 ) {
     init {
         require(eventId.isNotBlank()) { "eventId must not be blank" }
+        require(idempotencyKey.isNotBlank()) { "idempotencyKey must not be blank" }
         require(strategyExecutionId.isNotBlank()) { "strategyExecutionId must not be blank" }
         require(orderIntentId.isNotBlank()) { "orderIntentId must not be blank" }
         require(brokerOrderId.isNotBlank()) { "brokerOrderId must not be blank" }

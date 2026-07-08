@@ -9,14 +9,22 @@ import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
 import jakarta.persistence.Id
 import jakarta.persistence.Table
+import jakarta.persistence.UniqueConstraint
 import java.time.ZonedDateTime
 
 @Entity
-@Table(name = "strategy_execution_order_event")
+@Table(
+    name = "strategy_execution_order_event",
+    uniqueConstraints = [
+        UniqueConstraint(name = "uk_strategy_order_event_idempotency", columnNames = ["idempotencyKey"]),
+    ],
+)
 internal class StrategyExecutionOrderEventEntity private constructor(
     @Id
     @Column(nullable = false)
     val eventId: String,
+    @Column(nullable = false)
+    val idempotencyKey: String,
     @Column(nullable = false)
     val strategyExecutionId: String,
     @Column(nullable = false)
@@ -43,6 +51,7 @@ internal class StrategyExecutionOrderEventEntity private constructor(
     fun toDto(): StrategyExecutionOrderEventRecord {
         return StrategyExecutionOrderEventRecord(
             eventId = eventId,
+            idempotencyKey = idempotencyKey,
             strategyExecutionId = strategyExecutionId,
             orderIntentId = orderIntentId,
             brokerOrderId = brokerOrderId,
@@ -60,6 +69,7 @@ internal class StrategyExecutionOrderEventEntity private constructor(
         fun from(dto: StrategyExecutionOrderEventRecord): StrategyExecutionOrderEventEntity {
             return StrategyExecutionOrderEventEntity(
                 eventId = dto.eventId,
+                idempotencyKey = dto.idempotencyKey,
                 strategyExecutionId = dto.strategyExecutionId,
                 orderIntentId = dto.orderIntentId,
                 brokerOrderId = dto.brokerOrderId,

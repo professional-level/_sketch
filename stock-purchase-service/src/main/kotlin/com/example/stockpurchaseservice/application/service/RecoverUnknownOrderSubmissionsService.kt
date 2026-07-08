@@ -54,18 +54,17 @@ class RecoverUnknownOrderSubmissionsService(
 
     private suspend fun recover(submission: OrderIntentSubmissionDto) {
         val status = lookupStatus(submission, RecoveryMode.UNKNOWN_SUBMISSION) ?: return
-        when (status.status) {
-            BrokerOrderStatus.SUBMITTED -> markSubmitted(submission, status)
-            BrokerOrderStatus.PARTIALLY_FILLED,
-            BrokerOrderStatus.FILLED -> markSubmitted(submission, status)?.let { recovered ->
+        when (OrderSubmissionLifecycle.recoverUnknown(status.status)) {
+            OrderSubmissionTransition.MARK_SUBMITTED_AND_PUBLISH -> markSubmitted(submission, status)
+            OrderSubmissionTransition.MARK_SUBMITTED_AND_RECOVER_FILL -> markSubmitted(submission, status)?.let { recovered ->
                 recoverFillFromStatus(recovered, status)
             }
-            BrokerOrderStatus.REJECTED -> markRejected(submission, status)
-            BrokerOrderStatus.CANCELLED -> {
+            OrderSubmissionTransition.MARK_REJECTED -> markRejected(submission, status)
+            OrderSubmissionTransition.RECOVER_FILL_AND_MARK_CANCELLED -> {
                 recoverFillFromStatus(submission, status)
                 markCancelled(submission, status)
             }
-            BrokerOrderStatus.UNKNOWN -> {
+            OrderSubmissionTransition.KEEP_UNKNOWN -> {
                 val unresolved = submission.copy(
                     statusReason = status.reason,
                     lastStatusCheckedAt = status.checkedAt,
@@ -75,21 +74,28 @@ class RecoverUnknownOrderSubmissionsService(
                     operationalAlertPort.alertSubmissionUnknown(unresolved.toSubmissionUnknownAlert(status))
                 }
             }
+            OrderSubmissionTransition.MARK_SUBMITTED_WITHOUT_REPUBLISH_AND_RECOVER_FILL,
+            OrderSubmissionTransition.KEEP_CANCEL_PENDING,
+            OrderSubmissionTransition.KEEP_CANCEL_PENDING_AND_RECOVER_FILL -> {
+                error("unexpected transition for unknown submission recovery: ${status.status}")
+            }
         }
     }
 
     private suspend fun recoverCancelPending(submission: OrderIntentSubmissionDto) {
         val status = lookupStatus(submission, RecoveryMode.CANCEL_PENDING) ?: return
-        when (status.status) {
-            BrokerOrderStatus.CANCELLED -> {
+        when (OrderSubmissionLifecycle.recoverCancelPending(status.status)) {
+            OrderSubmissionTransition.RECOVER_FILL_AND_MARK_CANCELLED -> {
                 recoverFillFromStatus(submission, status)
                 markCancelled(submission, status)
             }
-            BrokerOrderStatus.REJECTED -> markRejected(submission, status)
-            BrokerOrderStatus.FILLED -> markSubmittedWithoutRepublishing(submission, status)?.let { recovered ->
-                recoverFillFromStatus(recovered, status)
+            OrderSubmissionTransition.MARK_REJECTED -> markRejected(submission, status)
+            OrderSubmissionTransition.MARK_SUBMITTED_WITHOUT_REPUBLISH_AND_RECOVER_FILL -> {
+                markSubmittedWithoutRepublishing(submission, status)?.let { recovered ->
+                    recoverFillFromStatus(recovered, status)
+                }
             }
-            BrokerOrderStatus.PARTIALLY_FILLED -> {
+            OrderSubmissionTransition.KEEP_CANCEL_PENDING_AND_RECOVER_FILL -> {
                 val pending = submission.copy(
                     externalOrderId = submission.resolveExternalOrderId(status),
                     branchOrderNumber = submission.branchOrderNumber.nonBlank(),
@@ -99,8 +105,7 @@ class RecoverUnknownOrderSubmissionsService(
                 orderIntentSubmissionPort.saveCancelPending(pending)
                 recoverFillFromStatus(pending, status)
             }
-            BrokerOrderStatus.SUBMITTED,
-            BrokerOrderStatus.UNKNOWN -> {
+            OrderSubmissionTransition.KEEP_CANCEL_PENDING -> {
                 val pending = submission.copy(
                     externalOrderId = submission.resolveExternalOrderId(status),
                     branchOrderNumber = submission.branchOrderNumber.nonBlank(),
@@ -113,6 +118,11 @@ class RecoverUnknownOrderSubmissionsService(
                         operationalAlertPort.alertSubmissionUnknown(pending.toSubmissionUnknownAlert(status))
                     }
                 }
+            }
+            OrderSubmissionTransition.MARK_SUBMITTED_AND_PUBLISH,
+            OrderSubmissionTransition.MARK_SUBMITTED_AND_RECOVER_FILL,
+            OrderSubmissionTransition.KEEP_UNKNOWN -> {
+                error("unexpected transition for cancel-pending recovery: ${status.status}")
             }
         }
     }
@@ -271,6 +281,7 @@ class RecoverUnknownOrderSubmissionsService(
                     filledQuantity = filledQuantity,
                     orderTag = submission.orderTag,
                     filledAt = filledAt,
+                    idempotencyKey = "${submission.idempotencyKey}:FILLED:$externalExecutionId",
                 ),
             )
         } else {
@@ -285,6 +296,7 @@ class RecoverUnknownOrderSubmissionsService(
                     filledQuantity = filledQuantity,
                     orderTag = submission.orderTag,
                     filledAt = filledAt,
+                    idempotencyKey = "${submission.idempotencyKey}:PARTIALLY_FILLED:$externalExecutionId",
                 ),
             )
         }
@@ -368,6 +380,7 @@ class RecoverUnknownOrderSubmissionsService(
             orderTag = orderTag,
             quantity = quantity,
             submittedAt = lastStatusCheckedAt ?: ZonedDateTime.now(),
+            idempotencyKey = "$idempotencyKey:SUBMITTED",
         )
     }
 
@@ -381,6 +394,7 @@ class RecoverUnknownOrderSubmissionsService(
             brokerOrderId = status.externalOrderId.nonBlank() ?: externalOrderId.nonBlank(),
             reason = status.reason ?: "broker order rejected",
             rejectedAt = status.checkedAt,
+            idempotencyKey = "$idempotencyKey:REJECTED",
         )
     }
 
@@ -395,6 +409,7 @@ class RecoverUnknownOrderSubmissionsService(
             brokerOrderId = externalOrderId,
             reason = status.reason ?: "broker order cancelled",
             cancelledAt = status.checkedAt,
+            idempotencyKey = "$idempotencyKey:CANCELLED",
         )
     }
 

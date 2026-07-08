@@ -21,6 +21,7 @@ data class OrderSubmittedMessage(
     val orderTag: String,
     val quantity: Long,
     val submittedAt: ZonedDateTime,
+    val idempotencyKey: String = eventId.toString(),
 )
 
 data class OrderRejectedMessage(
@@ -30,6 +31,7 @@ data class OrderRejectedMessage(
     val brokerOrderId: String?,
     val reason: String,
     val rejectedAt: ZonedDateTime,
+    val idempotencyKey: String = eventId.toString(),
 )
 
 data class OrderCancelledMessage(
@@ -39,6 +41,7 @@ data class OrderCancelledMessage(
     val brokerOrderId: String,
     val reason: String,
     val cancelledAt: ZonedDateTime,
+    val idempotencyKey: String = eventId.toString(),
 )
 
 data class OrderFilledMessage(
@@ -51,6 +54,7 @@ data class OrderFilledMessage(
     val filledQuantity: Long,
     val orderTag: String,
     val filledAt: ZonedDateTime,
+    val idempotencyKey: String = eventId.toString(),
 )
 
 data class OrderPartiallyFilledMessage(
@@ -63,4 +67,5 @@ data class OrderPartiallyFilledMessage(
     val filledQuantity: Long,
     val orderTag: String,
     val filledAt: ZonedDateTime,
+    val idempotencyKey: String = eventId.toString(),
 )

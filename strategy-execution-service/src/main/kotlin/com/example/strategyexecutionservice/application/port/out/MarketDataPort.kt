@@ -1,7 +1,9 @@
 package com.example.strategyexecutionservice.application.port.out
 
+import java.time.LocalDate
+
 interface MarketDataPort {
-    suspend fun getMarketSnapshot(symbol: String, recentCloseCount: Int): StrategyMarketDataSnapshot
+    suspend fun getMarketSnapshot(symbol: String, asOfDate: LocalDate, recentCloseCount: Int): StrategyMarketDataSnapshot
 }
 
 data class StrategyMarketDataSnapshot(

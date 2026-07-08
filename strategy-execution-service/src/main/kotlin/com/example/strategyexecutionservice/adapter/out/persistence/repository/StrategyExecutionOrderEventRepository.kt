@@ -17,6 +17,23 @@ internal class StrategyExecutionOrderEventRepository :
         return findById(eventId).awaitSuspending() != null
     }
 
+    suspend fun existsByEventIdOrIdempotencyKey(eventId: String, idempotencyKey: String): Boolean {
+        return sessionFactory.withSession { session ->
+            session.createQuery(
+                """
+                SELECT COUNT(e)
+                FROM StrategyExecutionOrderEventEntity e
+                WHERE e.eventId = :eventId
+                   OR e.idempotencyKey = :idempotencyKey
+                """.trimIndent(),
+                java.lang.Long::class.java,
+            )
+                .setParameter("eventId", eventId)
+                .setParameter("idempotencyKey", idempotencyKey)
+                .singleResult
+        }.awaitSuspending() > 0
+    }
+
     suspend fun countByType(): Map<StrategyExecutionOrderEventEntityType, Long> {
         val rows = sessionFactory.withSession { session ->
             session.createQuery(

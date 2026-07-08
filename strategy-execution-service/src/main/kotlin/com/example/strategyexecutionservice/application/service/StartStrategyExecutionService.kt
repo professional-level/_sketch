@@ -73,7 +73,11 @@ class StartStrategyExecutionService(
             )
         }
 
-        val market = marketDataPort.getMarketSnapshot(command.symbol, recentCloseCount = 5)
+        val market = marketDataPort.getMarketSnapshot(
+            symbol = command.symbol,
+            asOfDate = command.requestedAt.toLocalDate(),
+            recentCloseCount = 5,
+        )
         val result = runStrategyExecutionUseCase.execute(
             RunStrategyExecutionCommand.LaorV4(
                 executionId = command.executionId,
@@ -135,6 +139,10 @@ class StartStrategyExecutionService(
                     idempotencyKey = idempotencyKey,
                     createdAt = command.requestedAt,
                     tradingEnvironment = tradingEnvironmentResolver.resolve(command.executionId),
+                    executionRunId = command.idempotencyKey,
+                    orderIndex = 0,
+                    market = command.market,
+                    strategyVersion = command.strategyVersion,
                 ),
             ),
         )

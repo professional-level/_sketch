@@ -19,9 +19,11 @@ data class StrategyExecutionOrderEventRecord(
     val orderTag: String? = null,
     val reason: String? = null,
     val occurredAt: ZonedDateTime,
+    val idempotencyKey: String = eventId,
 ) {
     init {
         require(eventId.isNotBlank()) { "eventId must not be blank" }
+        require(idempotencyKey.isNotBlank()) { "idempotencyKey must not be blank" }
         require(strategyExecutionId.isNotBlank()) { "strategyExecutionId must not be blank" }
         require(orderIntentId.isNotBlank()) { "orderIntentId must not be blank" }
         brokerOrderId?.let { require(it.isNotBlank()) { "brokerOrderId must not be blank" } }
